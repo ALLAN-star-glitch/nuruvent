@@ -1,26 +1,165 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
+  /* Nuruvent Brand Colors - Primary Blue #1A73E8 */
+  --color-primary: #1A73E8;
+  --color-primary-50: #E8F0FE;
+  --color-primary-100: #D2E3FC;
+  --color-primary-200: #A6C8FA;
+  --color-primary-300: #7AADF8;
+  --color-primary-400: #4E91F5;
+  --color-primary-500: #1A73E8;
+  --color-primary-600: #1557B0;
+  --color-primary-700: #10428A;
+  --color-primary-800: #0A2D5E;
+  --color-primary-900: #051832;
+
+  /* Nuruvent Brand Colors - Secondary Gold #FBBC04 */
+  --color-secondary: #FBBC04;
+  --color-secondary-50: #FFF8E1;
+  --color-secondary-100: #FFECB3;
+  --color-secondary-200: #FFE082;
+  --color-secondary-300: #FFD54F;
+  --color-secondary-400: #FFCA28;
+  --color-secondary-500: #FBBC04;
+  --color-secondary-600: #F9A825;
+  --color-secondary-700: #F57F17;
+  --color-secondary-800: #E65100;
+  --color-secondary-900: #BF360C;
+
+  /* Nuruvent Brand Colors - Tertiary Green #34A853 */
+  --color-tertiary: #34A853;
+  --color-tertiary-50: #E6F4EA;
+  --color-tertiary-100: #CEEAD6;
+  --color-tertiary-200: #9ED5B2;
+  --color-tertiary-300: #6EC08E;
+  --color-tertiary-400: #3EAB6A;
+  --color-tertiary-500: #34A853;
+  --color-tertiary-600: #2D9349;
+  --color-tertiary-700: #237A3B;
+  --color-tertiary-800: #1A5E2D;
+  --color-tertiary-900: #0F421E;
+
+  /* Shadcn/ui compatibility - these map to shadcn's CSS variables */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* CSS Variables for shadcn/ui */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  
+  /* Nuruvent Primary - Blue #1A73E8 */
+  --primary: oklch(0.53 0.18 260);
+  --primary-foreground: oklch(1 0 0);
+  
+  /* Nuruvent Secondary - Gold #FBBC04 */
+  --secondary: oklch(0.85 0.15 90);
+  --secondary-foreground: oklch(0.145 0 0);
+  
+  /* Nuruvent Tertiary - Green #34A853 */
+  --tertiary: oklch(0.55 0.15 145);
+  --tertiary-foreground: oklch(1 0 0);
+  
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.53 0.18 260);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  
+  --primary: oklch(0.53 0.18 260);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.85 0.15 90);
+  --secondary-foreground: oklch(0.145 0 0);
+  
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.53 0.18 260);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Add to your existing globals.css */
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes float-delayed {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 3.5s ease-in-out infinite;
+}
+
+/* Sticky shadow effect */
+.sticky-shadow {
+  transition: box-shadow 0.2s ease;
+}
+
+.sticky-shadow.scrolled {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
