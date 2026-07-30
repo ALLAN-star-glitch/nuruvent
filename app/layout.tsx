@@ -62,6 +62,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+
+
+        {/* Bing validation */}
+        <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
+
+        
         {/* PWA: Manifest */}
         <link rel="manifest" href="/manifest.json" />
         
