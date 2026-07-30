@@ -21,7 +21,6 @@ export const viewport: Viewport = {
   themeColor: '#1A73E8',
 };
 
-// ✅ Layout metadata - ONLY global stuff, NO openGraph or twitter
 export const metadata: Metadata = {
   title: {
     default: "Nuruvent",
@@ -51,8 +50,6 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
   },
-  // ❌ NO openGraph here
-  // ❌ NO twitter here
 };
 
 export default function RootLayout({
@@ -75,14 +72,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-        {/* Google Analytics */}
+        {/* Google Analytics - Load BEFORE page interactive */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
+              strategy="beforeInteractive"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="beforeInteractive">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
@@ -93,7 +90,7 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget */}
+        {/* Tawk.to Chat Widget - Load after page interactive */}
         <Script id="tawk-to" strategy="afterInteractive">
           {`
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
