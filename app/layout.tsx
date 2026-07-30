@@ -67,7 +67,7 @@ export default function RootLayout({
         {/* Bing Webmaster Validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
         
-        {/* PWA: Manifest */}
+        {/* PWA: Manifest - Use .webmanifest (Next.js auto-generates from app/manifest.ts) */}
         <link rel="manifest" href="/manifest.webmanifest" />
         
         {/* PWA: Apple Touch Icon */}
@@ -82,7 +82,7 @@ export default function RootLayout({
         <main>{children}</main>
         <Footer />
 
-        {/* Google Analytics - In body like ACOP */}
+        {/* Google Analytics */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
@@ -100,22 +100,85 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget - In body like ACOP */}
-        <Script id="tawk-to" strategy="afterInteractive">
-          {`
-            var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-            (function() {
-              var s1 = document.createElement("script"), s0 = document.getElementsByTagName("script")[0];
-              s1.async = true;
-              s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
-              s1.charset = 'UTF-8';
-              s1.setAttribute('crossorigin', '*');
-              s0.parentNode.insertBefore(s1, s0);
-            })();
-          `}
-        </Script>
+        {/* Tawk.to Chat Widget - Force reload on every navigation */}
+        <Script
+          id="tawk-to"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Function to load Tawk.to
+              function loadTawkTo() {
+                // Check if already loaded and visible
+                if (typeof Tawk_API !== 'undefined' && Tawk_API.isLoaded) {
+                  // Check if widget is actually visible
+                  var widget = document.querySelector('iframe[src*="tawk.to"]');
+                  if (widget) {
+                    return; // Already loaded and visible
+                  }
+                }
 
-        {/* PWA Components */}
+                // Reset Tawk_API to force fresh load
+                window.Tawk_API = window.Tawk_API || {};
+                window.Tawk_LoadStart = new Date();
+
+                // Remove old script if exists
+                var oldScript = document.getElementById('tawk-to-script');
+                if (oldScript) {
+                  oldScript.remove();
+                }
+
+                // Remove old iframe if exists
+                var oldIframe = document.querySelector('iframe[src*="tawk.to"]');
+                if (oldIframe) {
+                  oldIframe.remove();
+                }
+
+                // Create new script
+                var s1 = document.createElement('script');
+                var s0 = document.getElementsByTagName('script')[0];
+                s1.id = 'tawk-to-script';
+                s1.async = true;
+                s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
+                s1.charset = 'UTF-8';
+                s1.setAttribute('crossorigin', '*');
+                s0.parentNode.insertBefore(s1, s0);
+              }
+
+              // Load immediately
+              loadTawkTo();
+
+              // Re-load on every page navigation (for client-side routing)
+              if (typeof window !== 'undefined') {
+                // Listen for route changes
+                var originalPushState = history.pushState;
+                history.pushState = function() {
+                  originalPushState.apply(this, arguments);
+                  setTimeout(loadTawkTo, 500);
+                };
+
+                var originalReplaceState = history.replaceState;
+                history.replaceState = function() {
+                  originalReplaceState.apply(this, arguments);
+                  setTimeout(loadTawkTo, 500);
+                };
+
+                // Also reload on popstate (back/forward)
+                window.addEventListener('popstate', function() {
+                  setTimeout(loadTawkTo, 500);
+                });
+
+                // Reload on visibility change (user comes back to tab)
+                document.addEventListener('visibilitychange', function() {
+                  if (!document.hidden) {
+                    setTimeout(loadTawkTo, 500);
+                  }
+                });
+              }
+            `
+          }}
+        />
+
+        {/* PWA Components - Always rendered in layout */}
         <InstallPrompt />
         <PushNotificationManager />
       </body>
