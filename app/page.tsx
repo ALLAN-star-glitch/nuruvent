@@ -133,10 +133,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* PWA Components */}
-      <PushNotificationManager />
-      <InstallPrompt />
     </>
   );
 }
