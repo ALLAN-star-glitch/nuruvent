@@ -1,13 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable React Strict Mode
   reactStrictMode: true,
-  
-  // Compression for faster loading
   compress: true,
-  
-  // Image optimization
+
   images: {
     domains: [
       'localhost',
@@ -33,40 +29,21 @@ const nextConfig: NextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
   },
-  
-  // Disable powered by header for security
+
   poweredByHeader: false,
-  
-  // Redirect from www to non-www
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.nuruvent.com',
-          },
-        ],
-        destination: 'https://nuruvent.com/:path*',
-        permanent: true,
-      },
-    ];
-  },
-  
-  // API proxy to avoid CORS
+
+
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL 
+        destination: process.env.NEXT_PUBLIC_API_URL
           ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
           : 'http://localhost:8080/api/:path*',
       },
     ];
   },
-  
-  // Security headers
+
   async headers() {
     return [
       {
@@ -90,7 +67,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // PWA: Service Worker specific headers
       {
         source: '/sw.js',
         headers: [
@@ -108,7 +84,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // PWA: Manifest headers
       {
         source: '/manifest.json',
         headers: [
@@ -118,11 +93,10 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Cache-Control',
-            value: 'public, max-age=86400', // 24 hours
+            value: 'public, max-age=86400',
           },
         ],
       },
-      // Cache static assets aggressively
       {
         source: '/_next/static/(.*)',
         headers: [
@@ -132,7 +106,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Cache images
       {
         source: '/images/(.*)',
         headers: [
@@ -142,7 +115,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Cache favicon and icons
       {
         source: '/(favicon.ico|icon-*.png|icon.png|badge.png)',
         headers: [
