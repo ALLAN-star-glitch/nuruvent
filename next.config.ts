@@ -26,6 +26,28 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      // ✅ Add Tawk.to domains
+      {
+        protocol: 'https',
+        hostname: 'embed.tawk.to',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.tawk.to',
+      },
+      // ✅ Add Google Analytics domains
+      {
+        protocol: 'https',
+        hostname: 'www.googletagmanager.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.google-analytics.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleapis.com',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },
@@ -71,6 +93,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // ✅ Service Worker headers - no cache
       {
         source: '/sw.js',
         headers: [
@@ -88,6 +111,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // ✅ Manifest headers
       {
         source: '/manifest.webmanifest',
         headers: [
@@ -101,6 +125,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // ✅ Cache static assets aggressively
       {
         source: '/_next/static/(.*)',
         headers: [

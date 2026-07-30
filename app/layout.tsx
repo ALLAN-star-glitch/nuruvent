@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { InstallPrompt } from "@/components/PWA/InstallPrompt";
+import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
     default: "Nuruvent",
     template: "%s | Nuruvent"
   },
-  description: "Light Your Training Events. Illuminate Your Growth. The all-in-one platform for professional training events worldwide.",
+  description: "Light Your Training Events. Illuminate Your Growth.",
   keywords: [
     "training events",
     "professional development",
@@ -38,9 +40,6 @@ export const metadata: Metadata = {
     "professional training",
     "Nuruvent",
     "global training platform",
-    "event management",
-    "virtual events",
-    "hybrid events",
   ].join(", "),
   robots: "index, follow",
   alternates: {
@@ -72,14 +71,14 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-        {/* Google Analytics - Load BEFORE page interactive */}
+        {/* Google Analytics */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="beforeInteractive"
+              strategy="afterInteractive"
             />
-            <Script id="google-analytics" strategy="beforeInteractive">
+            <Script id="google-analytics" strategy="afterInteractive">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
@@ -90,7 +89,7 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget - Load after page interactive */}
+        {/* Tawk.to Chat Widget */}
         <Script id="tawk-to" strategy="afterInteractive">
           {`
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
@@ -109,6 +108,10 @@ export default function RootLayout({
         <Header />
         <main>{children}</main>
         <Footer />
+        
+        {/* PWA Components - Always rendered in layout */}
+        <InstallPrompt />
+        <PushNotificationManager />
       </body>
     </html>
   );
