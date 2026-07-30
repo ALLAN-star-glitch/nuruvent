@@ -3,7 +3,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Bell, BellOff } from 'lucide-react'
 import { subscribeUser, unsubscribeUser } from '@/app/actions'
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -24,8 +24,12 @@ export function PushNotificationManager() {
   const [subscription, setSubscription] = useState<PushSubscription | null>(null)
   const [loading, setLoading] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
 
   useEffect(() => {
+    // Check if desktop
+    setIsDesktop(window.innerWidth >= 1024)
+
     // Check if user has dismissed this before
     const dismissed = localStorage.getItem('nuruvent-notification-dismissed')
     if (dismissed === 'true') {
@@ -37,6 +41,15 @@ export function PushNotificationManager() {
       // eslint-disable-next-line react-hooks/immutability
       registerServiceWorker()
     }
+
+    // Handle resize
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024)
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const handleDismiss = () => {
@@ -90,8 +103,52 @@ export function PushNotificationManager() {
     return null
   }
 
+  // Desktop: Bottom-left
+  if (isDesktop) {
+    return (
+      <div className="fixed bottom-4 left-4 z-40 bg-white rounded-2xl shadow-2xl p-4 border border-gray-200 max-w-xs w-full animate-in slide-in-from-bottom-4 duration-300">
+        <button
+          onClick={handleDismiss}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          aria-label="Dismiss notifications prompt"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className="pr-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell className="h-5 w-5 text-[#1A73E8]" />
+            <h4 className="text-sm font-semibold text-gray-900">Notifications</h4>
+          </div>
+          {subscription ? (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">You are subscribed to push notifications.</p>
+              <button
+                onClick={unsubscribeFromPush}
+                disabled={loading}
+                className="text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <BellOff className="h-3.5 w-3.5" />
+                {loading ? 'Unsubscribing...' : 'Unsubscribe'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={subscribeToPush}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-[#1A73E8] to-[#1557B0] text-white font-medium px-4 py-2.5 rounded-xl text-sm transition hover:shadow-lg hover:shadow-[#1A73E8]/30 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Bell className="h-4 w-4" />
+              {loading ? 'Loading...' : 'Enable Notifications'}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Mobile: Bottom-left (below install prompt)
   return (
-    <div className="fixed bottom-20 right-4 z-50 bg-white rounded-xl shadow-xl p-4 border border-gray-200 max-w-sm w-full animate-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-4 left-4 right-4 z-40 bg-white rounded-2xl shadow-2xl p-4 border border-gray-200 max-w-sm animate-in slide-in-from-bottom-4 duration-300">
       <button
         onClick={handleDismiss}
         className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
@@ -100,15 +157,19 @@ export function PushNotificationManager() {
         <X className="h-4 w-4" />
       </button>
       <div className="pr-6">
-        <h4 className="text-sm font-semibold text-gray-900 mb-2">🔔 Notifications</h4>
+        <div className="flex items-center gap-2 mb-3">
+          <Bell className="h-5 w-5 text-[#1A73E8]" />
+          <h4 className="text-sm font-semibold text-gray-900">Notifications</h4>
+        </div>
         {subscription ? (
           <div className="space-y-3">
             <p className="text-xs text-gray-500">You are subscribed to push notifications.</p>
             <button
               onClick={unsubscribeFromPush}
               disabled={loading}
-              className="text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+              className="text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1.5"
             >
+              <BellOff className="h-3.5 w-3.5" />
               {loading ? 'Unsubscribing...' : 'Unsubscribe'}
             </button>
           </div>
@@ -116,8 +177,9 @@ export function PushNotificationManager() {
           <button
             onClick={subscribeToPush}
             disabled={loading}
-            className="w-full text-sm bg-[#1A73E8] text-white px-4 py-2 rounded-lg hover:bg-[#1557B0] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-[#1A73E8] to-[#1557B0] text-white font-medium px-4 py-2.5 rounded-xl text-sm transition hover:shadow-lg hover:shadow-[#1A73E8]/30 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            <Bell className="h-4 w-4" />
             {loading ? 'Loading...' : 'Enable Notifications'}
           </button>
         )}
