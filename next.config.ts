@@ -60,7 +60,6 @@ const nextConfig: NextConfig = {
           ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
           : 'http://localhost:8080/api/:path*',
       },
-      // Redirect manifest.json to manifest.webmanifest
       {
         source: '/manifest.json',
         destination: '/manifest.webmanifest',
@@ -102,10 +101,7 @@ const nextConfig: NextConfig = {
             key: 'Cache-Control',
             value: 'no-cache, no-store, must-revalidate',
           },
-          {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self'",
-          },
+          // ❌ REMOVE CSP from here - it's handled in vercel.json
         ],
       },
       {
@@ -121,7 +117,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ✅ Add no-cache for manifest.json
       {
         source: '/manifest.json',
         headers: [

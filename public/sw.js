@@ -1,7 +1,6 @@
 // public/sw.js
-const CACHE_VERSION = 'nuruvent-v7'
+const CACHE_VERSION = 'nuruvent-v11'
 
-// Force immediate activation
 self.addEventListener('install', function (event) {
   self.skipWaiting()
   event.waitUntil(
@@ -16,7 +15,6 @@ self.addEventListener('install', function (event) {
   )
 })
 
-// Take control immediately
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     Promise.all([
@@ -29,7 +27,6 @@ self.addEventListener('activate', function (event) {
           })
         )
       }),
-      // ✅ Ensure this is called
       self.clients.claim()
     ])
   )
@@ -66,11 +63,11 @@ self.addEventListener('notificationclick', function (event) {
   )
 })
 
-// ✅ CRITICAL: Skip caching for external scripts
+// ✅ NETWORK ONLY for external scripts - NEVER cache them
 self.addEventListener('fetch', function (event) {
   const url = new URL(event.request.url)
   
-  // Skip caching for external domains
+  // Network only for external domains
   const externalDomains = [
     'tawk.to',
     'embed.tawk.to',
@@ -78,18 +75,15 @@ self.addEventListener('fetch', function (event) {
     'google-analytics.com',
     'googleapis.com',
     'cdn.popt.in',
+    'google.com',
+    'www.google.com',
   ]
   
-  const shouldSkipCache = externalDomains.some(domain => url.hostname.includes(domain))
+  const isExternal = externalDomains.some(domain => url.hostname.includes(domain))
   
-  if (shouldSkipCache) {
-    // ✅ Network first - NEVER cache external scripts
-    event.respondWith(
-      fetch(event.request).catch(function() {
-        // Fallback to cache if network fails (but still don't cache)
-        return caches.match(event.request)
-      })
-    )
+  if (isExternal) {
+    // ✅ Network only - no caching at all
+    event.respondWith(fetch(event.request))
     return
   }
   
