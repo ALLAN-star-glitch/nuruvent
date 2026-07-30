@@ -1,7 +1,6 @@
 // public/sw.js
-const CACHE_VERSION = 'nuruvent-v3'
+const CACHE_VERSION = 'nuruvent-v5'
 
-// SKIP WAITING - Forces new service worker to activate immediately
 self.addEventListener('install', function (event) {
   self.skipWaiting()
   event.waitUntil(
@@ -16,11 +15,9 @@ self.addEventListener('install', function (event) {
   )
 })
 
-// CLAIM CLIENTS - Takes control immediately
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     Promise.all([
-      // Delete old caches
       caches.keys().then(function (cacheNames) {
         return Promise.all(
           cacheNames.map(function (cacheName) {
@@ -30,13 +27,11 @@ self.addEventListener('activate', function (event) {
           })
         )
       }),
-      // Take control of all clients
       self.clients.claim()
     ])
   )
 })
 
-// Push notification handler
 self.addEventListener('push', function (event) {
   if (event.data) {
     const data = event.data.json()
@@ -68,8 +63,29 @@ self.addEventListener('notificationclick', function (event) {
   )
 })
 
-// Fetch handler
+// ✅ SKIP CACHING FOR EXTERNAL SCRIPTS
 self.addEventListener('fetch', function (event) {
+  const url = new URL(event.request.url)
+  
+  // Skip caching for external domains
+  const externalDomains = [
+    'tawk.to',
+    'googletagmanager.com',
+    'google-analytics.com',
+    'googleapis.com',
+    'cdn.popt.in',
+    'embed.tawk.to',
+  ]
+  
+  const shouldSkipCache = externalDomains.some(domain => url.hostname.includes(domain))
+  
+  if (shouldSkipCache) {
+    // ✅ Don't cache external scripts - fetch fresh every time
+    event.respondWith(fetch(event.request))
+    return
+  }
+  
+  // For internal assets, use cache-first strategy
   event.respondWith(
     caches.match(event.request).then(function (response) {
       return response || fetch(event.request)
