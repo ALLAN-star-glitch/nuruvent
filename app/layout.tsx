@@ -63,9 +63,8 @@ export default function RootLayout({
     <html lang="en">
       <head>
 
-
-     
-
+          {/* Bing validation */}
+        <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
         
         {/* PWA: Manifest */}
         <link rel="manifest" href="/manifest.json" />
@@ -96,9 +95,8 @@ export default function RootLayout({
           </>
         )}
 
-           {/* Bing validation */}
-        <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
-        
+ 
+
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Header />
