@@ -5,7 +5,6 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { InstallPrompt } from "@/components/PWA/InstallPrompt";
 import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
-import { TawkToLoader } from "@/components/TawkToLoader";
 import Script from "next/script";
 
 const geistSans = Geist({
@@ -29,7 +28,7 @@ export const metadata: Metadata = {
     default: "Nuruvent",
     template: "%s | Nuruvent"
   },
-  description: "Light Your Training Events. Illuminate Your Growth. The all-in-one platform for professional training events worldwide.",
+  description: "Light Your Training Events. Illuminate Your Growth.",
   keywords: [
     "training events",
     "professional development",
@@ -41,9 +40,6 @@ export const metadata: Metadata = {
     "professional training",
     "Nuruvent",
     "global training platform",
-    "event management",
-    "virtual events",
-    "hybrid events",
   ].join(", "),
   robots: "index, follow",
   alternates: {
@@ -101,8 +97,65 @@ export default function RootLayout({
           </>
         )}
 
-        {/* ✅ Tawk.to - Load via client component (removed the old Script tag) */}
-        <TawkToLoader />
+        {/* Tawk.to Chat Widget */}
+        <Script
+          id="tawk-to"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Load Tawk.to
+              var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
+              (function() {
+                var s1 = document.createElement('script'), s0 = document.getElementsByTagName('script')[0];
+                s1.async = true;
+                s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
+                s1.charset = 'UTF-8';
+                s1.setAttribute('crossorigin', '*');
+                s0.parentNode.insertBefore(s1, s0);
+              })();
+
+              // Re-load on navigation (for client-side routing)
+              if (typeof window !== 'undefined') {
+                const loadTawk = function() {
+                  // Check if widget exists, if not reload
+                  setTimeout(function() {
+                    var widget = document.querySelector('iframe[src*="tawk.to"]');
+                    if (!widget) {
+                      // Reload Tawk.to
+                      var oldScript = document.getElementById('tawk-to-script');
+                      if (oldScript) oldScript.remove();
+                      var newScript = document.createElement('script');
+                      newScript.id = 'tawk-to-script';
+                      newScript.async = true;
+                      newScript.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
+                      newScript.charset = 'UTF-8';
+                      newScript.setAttribute('crossorigin', '*');
+                      document.head.appendChild(newScript);
+                    }
+                  }, 300);
+                };
+
+                // Listen for route changes
+                window.addEventListener('popstate', loadTawk);
+                document.addEventListener('visibilitychange', function() {
+                  if (!document.hidden) loadTawk();
+                });
+
+                // Intercept history methods
+                var originalPushState = history.pushState;
+                history.pushState = function() {
+                  originalPushState.apply(this, arguments);
+                  loadTawk();
+                };
+                var originalReplaceState = history.replaceState;
+                history.replaceState = function() {
+                  originalReplaceState.apply(this, arguments);
+                  loadTawk();
+                };
+              }
+            `
+          }}
+        />
 
         {/* PWA Components */}
         <InstallPrompt />
