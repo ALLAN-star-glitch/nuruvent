@@ -62,8 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-
-          {/* Bing validation */}
+        {/* Bing validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
         
         {/* PWA: Manifest */}
@@ -75,12 +74,16 @@ export default function RootLayout({
         {/* PWA: iOS Meta Tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Header />
+        <main>{children}</main>
+        <Footer />
+
         {/* Google Analytics - Only if ID exists */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
-              async
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
               strategy="afterInteractive"
             />
@@ -95,18 +98,10 @@ export default function RootLayout({
           </>
         )}
 
- 
-
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Header />
-        <main>{children}</main>
-        <Footer />
-
         {/* Tawk.to Chat Widget */}
         <Script
           id="tawk-to"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
           dangerouslySetInnerHTML={{
             __html: `
               var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
