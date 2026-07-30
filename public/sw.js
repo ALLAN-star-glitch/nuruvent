@@ -1,5 +1,5 @@
 // public/sw.js
-const CACHE_VERSION = 'nuruvent-v5'
+const CACHE_VERSION = 'nuruvent-v6'
 
 self.addEventListener('install', function (event) {
   self.skipWaiting()
