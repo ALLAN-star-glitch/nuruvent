@@ -12,48 +12,73 @@ export function InstallPrompt() {
   const [isVisible, setIsVisible] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
+
+  const addDebug = (msg: string) => {
+    setDebugInfo(prev => [...prev, msg])
+    console.log('🔍 InstallPrompt:', msg)
+  }
 
   useEffect(() => {
+    addDebug('Component mounted')
+
     // Check if desktop
     setIsDesktop(window.innerWidth >= 1024)
 
     // Check if user has dismissed this before
     const dismissed = localStorage.getItem('nuruvent-install-prompt-dismissed')
+    addDebug(`Previously dismissed: ${dismissed}`)
+    
     if (dismissed === 'true') {
+      addDebug('User previously dismissed - hiding')
       setIsDismissed(true)
       return
     }
 
     // Check if already installed (standalone mode)
-    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+    setIsStandalone(standalone)
+    addDebug(`Standalone mode: ${standalone}`)
+
+    if (standalone) {
+      addDebug('Already installed - hiding')
+      return
+    }
 
     // Check if iOS
-    setIsIOS(
-      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
-    )
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    setIsIOS(ios)
+    addDebug(`iOS: ${ios}`)
 
     // Listen for the beforeinstallprompt event (Android/Chrome)
     const handler = (e: Event) => {
+      addDebug('✅ beforeinstallprompt EVENT FIRED!')
       e.preventDefault()
       setDeferredPrompt(e)
       
       // Show prompt after 5 seconds delay
       setTimeout(() => {
+        addDebug('Showing prompt (5s delay)')
         setIsVisible(true)
       }, 5000)
     }
 
     window.addEventListener('beforeinstallprompt', handler)
+    addDebug('Added beforeinstallprompt listener')
 
     // If no beforeinstallprompt event, still show after 5 seconds
     const timer = setTimeout(() => {
       if (!isStandalone && !isDismissed) {
+        if (!deferredPrompt) {
+          addDebug('⚠️ beforeinstallprompt never fired - showing fallback')
+        }
         setIsVisible(true)
       }
     }, 5000)
 
     // Listen for successful installation
     const installedHandler = () => {
+      addDebug('✅ App installed event fired!')
       setIsVisible(false)
       setIsDismissed(true)
       localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
@@ -77,37 +102,56 @@ export function InstallPrompt() {
   }, [])
 
   const handleDismiss = () => {
+    addDebug('User dismissed prompt')
     setIsDismissed(true)
     setIsVisible(false)
     localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
   }
 
   const handleInstall = async () => {
+    addDebug('Install button clicked')
+
     if (deferredPrompt) {
+      addDebug('Using beforeinstallprompt')
       deferredPrompt.prompt()
       
       const result = await deferredPrompt.userChoice
-      
-      console.log(`User ${result.outcome} the install prompt`)
+      addDebug(`User ${result.outcome} the install prompt`)
       
       setDeferredPrompt(null)
       setIsVisible(false)
       
       if (result.outcome === 'accepted') {
+        addDebug('Install accepted - permanently dismissing')
         setIsDismissed(true)
         localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
+      } else {
+        addDebug('Install dismissed - hiding temporarily')
+        setIsVisible(false)
       }
     } else {
+      addDebug('No deferredPrompt - showing fallback instructions')
       if (isIOS) {
         alert('To install this app on iOS:\n\n1. Tap the Share button (⎋)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"')
       } else {
-        alert('To install this app:\n\n1. Look for the install icon in your browser address bar\n2. Click "Install" or "Add to Home Screen"')
+        alert('To install this app:\n\n1. Look for the install icon in your browser address bar\n2. Click "Install" or "Add to Home Screen"\n\nOr use Chrome DevTools:\n1. Press F12\n2. Go to Application tab\n3. Click Manifest in sidebar\n4. Click "Install" button')
       }
     }
   }
 
   // Don't show if already installed or dismissed
   if (isStandalone || isDismissed || !isVisible) {
+    // Show a small debug indicator in bottom-right (hidden in production)
+    if (process.env.NODE_ENV === 'development') {
+      return (
+        <div className="fixed bottom-4 right-4 z-50 bg-gray-100 p-2 rounded-lg text-[10px] max-w-xs border border-gray-300 opacity-50">
+          <span className="font-bold">🔍 PWA:</span>
+          <span className="ml-1 text-gray-600">
+            {isStandalone ? '✅ Installed' : isDismissed ? '❌ Dismissed' : '⏳ Waiting...'}
+          </span>
+        </div>
+      )
+    }
     return null
   }
 
@@ -140,6 +184,9 @@ export function InstallPrompt() {
               <Download className="h-4 w-4" />
               Install App
             </button>
+            <div className="mt-2 text-[9px] text-gray-400 truncate max-w-full">
+              {debugInfo.length > 0 && debugInfo[debugInfo.length - 1]}
+            </div>
           </div>
         </div>
       </div>
