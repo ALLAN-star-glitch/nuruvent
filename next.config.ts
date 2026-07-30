@@ -26,7 +26,6 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
-      // ✅ Add Tawk.to domains
       {
         protocol: 'https',
         hostname: 'embed.tawk.to',
@@ -35,7 +34,6 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.tawk.to',
       },
-      // ✅ Add Google Analytics domains
       {
         protocol: 'https',
         hostname: 'www.googletagmanager.com',
@@ -62,7 +60,7 @@ const nextConfig: NextConfig = {
           ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
           : 'http://localhost:8080/api/:path*',
       },
-      // ✅ Redirect manifest.json to manifest.webmanifest
+      // Redirect manifest.json to manifest.webmanifest
       {
         source: '/manifest.json',
         destination: '/manifest.webmanifest',
@@ -93,7 +91,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ✅ Service Worker headers - no cache
       {
         source: '/sw.js',
         headers: [
@@ -111,7 +108,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ✅ Manifest headers
       {
         source: '/manifest.webmanifest',
         headers: [
@@ -125,7 +121,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ✅ Cache static assets aggressively
       {
         source: '/_next/static/(.*)',
         headers: [

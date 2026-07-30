@@ -32,9 +32,9 @@ export async function sendNotification(message: string) {
     await webpush.sendNotification(
       subscription,
       JSON.stringify({
-        title: 'Test Notification',
+        title: 'Nuruvent',
         body: message,
-        icon: '/icon.png',
+        icon: '/icon-192.png',
       })
     )
     return { success: true }

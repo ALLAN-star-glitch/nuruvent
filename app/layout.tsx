@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     default: "Nuruvent",
     template: "%s | Nuruvent"
   },
-  description: "Light Your Training Events. Illuminate Your Growth.",
+  description: "Light Your Training Events. Illuminate Your Growth. The all-in-one platform for professional training events worldwide.",
   keywords: [
     "training events",
     "professional development",
@@ -40,6 +40,9 @@ export const metadata: Metadata = {
     "professional training",
     "Nuruvent",
     "global training platform",
+    "event management",
+    "virtual events",
+    "hybrid events",
   ].join(", "),
   robots: "index, follow",
   alternates: {
@@ -63,6 +66,9 @@ export default function RootLayout({
       <head>
         {/* Bing Webmaster Validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
+        
+        {/* PWA: Manifest - Use .webmanifest (Next.js auto-generates from app/manifest.ts) */}
+        <link rel="manifest" href="/manifest.webmanifest" />
         
         {/* PWA: Apple Touch Icon */}
         <link rel="apple-touch-icon" href="/icon-192.png" />

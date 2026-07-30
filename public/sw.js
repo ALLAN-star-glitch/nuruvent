@@ -3,7 +3,7 @@ const CACHE_VERSION = 'nuruvent-v3'
 
 // SKIP WAITING - Forces new service worker to activate immediately
 self.addEventListener('install', function (event) {
-  self.skipWaiting()  // ← Add this line
+  self.skipWaiting()
   event.waitUntil(
     caches.open(CACHE_VERSION).then(function (cache) {
       return cache.addAll([
@@ -31,7 +31,7 @@ self.addEventListener('activate', function (event) {
         )
       }),
       // Take control of all clients
-      self.clients.claim()  // ← Add this line
+      self.clients.claim()
     ])
   )
 })
