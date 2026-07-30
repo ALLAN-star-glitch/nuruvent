@@ -1,4 +1,6 @@
 // public/sw.js
+const CACHE_VERSION = 'nuruvent-v2'
+
 self.addEventListener('push', function (event) {
   if (event.data) {
     const data = event.data.json()
@@ -33,13 +35,29 @@ self.addEventListener('notificationclick', function (event) {
 // Service worker install event - cache assets
 self.addEventListener('install', function (event) {
   event.waitUntil(
-    caches.open('nuruvent-v1').then(function (cache) {
+    caches.open(CACHE_VERSION).then(function (cache) {
       return cache.addAll([
         '/',
         '/icon-192.png',
         '/icon-512.png',
         '/favicon.ico',
+        // No manifest.json here
       ])
+    })
+  )
+})
+
+// Clean up old caches
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    caches.keys().then(function (cacheNames) {
+      return Promise.all(
+        cacheNames.map(function (cacheName) {
+          if (cacheName !== CACHE_VERSION) {
+            return caches.delete(cacheName)
+          }
+        })
+      )
     })
   )
 })
