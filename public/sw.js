@@ -1,6 +1,42 @@
 // public/sw.js
-const CACHE_VERSION = 'nuruvent-v2'
+const CACHE_VERSION = 'nuruvent-v3'
 
+// SKIP WAITING - Forces new service worker to activate immediately
+self.addEventListener('install', function (event) {
+  self.skipWaiting()  // ← Add this line
+  event.waitUntil(
+    caches.open(CACHE_VERSION).then(function (cache) {
+      return cache.addAll([
+        '/',
+        '/icon-192.png',
+        '/icon-512.png',
+        '/favicon.ico',
+      ])
+    })
+  )
+})
+
+// CLAIM CLIENTS - Takes control immediately
+self.addEventListener('activate', function (event) {
+  event.waitUntil(
+    Promise.all([
+      // Delete old caches
+      caches.keys().then(function (cacheNames) {
+        return Promise.all(
+          cacheNames.map(function (cacheName) {
+            if (cacheName !== CACHE_VERSION) {
+              return caches.delete(cacheName)
+            }
+          })
+        )
+      }),
+      // Take control of all clients
+      self.clients.claim()  // ← Add this line
+    ])
+  )
+})
+
+// Push notification handler
 self.addEventListener('push', function (event) {
   if (event.data) {
     const data = event.data.json()
@@ -32,37 +68,7 @@ self.addEventListener('notificationclick', function (event) {
   )
 })
 
-// Service worker install event - cache assets
-self.addEventListener('install', function (event) {
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then(function (cache) {
-      return cache.addAll([
-        '/',
-        '/icon-192.png',
-        '/icon-512.png',
-        '/favicon.ico',
-        // No manifest.json here
-      ])
-    })
-  )
-})
-
-// Clean up old caches
-self.addEventListener('activate', function (event) {
-  event.waitUntil(
-    caches.keys().then(function (cacheNames) {
-      return Promise.all(
-        cacheNames.map(function (cacheName) {
-          if (cacheName !== CACHE_VERSION) {
-            return caches.delete(cacheName)
-          }
-        })
-      )
-    })
-  )
-})
-
-// Service worker fetch event - serve from cache if offline
+// Fetch handler
 self.addEventListener('fetch', function (event) {
   event.respondWith(
     caches.match(event.request).then(function (response) {

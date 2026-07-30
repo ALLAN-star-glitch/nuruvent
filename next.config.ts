@@ -32,7 +32,6 @@ const nextConfig: NextConfig = {
 
   poweredByHeader: false,
 
-
   async rewrites() {
     return [
       {
@@ -84,12 +83,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // ✅ FIX: Use /manifest.webmanifest instead of /manifest.json
       {
-        source: '/manifest.json',
+        source: '/manifest.webmanifest',
         headers: [
           {
             key: 'Content-Type',
-            value: 'application/json; charset=utf-8',
+            value: 'application/manifest+json; charset=utf-8',
           },
           {
             key: 'Cache-Control',
