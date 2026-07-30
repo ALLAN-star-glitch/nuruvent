@@ -64,7 +64,6 @@ export default function RootLayout({
       <head>
         {/* Bing validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
-    
         
         {/* PWA: Apple Touch Icon */}
         <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -78,14 +77,14 @@ export default function RootLayout({
         <main>{children}</main>
         <Footer />
 
-        {/* Google Analytics - Only if ID exists */}
+        {/* Google Analytics - Load early with beforeInteractive */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
+              strategy="beforeInteractive"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="beforeInteractive">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
@@ -96,7 +95,7 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget */}
+        {/* Tawk.to Chat Widget - Load after page load with lazyOnload */}
         <Script
           id="tawk-to"
           strategy="lazyOnload"
