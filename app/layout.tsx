@@ -67,7 +67,7 @@ export default function RootLayout({
         {/* Bing Webmaster Validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
         
-        {/* PWA: Manifest - Use .webmanifest */}
+        {/* PWA: Manifest */}
         <link rel="manifest" href="/manifest.webmanifest" />
         
         {/* PWA: Apple Touch Icon */}
@@ -76,8 +76,13 @@ export default function RootLayout({
         {/* PWA: iOS Meta Tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Header />
+        <main>{children}</main>
+        <Footer />
 
-        {/* Google Analytics */}
+        {/* Google Analytics - In body like ACOP */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
@@ -95,7 +100,7 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget - Same as ACOP */}
+        {/* Tawk.to Chat Widget - In body like ACOP */}
         <Script id="tawk-to" strategy="afterInteractive">
           {`
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
@@ -109,12 +114,7 @@ export default function RootLayout({
             })();
           `}
         </Script>
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Header />
-        <main>{children}</main>
-        <Footer />
-        
+
         {/* PWA Components */}
         <InstallPrompt />
         <PushNotificationManager />
