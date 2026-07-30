@@ -95,9 +95,10 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget */}
-        <Script id="tawk-to" strategy="afterInteractive">
-          {`
+      {/* Tawk.to Chat Widget - Use lazyOnload for better persistence */}
+      <Script id="tawk-to" strategy="lazyOnload">
+        {`
+          if (typeof Tawk_API === 'undefined' || !Tawk_API.isLoaded) {
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
             (function() {
               var s1 = document.createElement("script"), s0 = document.getElementsByTagName("script")[0];
@@ -107,8 +108,9 @@ export default function RootLayout({
               s1.setAttribute('crossorigin', '*');
               s0.parentNode.insertBefore(s1, s0);
             })();
-          `}
-        </Script>
+          }
+        `}
+      </Script>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Header />

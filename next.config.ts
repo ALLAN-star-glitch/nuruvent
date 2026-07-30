@@ -121,6 +121,20 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // ✅ Add no-cache for manifest.json
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Content-Type',
+            value: 'application/json; charset=utf-8',
+          },
+        ],
+      },
       {
         source: '/_next/static/(.*)',
         headers: [
