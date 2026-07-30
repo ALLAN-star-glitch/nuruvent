@@ -40,6 +40,11 @@ const nextConfig: NextConfig = {
           ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
           : 'http://localhost:8080/api/:path*',
       },
+      // ✅ Redirect manifest.json to manifest.webmanifest
+      {
+        source: '/manifest.json',
+        destination: '/manifest.webmanifest',
+      },
     ];
   },
 
@@ -83,7 +88,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // ✅ FIX: Use /manifest.webmanifest instead of /manifest.json
       {
         source: '/manifest.webmanifest',
         headers: [
