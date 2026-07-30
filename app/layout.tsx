@@ -67,7 +67,7 @@ export default function RootLayout({
         {/* Bing Webmaster Validation */}
         <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
         
-        {/* PWA: Manifest - Use .webmanifest (Next.js auto-generates from app/manifest.ts) */}
+        {/* PWA: Manifest - Use .webmanifest */}
         <link rel="manifest" href="/manifest.webmanifest" />
         
         {/* PWA: Apple Touch Icon */}
@@ -95,10 +95,9 @@ export default function RootLayout({
           </>
         )}
 
-      {/* Tawk.to Chat Widget - Use lazyOnload for better persistence */}
-      <Script id="tawk-to" strategy="lazyOnload">
-        {`
-          if (typeof Tawk_API === 'undefined' || !Tawk_API.isLoaded) {
+        {/* Tawk.to Chat Widget - Same as ACOP */}
+        <Script id="tawk-to" strategy="afterInteractive">
+          {`
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
             (function() {
               var s1 = document.createElement("script"), s0 = document.getElementsByTagName("script")[0];
@@ -108,16 +107,15 @@ export default function RootLayout({
               s1.setAttribute('crossorigin', '*');
               s0.parentNode.insertBefore(s1, s0);
             })();
-          }
-        `}
-      </Script>
+          `}
+        </Script>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Header />
         <main>{children}</main>
         <Footer />
         
-        {/* PWA Components - Always rendered in layout */}
+        {/* PWA Components */}
         <InstallPrompt />
         <PushNotificationManager />
       </body>
