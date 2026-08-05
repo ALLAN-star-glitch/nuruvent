@@ -15,11 +15,14 @@ import {
   Users, 
   Award, 
   Settings,
-  LogIn,
-  UserPlus
+  PlusCircle,
+  DollarSign,
+  Video
 } from 'lucide-react';
-import { Logo } from '../shared/Logo';
-import { SearchBar } from './SearchBar';
+import { Logo } from '@/components/shared/Logo';
+import { SearchBar } from '@/components/layout/SearchBar';
+import { NotificationBell } from '@/components/layout/NotificationBell';
+import { UserMenu } from '@/components/layout/UserMenu';
 import { 
   Sheet, 
   SheetContent, 
@@ -32,6 +35,16 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 
+interface DashboardHeaderProps {
+  user?: {
+    name: string;
+    email: string;
+    avatar?: string;
+    role: 'host' | 'attendee' | 'admin';
+  };
+}
+
+
 
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -42,11 +55,23 @@ const dashboardNavItems = [
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
-export function MainHeader() {
+const quickActions = [
+  { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
+  { label: 'Revenue', href: '/dashboard/payments', icon: DollarSign },
+  { label: 'Replays', href: '/dashboard/replays', icon: Video },
+];
+
+export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
 
+  const currentUser = user || {
+    name: 'John Doe',
+    email: 'john@example.com',
+    role: 'host' as const,
+  };
+
   return (
-    <div className="bg-white border-b shadow-sm">
+    <div className="bg-white border-b border-gray-200">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Left: Mobile Menu + Logo */}
@@ -74,7 +99,7 @@ export function MainHeader() {
 
                 {/* Mobile Drawer Navigation Links */}
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Main Navigation Section */}
+                  {/* Website Topbar Navigation Section */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Main Menu
@@ -131,31 +156,49 @@ export function MainHeader() {
                       })}
                     </nav>
                   </div>
+
+                  {/* Quick Actions (Host) */}
+                  {currentUser.role === 'host' && (
+                    <div>
+                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                        Quick Actions
+                      </p>
+                      <nav className="space-y-1">
+                        {quickActions.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <SheetClose asChild key={item.href}>
+                              <Link
+                                href={item.href}
+                                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                              >
+                                <Icon className="h-5 w-5 shrink-0 text-gray-500" />
+                                <span>{item.label}</span>
+                              </Link>
+                            </SheetClose>
+                          );
+                        })}
+                      </nav>
+                    </div>
+                  )}
                 </div>
 
-                {/* Mobile Drawer Footer Auth CTAs */}
-                <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-2">
-                  <SheetClose asChild>
-                    <Link href="/signin" className="w-full block">
-                      <Button variant="outline" className="w-full justify-center gap-2 text-gray-700">
-                        <LogIn className="h-4 w-4" />
-                        Sign In
-                      </Button>
-                    </Link>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Link href="/signup" className="w-full block">
-                      <Button className="w-full justify-center gap-2 bg-primary hover:bg-primary/90 text-white">
-                        <UserPlus className="h-4 w-4" />
-                        Get Started
-                      </Button>
-                    </Link>
-                  </SheetClose>
+                {/* Drawer Footer User Details */}
+                <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
+                      {currentUser.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
+                      <p className="text-xs text-gray-500 truncate capitalize">{currentUser.role}</p>
+                    </div>
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
 
-            {/* Logo */}
+            {/* Header Logo */}
             <div className="inline-flex items-center shrink-0">
               <Logo />
             </div>
@@ -166,7 +209,7 @@ export function MainHeader() {
             <SearchBar />
           </div>
 
-          {/* Right: Actions */}
+          {/* Right Header Controls */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Mobile Search Trigger Icon */}
             <button 
@@ -176,23 +219,8 @@ export function MainHeader() {
               <Search className="h-5 w-5" />
             </button>
 
-            <Link href="/signin" className="cursor-pointer">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="font-medium text-gray-600 hover:text-primary cursor-pointer"
-              >
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/signup" className="cursor-pointer">
-              <Button 
-                size="sm" 
-                className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer"
-              >
-                Get Started
-              </Button>
-            </Link>
+            <NotificationBell />
+            <UserMenu user={currentUser} />
           </div>
         </div>
       </div>

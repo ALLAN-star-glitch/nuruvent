@@ -1,5 +1,3 @@
-// components/layout/TopBar.tsx
-
 'use client';
 
 import Link from 'next/link';

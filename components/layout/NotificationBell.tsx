@@ -1,9 +1,13 @@
-
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface Notification {
   id: number;
@@ -16,7 +20,7 @@ interface Notification {
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Mock notifications - will be replaced with real data
+  // Mock notifications
   const notifications: Notification[] = [
     {
       id: 1,
@@ -44,67 +48,64 @@ export function NotificationBell() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="w-80 p-0 z-50 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
       >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full">
-            {unreadCount}
-          </span>
-        )}
-      </button>
-
-      {/* Dropdown */}
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <span className="font-semibold text-gray-900">Notifications</span>
+          <Link
+            href="/notifications"
+            className="text-sm text-primary hover:text-primary/80"
             onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <span className="font-semibold text-gray-900">Notifications</span>
-              <Link
-                href="/notifications"
-                className="text-sm text-primary hover:text-primary/80"
-                onClick={() => setIsOpen(false)}
-              >
-                View all
-              </Link>
-            </div>
+          >
+            View all
+          </Link>
+        </div>
 
-            <div className="max-h-96 overflow-y-auto">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
-                    !notification.read ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <p className="text-sm font-medium text-gray-900">
-                    {notification.title}
-                  </p>
-                  <p className="text-sm text-gray-600 mt-0.5">
-                    {notification.message}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {notification.time}
-                  </p>
-                </div>
-              ))}
+        <div className="max-h-96 overflow-y-auto">
+          {notifications.map((notification) => (
+            <div
+              key={notification.id}
+              className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                !notification.read ? 'bg-primary/5' : ''
+              }`}
+            >
+              <p className="text-sm font-medium text-gray-900">
+                {notification.title}
+              </p>
+              <p className="text-sm text-gray-600 mt-0.5">
+                {notification.message}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {notification.time}
+              </p>
             </div>
+          ))}
+        </div>
 
-            {notifications.length === 0 && (
-              <div className="p-8 text-center text-gray-500">
-                <p>No notifications</p>
-              </div>
-            )}
+        {notifications.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            <p>No notifications</p>
           </div>
-        </>
-      )}
-    </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }

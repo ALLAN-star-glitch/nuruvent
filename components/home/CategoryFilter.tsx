@@ -85,7 +85,7 @@ export function CategoryFilter({
 
   return (
     <>
-      {/* Mobile Floating Filter Button */}
+      {/* Mobile Floating Filter Button - Hidden on desktop */}
       <button
         onClick={() => setIsMobileOpen(true)}
         className="lg:hidden fixed bottom-24 right-4 z-30 flex items-center gap-2 bg-primary text-white px-4 py-3 rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all duration-300"
@@ -209,7 +209,7 @@ export function CategoryFilter({
         </div>
       </div>
 
-      {/* Desktop Filter - Sticky with scroll */}
+      {/* Desktop Filter - Hidden on mobile */}
       <div className="hidden lg:block sticky top-20 max-h-[calc(100vh-100px)] overflow-y-auto">
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           {/* Categories - Desktop */}

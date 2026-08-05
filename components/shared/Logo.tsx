@@ -1,17 +1,17 @@
-// components/shared/Logo.tsx
+'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center shrink-0 cursor-pointer">
+    <Link href="/" className="inline-flex items-center shrink-0 w-max h-auto pointer-events-auto">
       <Image
         src="/logo.png"
         alt="Nuruvent"
-        width={160}
-        height={50}
-        className="h-20 sm:h-20 md:h-30 lg:h-30 w-auto"
+        width={120}
+        height={40}
+        className="h-auto w-auto pointer-events-auto"
         priority
       />
     </Link>

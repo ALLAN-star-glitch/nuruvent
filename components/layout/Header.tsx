@@ -1,19 +1,37 @@
-
 'use client';
 
 import { TopBar } from './TopBar';
 import { MainHeader } from './MainHeader';
+import { DashboardHeader } from '../dashboard/DashboardHeader';
 
-export function Header() {
+interface HeaderProps {
+  isAuthenticated?: boolean;
+  user?: {
+    name: string;
+    email: string;
+    avatar?: string;
+    role: 'host' | 'attendee' | 'admin';
+  };
+}
+
+export function Header({ isAuthenticated = false, user }: HeaderProps) {
+  if (isAuthenticated) {
+    return (
+      <>
+        <div className="hidden md:block">
+          <TopBar />
+        </div>
+        <DashboardHeader user={user} />
+      </>
+    );
+  }
+
   return (
-    <header className="sticky top-0 z-50">
-      {/* Top Bar - Desktop only */}
+    <>
       <div className="hidden md:block">
         <TopBar />
       </div>
-
-      {/* Main Header */}
       <MainHeader />
-    </header>
+    </>
   );
 }

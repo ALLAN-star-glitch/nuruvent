@@ -5,15 +5,21 @@ const nextConfig: NextConfig = {
   compress: true,
 
   images: {
-    domains: [
-      'localhost',
-      'nuruvent.com',
-      'api.nuruvent.com',
-      'res.cloudinary.com',
-      'images.unsplash.com',
-      'lh3.googleusercontent.com',
-    ],
+    // Remove the deprecated 'domains' array
+    // domains: [...], // ← DELETE THIS ENTIRE SECTION
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: 'nuruvent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'api.nuruvent.com',
+      },
       {
         protocol: 'https',
         hostname: '**.nuruvent.com',
@@ -25,6 +31,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
       },
       {
         protocol: 'https',
@@ -101,7 +111,6 @@ const nextConfig: NextConfig = {
             key: 'Cache-Control',
             value: 'no-cache, no-store, must-revalidate',
           },
-          // ❌ REMOVE CSP from here - it's handled in vercel.json
         ],
       },
       {
@@ -130,15 +139,16 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      {
-        source: '/_next/static/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
+      // REMOVE this section - it causes the warning
+      // {
+      //   source: '/_next/static/(.*)',
+      //   headers: [
+      //     {
+      //       key: 'Cache-Control',
+      //       value: 'public, max-age=31536000, immutable',
+      //     },
+      //   ],
+      // },
       {
         source: '/images/(.*)',
         headers: [

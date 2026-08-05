@@ -44,7 +44,7 @@ export function SignInForm() {
       />
       
       {/* Whitish Overlay - Hero Style */}
-      <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/70 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
       
       {/* Dot Pattern Overlay */}
       <div className="absolute inset-0 pointer-events-none">

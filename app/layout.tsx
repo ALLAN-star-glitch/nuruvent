@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
 import { InstallPrompt } from "@/components/PWA/InstallPrompt";
 import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
 import Script from "next/script";
@@ -20,13 +18,13 @@ const geistMono = Geist_Mono({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: '#1A73E8',
+  themeColor: "#1A73E8",
 };
 
 export const metadata: Metadata = {
   title: {
     default: "Nuruvent",
-    template: "%s | Nuruvent"
+    template: "%s | Nuruvent",
   },
   description: "Light Your Training Events. Illuminate Your Growth.",
   keywords: [
@@ -45,9 +43,16 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://nuruvent.com/",
   },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    apple: "/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "msvalidate.01": "7F9BEC1255ABF3C4802D7356DC131BE7",
   },
 };
 
@@ -57,29 +62,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  
+
   return (
     <html lang="en">
-      <head>
-        {/* Bing Webmaster Validation */}
-        <meta name="msvalidate.01" content="7F9BEC1255ABF3C4802D7356DC131BE7" />
-        
-        {/* PWA: Manifest */}
-        <link rel="manifest" href="/manifest.webmanifest" />
-        
-        {/* PWA: Apple Touch Icon */}
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-        
-        {/* PWA: iOS Meta Tags */}
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Header />
-        <main>{children}</main>
-        <Footer />
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
+        {/* Render child layout route groups: (public) or (dashboard) */}
+        {children}
 
-        {/* Google Analytics */}
+        {/* Global Analytics */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
@@ -97,67 +87,7 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Tawk.to Chat Widget */}
-        <Script
-          id="tawk-to"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              // Load Tawk.to
-              var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-              (function() {
-                var s1 = document.createElement('script'), s0 = document.getElementsByTagName('script')[0];
-                s1.async = true;
-                s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
-                s1.charset = 'UTF-8';
-                s1.setAttribute('crossorigin', '*');
-                s0.parentNode.insertBefore(s1, s0);
-              })();
-
-              // Re-load on navigation (for client-side routing)
-              if (typeof window !== 'undefined') {
-                const loadTawk = function() {
-                  // Check if widget exists, if not reload
-                  setTimeout(function() {
-                    var widget = document.querySelector('iframe[src*="tawk.to"]');
-                    if (!widget) {
-                      // Reload Tawk.to
-                      var oldScript = document.getElementById('tawk-to-script');
-                      if (oldScript) oldScript.remove();
-                      var newScript = document.createElement('script');
-                      newScript.id = 'tawk-to-script';
-                      newScript.async = true;
-                      newScript.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
-                      newScript.charset = 'UTF-8';
-                      newScript.setAttribute('crossorigin', '*');
-                      document.head.appendChild(newScript);
-                    }
-                  }, 300);
-                };
-
-                // Listen for route changes
-                window.addEventListener('popstate', loadTawk);
-                document.addEventListener('visibilitychange', function() {
-                  if (!document.hidden) loadTawk();
-                });
-
-                // Intercept history methods
-                var originalPushState = history.pushState;
-                history.pushState = function() {
-                  originalPushState.apply(this, arguments);
-                  loadTawk();
-                };
-                var originalReplaceState = history.replaceState;
-                history.replaceState = function() {
-                  originalReplaceState.apply(this, arguments);
-                  loadTawk();
-                };
-              }
-            `
-          }}
-        />
-
-        {/* PWA Components */}
+        {/* Global PWA Utilities */}
         <InstallPrompt />
         <PushNotificationManager />
       </body>

@@ -1,5 +1,3 @@
-// components/layout/UserMenu.tsx
-
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard,
   User,
@@ -28,6 +25,7 @@ import {
   LogOut,
   PlusCircle,
   Video,
+  ChevronDown,
 } from 'lucide-react';
 
 interface UserMenuProps {
@@ -103,34 +101,17 @@ export function UserMenu({ user }: UserMenuProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        <Button
-          variant="ghost"
-          className="flex items-center gap-2 h-9 px-2 hover:bg-gray-100 rounded-lg"
-        >
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user?.avatar} />
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-sm font-medium text-gray-700 hidden sm:inline">
-            My Account
-          </span>
-          <svg
-            className="h-4 w-4 text-gray-400 hidden sm:block"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </Button>
+      <DropdownMenuTrigger className="flex items-center gap-2 h-9 px-2 hover:bg-gray-100 rounded-lg cursor-pointer outline-none data-[state=open]:bg-gray-100 transition-colors">
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={user?.avatar} />
+          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+            {getInitials()}
+          </AvatarFallback>
+        </Avatar>
+        <span className="text-sm font-medium text-gray-700 hidden sm:inline">
+          {user?.name || 'Account'}
+        </span>
+        <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block" />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-72" align="end">
@@ -200,10 +181,10 @@ export function UserMenu({ user }: UserMenuProps) {
             </div>
             <DropdownMenuGroup>
               {quickLinks.map((item) => (
-                <DropdownMenuItem key={item.href} className="p-0">
+                <DropdownMenuItem key={item.href} className="p-0 cursor-pointer">
                   <Link
                     href={item.href}
-                    className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full"
+                    className="flex items-center gap-2 py-2 px-2 w-full"
                   >
                     <item.icon className="h-4 w-4 text-muted-foreground" />
                     <span>{item.label}</span>
@@ -222,20 +203,20 @@ export function UserMenu({ user }: UserMenuProps) {
           </span>
         </div>
         <DropdownMenuGroup>
-          <DropdownMenuItem className="p-0">
-            <Link href="/profile" className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full">
+          <DropdownMenuItem className="p-0 cursor-pointer">
+            <Link href="/profile" className="flex items-center gap-2 py-2 px-2 w-full">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>My Profile</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="p-0">
-            <Link href="/settings/security" className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full">
+          <DropdownMenuItem className="p-0 cursor-pointer">
+            <Link href="/settings/security" className="flex items-center gap-2 py-2 px-2 w-full">
               <Shield className="h-4 w-4 text-muted-foreground" />
               <span>Security (2FA)</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="p-0">
-            <Link href="/settings/payments" className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full">
+          <DropdownMenuItem className="p-0 cursor-pointer">
+            <Link href="/settings/payments" className="flex items-center gap-2 py-2 px-2 w-full">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
               <span>Payment Methods</span>
             </Link>
@@ -246,14 +227,14 @@ export function UserMenu({ user }: UserMenuProps) {
 
         {/* Support & Settings */}
         <DropdownMenuGroup>
-          <DropdownMenuItem className="p-0">
-            <Link href="/help" className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full">
+          <DropdownMenuItem className="p-0 cursor-pointer">
+            <Link href="/help" className="flex items-center gap-2 py-2 px-2 w-full">
               <LifeBuoy className="h-4 w-4 text-muted-foreground" />
               <span>Help & Support</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem className="p-0">
-            <Link href="/settings" className="flex items-center gap-2 cursor-pointer py-2 px-2 w-full">
+          <DropdownMenuItem className="p-0 cursor-pointer">
+            <Link href="/settings" className="flex items-center gap-2 py-2 px-2 w-full">
               <Settings className="h-4 w-4 text-muted-foreground" />
               <span>All Settings</span>
             </Link>
@@ -265,7 +246,6 @@ export function UserMenu({ user }: UserMenuProps) {
         {/* Sign Out */}
         <DropdownMenuItem
           onClick={() => {
-            // TODO: Implement sign out
             console.log('Sign out');
           }}
           className="flex items-center gap-2 text-red-600 cursor-pointer hover:bg-red-50"

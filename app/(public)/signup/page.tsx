@@ -1,6 +1,6 @@
 // app/(public)/signup/page.tsx
 
-import { SignUpForm } from "../../components/registration/SignupForm";
+import { SignUpForm } from "../../../components/registration/SignupForm";
 
 
 export const metadata = {
