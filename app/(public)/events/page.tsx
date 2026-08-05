@@ -25,6 +25,26 @@ export const metadata: Metadata = {
 
 export const revalidate = 3600; // 1 hour revalidation
 
+// Wrapper component to handle Suspense for EventGrid
+function EventGridWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
+            <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+          </div>
+        ))}
+      </div>
+    }>
+      <EventGrid />
+    </Suspense>
+  );
+}
+
 export default function EventsPage() {
   return (
     <div className="min-h-screen bg-gray-50/30">
@@ -78,9 +98,7 @@ export default function EventsPage() {
             <CategoryFilter />
           </div>
           <div className="flex-1">
-            <Suspense fallback={<div className="text-center py-12">Loading events...</div>}>
-              <EventGrid />
-            </Suspense>
+            <EventGridWrapper />
           </div>
         </div>
       </div>
