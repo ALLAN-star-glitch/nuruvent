@@ -4,12 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   Menu, 
-  Search,
-  BookOpen, 
-  Zap, 
   CreditCard, 
-  Target, 
-  HelpCircle,
   LayoutDashboard, 
   Calendar, 
   Users, 
@@ -32,7 +27,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 
-
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
@@ -46,7 +40,7 @@ export function MainHeader() {
   const pathname = usePathname();
 
   return (
-    <div className="bg-white border-b shadow-sm">
+    <div className="bg-white border-b shadow-xs">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Left: Mobile Menu + Logo */}
@@ -88,7 +82,7 @@ export function MainHeader() {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
                                 isActive
                                   ? 'bg-primary text-white'
                                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -117,7 +111,7 @@ export function MainHeader() {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
                                 isActive
                                   ? 'bg-primary text-white'
                                   : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -136,16 +130,16 @@ export function MainHeader() {
                 {/* Mobile Drawer Footer Auth CTAs */}
                 <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-2">
                   <SheetClose asChild>
-                    <Link href="/signin" className="w-full block">
-                      <Button variant="outline" className="w-full justify-center gap-2 text-gray-700">
+                    <Link href="/signin" className="w-full block cursor-pointer">
+                      <Button variant="outline" className="w-full justify-center gap-2 text-gray-700 cursor-pointer">
                         <LogIn className="h-4 w-4" />
                         Sign In
                       </Button>
                     </Link>
                   </SheetClose>
                   <SheetClose asChild>
-                    <Link href="/signup" className="w-full block">
-                      <Button className="w-full justify-center gap-2 bg-primary hover:bg-primary/90 text-white">
+                    <Link href="/signup" className="w-full block cursor-pointer">
+                      <Button className="w-full justify-center gap-2 bg-primary hover:bg-primary/90 text-white cursor-pointer">
                         <UserPlus className="h-4 w-4" />
                         Get Started
                       </Button>
@@ -168,14 +162,6 @@ export function MainHeader() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Mobile Search Trigger Icon */}
-            <button 
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              aria-label="Search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-
             <Link href="/signin" className="cursor-pointer">
               <Button 
                 variant="ghost" 

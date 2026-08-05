@@ -4,12 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   Menu, 
-  Search,
-  BookOpen, 
-  Zap, 
   CreditCard, 
-  Target, 
-  HelpCircle,
   LayoutDashboard, 
   Calendar, 
   Users, 
@@ -43,8 +38,6 @@ interface DashboardHeaderProps {
     role: 'host' | 'attendee' | 'admin';
   };
 }
-
-
 
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -211,14 +204,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Mobile Search Trigger Icon */}
-            <button 
-              className="md:hidden p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              aria-label="Search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-
             <NotificationBell />
             <UserMenu user={currentUser} />
           </div>
