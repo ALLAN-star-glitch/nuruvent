@@ -52,6 +52,7 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 2592000; // 30 days
+export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
   return (
