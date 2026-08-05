@@ -29,6 +29,11 @@ import {
   Link as LinkIcon,
   Plus,
   ChevronDown,
+  Grid3x3,
+  List,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 // Shadcn components
@@ -264,6 +269,10 @@ const accessConfig = {
   hosts: { label: 'Hosts Only', color: 'bg-amber-100 text-amber-700' },
 };
 
+type SortField = 'eventTitle' | 'eventDate' | 'views' | 'status' | 'uploadDate';
+type SortDirection = 'asc' | 'desc';
+type ViewMode = 'table' | 'grid';
+
 export default function ReplaysPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -276,11 +285,15 @@ export default function ReplaysPage() {
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
   const [selectAll, setSelectAll] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  
+  // New state for view and sort
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [sortField, setSortField] = useState<SortField>('uploadDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Filter replays
   const filteredReplays = useMemo(() => {
-    return mockReplays.filter((replay) => {
+    const filtered = mockReplays.filter((replay) => {
       const matchesSearch = 
         replay.eventTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
         replay.hostName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -289,7 +302,34 @@ export default function ReplaysPage() {
       const matchesVisibility = selectedVisibility === 'all' || replay.visibility === selectedVisibility;
       return matchesSearch && matchesStatus && matchesVisibility;
     });
-  }, [searchQuery, selectedStatus, selectedVisibility]);
+
+    // Sort logic
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'eventTitle':
+          comparison = a.eventTitle.localeCompare(b.eventTitle);
+          break;
+        case 'eventDate':
+          comparison = new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
+          break;
+        case 'views':
+          comparison = a.views - b.views;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'uploadDate':
+          comparison = new Date(a.uploadDate).getTime() - new Date(b.uploadDate).getTime();
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [searchQuery, selectedStatus, selectedVisibility, sortField, sortDirection]);
 
   // Stats
   const stats = useMemo(() => {
@@ -367,6 +407,54 @@ export default function ReplaysPage() {
     return size;
   };
 
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
+      : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
+  };
+
+  // Action handlers for modal
+  const handleModalPlay = () => {
+    if (selectedReplay) {
+      setIsViewDialogOpen(false);
+      window.open(selectedReplay.videoUrl, '_blank');
+    }
+  };
+
+  const handleModalCopyLink = () => {
+    if (selectedReplay) {
+      setIsViewDialogOpen(false);
+      navigator.clipboard.writeText(selectedReplay.videoUrl);
+    }
+  };
+
+  const handleModalShare = () => {
+    if (selectedReplay) {
+      setIsViewDialogOpen(false);
+      // Share functionality
+      console.log('Share replay:', selectedReplay.eventTitle);
+    }
+  };
+
+  const handleModalDelete = () => {
+    setIsViewDialogOpen(false);
+    if (selectedReplay) {
+      handleDeleteReplay(selectedReplay);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -429,47 +517,137 @@ export default function ReplaysPage() {
         </Card>
       </div>
 
-      {/* Filters and Bulk Actions */}
+      {/* Filters, View Options, and Sort */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            {/* Search */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <Input
-                placeholder="Search replays by event, host, or tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full cursor-text"
-              />
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Filters */}
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              {/* Search */}
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  placeholder="Search replays by event, host, or tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-full cursor-text"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
+                  <SelectItem value="processed" className="cursor-pointer">Processed</SelectItem>
+                  <SelectItem value="processing" className="cursor-pointer">Processing</SelectItem>
+                  <SelectItem value="uploaded" className="cursor-pointer">Uploaded</SelectItem>
+                  <SelectItem value="failed" className="cursor-pointer">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Visibility Filter */}
+              <Select value={selectedVisibility} onValueChange={setSelectedVisibility}>
+                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                  <SelectValue placeholder="All Visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Visibility</SelectItem>
+                  <SelectItem value="public" className="cursor-pointer">Public</SelectItem>
+                  <SelectItem value="private" className="cursor-pointer">Private</SelectItem>
+                  <SelectItem value="unlisted" className="cursor-pointer">Unlisted</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Status Filter */}
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
-                <SelectItem value="processed" className="cursor-pointer">Processed</SelectItem>
-                <SelectItem value="processing" className="cursor-pointer">Processing</SelectItem>
-                <SelectItem value="uploaded" className="cursor-pointer">Uploaded</SelectItem>
-                <SelectItem value="failed" className="cursor-pointer">Failed</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Row 2: View Options and Sort */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'table' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Table View"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'grid' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Grid View"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
 
-            {/* Visibility Filter */}
-            <Select value={selectedVisibility} onValueChange={setSelectedVisibility}>
-              <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                <SelectValue placeholder="All Visibility" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Visibility</SelectItem>
-                <SelectItem value="public" className="cursor-pointer">Public</SelectItem>
-                <SelectItem value="private" className="cursor-pointer">Private</SelectItem>
-                <SelectItem value="unlisted" className="cursor-pointer">Unlisted</SelectItem>
-              </SelectContent>
-            </Select>
+                <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+
+                {/* Sort Options */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                  <Select
+                    value={sortField}
+                    onValueChange={(value: SortField) => {
+                      setSortField(value);
+                      setSortDirection('asc');
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="eventTitle" className="cursor-pointer text-sm">Title</SelectItem>
+                      <SelectItem value="eventDate" className="cursor-pointer text-sm">Date</SelectItem>
+                      <SelectItem value="views" className="cursor-pointer text-sm">Views</SelectItem>
+                      <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
+                      <SelectItem value="uploadDate" className="cursor-pointer text-sm">Uploaded</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <button
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                    title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    {sortDirection === 'asc' 
+                      ? <ArrowUp className="h-4 w-4 text-primary" />
+                      : <ArrowDown className="h-4 w-4 text-primary" />
+                    }
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-xs text-gray-400">
+                  {filteredReplays.length} replay{filteredReplays.length !== 1 ? 's' : ''}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-xs cursor-pointer"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedStatus('all');
+                    setSelectedVisibility('all');
+                    setSortField('uploadDate');
+                    setSortDirection('desc');
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -527,326 +705,475 @@ export default function ReplaysPage() {
         </CardContent>
       </Card>
 
-      {/* Replays Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead className="py-3 px-4 w-10">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      className="cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="py-3 px-4">Event / Replay</TableHead>
-                  <TableHead className="py-3 px-4">Status</TableHead>
-                  <TableHead className="py-3 px-4">Visibility</TableHead>
-                  <TableHead className="py-3 px-4">Stats</TableHead>
-                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReplays.length > 0 ? (
-                  filteredReplays.map((replay) => {
-                    const status = statusConfig[replay.status];
-                    const visibility = visibilityConfig[replay.visibility];
-                    const StatusIcon = status.icon;
-                    const isSelected = selectedReplays.includes(replay.id);
-
-                    return (
-                      <TableRow 
-                        key={replay.id}
-                        className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary/5' : ''
-                        }`}
-                        onClick={() => handleViewReplay(replay)}
-                      >
-                        <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => handleSelectReplay(replay.id)}
-                            className="cursor-pointer"
-                          />
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-16 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Video className="h-6 w-6 text-gray-400" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                                {replay.eventTitle}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <Calendar className="h-3 w-3" />
-                                <span>{replay.eventDate}</span>
-                                <span className="text-gray-300">•</span>
-                                <span>{formatDuration(replay.duration)}</span>
-                                <span className="text-gray-300">•</span>
-                                <span>{replay.hostName}</span>
-                              </div>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {replay.tags.slice(0, 2).map((tag) => (
-                                  <Badge key={tag} variant="secondary" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {replay.tags.length > 2 && (
-                                  <span className="text-xs text-gray-400">+{replay.tags.length - 2}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${status.color} border`}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                          {replay.status === 'processing' && (
-                            <Progress value={65} className="w-20 h-1 mt-1" />
-                          )}
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${visibility.color} border`}>
-                            {visibility.label}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">{accessConfig[replay.accessLevel].label}</p>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-4 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Eye className="h-3 w-3 text-gray-400" />
-                              <span>{replay.views}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Download className="h-3 w-3 text-gray-400" />
-                              <span>{replay.downloads}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Users className="h-3 w-3 text-gray-400" />
-                              <span>{replay.attendeesCount}</span>
-                            </div>
-                          </div>
-                          {replay.cpdHours > 0 && (
-                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs mt-1">
-                              {replay.cpdHours} CPD hrs
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewReplay(replay);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(replay.videoUrl, '_blank');
-                                }}
-                              >
-                                <Play className="h-4 w-4 mr-2" />
-                                Play Replay
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(replay.videoUrl);
-                                }}
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Copy Link
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Share functionality
-                                }}
-                              >
-                                <Share2 className="h-4 w-4 mr-2" />
-                                Share
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteReplay(replay);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="py-12 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <Video className="h-8 w-8 text-gray-300" />
-                        <p className="font-medium">No replays found</p>
-                        <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+      {/* Replays Table or Grid View */}
+      {viewMode === 'table' ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50">
+                    <TableHead className="py-3 px-4 w-10">
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
+                        className="cursor-pointer"
+                      />
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventTitle')}>
+                      <div className="flex items-center">
+                        Event / Replay
+                        {getSortIcon('eventTitle')}
                       </div>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
+                      <div className="flex items-center">
+                        Status
+                        {getSortIcon('status')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4">Visibility</TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('views')}>
+                      <div className="flex items-center">
+                        Stats
+                        {getSortIcon('views')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 text-right">Actions</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {filteredReplays.length > 0 ? (
+                    filteredReplays.map((replay) => {
+                      const status = statusConfig[replay.status];
+                      const visibility = visibilityConfig[replay.visibility];
+                      const StatusIcon = status.icon;
+                      const isSelected = selectedReplays.includes(replay.id);
 
-      {/* View Replay Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Replay Details</DialogTitle>
-            <DialogDescription>
-              View and manage replay information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedReplay && (
-            <div className="space-y-6">
-              {/* Video Player Preview */}
-              <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
-                    <Play className="h-8 w-8 text-primary" />
-                  </div>
-                  <p className="text-white text-sm mt-2">{selectedReplay.eventTitle}</p>
-                  <p className="text-gray-400 text-xs">{formatDuration(selectedReplay.duration)}</p>
-                </div>
-              </div>
+                      return (
+                        <TableRow 
+                          key={replay.id}
+                          className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => handleViewReplay(replay)}
+                        >
+                          <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleSelectReplay(replay.id)}
+                              className="cursor-pointer"
+                            />
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-16 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <Video className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                                  {replay.eventTitle}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>{replay.eventDate}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span>{formatDuration(replay.duration)}</span>
+                                  <span className="text-gray-300">•</span>
+                                  <span>{replay.hostName}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {replay.tags.slice(0, 2).map((tag) => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                  {replay.tags.length > 2 && (
+                                    <span className="text-xs text-gray-400">+{replay.tags.length - 2}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${status.color} border`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {status.label}
+                            </Badge>
+                            {replay.status === 'processing' && (
+                              <Progress value={65} className="w-20 h-1 mt-1" />
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${visibility.color} border`}>
+                              {visibility.label}
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">{accessConfig[replay.accessLevel].label}</p>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="flex items-center gap-1">
+                                <Eye className="h-3 w-3 text-gray-400" />
+                                <span>{replay.views}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Download className="h-3 w-3 text-gray-400" />
+                                <span>{replay.downloads}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-gray-400" />
+                                <span>{replay.attendeesCount}</span>
+                              </div>
+                            </div>
+                            {replay.cpdHours > 0 && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs mt-1">
+                                {replay.cpdHours} CPD hrs
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewReplay(replay);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.open(replay.videoUrl, '_blank');
+                                  }}
+                                >
+                                  <Play className="h-4 w-4 mr-2" />
+                                  Play Replay
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(replay.videoUrl);
+                                  }}
+                                >
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Copy Link
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Share functionality
+                                  }}
+                                >
+                                  <Share2 className="h-4 w-4 mr-2" />
+                                  Share
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-red-600 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteReplay(replay);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <Video className="h-8 w-8 text-gray-300" />
+                          <p className="font-medium">No replays found</p>
+                          <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        // Grid View
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredReplays.length > 0 ? (
+            filteredReplays.map((replay) => {
+              const status = statusConfig[replay.status];
+              const visibility = visibilityConfig[replay.visibility];
+              const StatusIcon = status.icon;
+              const isSelected = selectedReplays.includes(replay.id);
 
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{selectedReplay.eventTitle}</h2>
-                <p className="text-sm text-gray-500">{selectedReplay.description}</p>
-              </div>
+              return (
+                <Card 
+                  key={replay.id} 
+                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+                    isSelected ? 'border-primary/50 bg-primary/5' : ''
+                  }`}
+                  onClick={() => handleViewReplay(replay)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectReplay(replay.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="cursor-pointer"
+                        />
+                        <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Video className="h-5 w-5 text-gray-400" />
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={`${status.color} border`}>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {status.label}
+                      </Badge>
+                    </div>
 
-              <Separator />
+                    <div>
+                      <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors line-clamp-2">
+                        {replay.eventTitle}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{replay.eventDate}</span>
+                        <span>•</span>
+                        <span>{formatDuration(replay.duration)}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{replay.hostName}</p>
+                    </div>
 
-              {/* Details Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">Status</Label>
-                  <Badge variant="outline" className={`${statusConfig[selectedReplay.status].color} border mt-1`}>
-                    {statusConfig[selectedReplay.status].label}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Visibility</Label>
-                  <Badge variant="outline" className={`${visibilityConfig[selectedReplay.visibility].color} border mt-1`}>
-                    {visibilityConfig[selectedReplay.visibility].label}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Access Level</Label>
-                  <Badge variant="outline" className={`${accessConfig[selectedReplay.accessLevel].color} border mt-1`}>
-                    {accessConfig[selectedReplay.accessLevel].label}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">CPD Hours</Label>
-                  <p className="font-medium mt-1">{selectedReplay.cpdHours} hours</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Duration</Label>
-                  <p className="font-medium mt-1">{formatDuration(selectedReplay.duration)}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">File Size</Label>
-                  <p className="font-medium mt-1">{formatFileSize(selectedReplay.fileSize)}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Uploaded</Label>
-                  <p className="font-medium mt-1">{selectedReplay.uploadDate}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Certificate Issued</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    {selectedReplay.certificateIssued ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm font-medium text-green-600">Yes</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-500">No</span>
-                      </>
+                    <div className="flex flex-wrap gap-1">
+                      {replay.tags.slice(0, 3).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                      {replay.tags.length > 3 && (
+                        <span className="text-xs text-gray-400">+{replay.tags.length - 3}</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <Badge variant="outline" className={`${visibility.color} border text-xs`}>
+                        {visibility.label}
+                      </Badge>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Eye className="h-3 w-3" />
+                          <span>{replay.views}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Download className="h-3 w-3" />
+                          <span>{replay.downloads}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {replay.cpdHours > 0 && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                        {replay.cpdHours} CPD hrs
+                      </Badge>
                     )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <Video className="h-8 w-8 text-gray-300" />
+                <p className="font-medium">No replays found</p>
+                <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
               </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-lg p-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{selectedReplay.views}</p>
-                  <p className="text-xs text-gray-500">Views</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{selectedReplay.downloads}</p>
-                  <p className="text-xs text-gray-500">Downloads</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900">{selectedReplay.attendeesCount}</p>
-                  <p className="text-xs text-gray-500">Attendees</p>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewDialogOpen(false)}
-                  className="cursor-pointer"
-                >
-                  Close
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => window.open(selectedReplay.videoUrl, '_blank')}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Play Replay
-                </Button>
-                <Button 
-                  className="bg-primary hover:bg-primary/90 cursor-pointer"
-                >
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share
-                </Button>
-              </DialogFooter>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+     {/* View Replay Dialog - Horizontal layout */}
+<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Replay Details</DialogTitle>
+      <DialogDescription>
+        View and manage replay information.
+      </DialogDescription>
+    </DialogHeader>
+    {selectedReplay && (
+      <div className="space-y-4 sm:space-y-6">
+        {/* Video Player Preview */}
+        <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
+              <Play className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+            </div>
+            <p className="text-white text-xs sm:text-sm mt-2">{selectedReplay.eventTitle}</p>
+            <p className="text-gray-400 text-xs">{formatDuration(selectedReplay.duration)}</p>
+          </div>
+        </div>
+
+        {/* Title & Description */}
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">{selectedReplay.eventTitle}</h2>
+          <p className="text-xs sm:text-sm text-gray-500">{selectedReplay.description}</p>
+        </div>
+
+        <Separator />
+
+        {/* Details Grid - 2 columns horizontal */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Status</Label>
+            <Badge variant="outline" className={`${statusConfig[selectedReplay.status].color} border mt-1`}>
+              {statusConfig[selectedReplay.status].label}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Visibility</Label>
+            <Badge variant="outline" className={`${visibilityConfig[selectedReplay.visibility].color} border mt-1`}>
+              {visibilityConfig[selectedReplay.visibility].label}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Access Level</Label>
+            <Badge variant="outline" className={`${accessConfig[selectedReplay.accessLevel].color} border mt-1`}>
+              {accessConfig[selectedReplay.accessLevel].label}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">CPD Hours</Label>
+            <p className="text-sm sm:text-base font-medium mt-1">{selectedReplay.cpdHours} hours</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Duration</Label>
+            <p className="text-sm sm:text-base font-medium mt-1">{formatDuration(selectedReplay.duration)}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">File Size</Label>
+            <p className="text-sm sm:text-base font-medium mt-1">{formatFileSize(selectedReplay.fileSize)}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Uploaded</Label>
+            <p className="text-sm sm:text-base font-medium mt-1">{selectedReplay.uploadDate}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Certificate Issued</Label>
+            <div className="flex items-center gap-2 mt-1">
+              {selectedReplay.certificateIssued ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                  <span className="text-sm font-medium text-green-600">Yes</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-500">No</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats - 3 columns horizontal */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-gray-50 rounded-lg p-3 sm:p-4">
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedReplay.views}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500">Views</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedReplay.downloads}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500">Downloads</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedReplay.attendeesCount}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500">Attendees</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Actions - Horizontal grid */}
+        <div className="space-y-3">
+          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={() => setIsViewDialogOpen(false)}
+            >
+              <Eye className="h-4 w-4 mr-2 shrink-0" />
+              View Details
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalPlay}
+            >
+              <Play className="h-4 w-4 mr-2 shrink-0" />
+              Play Replay
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalCopyLink}
+            >
+              <Copy className="h-4 w-4 mr-2 shrink-0" />
+              Copy Link
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalShare}
+            >
+              <Share2 className="h-4 w-4 mr-2 shrink-0" />
+              Share
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="w-full cursor-pointer justify-start text-sm col-span-2"
+              onClick={handleModalDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+              Delete Replay
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsViewDialogOpen(false)}
+            className="w-full sm:w-auto cursor-pointer"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

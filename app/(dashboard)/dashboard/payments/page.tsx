@@ -28,6 +28,11 @@ import {
   Ban,
   UserPlus,
   Trash2,
+  Grid3x3,
+  List,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 // Shadcn components
@@ -81,7 +86,6 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-
 
 // Types
 interface Payment {
@@ -247,6 +251,10 @@ const payoutStatusConfig = {
   paid: { label: 'Paid', color: 'bg-green-100 text-green-700' },
 };
 
+type SortField = 'attendeeName' | 'eventTitle' | 'amount' | 'status' | 'paymentDate';
+type SortDirection = 'asc' | 'desc';
+type ViewMode = 'table' | 'grid';
+
 export default function PaymentsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,10 +267,15 @@ export default function PaymentsPage() {
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
   const [selectAll, setSelectAll] = useState(false);
+  
+  // New state for view and sort
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [sortField, setSortField] = useState<SortField>('paymentDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Filter payments
   const filteredPayments = useMemo(() => {
-    return mockPayments.filter((payment) => {
+    const filtered = mockPayments.filter((payment) => {
       const matchesSearch = 
         payment.attendeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         payment.attendeeEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -273,7 +286,34 @@ export default function PaymentsPage() {
       const matchesMethod = selectedMethod === 'all' || payment.paymentMethod === selectedMethod;
       return matchesSearch && matchesStatus && matchesMethod;
     });
-  }, [searchQuery, selectedStatus, selectedMethod]);
+
+    // Sort logic
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'attendeeName':
+          comparison = a.attendeeName.localeCompare(b.attendeeName);
+          break;
+        case 'eventTitle':
+          comparison = a.eventTitle.localeCompare(b.eventTitle);
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'paymentDate':
+          comparison = new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime();
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [searchQuery, selectedStatus, selectedMethod, sortField, sortDirection]);
 
   // Stats
   const stats = useMemo(() => {
@@ -350,6 +390,46 @@ export default function PaymentsPage() {
       currency: 'KES',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
+      : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
+  };
+
+  // Action handlers for modal
+  const handleModalDownloadReceipt = () => {
+    if (selectedPayment) {
+      setIsViewDialogOpen(false);
+      console.log('Download receipt for:', selectedPayment.invoiceNumber);
+    }
+  };
+
+  const handleModalSendInvoice = () => {
+    if (selectedPayment) {
+      setIsViewDialogOpen(false);
+      console.log('Send invoice for:', selectedPayment.invoiceNumber);
+    }
+  };
+
+  const handleModalDelete = () => {
+    setIsViewDialogOpen(false);
+    if (selectedPayment) {
+      handleDeletePayment(selectedPayment);
+    }
   };
 
   return (
@@ -433,47 +513,137 @@ export default function PaymentsPage() {
         </Card>
       </div>
 
-      {/* Filters and Bulk Actions */}
+      {/* Filters, View Options, and Sort */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            {/* Search */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <Input
-                placeholder="Search payments by attendee, event, or transaction ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full cursor-text"
-              />
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Filters */}
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              {/* Search */}
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  placeholder="Search payments by attendee, event, or transaction ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-full cursor-text"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
+                  <SelectItem value="completed" className="cursor-pointer">Completed</SelectItem>
+                  <SelectItem value="pending" className="cursor-pointer">Pending</SelectItem>
+                  <SelectItem value="failed" className="cursor-pointer">Failed</SelectItem>
+                  <SelectItem value="refunded" className="cursor-pointer">Refunded</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Payment Method Filter */}
+              <Select value={selectedMethod} onValueChange={setSelectedMethod}>
+                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                  <SelectValue placeholder="All Methods" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Methods</SelectItem>
+                  <SelectItem value="mpesa" className="cursor-pointer">M-Pesa</SelectItem>
+                  <SelectItem value="card" className="cursor-pointer">Card</SelectItem>
+                  <SelectItem value="bank" className="cursor-pointer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Status Filter */}
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
-                <SelectItem value="completed" className="cursor-pointer">Completed</SelectItem>
-                <SelectItem value="pending" className="cursor-pointer">Pending</SelectItem>
-                <SelectItem value="failed" className="cursor-pointer">Failed</SelectItem>
-                <SelectItem value="refunded" className="cursor-pointer">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Row 2: View Options and Sort */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'table' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Table View"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'grid' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Grid View"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
 
-            {/* Payment Method Filter */}
-            <Select value={selectedMethod} onValueChange={setSelectedMethod}>
-              <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                <SelectValue placeholder="All Methods" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Methods</SelectItem>
-                <SelectItem value="mpesa" className="cursor-pointer">M-Pesa</SelectItem>
-                <SelectItem value="card" className="cursor-pointer">Card</SelectItem>
-                <SelectItem value="bank" className="cursor-pointer">Bank Transfer</SelectItem>
-              </SelectContent>
-            </Select>
+                <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+
+                {/* Sort Options */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                  <Select
+                    value={sortField}
+                    onValueChange={(value: SortField) => {
+                      setSortField(value);
+                      setSortDirection('asc');
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="attendeeName" className="cursor-pointer text-sm">Attendee</SelectItem>
+                      <SelectItem value="eventTitle" className="cursor-pointer text-sm">Event</SelectItem>
+                      <SelectItem value="amount" className="cursor-pointer text-sm">Amount</SelectItem>
+                      <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
+                      <SelectItem value="paymentDate" className="cursor-pointer text-sm">Date</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <button
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                    title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    {sortDirection === 'asc' 
+                      ? <ArrowUp className="h-4 w-4 text-primary" />
+                      : <ArrowDown className="h-4 w-4 text-primary" />
+                    }
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-xs text-gray-400">
+                  {filteredPayments.length} payment{filteredPayments.length !== 1 ? 's' : ''}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-xs cursor-pointer"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedStatus('all');
+                    setSelectedMethod('all');
+                    setSortField('paymentDate');
+                    setSortDirection('desc');
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -522,288 +692,417 @@ export default function PaymentsPage() {
         </CardContent>
       </Card>
 
-      {/* Payments Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead className="py-3 px-4 w-10">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      className="cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="py-3 px-4">Attendee</TableHead>
-                  <TableHead className="py-3 px-4">Event</TableHead>
-                  <TableHead className="py-3 px-4">Amount</TableHead>
-                  <TableHead className="py-3 px-4">Status</TableHead>
-                  <TableHead className="py-3 px-4">Method</TableHead>
-                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPayments.length > 0 ? (
-                  filteredPayments.map((payment) => {
-                    const status = statusConfig[payment.status];
-                    const method = paymentMethodConfig[payment.paymentMethod];
-                    const StatusIcon = status.icon;
-                    const isSelected = selectedPayments.includes(payment.id);
-
-                    return (
-                      <TableRow 
-                        key={payment.id}
-                        className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary/5' : ''
-                        }`}
-                        onClick={() => handleViewPayment(payment)}
-                      >
-                        <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => handleSelectPayment(payment.id)}
-                            className="cursor-pointer"
-                          />
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={payment.attendeeAvatar} />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {getInitials(payment.attendeeName)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                                {payment.attendeeName}
-                              </p>
-                              <p className="text-xs text-gray-500">{payment.attendeeEmail}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{payment.eventTitle}</p>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Calendar className="h-3 w-3" />
-                              <span>{payment.eventDate}</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div>
-                            <p className="font-semibold text-gray-900">{formatCurrency(payment.amount)}</p>
-                            <p className="text-xs text-gray-500">Net: {formatCurrency(payment.netAmount)}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${status.color} border`}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${method.color} border`}>
-                            {method.label}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">{payment.transactionId}</p>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewPayment(payment);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Download receipt
-                                }}
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download Receipt
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Send invoice
-                                }}
-                              >
-                                <Send className="h-4 w-4 mr-2" />
-                                Send Invoice
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeletePayment(payment);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <CreditCard className="h-8 w-8 text-gray-300" />
-                        <p className="font-medium">No payments found</p>
-                        <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+      {/* Payments Table or Grid View */}
+      {viewMode === 'table' ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50">
+                    <TableHead className="py-3 px-4 w-10">
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
+                        className="cursor-pointer"
+                      />
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('attendeeName')}>
+                      <div className="flex items-center">
+                        Attendee
+                        {getSortIcon('attendeeName')}
                       </div>
-                    </TableCell>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventTitle')}>
+                      <div className="flex items-center">
+                        Event
+                        {getSortIcon('eventTitle')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('amount')}>
+                      <div className="flex items-center">
+                        Amount
+                        {getSortIcon('amount')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
+                      <div className="flex items-center">
+                        Status
+                        {getSortIcon('status')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4">Method</TableHead>
+                    <TableHead className="py-3 px-4 text-right">Actions</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {filteredPayments.length > 0 ? (
+                    filteredPayments.map((payment) => {
+                      const status = statusConfig[payment.status];
+                      const method = paymentMethodConfig[payment.paymentMethod];
+                      const StatusIcon = status.icon;
+                      const isSelected = selectedPayments.includes(payment.id);
 
-      {/* View Payment Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Payment Details</DialogTitle>
-            <DialogDescription>
-              View and manage payment information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPayment && (
-            <div className="space-y-6">
-              {/* Payment Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {formatCurrency(selectedPayment.amount)}
-                  </h2>
-                  <p className="text-sm text-gray-500">{selectedPayment.invoiceNumber}</p>
-                </div>
-                <Badge variant="outline" className={`${statusConfig[selectedPayment.status].color} border`}>
-                  {statusConfig[selectedPayment.status].label}
-                </Badge>
-              </div>
+                      return (
+                        <TableRow 
+                          key={payment.id}
+                          className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => handleViewPayment(payment)}
+                        >
+                          <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleSelectPayment(payment.id)}
+                              className="cursor-pointer"
+                            />
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={payment.attendeeAvatar} />
+                                <AvatarFallback className="bg-primary/10 text-primary">
+                                  {getInitials(payment.attendeeName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                                  {payment.attendeeName}
+                                </p>
+                                <p className="text-xs text-gray-500">{payment.attendeeEmail}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{payment.eventTitle}</p>
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Calendar className="h-3 w-3" />
+                                <span>{payment.eventDate}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div>
+                              <p className="font-semibold text-gray-900">{formatCurrency(payment.amount)}</p>
+                              <p className="text-xs text-gray-500">Net: {formatCurrency(payment.netAmount)}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${status.color} border`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {status.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${method.color} border`}>
+                              {method.label}
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">{payment.transactionId}</p>
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewPayment(payment);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleModalDownloadReceipt();
+                                  }}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download Receipt
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleModalSendInvoice();
+                                  }}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Send Invoice
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-red-600 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleModalDelete();
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <CreditCard className="h-8 w-8 text-gray-300" />
+                          <p className="font-medium">No payments found</p>
+                          <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        // Grid View
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPayments.length > 0 ? (
+            filteredPayments.map((payment) => {
+              const status = statusConfig[payment.status];
+              const method = paymentMethodConfig[payment.paymentMethod];
+              const StatusIcon = status.icon;
+              const isSelected = selectedPayments.includes(payment.id);
 
-              <Separator />
-
-              {/* Payment Details Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">Attendee</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={selectedPayment.attendeeAvatar} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {getInitials(selectedPayment.attendeeName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{selectedPayment.attendeeName}</p>
-                      <p className="text-xs text-gray-500">{selectedPayment.attendeeEmail}</p>
+              return (
+                <Card 
+                  key={payment.id} 
+                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+                    isSelected ? 'border-primary/50 bg-primary/5' : ''
+                  }`}
+                  onClick={() => handleViewPayment(payment)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectPayment(payment.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="cursor-pointer"
+                        />
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={payment.attendeeAvatar} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(payment.attendeeName)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <Badge variant="outline" className={`${status.color} border`}>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {status.label}
+                      </Badge>
                     </div>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Event</Label>
-                  <p className="font-medium mt-1">{selectedPayment.eventTitle}</p>
-                  <p className="text-xs text-gray-500">{selectedPayment.eventDate}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Payment Method</Label>
-                  <Badge variant="outline" className={`${paymentMethodConfig[selectedPayment.paymentMethod].color} border mt-1`}>
-                    {paymentMethodConfig[selectedPayment.paymentMethod].label}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Transaction ID</Label>
-                  <p className="font-mono font-medium mt-1">{selectedPayment.transactionId}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Payment Date</Label>
-                  <p className="font-medium mt-1">{selectedPayment.paymentDate}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Payout Status</Label>
-                  <Badge variant="outline" className={`${payoutStatusConfig[selectedPayment.payoutStatus].color} border mt-1`}>
-                    {payoutStatusConfig[selectedPayment.payoutStatus].label}
-                  </Badge>
-                </div>
-                {selectedPayment.payoutDate && (
-                  <div>
-                    <Label className="text-xs text-gray-500">Payout Date</Label>
-                    <p className="font-medium mt-1">{selectedPayment.payoutDate}</p>
-                  </div>
-                )}
+
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{payment.attendeeName}</h3>
+                      <p className="text-xs text-gray-500">{payment.attendeeEmail}</p>
+                      <p className="text-sm font-medium text-primary mt-1">{formatCurrency(payment.amount)}</p>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <p className="font-medium text-gray-700">{payment.eventTitle}</p>
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Calendar className="h-3 w-3" />
+                        <span>{payment.eventDate}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <Badge variant="outline" className={`${method.color} border text-xs`}>
+                        {method.label}
+                      </Badge>
+                      <span className="text-xs text-gray-500">{payment.transactionId}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>Net: {formatCurrency(payment.netAmount)}</span>
+                      <span>Commission: {formatCurrency(payment.commission)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <CreditCard className="h-8 w-8 text-gray-300" />
+                <p className="font-medium">No payments found</p>
+                <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
               </div>
-
-              <Separator />
-
-              {/* Financial Summary */}
-              <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-lg p-4">
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Total Amount</p>
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(selectedPayment.amount)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Commission (10%)</p>
-                  <p className="text-xl font-bold text-amber-600">{formatCurrency(selectedPayment.commission)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-gray-500">Net Earnings</p>
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(selectedPayment.netAmount)}</p>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewDialogOpen(false)}
-                  className="cursor-pointer"
-                >
-                  Close
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="cursor-pointer"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Receipt
-                </Button>
-                <Button 
-                  className="bg-primary hover:bg-primary/90 cursor-pointer"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Invoice
-                </Button>
-              </DialogFooter>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+  {/* View Payment Dialog - Matching Attendee/Certificate Dialog layout */}
+<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Payment Details</DialogTitle>
+      <DialogDescription>
+        View and manage payment information.
+      </DialogDescription>
+    </DialogHeader>
+    {selectedPayment && (
+      <div className="space-y-4 sm:space-y-6">
+        {/* Payment Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+              {formatCurrency(selectedPayment.amount)}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500">{selectedPayment.invoiceNumber}</p>
+          </div>
+          <Badge variant="outline" className={`${statusConfig[selectedPayment.status].color} border shrink-0`}>
+            {statusConfig[selectedPayment.status].label}
+          </Badge>
+        </div>
+
+        <Separator />
+
+        {/* Payment Details Grid - 2 columns on all screens */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Attendee</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                <AvatarImage src={selectedPayment.attendeeAvatar} />
+                <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
+                  {getInitials(selectedPayment.attendeeName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-sm sm:text-base font-medium text-gray-900 truncate">{selectedPayment.attendeeName}</p>
+                <p className="text-xs text-gray-500 truncate">{selectedPayment.attendeeEmail}</p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Event</Label>
+            <p className="text-sm sm:text-base font-medium mt-1 truncate">{selectedPayment.eventTitle}</p>
+            <p className="text-xs text-gray-500">{selectedPayment.eventDate}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Payment Method</Label>
+            <Badge variant="outline" className={`${paymentMethodConfig[selectedPayment.paymentMethod].color} border mt-1`}>
+              {paymentMethodConfig[selectedPayment.paymentMethod].label}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Transaction ID</Label>
+            <p className="text-sm sm:text-base font-mono font-medium mt-1 break-all">{selectedPayment.transactionId}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Payment Date</Label>
+            <p className="text-sm sm:text-base font-medium mt-1">{selectedPayment.paymentDate}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Payout Status</Label>
+            <Badge variant="outline" className={`${payoutStatusConfig[selectedPayment.payoutStatus].color} border mt-1`}>
+              {payoutStatusConfig[selectedPayment.payoutStatus].label}
+            </Badge>
+          </div>
+          {selectedPayment.payoutDate && (
+            <div className="space-y-1">
+              <Label className="text-xs text-gray-500">Payout Date</Label>
+              <p className="text-sm sm:text-base font-medium mt-1">{selectedPayment.payoutDate}</p>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Financial Summary - 3 columns */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 bg-gray-50 rounded-lg p-3 sm:p-4">
+          <div className="text-center">
+            <p className="text-[10px] sm:text-xs text-gray-500">Total Amount</p>
+            <p className="text-base sm:text-xl font-bold text-gray-900">{formatCurrency(selectedPayment.amount)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] sm:text-xs text-gray-500">Commission</p>
+            <p className="text-base sm:text-xl font-bold text-amber-600">{formatCurrency(selectedPayment.commission)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] sm:text-xs text-gray-500">Net Earnings</p>
+            <p className="text-base sm:text-xl font-bold text-green-600">{formatCurrency(selectedPayment.netAmount)}</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Actions - 2 columns matching Attendee/Certificate Dialog */}
+        <div className="space-y-3">
+          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={() => setIsViewDialogOpen(false)}
+            >
+              <Eye className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">View Details</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalDownloadReceipt}
+            >
+              <Download className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Download Receipt</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalSendInvoice}
+            >
+              <Send className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Send Invoice</span>
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="w-full cursor-pointer justify-start text-sm col-span-2"
+              onClick={handleModalDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Delete Payment</span>
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsViewDialogOpen(false)}
+            className="w-full sm:w-auto cursor-pointer"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -839,7 +1138,6 @@ export default function PaymentsPage() {
               variant="destructive" 
               className="cursor-pointer"
               onClick={() => {
-                // Handle delete
                 setIsDeleteDialogOpen(false);
               }}
             >

@@ -10,8 +10,8 @@ export function Logo() {
         src="/logo.png"
         alt="Nuruvent"
         width={120}
-        height={40}
-        className="h-auto w-auto pointer-events-auto"
+        height={28}
+
         priority
       />
     </Link>

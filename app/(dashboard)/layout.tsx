@@ -1,6 +1,7 @@
+// app/(dashboard)/layout.tsx
 import type { Metadata } from 'next';
-import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { Header } from '@/components/layout/Header';
+import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Nuruvent',
@@ -25,13 +26,10 @@ export default function DashboardLayout({
         <Header isAuthenticated={true} user={mockUser} />
       </header>
 
-      {/* Main Body */}
-      <div className="flex flex-1 items-start relative z-30">
-        <DashboardSidebar role={mockUser.role} />
-        <main className="flex-1 p-4 md:p-6 space-y-6 overflow-x-hidden min-w-0">
-          {children}
-        </main>
-      </div>
+      {/* Client Component for sidebar interaction */}
+      <DashboardLayoutClient role={mockUser.role}>
+        {children}
+      </DashboardLayoutClient>
     </div>
   );
 }

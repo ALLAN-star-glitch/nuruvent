@@ -21,6 +21,11 @@ import {
   Award,
   Check,
   Send,
+  Grid3x3,
+  List,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 // Shadcn components
@@ -230,6 +235,10 @@ const paymentStatusConfig = {
   failed: { label: 'Failed', color: 'bg-red-100 text-red-700' },
 };
 
+type SortField = 'name' | 'eventTitle' | 'status' | 'registrationDate' | 'price';
+type SortDirection = 'asc' | 'desc';
+type ViewMode = 'table' | 'grid';
+
 export default function AttendeesPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -242,6 +251,11 @@ export default function AttendeesPage() {
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
   const [selectAll, setSelectAll] = useState(false);
+  
+  // New state for view and sort
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Get unique events for filter
   const events = useMemo(() => {
@@ -249,9 +263,9 @@ export default function AttendeesPage() {
     return Array.from(uniqueEvents);
   }, []);
 
-  // Filter attendees
+  // Filter and sort attendees
   const filteredAttendees = useMemo(() => {
-    return mockAttendees.filter((attendee) => {
+    const filtered = mockAttendees.filter((attendee) => {
       const matchesSearch = attendee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         attendee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         attendee.phone.includes(searchQuery);
@@ -259,7 +273,36 @@ export default function AttendeesPage() {
       const matchesStatus = selectedStatus === 'all' || attendee.status === selectedStatus;
       return matchesSearch && matchesEvent && matchesStatus;
     });
-  }, [searchQuery, selectedEvent, selectedStatus]);
+
+    // Sort logic
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'eventTitle':
+          comparison = a.eventTitle.localeCompare(b.eventTitle);
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'registrationDate':
+          comparison = new Date(a.registrationDate).getTime() - new Date(b.registrationDate).getTime();
+          break;
+        case 'price':
+          const priceA = parseFloat(a.price.replace(/[^0-9.-]+/g, ''));
+          const priceB = parseFloat(b.price.replace(/[^0-9.-]+/g, ''));
+          comparison = priceA - priceB;
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [searchQuery, selectedEvent, selectedStatus, sortField, sortDirection]);
 
   // Stats
   const stats = useMemo(() => {
@@ -314,27 +357,80 @@ export default function AttendeesPage() {
   };
 
   const handleBulkSend = () => {
-    // Handle bulk send (e.g., send certificates, reminders, etc.)
     setIsBulkActionDialogOpen(false);
     setSelectedAttendees([]);
     setSelectAll(false);
   };
 
   const handleBulkDelete = () => {
-    // Handle bulk delete
     setIsBulkActionDialogOpen(false);
     setSelectedAttendees([]);
     setSelectAll(false);
   };
 
   const handleBulkExport = () => {
-    // Handle bulk export
     setIsBulkActionDialogOpen(false);
     setSelectedAttendees([]);
     setSelectAll(false);
   };
 
   const getSelectedCount = () => selectedAttendees.length;
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
+      : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
+  };
+
+  // Action handlers for modal - ALL actions from dropdown
+  const handleModalEdit = () => {
+    if (selectedAttendee) {
+      setIsViewDialogOpen(false);
+      router.push(`/dashboard/attendees/${selectedAttendee.id}/edit`);
+    }
+  };
+
+  const handleModalViewCertificate = () => {
+    if (selectedAttendee && selectedAttendee.certificateIssued) {
+      setIsViewDialogOpen(false);
+      router.push(`/certificates/${selectedAttendee.id}`);
+    }
+  };
+
+  const handleModalDelete = () => {
+    setIsViewDialogOpen(false);
+    if (selectedAttendee) {
+      handleDeleteAttendee(selectedAttendee);
+    }
+  };
+
+  const handleModalSendReminder = () => {
+    if (selectedAttendee) {
+      setIsViewDialogOpen(false);
+      // Handle send reminder
+      console.log('Send reminder to:', selectedAttendee.email);
+    }
+  };
+
+  const handleModalExport = () => {
+    if (selectedAttendee) {
+      setIsViewDialogOpen(false);
+      // Handle export attendee data
+      console.log('Export attendee:', selectedAttendee.name);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -417,50 +513,140 @@ export default function AttendeesPage() {
         </Card>
       </div>
 
-      {/* Filters and Bulk Actions */}
+      {/* Filters, View Options, and Sort */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            {/* Search */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              <Input
-                placeholder="Search attendees by name, email, or phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full cursor-text"
-              />
+          <div className="flex flex-col gap-4">
+            {/* Row 1: Filters */}
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              {/* Search */}
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  placeholder="Search attendees by name, email, or phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-full cursor-text"
+                />
+              </div>
+
+              {/* Event Filter */}
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger className="w-full md:w-[200px] cursor-pointer">
+                  <SelectValue placeholder="All Events" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Events</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event} value={event} className="cursor-pointer">
+                      {event}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Status Filter */}
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
+                  <SelectItem value="registered" className="cursor-pointer">Registered</SelectItem>
+                  <SelectItem value="checked-in" className="cursor-pointer">Checked In</SelectItem>
+                  <SelectItem value="attended" className="cursor-pointer">Attended</SelectItem>
+                  <SelectItem value="no-show" className="cursor-pointer">No Show</SelectItem>
+                  <SelectItem value="cancelled" className="cursor-pointer">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Event Filter */}
-            <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-              <SelectTrigger className="w-full md:w-[200px] cursor-pointer">
-                <SelectValue placeholder="All Events" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Events</SelectItem>
-                {events.map((event) => (
-                  <SelectItem key={event} value={event} className="cursor-pointer">
-                    {event}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Row 2: View Options and Sort */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'table' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Table View"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                      viewMode === 'grid' 
+                        ? 'bg-white text-primary shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                    title="Grid View"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
 
-            {/* Status Filter */}
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
-                <SelectItem value="registered" className="cursor-pointer">Registered</SelectItem>
-                <SelectItem value="checked-in" className="cursor-pointer">Checked In</SelectItem>
-                <SelectItem value="attended" className="cursor-pointer">Attended</SelectItem>
-                <SelectItem value="no-show" className="cursor-pointer">No Show</SelectItem>
-                <SelectItem value="cancelled" className="cursor-pointer">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+                <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+
+                {/* Sort Options */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                  <Select
+                    value={sortField}
+                    onValueChange={(value: SortField) => {
+                      setSortField(value);
+                      setSortDirection('asc');
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name" className="cursor-pointer text-sm">Name</SelectItem>
+                      <SelectItem value="eventTitle" className="cursor-pointer text-sm">Event</SelectItem>
+                      <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
+                      <SelectItem value="registrationDate" className="cursor-pointer text-sm">Registered</SelectItem>
+                      <SelectItem value="price" className="cursor-pointer text-sm">Price</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <button
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                    title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    {sortDirection === 'asc' 
+                      ? <ArrowUp className="h-4 w-4 text-primary" />
+                      : <ArrowDown className="h-4 w-4 text-primary" />
+                    }
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <span className="text-xs text-gray-400">
+                  {filteredAttendees.length} attendee{filteredAttendees.length !== 1 ? 's' : ''}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-xs cursor-pointer"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedEvent('all');
+                    setSelectedStatus('all');
+                    setSortField('name');
+                    setSortDirection('asc');
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Bulk Actions Bar */}
@@ -518,291 +704,473 @@ export default function AttendeesPage() {
         </CardContent>
       </Card>
 
-      {/* Attendees Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead className="py-3 px-4 w-10">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      className="cursor-pointer"
-                    />
-                  </TableHead>
-                  <TableHead className="py-3 px-4">Attendee</TableHead>
-                  <TableHead className="py-3 px-4">Event</TableHead>
-                  <TableHead className="py-3 px-4">Status</TableHead>
-                  <TableHead className="py-3 px-4">Payment</TableHead>
-                  <TableHead className="py-3 px-4">CPD Hours</TableHead>
-                  <TableHead className="py-3 px-4 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAttendees.length > 0 ? (
-                  filteredAttendees.map((attendee) => {
-                    const status = statusConfig[attendee.status];
-                    const payment = paymentStatusConfig[attendee.paymentStatus];
-                    const StatusIcon = status.icon;
-                    const isSelected = selectedAttendees.includes(attendee.id);
+      {/* Attendees Table or Grid View */}
+      {viewMode === 'table' ? (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50">
+                    <TableHead className="py-3 px-4 w-10">
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
+                        className="cursor-pointer"
+                      />
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
+                      <div className="flex items-center">
+                        Attendee
+                        {getSortIcon('name')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventTitle')}>
+                      <div className="flex items-center">
+                        Event
+                        {getSortIcon('eventTitle')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
+                      <div className="flex items-center">
+                        Status
+                        {getSortIcon('status')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('price')}>
+                      <div className="flex items-center">
+                        Payment
+                        {getSortIcon('price')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4">CPD Hours</TableHead>
+                    <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAttendees.length > 0 ? (
+                    filteredAttendees.map((attendee) => {
+                      const status = statusConfig[attendee.status];
+                      const payment = paymentStatusConfig[attendee.paymentStatus];
+                      const StatusIcon = status.icon;
+                      const isSelected = selectedAttendees.includes(attendee.id);
 
-                    return (
-                      <TableRow 
-                        key={attendee.id}
-                        className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
-                          isSelected ? 'bg-primary/5' : ''
-                        }`}
-                        onClick={() => handleViewAttendee(attendee)}
-                      >
-                        <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => handleSelectAttendee(attendee.id)}
-                            className="cursor-pointer"
-                          />
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={attendee.avatar} />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {getInitials(attendee.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                                {attendee.name}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <Mail className="h-3 w-3" />
-                                <span>{attendee.email}</span>
+                      return (
+                        <TableRow 
+                          key={attendee.id}
+                          className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
+                            isSelected ? 'bg-primary/5' : ''
+                          }`}
+                          onClick={() => handleViewAttendee(attendee)}
+                        >
+                          <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                              className="cursor-pointer"
+                            />
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={attendee.avatar} />
+                                <AvatarFallback className="bg-primary/10 text-primary">
+                                  {getInitials(attendee.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                                  {attendee.name}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <Mail className="h-3 w-3" />
+                                  <span>{attendee.email}</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{attendee.eventTitle}</p>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <Calendar className="h-3 w-3" />
-                              <span>{attendee.eventDate}</span>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{attendee.eventTitle}</p>
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Calendar className="h-3 w-3" />
+                                <span>{attendee.eventDate}</span>
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${status.color} border`}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          <Badge variant="outline" className={`${payment.color} border`}>
-                            {payment.label}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">{attendee.price}</p>
-                        </TableCell>
-                        <TableCell className="py-4 px-4">
-                          {attendee.cpdHours && attendee.cpdHours > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <Award className="h-4 w-4 text-amber-500" />
-                              <span className="font-medium">{attendee.cpdHours} hrs</span>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewAttendee(attendee);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/attendees/${attendee.id}/edit`);
-                                }}
-                              >
-                                <Edit3 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              {attendee.certificateIssued && (
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${status.color} border`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {status.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            <Badge variant="outline" className={`${payment.color} border`}>
+                              {payment.label}
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">{attendee.price}</p>
+                          </TableCell>
+                          <TableCell className="py-4 px-4">
+                            {attendee.cpdHours && attendee.cpdHours > 0 ? (
+                              <div className="flex items-center gap-1">
+                                <Award className="h-4 w-4 text-amber-500" />
+                                <span className="font-medium">{attendee.cpdHours} hrs</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem 
                                   className="cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/certificates/${attendee.id}`);
+                                    handleViewAttendee(attendee);
                                   }}
                                 >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  View Certificate
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
                                 </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteAttendee(attendee);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-12 text-center text-gray-500">
-                      <div className="flex flex-col items-center gap-2">
-                        <Search className="h-8 w-8 text-gray-300" />
-                        <p className="font-medium">No attendees found</p>
-                        <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/dashboard/attendees/${attendee.id}/edit`);
+                                  }}
+                                >
+                                  <Edit3 className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleModalSendReminder();
+                                  }}
+                                >
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Send Reminder
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleModalExport();
+                                  }}
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Export
+                                </DropdownMenuItem>
+                                {attendee.certificateIssued && (
+                                  <DropdownMenuItem 
+                                    className="cursor-pointer"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      router.push(`/certificates/${attendee.id}`);
+                                    }}
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    View Certificate
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-red-600 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteAttendee(attendee);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-12 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <Search className="h-8 w-8 text-gray-300" />
+                          <p className="font-medium">No attendees found</p>
+                          <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        // Grid View
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredAttendees.length > 0 ? (
+            filteredAttendees.map((attendee) => {
+              const status = statusConfig[attendee.status];
+              const payment = paymentStatusConfig[attendee.paymentStatus];
+              const StatusIcon = status.icon;
+              const isSelected = selectedAttendees.includes(attendee.id);
+
+              return (
+                <Card 
+                  key={attendee.id} 
+                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+                    isSelected ? 'border-primary/50 bg-primary/5' : ''
+                  }`}
+                  onClick={() => handleViewAttendee(attendee)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="cursor-pointer"
+                        />
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={attendee.avatar} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(attendee.name)}
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      <Badge variant="outline" className={`${status.color} border`}>
+                        <StatusIcon className="h-3 w-3 mr-1" />
+                        {status.label}
+                      </Badge>
+                    </div>
 
-      {/* View Attendee Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Attendee Details</DialogTitle>
-            <DialogDescription>
-              View and manage attendee information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedAttendee && (
-            <div className="space-y-4">
-              {/* Profile */}
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedAttendee.avatar} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                    {getInitials(selectedAttendee.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="text-lg font-semibold">{selectedAttendee.name}</h3>
-                  <p className="text-sm text-gray-500">{selectedAttendee.email}</p>
-                  <p className="text-sm text-gray-500">{selectedAttendee.phone}</p>
-                </div>
-              </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                        {attendee.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate">{attendee.email}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">{attendee.phone}</p>
+                    </div>
 
-              <Separator />
+                    <div className="space-y-1 text-xs">
+                      <p className="font-medium text-gray-700 truncate">{attendee.eventTitle}</p>
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <Calendar className="h-3 w-3" />
+                        <span className="truncate">{attendee.eventDate}</span>
+                      </div>
+                    </div>
 
-              {/* Event Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">Event</Label>
-                  <p className="font-medium">{selectedAttendee.eventTitle}</p>
-                  <p className="text-sm text-gray-500">{selectedAttendee.eventDate}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Status</Label>
-                  <Badge variant="outline" className={`${statusConfig[selectedAttendee.status].color} border mt-1`}>
-                    {statusConfig[selectedAttendee.status].label}
-                  </Badge>
-                </div>
-              </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`${payment.color} border text-xs`}>
+                          {payment.label}
+                        </Badge>
+                        <span className="text-xs text-gray-500">{attendee.price}</span>
+                      </div>
+                      {attendee.cpdHours && attendee.cpdHours > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-amber-600">
+                          <Award className="h-3.5 w-3.5" />
+                          <span>{attendee.cpdHours}h</span>
+                        </div>
+                      )}
+                    </div>
 
-              {/* Ticket & Payment */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">Ticket Type</Label>
-                  <p className="font-medium">{selectedAttendee.ticketType}</p>
-                  <p className="text-sm text-gray-500">{selectedAttendee.price}</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Payment</Label>
-                  <Badge variant="outline" className={`${paymentStatusConfig[selectedAttendee.paymentStatus].color} border mt-1`}>
-                    {paymentStatusConfig[selectedAttendee.paymentStatus].label}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* CPD & Certificate */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-gray-500">CPD Hours</Label>
-                  <p className="font-medium">{selectedAttendee.cpdHours || 0} hours</p>
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500">Certificate</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    {selectedAttendee.certificateIssued ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-sm font-medium text-green-600">Issued</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-500">Not issued</span>
-                      </>
+                    {attendee.certificateIssued && (
+                      <div className="flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>Certificate Issued</span>
+                      </div>
                     )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <Search className="h-8 w-8 text-gray-300" />
+                <p className="font-medium">No attendees found</p>
+                <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
               </div>
-
-              {selectedAttendee.checkedInAt && (
-                <div>
-                  <Label className="text-xs text-gray-500">Checked In At</Label>
-                  <p className="text-sm">{selectedAttendee.checkedInAt}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              <DialogFooter className="gap-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewDialogOpen(false)}
-                  className="cursor-pointer"
-                >
-                  Close
-                </Button>
-                <Button 
-                  className="bg-primary hover:bg-primary/90 cursor-pointer"
-                  onClick={() => {
-                    setIsViewDialogOpen(false);
-                    router.push(`/dashboard/attendees/${selectedAttendee.id}/edit`);
-                  }}
-                >
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  Edit Attendee
-                </Button>
-              </DialogFooter>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+{/* View Attendee Dialog - Horizontal layout */}
+<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  <DialogContent className="max-w-[95vw] sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Attendee Details</DialogTitle>
+      <DialogDescription>
+        View and manage attendee information.
+      </DialogDescription>
+    </DialogHeader>
+    {selectedAttendee && (
+      <div className="space-y-4 sm:space-y-6">
+        {/* Profile - Horizontal */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
+            <AvatarImage src={selectedAttendee.avatar} />
+            <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg">
+              {getInitials(selectedAttendee.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base sm:text-lg font-semibold truncate">{selectedAttendee.name}</h3>
+            <p className="text-xs sm:text-sm text-gray-500 truncate">{selectedAttendee.email}</p>
+            <p className="text-xs sm:text-sm text-gray-500">{selectedAttendee.phone}</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Event Info - 2 columns */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Event</Label>
+            <p className="text-sm sm:text-base font-medium truncate">{selectedAttendee.eventTitle}</p>
+            <p className="text-xs text-gray-500">{selectedAttendee.eventDate}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Status</Label>
+            <Badge variant="outline" className={`${statusConfig[selectedAttendee.status].color} border mt-1`}>
+              {statusConfig[selectedAttendee.status].label}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Ticket & Payment - 2 columns */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Ticket Type</Label>
+            <p className="text-sm sm:text-base font-medium">{selectedAttendee.ticketType}</p>
+            <p className="text-xs text-gray-500">{selectedAttendee.price}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Payment</Label>
+            <Badge variant="outline" className={`${paymentStatusConfig[selectedAttendee.paymentStatus].color} border mt-1`}>
+              {paymentStatusConfig[selectedAttendee.paymentStatus].label}
+            </Badge>
+          </div>
+        </div>
+
+        {/* CPD & Certificate - 2 columns */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">CPD Hours</Label>
+            <p className="text-sm sm:text-base font-medium">{selectedAttendee.cpdHours || 0} hours</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Certificate</Label>
+            <div className="flex items-center gap-2 mt-1">
+              {selectedAttendee.certificateIssued ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                  <span className="text-sm font-medium text-green-600">Issued</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 text-gray-400 shrink-0" />
+                  <span className="text-sm text-gray-500">Not issued</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {selectedAttendee.checkedInAt && (
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Checked In At</Label>
+            <p className="text-sm">{selectedAttendee.checkedInAt}</p>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Actions - 2 columns horizontal */}
+        <div className="space-y-3">
+          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={() => setIsViewDialogOpen(false)}
+            >
+              <Eye className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">View Details</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalEdit}
+            >
+              <Edit3 className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Edit Attendee</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalSendReminder}
+            >
+              <Send className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Send Reminder</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-start text-sm"
+              onClick={handleModalExport}
+            >
+              <Download className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Export</span>
+            </Button>
+            {selectedAttendee.certificateIssued && (
+              <Button 
+                variant="outline" 
+                className="w-full cursor-pointer justify-start text-sm col-span-2"
+                onClick={handleModalViewCertificate}
+              >
+                <FileText className="h-4 w-4 mr-2 shrink-0" />
+                <span className="truncate">View Certificate</span>
+              </Button>
+            )}
+            <Button 
+              variant="destructive" 
+              className="w-full cursor-pointer justify-start text-sm col-span-2"
+              onClick={handleModalDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Delete Attendee</span>
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsViewDialogOpen(false)}
+            className="w-full sm:w-auto cursor-pointer"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Bulk Action Confirmation Dialog */}
       <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
@@ -901,7 +1269,6 @@ export default function AttendeesPage() {
               variant="destructive" 
               className="cursor-pointer"
               onClick={() => {
-                // Handle delete
                 setIsDeleteDialogOpen(false);
               }}
             >
