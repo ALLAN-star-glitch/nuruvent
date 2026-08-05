@@ -1,9 +1,10 @@
+// app/events/page.tsx
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { CategoryFilter } from '@/components/home/CategoryFilter';
 import { EventGrid } from '@/components/home/EventGrid';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
-import { SlidersHorizontal } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: `Browse Training Events & Workshops | ${SITE_NAME}`,
@@ -77,7 +78,9 @@ export default function EventsPage() {
             <CategoryFilter />
           </div>
           <div className="flex-1">
-            <EventGrid />
+            <Suspense fallback={<div className="text-center py-12">Loading events...</div>}>
+              <EventGrid />
+            </Suspense>
           </div>
         </div>
       </div>
