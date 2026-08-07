@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 
+// Dashboard menu items - matching sidebar exactly
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
@@ -38,6 +39,10 @@ const dashboardNavItems = [
 
 export function MainHeader() {
   const pathname = usePathname();
+
+  // Split items: everything except Settings in main group, Settings in its own group
+  const mainItems = dashboardNavItems.filter(item => item.href !== '/dashboard/settings');
+  const settingsItem = dashboardNavItems.find(item => item.href === '/dashboard/settings');
 
   return (
     <div className="bg-white border-b shadow-xs">
@@ -66,14 +71,14 @@ export function MainHeader() {
                   </div>
                 </SheetHeader>
 
-                {/* Mobile Drawer Navigation Links */}
+                {/* Mobile Drawer Navigation Links - Main Menu on Top */}
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Main Navigation Section */}
+                  {/* Main Navigation Section - On Top */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Main Menu
                     </p>
-                    <nav className="space-y-1">
+                    <nav className="space-y-0.5">
                       {NAV_ITEMS.map((item) => {
                         const isActive = pathname === item.href;
                         const Icon = item.icon;
@@ -82,13 +87,16 @@ export function MainHeader() {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer',
                                 isActive
-                                  ? 'bg-primary text-white'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                               )}
                             >
-                              <Icon className="h-5 w-5 shrink-0" />
+                              <Icon className={cn(
+                                'h-5 w-5 shrink-0',
+                                isActive ? 'text-primary' : 'text-gray-400'
+                              )} />
                               <span>{item.label}</span>
                             </Link>
                           </SheetClose>
@@ -97,33 +105,72 @@ export function MainHeader() {
                     </nav>
                   </div>
 
-                  {/* Dashboard Menu Section */}
+                  {/* Dashboard Menu Section - Below Main Menu */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Dashboard
                     </p>
-                    <nav className="space-y-1">
-                      {dashboardNavItems.map((item) => {
-                        const isActive = pathname === item.href;
+                    <nav className="space-y-0.5">
+                      {mainItems.map((item) => {
+                        const isActive = pathname === item.href || 
+                          (item.href !== '/dashboard' && pathname.startsWith(item.href));
                         const Icon = item.icon;
                         return (
                           <SheetClose asChild key={item.href}>
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer',
                                 isActive
-                                  ? 'bg-primary text-white'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                               )}
                             >
-                              <Icon className="h-5 w-5 shrink-0" />
+                              <Icon className={cn(
+                                'h-5 w-5 shrink-0',
+                                isActive ? 'text-primary' : 'text-gray-400'
+                              )} />
                               <span>{item.label}</span>
                             </Link>
                           </SheetClose>
                         );
                       })}
                     </nav>
+
+                    {/* Divider with dot */}
+                    <div className="relative my-4 mx-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200/40" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="bg-white px-2 text-[8px] font-medium tracking-widest uppercase text-gray-400/50">
+                          •
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Settings item */}
+                    {settingsItem && (
+                      <nav className="space-y-0.5">
+                        <SheetClose asChild>
+                          <Link
+                            href={settingsItem.href}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer',
+                              pathname.startsWith(settingsItem.href)
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
+                            )}
+                          >
+                            <Settings className={cn(
+                              'h-5 w-5 shrink-0',
+                              pathname.startsWith(settingsItem.href) ? 'text-primary' : 'text-gray-400'
+                            )} />
+                            <span>{settingsItem.label}</span>
+                          </Link>
+                        </SheetClose>
+                      </nav>
+                    )}
                   </div>
                 </div>
 

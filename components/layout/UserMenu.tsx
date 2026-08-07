@@ -19,13 +19,13 @@ import {
   Award,
   CreditCard,
   DollarSign,
-  Shield,
   LifeBuoy,
   Settings,
   LogOut,
   PlusCircle,
   Video,
   ChevronDown,
+  Shield,
 } from 'lucide-react';
 
 interface UserMenuProps {
@@ -48,11 +48,6 @@ export function UserMenu({ user }: UserMenuProps) {
       .slice(0, 2);
   };
 
-  const getDashboardLink = () => {
-    if (!user?.role) return '/dashboard';
-    return `/dashboard/${user.role}`;
-  };
-
   const getRoleBadge = () => {
     switch (user?.role) {
       case 'host':
@@ -71,33 +66,42 @@ export function UserMenu({ user }: UserMenuProps) {
   const getQuickLinks = () => {
     if (user?.role === 'host') {
       return [
-        { label: 'My Events', href: '/dashboard/host/events', icon: Calendar },
-        { label: 'Create Event', href: '/dashboard/host/events/new', icon: PlusCircle },
-        { label: 'Attendees', href: '/dashboard/host/attendees', icon: Users },
-        { label: 'Revenue', href: '/dashboard/host/revenue', icon: DollarSign },
-        { label: 'Certificates', href: '/dashboard/host/certificates', icon: Award },
+        { label: 'Events', href: '/dashboard/events', icon: Calendar },
+        { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
+        { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
+        { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
+        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
+        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
+        { label: 'Replays', href: '/dashboard/replays', icon: Video },
       ];
     }
     if (user?.role === 'attendee') {
       return [
-        { label: 'My Events', href: '/dashboard/attendee/events', icon: Calendar },
-        { label: 'Certificates', href: '/dashboard/attendee/certificates', icon: Award },
-        { label: 'Replays', href: '/dashboard/attendee/replays', icon: Video },
-        { label: 'Payments', href: '/dashboard/attendee/payments', icon: CreditCard },
+        { label: 'My Events', href: '/dashboard/events', icon: Calendar },
+        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
+        { label: 'Replays', href: '/dashboard/replays', icon: Video },
+        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
       ];
     }
     if (user?.role === 'admin') {
       return [
-        { label: 'Users', href: '/dashboard/admin/users', icon: Users },
-        { label: 'Events', href: '/dashboard/admin/events', icon: Calendar },
-        { label: 'Payments', href: '/dashboard/admin/payments', icon: CreditCard },
-        { label: 'Certificates', href: '/dashboard/admin/certificates', icon: Award },
+        { label: 'Users', href: '/dashboard/users', icon: Users },
+        { label: 'Events', href: '/dashboard/events', icon: Calendar },
+        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
+        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
+        { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
+        { label: 'Replays', href: '/dashboard/replays', icon: Video },
       ];
     }
     return [];
   };
 
   const quickLinks = getQuickLinks();
+
+  // Helper to close dropdown
+  const closeDropdown = () => {
+    document.body.click();
+  };
 
   return (
     <DropdownMenu>
@@ -143,8 +147,9 @@ export function UserMenu({ user }: UserMenuProps) {
         {/* Dashboard Link */}
         <DropdownMenuItem className="bg-primary/5 hover:bg-primary/10 cursor-pointer p-0">
           <Link
-            href={getDashboardLink()}
+            href="/dashboard"
             className="flex items-center gap-3 py-2.5 px-2 w-full"
+            onClick={closeDropdown}
           >
             <div className="bg-primary p-1.5 rounded-lg">
               <LayoutDashboard className="h-4 w-4 text-white" />
@@ -185,6 +190,7 @@ export function UserMenu({ user }: UserMenuProps) {
                   <Link
                     href={item.href}
                     className="flex items-center gap-2 py-2 px-2 w-full"
+                    onClick={closeDropdown}
                   >
                     <item.icon className="h-4 w-4 text-muted-foreground" />
                     <span>{item.label}</span>
@@ -196,7 +202,7 @@ export function UserMenu({ user }: UserMenuProps) {
           </>
         )}
 
-        {/* Account Settings */}
+        {/* Account */}
         <div className="px-2 py-1.5">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Account
@@ -204,39 +210,44 @@ export function UserMenu({ user }: UserMenuProps) {
         </div>
         <DropdownMenuGroup>
           <DropdownMenuItem className="p-0 cursor-pointer">
-            <Link href="/profile" className="flex items-center gap-2 py-2 px-2 w-full">
+            <Link
+              href="/dashboard/account"
+              className="flex items-center gap-2 py-2 px-2 w-full"
+              onClick={closeDropdown}
+            >
               <User className="h-4 w-4 text-muted-foreground" />
-              <span>My Profile</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="p-0 cursor-pointer">
-            <Link href="/settings/security" className="flex items-center gap-2 py-2 px-2 w-full">
-              <Shield className="h-4 w-4 text-muted-foreground" />
-              <span>Security (2FA)</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="p-0 cursor-pointer">
-            <Link href="/settings/payments" className="flex items-center gap-2 py-2 px-2 w-full">
-              <CreditCard className="h-4 w-4 text-muted-foreground" />
-              <span>Payment Methods</span>
+              <span>My Account</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
-        {/* Support & Settings */}
+        {/* Settings */}
+        <div className="px-2 py-1.5">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Preferences
+          </span>
+        </div>
         <DropdownMenuGroup>
           <DropdownMenuItem className="p-0 cursor-pointer">
-            <Link href="/help" className="flex items-center gap-2 py-2 px-2 w-full">
-              <LifeBuoy className="h-4 w-4 text-muted-foreground" />
-              <span>Help & Support</span>
+            <Link
+              href="/dashboard/settings"
+              className="flex items-center gap-2 py-2 px-2 w-full"
+              onClick={closeDropdown}
+            >
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <span>Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem className="p-0 cursor-pointer">
-            <Link href="/settings" className="flex items-center gap-2 py-2 px-2 w-full">
-              <Settings className="h-4 w-4 text-muted-foreground" />
-              <span>All Settings</span>
+            <Link
+              href="/help"
+              className="flex items-center gap-2 py-2 px-2 w-full"
+              onClick={closeDropdown}
+            >
+              <LifeBuoy className="h-4 w-4 text-muted-foreground" />
+              <span>Help & Support</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>

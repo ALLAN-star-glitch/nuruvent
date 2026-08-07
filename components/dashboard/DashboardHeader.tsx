@@ -12,7 +12,8 @@ import {
   Settings,
   PlusCircle,
   DollarSign,
-  Video
+  Video,
+  LogOut,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -39,19 +40,16 @@ interface DashboardHeaderProps {
   };
 }
 
+// Dashboard menu items - matching sidebar exactly
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
   { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
   { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
+  { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
+  { href: '/dashboard/replays', label: 'Replays', icon: Video },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
-];
-
-const quickActions = [
-  { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
-  { label: 'Revenue', href: '/dashboard/payments', icon: DollarSign },
-  { label: 'Replays', href: '/dashboard/replays', icon: Video },
 ];
 
 export function DashboardHeader({ user }: DashboardHeaderProps) {
@@ -61,6 +59,24 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     name: 'John Doe',
     email: 'john@example.com',
     role: 'host' as const,
+  };
+
+  // Split items: everything except Settings in main group, Settings in its own group
+  const mainItems = dashboardNavItems.filter(item => item.href !== '/dashboard/settings');
+  const settingsItem = dashboardNavItems.find(item => item.href === '/dashboard/settings');
+
+  // Get initials for avatar
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const handleLogout = () => {
+    console.log('Logout clicked');
   };
 
   return (
@@ -92,12 +108,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                 {/* Mobile Drawer Navigation Links */}
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Website Topbar Navigation Section */}
+                  {/* Main Website Navigation Section */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Main Menu
                     </p>
-                    <nav className="space-y-1">
+                    <nav className="space-y-0.5">
                       {NAV_ITEMS.map((item) => {
                         const isActive = pathname === item.href;
                         const Icon = item.icon;
@@ -106,13 +122,16 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                                 isActive
-                                  ? 'bg-primary text-white'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                               )}
                             >
-                              <Icon className="h-5 w-5 shrink-0" />
+                              <Icon className={cn(
+                                'h-5 w-5 shrink-0',
+                                isActive ? 'text-primary' : 'text-gray-400'
+                              )} />
                               <span>{item.label}</span>
                             </Link>
                           </SheetClose>
@@ -121,66 +140,91 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </nav>
                   </div>
 
-                  {/* Dashboard Menu Section */}
+                  {/* Dashboard Menu Section - Matching Sidebar */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Dashboard
                     </p>
-                    <nav className="space-y-1">
-                      {dashboardNavItems.map((item) => {
-                        const isActive = pathname === item.href;
+                    <nav className="space-y-0.5">
+                      {mainItems.map((item) => {
+                        const isActive = pathname === item.href || 
+                          (item.href !== '/dashboard' && pathname.startsWith(item.href));
                         const Icon = item.icon;
                         return (
                           <SheetClose asChild key={item.href}>
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                                 isActive
-                                  ? 'bg-primary text-white'
-                                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                               )}
                             >
-                              <Icon className="h-5 w-5 shrink-0" />
+                              <Icon className={cn(
+                                'h-5 w-5 shrink-0',
+                                isActive ? 'text-primary' : 'text-gray-400'
+                              )} />
                               <span>{item.label}</span>
                             </Link>
                           </SheetClose>
                         );
                       })}
                     </nav>
-                  </div>
 
-                  {/* Quick Actions (Host) */}
-                  {currentUser.role === 'host' && (
-                    <div>
-                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                        Quick Actions
-                      </p>
-                      <nav className="space-y-1">
-                        {quickActions.map((item) => {
-                          const Icon = item.icon;
-                          return (
-                            <SheetClose asChild key={item.href}>
-                              <Link
-                                href={item.href}
-                                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                              >
-                                <Icon className="h-5 w-5 shrink-0 text-gray-500" />
-                                <span>{item.label}</span>
-                              </Link>
-                            </SheetClose>
-                          );
-                        })}
-                      </nav>
+                    {/* Divider with dot - matching sidebar */}
+                    <div className="relative my-4 mx-3">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-200/40" />
+                      </div>
+                      <div className="relative flex justify-center">
+                        <span className="bg-white px-2 text-[8px] font-medium tracking-widest uppercase text-gray-400/50">
+                          •
+                        </span>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Settings item - matching sidebar */}
+                    {settingsItem && (
+                      <nav className="space-y-0.5">
+                        <SheetClose asChild>
+                          <Link
+                            href={settingsItem.href}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                              pathname.startsWith(settingsItem.href)
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
+                            )}
+                          >
+                            <Settings className={cn(
+                              'h-5 w-5 shrink-0',
+                              pathname.startsWith(settingsItem.href) ? 'text-primary' : 'text-gray-400'
+                            )} />
+                            <span>{settingsItem.label}</span>
+                          </Link>
+                        </SheetClose>
+                      </nav>
+                    )}
+                  </div>
                 </div>
 
-                {/* Drawer Footer User Details */}
-                <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0">
-                  <div className="flex items-center gap-3">
+                {/* Drawer Footer - Logout and User */}
+                <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3">
+                  {/* Logout Button */}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-red-500 hover:bg-red-50/50"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0 text-red-400" />
+                    <span className="text-sm font-medium">Logout</span>
+                  </button>
+
+                  {/* User Info */}
+                  <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
                     <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
-                      {currentUser.name.charAt(0)}
+                      {getInitials(currentUser.name)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>

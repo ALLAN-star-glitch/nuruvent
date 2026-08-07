@@ -36,6 +36,7 @@ import {
   Database,
   Zap,
   RefreshCw,
+  LayoutDashboard,
 } from 'lucide-react';
 
 // Shadcn components
@@ -81,18 +82,15 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Types
-interface ProfileData {
-  name: string;
-  email: string;
-  phone: string;
-  avatar?: string;
-  bio: string;
-  role: 'host' | 'attendee' | 'admin';
-  organization: string;
-  website: string;
-  location: string;
+interface GeneralSettings {
+  appTheme: 'light' | 'dark' | 'system';
+  appLanguage: string;
   timezone: string;
-  language: string;
+  dateFormat: string;
+  timeFormat: '12h' | '24h';
+  compactView: boolean;
+  autoPlayVideos: boolean;
+  reduceMotion: boolean;
 }
 
 interface NotificationSettings {
@@ -124,17 +122,15 @@ interface PaymentSettings {
 }
 
 // Mock Data
-const mockProfile: ProfileData = {
-  name: 'John Doe',
-  email: 'john@nuruvent.com',
-  phone: '+254 712 345 678',
-  bio: 'Training event host and professional development coach.',
-  role: 'host',
-  organization: 'Nuruvent Inc.',
-  website: 'https://nuruvent.com',
-  location: 'Nairobi, Kenya',
+const mockGeneral: GeneralSettings = {
+  appTheme: 'light',
+  appLanguage: 'English',
   timezone: 'Africa/Nairobi',
-  language: 'English',
+  dateFormat: 'MMM DD, YYYY',
+  timeFormat: '12h',
+  compactView: false,
+  autoPlayVideos: true,
+  reduceMotion: false,
 };
 
 const mockNotifications: NotificationSettings = {
@@ -165,44 +161,27 @@ const mockPayment: PaymentSettings = {
   minPayoutAmount: 1000,
 };
 
-const timezones = [
-  'Africa/Nairobi',
-  'Africa/Lagos',
-  'Africa/Cairo',
-  'Africa/Johannesburg',
-  'Africa/Casablanca',
-  'Europe/London',
-  'America/New_York',
-  'Asia/Dubai',
-];
-
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'TZS', 'UGX'];
-
 const languages = ['English', 'Swahili', 'French', 'Arabic', 'Portuguese'];
+const timezones = ['Africa/Nairobi', 'Africa/Lagos', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Casablanca', 'Europe/London', 'America/New_York', 'Asia/Dubai'];
+const dateFormats = ['MMM DD, YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<ProfileData>(mockProfile);
+  const [general, setGeneral] = useState<GeneralSettings>(mockGeneral);
   const [notifications, setNotifications] = useState<NotificationSettings>(mockNotifications);
   const [security, setSecurity] = useState<SecuritySettings>(mockSecurity);
   const [payment, setPayment] = useState<PaymentSettings>(mockPayment);
-  const [isEditing, setIsEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('general');
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const handleProfileSave = () => {
-    setIsSaveDialogOpen(true);
+  const handleGeneralChange = (key: keyof GeneralSettings, value: string | boolean) => {
+    setGeneral(prev => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
   const handleNotificationToggle = (key: keyof NotificationSettings) => {
@@ -226,6 +205,10 @@ export default function SettingsPage() {
     }));
   };
 
+  const handleSaveSettings = () => {
+    setIsSaveDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -236,42 +219,21 @@ export default function SettingsPage() {
             Manage your account preferences and platform settings.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button 
-                variant="outline" 
-                className="cursor-pointer"
-                onClick={() => setIsEditing(false)}
-              >
-                Cancel
-              </Button>
-              <Button 
-                className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-                onClick={handleProfileSave}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </Button>
-            </>
-          ) : (
-            <Button 
-              className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-              onClick={() => setIsEditing(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Edit Settings
-            </Button>
-          )}
-        </div>
+        <Button 
+          className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+          onClick={handleSaveSettings}
+        >
+          <Save className="h-4 w-4 mr-2" />
+          Save Changes
+        </Button>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 bg-gray-100 p-1 rounded-lg">
-          <TabsTrigger value="profile" className="cursor-pointer flex items-center gap-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profile</span>
+        <TabsList className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-gray-100 p-1 rounded-lg">
+          <TabsTrigger value="general" className="cursor-pointer flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">General</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="cursor-pointer flex items-center gap-2">
             <Bell className="h-4 w-4" />
@@ -285,125 +247,64 @@ export default function SettingsPage() {
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Payments</span>
           </TabsTrigger>
-          <TabsTrigger value="preferences" className="cursor-pointer flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            <span className="hidden sm:inline">Preferences</span>
-          </TabsTrigger>
           <TabsTrigger value="danger" className="cursor-pointer flex items-center gap-2 text-red-600 hover:text-red-700">
             <AlertCircle className="h-4 w-4" />
             <span className="hidden sm:inline">Danger</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile">
+        {/* General Tab */}
+        <TabsContent value="general">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
+              <CardTitle>General Settings</CardTitle>
               <CardDescription>
-                Manage your personal information and public profile.
+                Customize your app experience and display preferences.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Avatar */}
-              <div className="flex items-center gap-6">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={profile.avatar} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
-                    {getInitials(profile.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <Button variant="outline" className="cursor-pointer" disabled={!isEditing}>
-                    Change Avatar
-                  </Button>
-                  <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</p>
-                </div>
-              </div>
-
-              <Separator />
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Full Name</Label>
-                  <Input
-                    value={profile.name}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
-                </div>
-                <div>
-                  <Label>Email Address</Label>
-                  <Input
-                    type="email"
-                    value={profile.email}
-                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
-                </div>
-                <div>
-                  <Label>Phone Number</Label>
-                  <Input
-                    value={profile.phone}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
-                </div>
-                <div>
-                  <Label>Role</Label>
+                  <Label>App Theme</Label>
                   <Select
-                    value={profile.role}
-                    onValueChange={(value: 'host' | 'attendee' | 'admin') => 
-                      setProfile({ ...profile, role: value })
-                    }
-                    disabled={!isEditing}
+                    value={general.appTheme}
+                    onValueChange={(value) => handleGeneralChange('appTheme', value)}
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="host" className="cursor-pointer">Host</SelectItem>
-                      <SelectItem value="attendee" className="cursor-pointer">Attendee</SelectItem>
-                      <SelectItem value="admin" className="cursor-pointer">Admin</SelectItem>
+                      <SelectItem value="light" className="cursor-pointer">Light</SelectItem>
+                      <SelectItem value="dark" className="cursor-pointer">Dark</SelectItem>
+                      <SelectItem value="system" className="cursor-pointer">System</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div>
-                  <Label>Organization</Label>
-                  <Input
-                    value={profile.organization}
-                    onChange={(e) => setProfile({ ...profile, organization: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
+                  <Label>App Language</Label>
+                  <Select
+                    value={general.appLanguage}
+                    onValueChange={(value) => handleGeneralChange('appLanguage', value)}
+                  >
+                    <SelectTrigger className="mt-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languages.map((lang) => (
+                        <SelectItem key={lang} value={lang} className="cursor-pointer">
+                          {lang}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <Label>Website</Label>
-                  <Input
-                    value={profile.website}
-                    onChange={(e) => setProfile({ ...profile, website: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
-                </div>
-                <div>
-                  <Label>Location</Label>
-                  <Input
-                    value={profile.location}
-                    onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                    disabled={!isEditing}
-                    className="mt-1 cursor-text"
-                  />
-                </div>
+
                 <div>
                   <Label>Time Zone</Label>
                   <Select
-                    value={profile.timezone}
-                    onValueChange={(value) => setProfile({ ...profile, timezone: value })}
-                    disabled={!isEditing}
+                    value={general.timezone}
+                    onValueChange={(value) => handleGeneralChange('timezone', value)}
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
@@ -417,14 +318,76 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="md:col-span-2">
-                  <Label>Bio</Label>
-                  <textarea
-                    value={profile.bio}
-                    onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                    disabled={!isEditing}
-                    className="w-full min-h-[100px] p-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-text mt-1"
-                    placeholder="Tell us about yourself..."
+
+                <div>
+                  <Label>Date Format</Label>
+                  <Select
+                    value={general.dateFormat}
+                    onValueChange={(value) => handleGeneralChange('dateFormat', value)}
+                  >
+                    <SelectTrigger className="mt-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dateFormats.map((format) => (
+                        <SelectItem key={format} value={format} className="cursor-pointer">
+                          {format}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Time Format</Label>
+                  <Select
+                    value={general.timeFormat}
+                    onValueChange={(value) => handleGeneralChange('timeFormat', value)}
+                  >
+                    <SelectTrigger className="mt-1 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="12h" className="cursor-pointer">12-hour (AM/PM)</SelectItem>
+                      <SelectItem value="24h" className="cursor-pointer">24-hour</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Compact View</Label>
+                    <p className="text-xs text-gray-500">Display more content with compact spacing</p>
+                  </div>
+                  <Switch
+                    checked={general.compactView}
+                    onCheckedChange={(checked) => handleGeneralChange('compactView', checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Auto-Play Videos</Label>
+                    <p className="text-xs text-gray-500">Automatically play videos when they appear</p>
+                  </div>
+                  <Switch
+                    checked={general.autoPlayVideos}
+                    onCheckedChange={(checked) => handleGeneralChange('autoPlayVideos', checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Reduce Motion</Label>
+                    <p className="text-xs text-gray-500">Minimize animations and transitions</p>
+                  </div>
+                  <Switch
+                    checked={general.reduceMotion}
+                    onCheckedChange={(checked) => handleGeneralChange('reduceMotion', checked)}
                   />
                 </div>
               </div>
@@ -594,7 +557,7 @@ export default function SettingsPage() {
                   <Label>Session Timeout</Label>
                   <Select
                     value={String(security.sessionTimeout)}
-                    onValueChange={(value) => handleSecurityToggle('sessionTimeout')}
+                    onValueChange={(value) => setSecurity({ ...security, sessionTimeout: Number(value) })}
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
@@ -726,54 +689,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Preferences Tab */}
-        <TabsContent value="preferences">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferences</CardTitle>
-              <CardDescription>
-                Customize your platform experience and display settings.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <Label>Language</Label>
-                <Select
-                  value={profile.language}
-                  onValueChange={(value) => setProfile({ ...profile, language: value })}
-                >
-                  <SelectTrigger className="mt-1 cursor-pointer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {languages.map((lang) => (
-                      <SelectItem key={lang} value={lang} className="cursor-pointer">
-                        {lang}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Dark Mode</Label>
-                  <p className="text-xs text-gray-500">Switch between light and dark theme</p>
-                </div>
-                <Switch />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Compact View</Label>
-                  <p className="text-xs text-gray-500">Display more content with compact spacing</p>
-                </div>
-                <Switch />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* Danger Tab */}
         <TabsContent value="danger">
           <Card className="border-red-200">
@@ -837,7 +752,7 @@ export default function SettingsPage() {
             <CheckCircle2 className="h-6 w-6 text-green-600" />
             <div>
               <p className="font-medium text-gray-900">Changes Saved</p>
-              <p className="text-sm text-gray-500">Your profile settings have been updated.</p>
+              <p className="text-sm text-gray-500">Your settings have been updated.</p>
             </div>
           </div>
           <DialogFooter>
@@ -845,7 +760,6 @@ export default function SettingsPage() {
               className="bg-primary hover:bg-primary/90 cursor-pointer"
               onClick={() => {
                 setIsSaveDialogOpen(false);
-                setIsEditing(false);
               }}
             >
               Done

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -30,6 +30,11 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Filter,
+  ArrowRight,
 } from 'lucide-react';
 
 // Shadcn components
@@ -73,6 +78,13 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -251,11 +263,28 @@ export default function CertificatesPage() {
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
   const [selectAll, setSelectAll] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   
-  // New state for view and sort
+  // Sort and view state
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [sortField, setSortField] = useState<SortField>('issueDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+
+  // Check if mobile
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Filter certificates
   const filteredCertificates = useMemo(() => {
@@ -298,6 +327,15 @@ export default function CertificatesPage() {
     return filtered;
   }, [searchQuery, selectedStatus, selectedType, sortField, sortDirection]);
 
+  // Paginate certificates
+  const paginatedCertificates = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredCertificates.slice(startIndex, endIndex);
+  }, [filteredCertificates, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredCertificates.length / itemsPerPage);
+
   // Stats
   const stats = useMemo(() => {
     const total = mockCertificates.length;
@@ -337,7 +375,7 @@ export default function CertificatesPage() {
     if (selectAll) {
       setSelectedCertificates([]);
     } else {
-      setSelectedCertificates(filteredCertificates.map(c => c.id));
+      setSelectedCertificates(paginatedCertificates.map(c => c.id));
     }
     setSelectAll(!selectAll);
   };
@@ -350,6 +388,20 @@ export default function CertificatesPage() {
         return [...prev, id];
       }
     });
+  };
+
+  const handleRowClick = (id: string) => {
+    if (!isMobile) {
+      handleSelectCertificate(id);
+    }
+  };
+
+  const handleCardClick = (cert: Certificate) => {
+    if (isMobile) {
+      handleViewCertificate(cert);
+    } else {
+      handleSelectCertificate(cert.id);
+    }
   };
 
   const handleBulkAction = (action: string) => {
@@ -373,6 +425,15 @@ export default function CertificatesPage() {
     setIsBulkActionDialogOpen(false);
     setSelectedCertificates([]);
     setSelectAll(false);
+  };
+
+  const handleViewSelected = () => {
+    if (selectedCertificates.length === 1) {
+      const cert = mockCertificates.find(c => c.id === selectedCertificates[0]);
+      if (cert) {
+        handleViewCertificate(cert);
+      }
+    }
   };
 
   const getSelectedCount = () => selectedCertificates.length;
@@ -399,7 +460,6 @@ export default function CertificatesPage() {
   const handleModalDownloadPDF = () => {
     if (selectedCertificate) {
       setIsViewDialogOpen(false);
-      // Handle download PDF
       console.log('Download PDF for:', selectedCertificate.certificateNumber);
     }
   };
@@ -414,7 +474,6 @@ export default function CertificatesPage() {
   const handleModalPrint = () => {
     if (selectedCertificate) {
       setIsViewDialogOpen(false);
-      // Handle print
       console.log('Print certificate:', selectedCertificate.certificateNumber);
     }
   };
@@ -426,8 +485,45 @@ export default function CertificatesPage() {
     }
   };
 
+  // Get active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (selectedStatus !== 'all') count++;
+    if (selectedType !== 'all') count++;
+    return count;
+  };
+
+  // Get sort label
+  const getSortLabel = () => {
+    const labels = {
+      attendeeName: 'Attendee',
+      eventTitle: 'Event',
+      status: 'Status',
+      issueDate: 'Issue Date',
+      certificateNumber: 'Certificate #'
+    };
+    return labels[sortField];
+  };
+
+  // Handle reset on mobile
+  const handleMobileReset = () => {
+    setSearchQuery('');
+    setSelectedStatus('all');
+    setSelectedType('all');
+    setSortField('issueDate');
+    setSortDirection('desc');
+    setCurrentPage(1);
+    setIsFilterSheetOpen(false);
+  };
+
+  // Handle apply on mobile
+  const handleMobileApply = () => {
+    setIsFilterSheetOpen(false);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -441,7 +537,10 @@ export default function CertificatesPage() {
             <Download className="h-4 w-4 mr-2" />
             Export All
           </Button>
-          <Button className="bg-primary hover:bg-primary/90 text-white cursor-pointer">
+          <Button 
+            className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+            onClick={() => router.push('/dashboard/certificates/create')}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Certificate
           </Button>
@@ -507,196 +606,206 @@ export default function CertificatesPage() {
         </Card>
       </div>
 
-      {/* Filters, View Options, and Sort */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Filters */}
-            <div className="flex flex-col md:flex-row items-center gap-4">
-              {/* Search */}
-              <div className="relative flex-1 w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                <Input
-                  placeholder="Search certificates by name, email, event, or number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-full cursor-text"
-                />
-              </div>
-
-              {/* Status Filter */}
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
-                  <SelectItem value="issued" className="cursor-pointer">Issued</SelectItem>
-                  <SelectItem value="pending" className="cursor-pointer">Pending</SelectItem>
-                  <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
-                  <SelectItem value="expired" className="cursor-pointer">Expired</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* Type Filter */}
-              <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="cursor-pointer">All Types</SelectItem>
-                  <SelectItem value="cpd" className="cursor-pointer">CPD</SelectItem>
-                  <SelectItem value="completion" className="cursor-pointer">Completion</SelectItem>
-                  <SelectItem value="attendance" className="cursor-pointer">Attendance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Row 2: View Options and Sort */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {/* View Toggle */}
-                <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
-                  <button
-                    onClick={() => setViewMode('table')}
-                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                      viewMode === 'table' 
-                        ? 'bg-white text-primary shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                    title="Table View"
-                  >
-                    <List className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                      viewMode === 'grid' 
-                        ? 'bg-white text-primary shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                    title="Grid View"
-                  >
-                    <Grid3x3 className="h-4 w-4" />
-                  </button>
+      {/* Desktop Filters - Hidden on Mobile */}
+      {!isMobile && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+              {/* Row 1: Filters */}
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <Input
+                    placeholder="Search certificates by name, email, event, or number..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 w-full cursor-text"
+                  />
                 </div>
 
-                <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
+                    <SelectItem value="issued" className="cursor-pointer">Issued</SelectItem>
+                    <SelectItem value="pending" className="cursor-pointer">Pending</SelectItem>
+                    <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
+                    <SelectItem value="expired" className="cursor-pointer">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
 
-                {/* Sort Options */}
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
-                  <Select
-                    value={sortField}
-                    onValueChange={(value: SortField) => {
-                      setSortField(value);
-                      setSortDirection('asc');
+                <Select value={selectedType} onValueChange={setSelectedType}>
+                  <SelectTrigger className="w-full md:w-[150px] cursor-pointer">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">All Types</SelectItem>
+                    <SelectItem value="cpd" className="cursor-pointer">CPD</SelectItem>
+                    <SelectItem value="completion" className="cursor-pointer">Completion</SelectItem>
+                    <SelectItem value="attendance" className="cursor-pointer">Attendance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Row 2: View Options and Sort */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                    <button
+                      onClick={() => setViewMode('table')}
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                        viewMode === 'table' 
+                          ? 'bg-white text-primary shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      title="Table View"
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                        viewMode === 'grid' 
+                          ? 'bg-white text-primary shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      title="Grid View"
+                    >
+                      <Grid3x3 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                    <Select
+                      value={sortField}
+                      onValueChange={(value: SortField) => {
+                        setSortField(value);
+                        setSortDirection('asc');
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="attendeeName" className="cursor-pointer text-sm">Attendee</SelectItem>
+                        <SelectItem value="eventTitle" className="cursor-pointer text-sm">Event</SelectItem>
+                        <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
+                        <SelectItem value="issueDate" className="cursor-pointer text-sm">Issue Date</SelectItem>
+                        <SelectItem value="certificateNumber" className="cursor-pointer text-sm">Certificate #</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <button
+                      onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                      className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+                      title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                    >
+                      {sortDirection === 'asc' 
+                        ? <ArrowUp className="h-4 w-4 text-primary" />
+                        : <ArrowDown className="h-4 w-4 text-primary" />
+                      }
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                  <span className="text-xs text-gray-400">
+                    {filteredCertificates.length} certificate{filteredCertificates.length !== 1 ? 's' : ''}
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-xs cursor-pointer"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedStatus('all');
+                      setSelectedType('all');
+                      setSortField('issueDate');
+                      setSortDirection('desc');
+                      setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="attendeeName" className="cursor-pointer text-sm">Attendee</SelectItem>
-                      <SelectItem value="eventTitle" className="cursor-pointer text-sm">Event</SelectItem>
-                      <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
-                      <SelectItem value="issueDate" className="cursor-pointer text-sm">Issue Date</SelectItem>
-                      <SelectItem value="certificateNumber" className="cursor-pointer text-sm">Certificate #</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <button
-                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                    className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-                    title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
-                  >
-                    {sortDirection === 'asc' 
-                      ? <ArrowUp className="h-4 w-4 text-primary" />
-                      : <ArrowDown className="h-4 w-4 text-primary" />
-                    }
-                  </button>
+                    <Filter className="h-3.5 w-3.5 mr-1" />
+                    Reset
+                  </Button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                <span className="text-xs text-gray-400">
-                  {filteredCertificates.length} certificate{filteredCertificates.length !== 1 ? 's' : ''}
-                </span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 text-xs cursor-pointer"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedStatus('all');
-                    setSelectedType('all');
-                    setSortField('issueDate');
-                    setSortDirection('desc');
-                  }}
-                >
-                  Reset
-                </Button>
-              </div>
             </div>
-          </div>
 
-          {/* Bulk Actions Bar */}
-          {getSelectedCount() > 0 && (
-            <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-gray-700">
-                  {getSelectedCount()} certificate{getSelectedCount() > 1 ? 's' : ''} selected
-                </span>
+            {/* Bulk Actions Bar - Desktop Only */}
+            {getSelectedCount() > 0 && (
+              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {getSelectedCount()} certificate{getSelectedCount() > 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {getSelectedCount() === 1 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="cursor-pointer"
+                      onClick={handleViewSelected}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={() => handleBulkAction('send')}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    Send
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={() => handleBulkAction('download')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={() => handleBulkAction('delete')}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="cursor-pointer"
+                    onClick={() => {
+                      setSelectedCertificates([]);
+                      setSelectAll(false);
+                    }}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleBulkAction('send')}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  Send
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleBulkAction('download')}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleBulkAction('delete')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="cursor-pointer"
-                  onClick={() => {
-                    setSelectedCertificates([]);
-                    setSelectAll(false);
-                  }}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Certificates Table or Grid View */}
-      {viewMode === 'table' ? (
+      {!isMobile && viewMode === 'table' ? (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -739,8 +848,8 @@ export default function CertificatesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCertificates.length > 0 ? (
-                    filteredCertificates.map((cert) => {
+                  {paginatedCertificates.length > 0 ? (
+                    paginatedCertificates.map((cert) => {
                       const status = statusConfig[cert.status];
                       const type = typeConfig[cert.type];
                       const StatusIcon = status.icon;
@@ -752,7 +861,7 @@ export default function CertificatesPage() {
                           className={`hover:bg-gray-50/60 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
                           }`}
-                          onClick={() => handleViewCertificate(cert)}
+                          onClick={() => handleRowClick(cert.id)}
                         >
                           <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
@@ -770,7 +879,7 @@ export default function CertificatesPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                                <p className="font-semibold text-gray-900">
                                   {cert.attendeeName}
                                 </p>
                                 <p className="text-xs text-gray-500">{cert.attendeeEmail}</p>
@@ -897,264 +1006,626 @@ export default function CertificatesPage() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {filteredCertificates.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">Rows per page:</span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={(value) => {
+                      setItemsPerPage(Number(value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5" className="cursor-pointer">5</SelectItem>
+                      <SelectItem value="10" className="cursor-pointer">10</SelectItem>
+                      <SelectItem value="20" className="cursor-pointer">20</SelectItem>
+                      <SelectItem value="50" className="cursor-pointer">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">
+                    {filteredCertificates.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} -{' '}
+                    {Math.min(currentPage * itemsPerPage, filteredCertificates.length)} of{' '}
+                    {filteredCertificates.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 cursor-pointer"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 cursor-pointer"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
         // Grid View
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCertificates.length > 0 ? (
-            filteredCertificates.map((cert) => {
-              const status = statusConfig[cert.status];
-              const type = typeConfig[cert.type];
-              const StatusIcon = status.icon;
-              const isSelected = selectedCertificates.includes(cert.id);
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedCertificates.length > 0 ? (
+              paginatedCertificates.map((cert) => {
+                const status = statusConfig[cert.status];
+                const type = typeConfig[cert.type];
+                const StatusIcon = status.icon;
+                const isSelected = selectedCertificates.includes(cert.id);
 
-              return (
-                <Card 
-                  key={cert.id} 
-                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
-                    isSelected ? 'border-primary/50 bg-primary/5' : ''
-                  }`}
-                  onClick={() => handleViewCertificate(cert)}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => handleSelectCertificate(cert.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="cursor-pointer"
-                        />
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={cert.attendeeAvatar} />
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            {getInitials(cert.attendeeName)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </div>
-                      <Badge variant="outline" className={`${status.color} border`}>
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        {status.label}
-                      </Badge>
-                    </div>
-
-                    <div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
-                        {cert.attendeeName}
-                      </h3>
-                      <p className="text-xs text-gray-500">{cert.attendeeEmail}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={`${type.color} border text-xs`}>
-                          {type.label}
+                return (
+                  <Card 
+                    key={cert.id} 
+                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+                      isSelected ? 'border-primary/50 bg-primary/5' : ''
+                    }`}
+                    onClick={() => handleCardClick(cert)}
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {!isMobile && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => handleSelectCertificate(cert.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="cursor-pointer"
+                            />
+                          )}
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={cert.attendeeAvatar} />
+                            <AvatarFallback className="bg-primary/10 text-primary">
+                              {getInitials(cert.attendeeName)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <Badge variant="outline" className={`${status.color} border`}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {status.label}
                         </Badge>
-                        <span className="text-xs text-gray-400">#{cert.certificateNumber}</span>
                       </div>
-                    </div>
 
-                    <div className="space-y-1 text-xs">
-                      <p className="font-medium text-gray-700">{cert.eventTitle}</p>
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <Calendar className="h-3 w-3" />
-                        <span>{cert.eventDate}</span>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {cert.attendeeName}
+                        </h3>
+                        <p className="text-xs text-gray-500">{cert.attendeeEmail}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className={`${type.color} border text-xs`}>
+                            {type.label}
+                          </Badge>
+                          <span className="text-xs text-gray-400">#{cert.certificateNumber}</span>
+                        </div>
                       </div>
-                      {cert.cpdHours && (
-                        <p className="text-amber-600">{cert.cpdHours} CPD hrs</p>
-                      )}
-                    </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <QrCode className="h-3 w-3" />
-                        <span className="font-mono">{cert.verificationCode}</span>
+                      <div className="space-y-1 text-xs">
+                        <p className="font-medium text-gray-700">{cert.eventTitle}</p>
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Calendar className="h-3 w-3" />
+                          <span>{cert.eventDate}</span>
+                        </div>
+                        {cert.cpdHours && (
+                          <p className="text-amber-600">{cert.cpdHours} CPD hrs</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span>{cert.verifiedCount} verified</span>
-                        <span>•</span>
-                        <span>{cert.downloadCount} downloads</span>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <QrCode className="h-3 w-3" />
+                          <span className="font-mono">{cert.verificationCode}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span>{cert.verifiedCount} verified</span>
+                          <span>•</span>
+                          <span>{cert.downloadCount} downloads</span>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
-          ) : (
-            <div className="col-span-full py-12 text-center text-gray-500">
-              <div className="flex flex-col items-center gap-2">
-                <Award className="h-8 w-8 text-gray-300" />
-                <p className="font-medium">No certificates found</p>
-                <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <span className="font-medium">Template:</span>
+                          <span>{cert.template}</span>
+                        </div>
+                        {isMobile ? (
+                          <div 
+                            className="flex items-center gap-1 text-xs text-primary font-medium cursor-pointer hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewCertificate(cert);
+                            }}
+                          >
+                            View Details
+                            <ArrowRight className="h-3 w-3" />
+                          </div>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
+                                <MoreVertical className="h-4 w-4 text-gray-400" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewCertificate(cert);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleModalDownloadPDF();
+                                }}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleModalSendToAttendee();
+                                }}
+                              >
+                                <Send className="h-4 w-4 mr-2" />
+                                Send to Attendee
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-red-600 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleModalDelete();
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            ) : (
+              <div className="col-span-full py-12 text-center text-gray-500">
+                <div className="flex flex-col items-center gap-2">
+                  <Award className="h-8 w-8 text-gray-300" />
+                  <p className="font-medium">No certificates found</p>
+                  <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pagination for Grid View */}
+          {filteredCertificates.length > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows per page:</span>
+                <Select
+                  value={itemsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5" className="cursor-pointer">5</SelectItem>
+                    <SelectItem value="10" className="cursor-pointer">10</SelectItem>
+                    <SelectItem value="20" className="cursor-pointer">20</SelectItem>
+                    <SelectItem value="50" className="cursor-pointer">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">
+                  {filteredCertificates.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} -{' '}
+                  {Math.min(currentPage * itemsPerPage, filteredCertificates.length)} of{' '}
+                  {filteredCertificates.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           )}
+        </>
+      )}
+
+      {/* Mobile Floating Filter Strip */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
+          <div className="pointer-events-auto mx-auto max-w-md bg-white rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm bg-white/95">
+            <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+              <button
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+              >
+                <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                <span className="text-sm text-gray-600 truncate">
+                  {searchQuery || 'Search'}
+                </span>
+              </button>
+
+              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+
+              <button
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors relative"
+              >
+                <Filter className="h-4 w-4 text-gray-400" />
+                <span className="text-sm text-gray-600">Filters</span>
+                {getActiveFilterCount() > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
+                    {getActiveFilterCount()}
+                  </span>
+                )}
+              </button>
+
+              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+
+              <button
+                onClick={() => setIsFilterSheetOpen(true)}
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+              >
+                <ArrowUpDown className="h-4 w-4 text-gray-400" />
+                <span className="text-sm text-gray-600 truncate max-w-[60px]">
+                  {getSortLabel()}
+                </span>
+                {sortDirection === 'asc' ? (
+                  <ArrowUp className="h-3 w-3 text-gray-400" />
+                ) : (
+                  <ArrowDown className="h-3 w-3 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-  {/* View Certificate Dialog - Matching Attendee Dialog layout */}
-<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-  <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle>Certificate Details</DialogTitle>
-      <DialogDescription>
-        View and manage certificate information.
-      </DialogDescription>
-    </DialogHeader>
-    {selectedCertificate && (
-      <div className="space-y-4 sm:space-y-6">
-        {/* Certificate Preview - Responsive */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 sm:p-6 border border-blue-100">
-          <div className="text-center">
-            <Award className="h-10 w-10 sm:h-12 sm:w-12 text-primary mx-auto mb-2" />
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Certificate of Completion</h2>
-            <p className="text-xs sm:text-sm text-gray-600 mt-1">
-              This certifies that <span className="font-semibold">{selectedCertificate.attendeeName}</span> has successfully completed
-            </p>
-            <h3 className="text-base sm:text-lg font-semibold text-primary mt-2">{selectedCertificate.eventTitle}</h3>
-            <p className="text-xs sm:text-sm text-gray-500 mt-2">
-              Issued on {selectedCertificate.issueDate}
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-4 text-xs sm:text-sm text-gray-600">
-              <span>Certificate #{selectedCertificate.certificateNumber}</span>
-              {selectedCertificate.cpdHours && (
-                <>
-                  <span className="hidden xs:inline">•</span>
-                  <span>{selectedCertificate.cpdHours} CPD Hours</span>
-                </>
-              )}
-            </div>
-            <div className="flex flex-col xs:flex-row items-center justify-center gap-3 sm:gap-4 mt-4">
-              <QrCode className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400" />
-              <div className="text-left text-xs text-gray-500">
-                <p>Verification Code:</p>
-                <p className="font-mono font-semibold text-xs sm:text-sm break-all">{selectedCertificate.verificationCode}</p>
-                <p className="mt-1 hidden xs:block">Scan to verify authenticity</p>
+      {/* Mobile Filter Bottom Sheet */}
+      <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
+          <div className="px-6 pt-6 pb-8 h-full flex flex-col">
+            <SheetHeader className="text-left space-y-1">
+              <div className="flex items-center justify-between">
+                <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
+                <button
+                  onClick={() => setIsFilterSheetOpen(false)}
+                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              <SheetDescription className="text-sm text-gray-500">
+                Refine your certificate list
+              </SheetDescription>
+            </SheetHeader>
+            
+            <div className="flex-1 overflow-y-auto mt-6 pb-6">
+              <div className="space-y-1.5 mb-5">
+                <Label className="text-sm font-medium text-gray-700">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search certificates..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-11 cursor-text border-gray-200 focus:border-primary focus:ring-primary/20 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-700 truncate">Status</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
+                      <div className="truncate w-full text-left">
+                        <SelectValue placeholder="All Status" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="cursor-pointer">All Status</SelectItem>
+                      <SelectItem value="issued" className="cursor-pointer">Issued</SelectItem>
+                      <SelectItem value="pending" className="cursor-pointer">Pending</SelectItem>
+                      <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
+                      <SelectItem value="expired" className="cursor-pointer">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-700 truncate">Type</Label>
+                  <Select value={selectedType} onValueChange={setSelectedType}>
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
+                      <div className="truncate w-full text-left">
+                        <SelectValue placeholder="All Types" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="cursor-pointer">All Types</SelectItem>
+                      <SelectItem value="cpd" className="cursor-pointer">CPD</SelectItem>
+                      <SelectItem value="completion" className="cursor-pointer">Completion</SelectItem>
+                      <SelectItem value="attendance" className="cursor-pointer">Attendance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 mb-5">
+                <Label className="text-sm font-medium text-gray-700">Sort By</Label>
+                <Select
+                  value={sortField}
+                  onValueChange={(value: SortField) => {
+                    setSortField(value);
+                  }}
+                >
+                  <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="attendeeName" className="cursor-pointer">Attendee</SelectItem>
+                    <SelectItem value="eventTitle" className="cursor-pointer">Event</SelectItem>
+                    <SelectItem value="status" className="cursor-pointer">Status</SelectItem>
+                    <SelectItem value="issueDate" className="cursor-pointer">Issue Date</SelectItem>
+                    <SelectItem value="certificateNumber" className="cursor-pointer">Certificate #</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Sort Direction</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant={sortDirection === 'asc' ? 'default' : 'outline'}
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${
+                      sortDirection === 'asc' 
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSortDirection('asc')}
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Ascending
+                  </Button>
+                  <Button
+                    variant={sortDirection === 'desc' ? 'default' : 'outline'}
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${
+                      sortDirection === 'desc' 
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSortDirection('desc')}
+                  >
+                    <ArrowDown className="h-4 w-4 mr-2" />
+                    Descending
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <Separator />
-
-        {/* Details Grid - 2 columns on all screens */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Attendee</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
-                <AvatarImage src={selectedCertificate.attendeeAvatar} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
-                  {getInitials(selectedCertificate.attendeeName)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="text-sm sm:text-base font-medium text-gray-900 truncate">{selectedCertificate.attendeeName}</p>
-                <p className="text-xs text-gray-500 truncate">{selectedCertificate.attendeeEmail}</p>
-              </div>
+            <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50 transition-colors"
+                onClick={handleMobileReset}
+              >
+                Reset All
+              </Button>
+              <Button
+                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm transition-all"
+                onClick={handleMobileApply}
+              >
+                Apply Filters
+              </Button>
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Event</Label>
-            <p className="text-sm sm:text-base font-medium mt-1 truncate">{selectedCertificate.eventTitle}</p>
-            <p className="text-xs text-gray-500">{selectedCertificate.eventDate}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Type</Label>
-            <Badge variant="outline" className={`${typeConfig[selectedCertificate.type].color} border mt-1`}>
-              {typeConfig[selectedCertificate.type].label}
-            </Badge>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Status</Label>
-            <Badge variant="outline" className={`${statusConfig[selectedCertificate.status].color} border mt-1`}>
-              {statusConfig[selectedCertificate.status].label}
-            </Badge>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Template</Label>
-            <p className="text-sm sm:text-base font-medium mt-1">{selectedCertificate.template}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Verification Code</Label>
-            <p className="text-sm sm:text-base font-mono font-medium mt-1 break-all">{selectedCertificate.verificationCode}</p>
-          </div>
-        </div>
+        </SheetContent>
+      </Sheet>
 
-        <Separator />
+      {/* View Certificate Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Certificate Details</DialogTitle>
+            <DialogDescription>
+              View and manage certificate information.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedCertificate && (
+            <div className="space-y-4 sm:space-y-6">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 sm:p-6 border border-blue-100">
+                <div className="text-center">
+                  <Award className="h-10 w-10 sm:h-12 sm:w-12 text-primary mx-auto mb-2" />
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">Certificate of Completion</h2>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                    This certifies that <span className="font-semibold">{selectedCertificate.attendeeName}</span> has successfully completed
+                  </p>
+                  <h3 className="text-base sm:text-lg font-semibold text-primary mt-2">{selectedCertificate.eventTitle}</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                    Issued on {selectedCertificate.issueDate}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-4 text-xs sm:text-sm text-gray-600">
+                    <span>Certificate #{selectedCertificate.certificateNumber}</span>
+                    {selectedCertificate.cpdHours && (
+                      <>
+                        <span className="hidden xs:inline">•</span>
+                        <span>{selectedCertificate.cpdHours} CPD Hours</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex flex-col xs:flex-row items-center justify-center gap-3 sm:gap-4 mt-4">
+                    <QrCode className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400" />
+                    <div className="text-left text-xs text-gray-500">
+                      <p>Verification Code:</p>
+                      <p className="font-mono font-semibold text-xs sm:text-sm break-all">{selectedCertificate.verificationCode}</p>
+                      <p className="mt-1 hidden xs:block">Scan to verify authenticity</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        {/* Stats - 2 columns */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-4 bg-gray-50 rounded-lg p-3 sm:p-4">
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedCertificate.verifiedCount}</p>
-            <p className="text-[10px] sm:text-xs text-gray-500">Verifications</p>
-          </div>
-          <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedCertificate.downloadCount}</p>
-            <p className="text-[10px] sm:text-xs text-gray-500">Downloads</p>
-          </div>
-        </div>
+              <Separator />
 
-        <Separator />
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Attendee</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
+                      <AvatarImage src={selectedCertificate.attendeeAvatar} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
+                        {getInitials(selectedCertificate.attendeeName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="text-sm sm:text-base font-medium text-gray-900 truncate">{selectedCertificate.attendeeName}</p>
+                      <p className="text-xs text-gray-500 truncate">{selectedCertificate.attendeeEmail}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Event</Label>
+                  <p className="text-sm sm:text-base font-medium mt-1 truncate">{selectedCertificate.eventTitle}</p>
+                  <p className="text-xs text-gray-500">{selectedCertificate.eventDate}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Type</Label>
+                  <Badge variant="outline" className={`${typeConfig[selectedCertificate.type].color} border mt-1`}>
+                    {typeConfig[selectedCertificate.type].label}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Status</Label>
+                  <Badge variant="outline" className={`${statusConfig[selectedCertificate.status].color} border mt-1`}>
+                    {statusConfig[selectedCertificate.status].label}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Template</Label>
+                  <p className="text-sm sm:text-base font-medium mt-1">{selectedCertificate.template}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Verification Code</Label>
+                  <p className="text-sm sm:text-base font-mono font-medium mt-1 break-all">{selectedCertificate.verificationCode}</p>
+                </div>
+              </div>
 
-        {/* Actions - 2 columns matching Attendee Dialog */}
-        <div className="space-y-3">
-          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
-          <div className="grid grid-cols-2 gap-2">
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-start text-sm"
-              onClick={() => setIsViewDialogOpen(false)}
-            >
-              <Eye className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">View Details</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-start text-sm"
-              onClick={handleModalDownloadPDF}
-            >
-              <Download className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">Download PDF</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-start text-sm"
-              onClick={handleModalSendToAttendee}
-            >
-              <Send className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">Send to Attendee</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-start text-sm"
-              onClick={handleModalPrint}
-            >
-              <Printer className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">Print</span>
-            </Button>
-            <Button 
-              variant="destructive" 
-              className="w-full cursor-pointer justify-start text-sm col-span-2"
-              onClick={handleModalDelete}
-            >
-              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">Delete Certificate</span>
-            </Button>
-          </div>
-        </div>
+              <Separator />
 
-        <DialogFooter className="gap-2 flex-col sm:flex-row">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsViewDialogOpen(false)}
-            className="w-full sm:w-auto cursor-pointer"
-          >
-            Close
-          </Button>
-        </DialogFooter>
-      </div>
-    )}
-  </DialogContent>
-</Dialog>
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 bg-gray-50 rounded-lg p-3 sm:p-4">
+                <div className="text-center">
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedCertificate.verifiedCount}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500">Verifications</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedCertificate.downloadCount}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500">Downloads</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full cursor-pointer justify-start text-sm"
+                    onClick={handleModalDownloadPDF}
+                  >
+                    <Download className="h-4 w-4 mr-2 shrink-0" />
+                    <span className="truncate">Download PDF</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full cursor-pointer justify-start text-sm"
+                    onClick={handleModalSendToAttendee}
+                  >
+                    <Send className="h-4 w-4 mr-2 shrink-0" />
+                    <span className="truncate">Send to Attendee</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full cursor-pointer justify-start text-sm"
+                    onClick={handleModalPrint}
+                  >
+                    <Printer className="h-4 w-4 mr-2 shrink-0" />
+                    <span className="truncate">Print</span>
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full cursor-pointer justify-start text-sm"
+                    onClick={handleModalDelete}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+                    <span className="truncate">Delete Certificate</span>
+                  </Button>
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 flex-col sm:flex-row">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsViewDialogOpen(false)}
+                  className="w-full sm:w-auto cursor-pointer"
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Send Certificate Dialog */}
       <Dialog open={isSendDialogOpen} onOpenChange={setIsSendDialogOpen}>
