@@ -28,7 +28,7 @@ import {
 
 // Shadcn components
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -215,6 +215,7 @@ export default function SignupForm() {
         setCurrentStep('details');
         break;
       case 'otp':
+        setOtp(['', '', '', '', '', '']);
         if (accountType === 'institution') {
           setCurrentStep('institution-details');
         } else {
@@ -361,53 +362,45 @@ export default function SignupForm() {
   // ============================================================
 
   const renderAccountTypeStep = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          {
-            type: 'personal' as AccountType,
-            icon: UserCircle,
-            title: 'Personal',
-            description: 'Individual user',
-            features: ['Host events', 'Sell tickets', 'Issue certificates'],
-            color: 'blue'
-          },
-          {
-            type: 'institution' as AccountType,
-            icon: Building,
-            title: 'Institution',
-            description: 'Organization account',
-            features: ['Host events', 'Manage teams', 'Track analytics'],
-            color: 'green'
-          }
-        ].map((option) => {
-          const OptionIcon = option.icon;
-          
-          return (
-            <motion.button
-              key={option.type}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleAccountTypeSelect(option.type)}
-              className={cn(
-                "group relative p-6 rounded-2xl border-2 transition-all duration-300 text-left cursor-pointer bg-white",
-                "hover:shadow-lg hover:border-[#1A73E8]/30"
-              )}
-            >
-              <OptionIcon className="h-10 w-10 mb-3 text-[#1A73E8]" />
-              <h3 className="text-lg font-semibold text-gray-900">{option.title}</h3>
-              <p className="text-sm text-gray-500 mt-1">{option.description}</p>
-              <ul className="mt-3 space-y-1">
-                {option.features.map((feature, i) => (
-                  <li key={i} className="text-xs text-gray-400 flex items-center gap-1.5">
-                    <Check className="h-3 w-3 text-[#1A73E8]" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </motion.button>
-          );
-        })}
+    <div className="space-y-8">
+      <div className="flex flex-col items-center">
+        <div className="relative inline-flex bg-gray-100 rounded-2xl p-1 w-full max-w-md">
+          <button
+            onClick={() => handleAccountTypeSelect('personal')}
+            className={cn(
+              "flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2",
+              accountType === 'personal'
+                ? "bg-white text-gray-900 shadow-md"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <UserCircle className="h-4 w-4" />
+            Personal
+          </button>
+          <button
+            onClick={() => handleAccountTypeSelect('institution')}
+            className={cn(
+              "flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all cursor-pointer flex items-center justify-center gap-2",
+              accountType === 'institution'
+                ? "bg-white text-gray-900 shadow-md"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <Building className="h-4 w-4" />
+            Institution
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-3 text-center">
+          {accountType === 'personal' 
+            ? 'Create a personal account to host or attend events' 
+            : 'Create an organization account to manage events and teams'}
+        </p>
+        {accountType && (
+          <div className="mt-2 flex items-center justify-center gap-2 text-xs text-green-600">
+            <Check className="h-3 w-3" />
+            <span>{accountType === 'personal' ? 'Personal' : 'Institution'} account selected</span>
+          </div>
+        )}
       </div>
     </div>
   );
