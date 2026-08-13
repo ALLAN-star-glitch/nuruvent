@@ -11,8 +11,6 @@ import {
   CreditCard,
   Settings,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   PlusCircle,
   DollarSign,
   Video,
@@ -20,9 +18,11 @@ import {
   LucideIcon,
   FileText,
   Sparkles,
+  ChevronsLeft,
+  ChevronsRight,
+  GripVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 interface NavItem {
   href: string;
@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
   { href: '/dashboard/replays', label: 'Replays', icon: Video },
   
-  // Settings section (will be separated by divider)
+  // Settings section
   { href: '/dashboard/account', label: 'Account', icon: User },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
@@ -67,20 +67,27 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ 
   role = 'host', 
   onCollapseChange,
-  collapsed: externalCollapsed 
+  collapsed: externalCollapsed = true // Default default prop value to true
 }: DashboardSidebarProps) {
   const pathname = usePathname();
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
-  
+
+  // Internal state initialized to true (closed by default)
+  const [internalCollapsed, setInternalCollapsed] = useState(true);
+
+  // Keep internal state in sync if parent controls `collapsed` prop
+  useEffect(() => {
+    if (externalCollapsed !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInternalCollapsed(externalCollapsed);
+    }
+  }, [externalCollapsed]);
+
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
 
   const toggleSidebar = () => {
     const newState = !collapsed;
-    if (externalCollapsed !== undefined) {
-      onCollapseChange?.(newState);
-    } else {
-      setInternalCollapsed(newState);
-    }
+    setInternalCollapsed(newState);
+    onCollapseChange?.(newState);
   };
 
   const handleLogout = (e: MouseEvent<HTMLButtonElement>) => {
@@ -89,13 +96,11 @@ export function DashboardSidebar({
   };
 
   // Split items: main items and settings items (Account + Settings)
-  const mainItems = navItems.filter(item => 
-    item.href !== '/dashboard/account' && 
-    item.href !== '/dashboard/settings'
+  const mainItems = navItems.filter(
+    item => item.href !== '/dashboard/account' && item.href !== '/dashboard/settings'
   );
-  const settingsItems = navItems.filter(item => 
-    item.href === '/dashboard/account' || 
-    item.href === '/dashboard/settings'
+  const settingsItems = navItems.filter(
+    item => item.href === '/dashboard/account' || item.href === '/dashboard/settings'
   );
 
   return (
@@ -105,14 +110,13 @@ export function DashboardSidebar({
         'hidden md:flex md:flex-col bg-white/80 backdrop-blur-xl shadow-2xl transition-all duration-300 select-none shrink-0',
         'fixed left-6 z-30 overflow-hidden',
         'rounded-3xl border border-white/30',
-        collapsed ? 'w-[70px]' : 'w-[240px]',
+        collapsed ? 'w-[72px]' : 'w-[260px]',
         'top-[140px] h-[calc(100vh-200px)]',
-        // Enhanced glass-morphism with gradient overlay
         'before:absolute before:inset-0 before:pointer-events-none before:rounded-3xl before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)]',
         'after:absolute after:inset-0 after:pointer-events-none after:rounded-3xl after:bg-gradient-to-br after:from-white/5 after:via-transparent after:to-white/5'
       )}
     >
-      {/* Toggle Button with Header Text */}
+      {/* Toggle Button */}
       <div
         onClick={toggleSidebar}
         className={cn(
@@ -121,17 +125,17 @@ export function DashboardSidebar({
           collapsed && "justify-center px-2"
         )}
       >
-        {/* Header Text - Show when expanded */}
         {!collapsed && (
-          <span className="text-xs font-medium text-gray-500/70 tracking-wider uppercase">
-            Close Sidebar
+          <span className="text-xs font-medium text-gray-500/70 tracking-wider uppercase flex items-center gap-2">
+            <GripVertical className="h-3 w-3 text-gray-400" />
+            Menu
           </span>
         )}
         
         <div 
           className={cn(
-            "h-8 w-8 flex items-center justify-center rounded-xl transition-all duration-200",
-            "hover:bg-gray-100/50 active:scale-95",
+            "h-10 w-10 flex items-center justify-center rounded-xl transition-all duration-200",
+            "hover:bg-gray-100/80 active:scale-95",
             collapsed && "w-full"
           )}
           role="button"
@@ -139,9 +143,9 @@ export function DashboardSidebar({
           tabIndex={0}
         >
           {collapsed ? (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
+            <ChevronsRight className="h-5 w-5 text-gray-500 hover:text-[#1A73E8] transition-colors" />
           ) : (
-            <ChevronLeft className="h-4 w-4 text-gray-500" />
+            <ChevronsLeft className="h-5 w-5 text-gray-500 hover:text-[#1A73E8] transition-colors" />
           )}
         </div>
       </div>
@@ -165,14 +169,14 @@ export function DashboardSidebar({
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
                   isActive
-                    ? 'bg-primary/10 text-primary shadow-sm'
+                    ? 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                 )}
               >
                 <Icon
                   className={cn(
                     'h-5 w-5 flex-shrink-0 transition-colors',
-                    isActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-600'
+                    isActive ? 'text-[#1A73E8]' : 'text-gray-400 group-hover:text-gray-600'
                   )}
                 />
                 {!collapsed && (
@@ -211,15 +215,15 @@ export function DashboardSidebar({
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
                     isActive
-                      ? 'bg-primary/10 text-primary shadow-sm'
+                      ? 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
                       : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900',
-                    !collapsed && 'border border-dashed border-gray-200/50 hover:border-primary/30'
+                    !collapsed && 'border border-dashed border-gray-200/50 hover:border-[#1A73E8]/30'
                   )}
                 >
                   <Icon
                     className={cn(
                       'h-5 w-5 flex-shrink-0 transition-colors',
-                      isActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-600'
+                      isActive ? 'text-[#1A73E8]' : 'text-gray-400 group-hover:text-gray-600'
                     )}
                   />
                   {!collapsed && (
@@ -242,10 +246,7 @@ export function DashboardSidebar({
         </div>
 
         {/* Divider with dot decoration */}
-        <div className={cn(
-          "relative my-4",
-          collapsed ? "mx-2" : "mx-3"
-        )}>
+        <div className={cn("relative my-4", collapsed ? "mx-2" : "mx-3")}>
           <div className="absolute inset-0 flex items-center">
             <div className={cn(
               "w-full border-t",
@@ -262,7 +263,7 @@ export function DashboardSidebar({
           </div>
         </div>
 
-        {/* Settings items (Account + Settings) */}
+        {/* Settings items */}
         <div className="space-y-0.5">
           {settingsItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
@@ -275,14 +276,14 @@ export function DashboardSidebar({
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
                   isActive
-                    ? 'bg-primary/10 text-primary shadow-sm'
+                    ? 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
                     : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
                 )}
               >
                 <Icon
                   className={cn(
                     'h-5 w-5 flex-shrink-0 transition-colors',
-                    isActive ? 'text-primary' : 'text-gray-400 group-hover:text-gray-600'
+                    isActive ? 'text-[#1A73E8]' : 'text-gray-400 group-hover:text-gray-600'
                   )}
                 />
                 {!collapsed && (
@@ -307,7 +308,6 @@ export function DashboardSidebar({
         "border-t border-gray-200/30",
         collapsed ? "px-2 py-3" : "px-3 py-3"
       )}>
-        {/* Top divider dot */}
         <div className="absolute -top-[1px] left-0 right-0 flex justify-center">
           <span className={cn(
             "bg-white/80 text-[8px] font-medium tracking-widest uppercase text-gray-400/50",
@@ -317,7 +317,6 @@ export function DashboardSidebar({
           </span>
         </div>
         
-        {/* Logout Button */}
         <button
           type="button"
           onClick={handleLogout}
@@ -336,7 +335,6 @@ export function DashboardSidebar({
           )}
         </button>
 
-        {/* Copyright Text */}
         {!collapsed && (
           <div className="px-3 pt-1 pb-0.5">
             <p className="text-[10px] text-gray-400/60 text-center font-light tracking-wider">

@@ -32,12 +32,15 @@ import {
   Send,
   RefreshCw,
   ChevronRight,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 // Shadcn components
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -137,10 +140,10 @@ const timezones = [
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'TZS', 'UGX'];
 
 const eventTypes = [
-  { value: 'workshop', label: 'Workshop' },
-  { value: 'webinar', label: 'Webinar' },
-  { value: 'bootcamp', label: 'Bootcamp' },
-  { value: 'meetup', label: 'Meetup' },
+  { value: 'workshop', label: 'Workshop', icon: '🔧' },
+  { value: 'webinar', label: 'Webinar', icon: '💻' },
+  { value: 'bootcamp', label: 'Bootcamp', icon: '🚀' },
+  { value: 'meetup', label: 'Meetup', icon: '🤝' },
 ];
 
 const platforms = [
@@ -159,6 +162,146 @@ const cpdBodies = [
   'Other',
 ];
 
+// ============= EVENT PREVIEW CARD =============
+const EventPreviewCard = ({ data }: { data: EventFormData }) => {
+  const getEventTypeIcon = (type: string) => {
+    const icons: Record<string, string> = {
+      workshop: '🔧',
+      webinar: '💻',
+      bootcamp: '🚀',
+      meetup: '🤝',
+    };
+    return icons[type] || '📌';
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-700 border-gray-200',
+      scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
+      published: 'bg-green-100 text-green-700 border-green-200',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const formatDate = (date: string) => {
+    if (!date) return 'TBD';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  return (
+    <div className="event-preview-card">
+      <div className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+        {/* Image */}
+        {data.imagePreview ? (
+          <div className="w-full h-48 bg-gray-100 overflow-hidden">
+            <img 
+              src={data.imagePreview} 
+              alt={data.title || 'Event preview'} 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-full h-48 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-4xl mb-2">{getEventTypeIcon(data.type)}</div>
+              <p className="text-sm text-gray-400">Event Image</p>
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 space-y-3">
+          {/* Status Badge */}
+          <div className="flex items-center justify-between">
+            <Badge className={cn("text-xs font-medium border", getStatusColor(data.status))}>
+              {data.status.charAt(0).toUpperCase() + data.status.slice(1)}
+            </Badge>
+            {data.cpdAccredited && (
+              <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700">
+                <Award className="h-3 w-3 mr-1" />
+                CPD
+              </Badge>
+            )}
+          </div>
+
+          {/* Title */}
+          <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
+            {data.title || 'Untitled Event'}
+          </h3>
+
+          {/* Type */}
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>{getEventTypeIcon(data.type)}</span>
+            <span className="capitalize">{data.type}</span>
+          </div>
+
+          {/* Date & Time */}
+          {(data.startDate || data.startTime) && (
+            <div className="flex items-start gap-2 text-sm text-gray-600">
+              <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <div>
+                {formatDate(data.startDate)}
+                {data.startTime && ` at ${data.startTime}`}
+                {data.endDate && ` - ${formatDate(data.endDate)}`}
+              </div>
+            </div>
+          )}
+
+          {/* Location */}
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {data.isVirtual ? (
+              <Video className="h-4 w-4 flex-shrink-0" />
+            ) : (
+              <MapPin className="h-4 w-4 flex-shrink-0" />
+            )}
+            <span>
+              {data.isVirtual ? 'Virtual Event' : data.location || 'Location TBD'}
+            </span>
+          </div>
+
+          {/* Host */}
+          {data.hostName && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <User className="h-4 w-4 flex-shrink-0" />
+              <span>Hosted by {data.hostName}</span>
+            </div>
+          )}
+
+          {/* Price & Capacity */}
+          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
+              <DollarSign className="h-4 w-4 text-gray-500" />
+              {data.price && Number(data.price) > 0 ? `${data.price} ${data.currency}` : 'Free'}
+            </div>
+            {data.capacity && (
+              <div className="flex items-center gap-1 text-sm text-gray-500">
+                <Users className="h-4 w-4" />
+                <span>{data.capacity} spots</span>
+              </div>
+            )}
+          </div>
+
+          {/* Tags */}
+          {data.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 pt-1">
+              {data.tags.slice(0, 3).map((tag) => (
+                <Badge key={tag} variant="secondary" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+              {data.tags.length > 3 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{data.tags.length - 3} more
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ============= STEPPER =============
 const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] }) => {
   return (
@@ -173,10 +316,10 @@ const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] 
             <div className="flex items-center gap-2">
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all cursor-pointer",
                   isActive && "bg-primary text-white ring-4 ring-primary/20",
                   isCompleted && "bg-green-500 text-white",
-                  !isActive && !isCompleted && "bg-gray-200 text-gray-500"
+                  !isActive && !isCompleted && "bg-gray-200 text-gray-500 hover:bg-gray-300"
                 )}
               >
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNumber}
@@ -225,7 +368,7 @@ export default function CreateEventPage() {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 1024);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -260,6 +403,7 @@ export default function CreateEventPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
+        handleChange('imagePreview', reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -284,16 +428,6 @@ export default function CreateEventPage() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
-  };
-
-  const getEventTypeIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      workshop: '🔧',
-      webinar: '💻',
-      bootcamp: '🚀',
-      meetup: '🤝',
-    };
-    return icons[type] || '📌';
   };
 
   // Render step content
@@ -332,7 +466,7 @@ export default function CreateEventPage() {
                         <SelectContent>
                           {eventTypes.map((type) => (
                             <SelectItem key={type.value} value={type.value} className="cursor-pointer">
-                              {type.label}
+                              {type.icon} {type.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -661,6 +795,7 @@ export default function CreateEventPage() {
                         onClick={() => {
                           setImagePreview(null);
                           setImageFile(null);
+                          handleChange('imagePreview', '');
                         }}
                         className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors cursor-pointer"
                       >
@@ -734,9 +869,9 @@ export default function CreateEventPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-24">
+    <div className="w-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Link 
             href="/dashboard/events" 
@@ -751,23 +886,38 @@ export default function CreateEventPage() {
             </p>
           </div>
         </div>
-        <Button 
-          className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-          onClick={() => handleSubmit(true)}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              Publishing...
-            </>
-          ) : (
-            <>
+        <div className="flex items-center gap-2">
+          {/* Mobile Preview Button */}
+          {isMobile && (
+            <Button 
+              variant="outline" 
+              className="cursor-pointer"
+              onClick={() => {
+                // Show preview in sheet
+              }}
+            >
               <Eye className="h-4 w-4 mr-2" />
-              Publish Event
-            </>
+              Preview
+            </Button>
           )}
-        </Button>
+          <Button 
+            className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+            onClick={() => handleSubmit(true)}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Publishing...
+              </>
+            ) : (
+              <>
+                <Send className="h-4 w-4 mr-2" />
+                Publish Event
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Stepper */}
@@ -775,68 +925,93 @@ export default function CreateEventPage() {
         <Stepper currentStep={currentStep} steps={STEPS} />
       </div>
 
-      {/* Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {currentStep === 1 && 'Basic Information'}
-            {currentStep === 2 && 'Event Details'}
-            {currentStep === 3 && 'Host Information'}
-          </CardTitle>
-          <CardDescription>
-            {currentStep === 1 && 'Enter the basic details about your event.'}
-            {currentStep === 2 && 'Configure pricing, platform, and CPD settings.'}
-            {currentStep === 3 && 'Provide information about the event host.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {renderStepContent()}
-        </CardContent>
-      </Card>
+      {/* Main Content - Grid Layout */}
+      <div className={cn(
+        "grid gap-6",
+        !isMobile ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
+      )}>
+        {/* Left Column - Editor */}
+        <div className="min-w-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {currentStep === 1 && 'Basic Information'}
+                {currentStep === 2 && 'Event Details'}
+                {currentStep === 3 && 'Host Information'}
+              </CardTitle>
+              <CardDescription>
+                {currentStep === 1 && 'Enter the basic details about your event.'}
+                {currentStep === 2 && 'Configure pricing, platform, and CPD settings.'}
+                {currentStep === 3 && 'Provide information about the event host.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderStepContent()}
+            </CardContent>
+          </Card>
 
-      {/* Navigation Buttons */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 md:relative md:border-t-0 md:p-0">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            className="cursor-pointer"
-            onClick={handlePrev}
-            disabled={currentStep === 1}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-
-          {currentStep < 3 ? (
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between gap-3 mt-6">
             <Button
-              className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-              onClick={handleNext}
+              variant="outline"
+              className="cursor-pointer"
+              onClick={handlePrev}
+              disabled={currentStep === 1}
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-2" />
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
             </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                className="cursor-pointer"
-                onClick={() => handleSubmit(false)}
-                disabled={isSaving}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save as Draft
-              </Button>
-              <Button 
+
+            {currentStep < 3 ? (
+              <Button
                 className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-                onClick={() => handleSubmit(true)}
-                disabled={isSaving}
+                onClick={handleNext}
               >
-                <Send className="h-4 w-4 mr-2" />
-                Publish Event
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="cursor-pointer"
+                  onClick={() => handleSubmit(false)}
+                  disabled={isSaving}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Draft
+                </Button>
+                <Button 
+                  className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+                  onClick={() => handleSubmit(true)}
+                  disabled={isSaving}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  Publish
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Right Column - Desktop Preview */}
+        {!isMobile && (
+          <div className="sticky top-24 h-fit">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Live Preview</CardTitle>
+                    <CardDescription>Real-time preview of your event</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <EventPreviewCard data={formData} />
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Success Dialog */}
@@ -858,12 +1033,14 @@ export default function CreateEventPage() {
             <div className="w-full p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{formData.title}</p>
+                  <p className="font-medium text-gray-900">{formData.title || 'Untitled Event'}</p>
                   <p className="text-sm text-gray-500">
-                    {formData.startDate} • {formData.type}
+                    {formData.startDate || 'TBD'} • {formData.type}
                   </p>
                 </div>
-                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                <Badge variant="outline" className={cn(
+                  isPublished ? 'text-green-600 border-green-200 bg-green-50' : 'text-gray-600 border-gray-200 bg-gray-50'
+                )}>
                   {isPublished ? 'Published' : 'Draft'}
                 </Badge>
               </div>
