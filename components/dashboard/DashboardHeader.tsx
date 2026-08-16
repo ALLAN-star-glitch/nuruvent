@@ -1,7 +1,9 @@
+// components/dashboard/DashboardHeader.tsx
+
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, 
   CreditCard, 
@@ -30,13 +32,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
+import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
+import { useLogoutMutation } from '@/lib/store/api/authApi';
+import { clearAuth, UserRole } from '@/lib/store/slices/authSlice';
+import { LogoutDialog } from '../ui/LogoutDialog';
+import { useState } from 'react';
 
 interface DashboardHeaderProps {
-  user?: {
+  user: {
     name: string;
     email: string;
     avatar?: string;
-    role: 'host' | 'attendee' | 'admin';
+    role: UserRole;
   };
 }
 
@@ -54,18 +61,20 @@ const dashboardNavItems = [
 
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const dispatch = useAppDispatch();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [logout, { isLoading }] = useLogoutMutation();
 
-  const currentUser = user || {
-    name: 'John Doe',
-    email: 'john@example.com',
-    role: 'host' as const,
-  };
+  // If not authenticated, don't show this header
+  if (!isAuthenticated) {
+    return null;
+  }
 
-  // Split items: everything except Settings in main group, Settings in its own group
   const mainItems = dashboardNavItems.filter(item => item.href !== '/dashboard/settings');
   const settingsItem = dashboardNavItems.find(item => item.href === '/dashboard/settings');
 
-  // Get initials for avatar
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -75,8 +84,16 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
       .slice(0, 2);
   };
 
-  const handleLogout = () => {
-    console.log('Logout clicked');
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+      dispatch(clearAuth());
+      router.push('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      dispatch(clearAuth());
+      router.push('/');
+    }
   };
 
   return (
@@ -85,7 +102,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* Left: Mobile Menu + Logo */}
           <div className="flex items-center gap-2 shrink-0 h-full">
-            {/* Mobile Sheet Navigation */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button
@@ -106,9 +122,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </div>
                 </SheetHeader>
 
-                {/* Mobile Drawer Navigation Links */}
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Main Website Navigation Section */}
+                  {/* Main Website Navigation */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Main Menu
@@ -140,7 +155,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </nav>
                   </div>
 
-                  {/* Dashboard Menu Section - Matching Sidebar */}
+                  {/* Dashboard Menu */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Dashboard
@@ -172,7 +187,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       })}
                     </nav>
 
-                    {/* Divider with dot - matching sidebar */}
                     <div className="relative my-4 mx-3">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-gray-200/40" />
@@ -184,7 +198,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       </div>
                     </div>
 
-                    {/* Settings item - matching sidebar */}
                     {settingsItem && (
                       <nav className="space-y-0.5">
                         <SheetClose asChild>
@@ -215,33 +228,46 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-red-500 hover:bg-red-50/50"
+                    disabled={isLoading}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-red-500 hover:bg-red-50/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <LogOut className="h-5 w-5 shrink-0 text-red-400" />
-                    <span className="text-sm font-medium">Logout</span>
+                    {isLoading ? (
+                      <div className="flex items-center gap-3">
+                        <svg className="animate-spin h-5 w-5 text-red-400" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span className="text-sm font-medium">Logging out...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <LogOut className="h-5 w-5 shrink-0 text-red-400" />
+                        <span className="text-sm font-medium">Logout</span>
+                      </>
+                    )}
                   </button>
 
                   {/* User Info */}
                   <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
                     <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
-                      {getInitials(currentUser.name)}
+                      {getInitials(user.name)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
-                      <p className="text-xs text-gray-500 truncate capitalize">{currentUser.role}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                      <p className="text-xs text-gray-500 truncate capitalize">{user.role}</p>
                     </div>
                   </div>
                 </div>
               </SheetContent>
             </Sheet>
 
-            {/* Header Logo */}
+            {/* Logo */}
             <div className="inline-flex items-center shrink-0">
               <Logo />
             </div>
           </div>
 
-          {/* Center: Search Bar - Desktop */}
+          {/* Search Bar */}
           <div className="flex-1 max-w-2xl mx-4 hidden md:block">
             <SearchBar />
           </div>
@@ -249,10 +275,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
           {/* Right Header Controls */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <NotificationBell />
-            <UserMenu user={currentUser} />
+            <UserMenu user={user} onLogout={handleLogout} />
           </div>
         </div>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <LogoutDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        onConfirm={handleLogout}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

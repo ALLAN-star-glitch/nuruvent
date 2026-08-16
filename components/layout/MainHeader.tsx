@@ -1,3 +1,5 @@
+// components/layout/MainHeader.tsx
+
 'use client';
 
 import Link from 'next/link';
@@ -26,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
+import { useAppSelector } from '@/lib/store/hooks';
 
 // Dashboard menu items - matching sidebar exactly
 const dashboardNavItems = [
@@ -39,10 +42,15 @@ const dashboardNavItems = [
 
 export function MainHeader() {
   const pathname = usePathname();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
 
-  // Split items: everything except Settings in main group, Settings in its own group
   const mainItems = dashboardNavItems.filter(item => item.href !== '/dashboard/settings');
   const settingsItem = dashboardNavItems.find(item => item.href === '/dashboard/settings');
+
+  // If authenticated, don't show this header
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="bg-white border-b shadow-xs">
@@ -71,9 +79,8 @@ export function MainHeader() {
                   </div>
                 </SheetHeader>
 
-                {/* Mobile Drawer Navigation Links - Main Menu on Top */}
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Main Navigation Section - On Top */}
+                  {/* Main Navigation Section */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Main Menu
@@ -105,7 +112,7 @@ export function MainHeader() {
                     </nav>
                   </div>
 
-                  {/* Dashboard Menu Section - Below Main Menu */}
+                  {/* Dashboard Menu Section */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Dashboard
@@ -137,7 +144,7 @@ export function MainHeader() {
                       })}
                     </nav>
 
-                    {/* Divider with dot */}
+                    {/* Divider */}
                     <div className="relative my-4 mx-3">
                       <div className="absolute inset-0 flex items-center">
                         <div className="w-full border-t border-gray-200/40" />
@@ -207,26 +214,28 @@ export function MainHeader() {
             <SearchBar />
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <Link href="/signin" className="cursor-pointer">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="font-medium text-gray-600 hover:text-primary cursor-pointer"
-              >
-                Sign In
-              </Button>
-            </Link>
-            <Link href="/signup" className="cursor-pointer">
-              <Button 
-                size="sm" 
-                className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer"
-              >
-                Get Started
-              </Button>
-            </Link>
-          </div>
+          {/* Right: Actions - Only show if not authenticated */}
+          {!isAuthenticated && (
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <Link href="/signin" className="cursor-pointer">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="font-medium text-gray-600 hover:text-primary cursor-pointer"
+                >
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/signup" className="cursor-pointer">
+                <Button 
+                  size="sm" 
+                  className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer"
+                >
+                  Get Started
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

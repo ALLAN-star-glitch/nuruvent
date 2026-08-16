@@ -1,3 +1,5 @@
+// app/(public)/layout.tsx
+
 import type { Metadata } from 'next';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -15,9 +17,9 @@ export default function PublicLayout({
 }) {
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Sticky Header for Public Site */}
+      {/* ✅ Header reads auth state from Redux automatically */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-        <Header isAuthenticated={false} />
+        <Header />
       </header>
 
       {/* Main Content Area */}
@@ -34,7 +36,6 @@ export default function PublicLayout({
           __html: `
             var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
             
-            // Show widget if navigating back to public pages
             if (typeof window !== 'undefined' && window.Tawk_API && window.Tawk_API.showWidget) {
               window.Tawk_API.showWidget();
             }
@@ -50,7 +51,6 @@ export default function PublicLayout({
               s0.parentNode.insertBefore(s1, s0);
             })();
 
-            // Hide widget on unmount/navigation to non-public layouts
             if (typeof window !== 'undefined') {
               var hideTawkOnDashboard = function() {
                 if (window.location.pathname.startsWith('/dashboard')) {

@@ -4,6 +4,7 @@ import "./globals.css";
 import { InstallPrompt } from "@/components/PWA/InstallPrompt";
 import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
 import Script from "next/script";
+import StoreProvider from "./StoreProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,7 +68,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
         {/* Render child layout route groups: (public) or (dashboard) */}
-        {children}
+        <StoreProvider>{children}</StoreProvider>
 
         {/* Global Analytics */}
         {GA_MEASUREMENT_ID && (

@@ -1,24 +1,34 @@
 // app/(dashboard)/DashboardLayoutClient.tsx
+
 'use client';
 
 import { useState } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
+import { useAppSelector } from '@/lib/store/hooks';
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
-  role: 'host' | 'attendee' | 'admin';
 }
 
-export function DashboardLayoutClient({ children, role }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+
+  // Show loading state while auth is being restored
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 relative">
       {/* Sidebar - Floating with glassmorphism */}
       <DashboardSidebar 
-        role={role} 
-        onCollapseChange={setCollapsed}
         collapsed={collapsed}
+        onCollapseChange={setCollapsed}
       />
 
       {/* Spacer that adjusts based on sidebar state */}

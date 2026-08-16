@@ -40,6 +40,16 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
+// Redux imports
+import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
+import {
+  useRegisterPersonalMutation,
+  useRegisterInstitutionMutation,
+  useVerifyOTPMutation,
+  useResendOTPMutation,
+} from '@/lib/store/api/authApi';
+import { setOtpEmail, setRegistrationData } from '@/lib/store/slices/authSlice';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -132,15 +142,25 @@ const Stepper = ({
 
 export default function SignupForm() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  
+  // Redux state
+  const { otpEmail, registrationData, isAuthenticated } = useAppSelector((state) => state.auth);
+  
+  // RTK Query hooks
+  const [registerPersonal, { isLoading: isRegisterPersonalLoading }] = useRegisterPersonalMutation();
+  const [registerInstitution, { isLoading: isRegisterInstitutionLoading }] = useRegisterInstitutionMutation();
+  const [verifyOTP, { isLoading: isVerifyLoading }] = useVerifyOTPMutation();
+  const [resendOTP, { isLoading: isResendLoading }] = useResendOTPMutation();
 
-  // State
+  // Local state
   const [accountType, setAccountType] = useState<AccountType>(null);
   const [currentStep, setCurrentStep] = useState<Step>('account-type');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -177,6 +197,13 @@ export default function SignupForm() {
     }
   }, [resendTimer]);
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
   // Get step info
   const getSteps = () => {
     if (accountType === 'institution') {
@@ -198,6 +225,7 @@ export default function SignupForm() {
 
   const steps = getSteps();
   const currentStepNumber = getStepNumber();
+  const isLoadingCombined = isRegisterPersonalLoading || isRegisterInstitutionLoading || isVerifyLoading || isResendLoading || isLoading;
 
   // Handlers
   const handleAccountTypeSelect = (type: AccountType) => {
@@ -303,7 +331,29 @@ export default function SignupForm() {
   const handleNext = () => {
     if (accountType === 'personal') {
       if (!validatePersonal()) return;
-      setCurrentStep('otp');
+      
+      setIsLoading(true);
+      registerPersonal({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone,
+        account_type: 'personal',
+      })
+        .unwrap()
+        .then((response) => {
+          const email = response.data?.email || formData.email;
+          dispatch(setOtpEmail(email));
+          dispatch(setRegistrationData(response.data));
+          setCurrentStep('otp');
+        })
+        .catch((error) => {
+          const message = error.data?.message || 'Registration failed. Please try again.';
+          setErrors({ email: message });
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     } else {
       // Institution flow
       if (currentStep === 'details') {
@@ -311,26 +361,82 @@ export default function SignupForm() {
         setCurrentStep('institution-details');
       } else if (currentStep === 'institution-details') {
         if (!validateInstitution()) return;
-        setCurrentStep('otp');
+        
+        setIsLoading(true);
+        registerInstitution({
+          email: formData.adminEmail,
+          password: formData.password,
+          name: formData.adminName,
+          phone: formData.adminPhone,
+          account_type: 'institution',
+          institution_name: formData.institutionName,
+          institution_email: formData.institutionEmail,
+          institution_phone: formData.institutionPhone,
+          institution_type: formData.institutionType,
+        })
+          .unwrap()
+          .then((response) => {
+            const email = response.data?.email || formData.adminEmail;
+            dispatch(setOtpEmail(email));
+            dispatch(setRegistrationData(response.data));
+            setCurrentStep('otp');
+          })
+          .catch((error) => {
+            const message = error.data?.message || 'Registration failed. Please try again.';
+            setErrors({ adminEmail: message });
+          })
+          .finally(() => {
+            setIsLoading(false);
+          });
       }
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = () => {
     const otpValue = otp.join('');
     if (otpValue.length !== 6) {
       setErrors({ otp: 'Please enter the full 6-digit code' });
       return;
     }
-    
+
+    const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
+    if (!email) {
+      setErrors({ otp: 'Email not found. Please try again.' });
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsLoading(false);
-    setCurrentStep('success');
+    verifyOTP({
+      email: email,
+      otp: otpValue,
+    })
+      .unwrap()
+      .then(() => {
+        setCurrentStep('success');
+        // Redirect after a moment
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 1500);
+      })
+      .catch((error) => {
+        const message = error.data?.message || 'Invalid OTP. Please try again.';
+        setErrors({ otp: message });
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleResendOtp = () => {
     setResendTimer(60);
+    const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
+    if (email) {
+      resendOTP({ email })
+        .unwrap()
+        .catch((error) => {
+          console.error('Failed to resend OTP:', error);
+        });
+    }
   };
 
   const handleGoogleSignUp = async () => {
@@ -372,7 +478,6 @@ export default function SignupForm() {
   const renderAccountTypeStep = () => (
     <div className="space-y-8">
       <div className="flex flex-col items-center">
-        {/* Radio-style buttons - Clean and minimal */}
         <div className="grid grid-cols-2 gap-3 w-full max-w-md">
           {[
             { 
@@ -437,7 +542,6 @@ export default function SignupForm() {
 
   const renderPersonalDetails = () => (
     <div className="space-y-6">
-      {/* Continue with Google Button */}
       <Button
         type="button"
         variant="outline"
@@ -809,22 +913,22 @@ export default function SignupForm() {
         <button
           type="button"
           onClick={handleResendOtp}
-          disabled={resendTimer > 0}
+          disabled={resendTimer > 0 || isResendLoading}
           className={cn(
             "text-[#1A73E8] font-medium hover:underline transition-colors cursor-pointer",
-            resendTimer > 0 && "text-gray-400 hover:no-underline cursor-not-allowed"
+            (resendTimer > 0 || isResendLoading) && "text-gray-400 hover:no-underline cursor-not-allowed"
           )}
         >
-          {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
+          {isResendLoading ? 'Sending...' : resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
         </button>
       </div>
 
       <Button
         onClick={handleVerifyOtp}
-        disabled={isLoading}
+        disabled={isVerifyLoading || isLoading}
         className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer"
       >
-        {isLoading ? (
+        {isVerifyLoading || isLoading ? (
           <span className="flex items-center gap-2">
             <Loader2 className="h-5 w-5 animate-spin" />
             Verifying...
@@ -944,7 +1048,6 @@ export default function SignupForm() {
         {/* Card */}
         <Card className="relative bg-white/80 backdrop-blur-xl shadow-2xl border border-white/60">
           <CardHeader className="pb-4">
-            {/* Back Button - Positioned above stepper */}
             {showBackButton && (
               <div className="flex justify-start mb-2">
                 <Button
@@ -959,7 +1062,6 @@ export default function SignupForm() {
               </div>
             )}
 
-            {/* Stepper */}
             <div className="mb-4 pt-1">
               <Stepper 
                 currentStep={currentStepNumber} 
@@ -968,7 +1070,6 @@ export default function SignupForm() {
               />
             </div>
 
-            {/* Step Title - Single, no duplication */}
             <div className="text-center mt-2">
               <div className="p-0">
                 <h2 className="text-xl font-semibold text-gray-900">
@@ -998,19 +1099,28 @@ export default function SignupForm() {
                 {currentStep === 'otp' && renderOtpStep()}
                 {currentStep === 'success' && renderSuccessStep()}
 
-                {/* Navigation Buttons */}
                 {currentStep !== 'account-type' && currentStep !== 'otp' && currentStep !== 'success' && (
                   <div className="mt-6">
                     <Button
                       onClick={handleNext}
-                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer"
+                      disabled={isLoadingCombined}
+                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                      <span className="flex items-center gap-2">
-                        {accountType === 'institution' && currentStep === 'institution-details' 
-                          ? 'Create Account' 
-                          : 'Continue'}
-                        <ArrowRight className="h-5 w-5" />
-                      </span>
+                      {isLoadingCombined ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          {accountType === 'institution' && currentStep === 'institution-details' 
+                            ? 'Creating Account...' 
+                            : 'Loading...'}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          {accountType === 'institution' && currentStep === 'institution-details' 
+                            ? 'Create Account' 
+                            : 'Continue'}
+                          <ArrowRight className="h-5 w-5" />
+                        </span>
+                      )}
                     </Button>
                   </div>
                 )}
@@ -1019,7 +1129,6 @@ export default function SignupForm() {
           </CardContent>
         </Card>
 
-        {/* Sign In Link */}
         {currentStep !== 'success' && (
           <div className="text-center mt-6">
             <p className="text-sm text-gray-600">
@@ -1031,7 +1140,6 @@ export default function SignupForm() {
           </div>
         )}
 
-        {/* Footer */}
         <div className="text-center mt-6">
           <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
             <Shield className="h-3 w-3" />
