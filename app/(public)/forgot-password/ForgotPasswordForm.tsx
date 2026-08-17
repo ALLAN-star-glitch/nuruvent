@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, ArrowLeft, CheckCircle, Shield, Sparkles, Loader2, RefreshCw } from 'lucide-react';
@@ -35,6 +35,9 @@ export function ForgotPasswordForm() {
   const [resendTimer, setResendTimer] = useState(0);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // ✅ Ref for OTP
+  const otpRef = useRef('');
+
   // Resend timer countdown
   useEffect(() => {
     if (resendTimer > 0) {
@@ -62,7 +65,9 @@ export function ForgotPasswordForm() {
     if (error) setError(null);
   };
 
+  // ✅ Only updates state - NO API call
   const handleOtpChange = (value: string) => {
+    otpRef.current = value;
     setOtp(value);
     setError(null);
     setSuccessMessage(null);
@@ -116,9 +121,10 @@ export function ForgotPasswordForm() {
     }
   };
 
-  // Step 2: Verify OTP
+  // ✅ Step 2: Verify OTP - ONLY called when button is clicked
   const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+    const code = otpRef.current;
+    if (code.length !== 6) {
       setError('Please enter the full 6-digit code');
       return;
     }
@@ -130,7 +136,7 @@ export function ForgotPasswordForm() {
     try {
       await verifyResetOTP({
         email: formData.email,
-        otp: otp,
+        otp: code,
       }).unwrap();
       
       setStep('success');
@@ -155,6 +161,7 @@ export function ForgotPasswordForm() {
       setSuccessMessage('New OTP sent to your email');
       setResendTimer(60);
       setOtp('');
+      otpRef.current = '';
       setTimeout(() => {
         const input = document.getElementById('reset-otp-input');
         if (input) (input as HTMLInputElement)?.focus();
@@ -263,7 +270,7 @@ export function ForgotPasswordForm() {
                 </div>
               )}
 
-              {/* ✅ Reusable OTP Input */}
+              {/* ✅ OTP Input - ONLY updates state, NO API call */}
               <OtpInput
                 id="reset-otp-input"
                 value={otp}
@@ -273,11 +280,7 @@ export function ForgotPasswordForm() {
                 disabled={isLoadingCombined}
                 error={error}
                 autoFocus={true}
-                onComplete={(val) => {
-                  if (val.length === 6) {
-                    handleVerifyOTP();
-                  }
-                }}
+                // ✅ NO onComplete - API only called on button click
               />
 
               <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-sm">
@@ -306,6 +309,7 @@ export function ForgotPasswordForm() {
                 </button>
               </div>
 
+              {/* ✅ Verify Button - ONLY API call on click */}
               <Button
                 onClick={handleVerifyOTP}
                 disabled={isLoadingCombined || otp.length !== 6}
@@ -326,6 +330,7 @@ export function ForgotPasswordForm() {
                 onClick={() => {
                   setStep('email');
                   setOtp('');
+                  otpRef.current = '';
                   setError(null);
                   setSuccessMessage(null);
                 }}

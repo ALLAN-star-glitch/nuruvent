@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';  // ✅ Add useRef
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -184,6 +184,9 @@ export default function SignupForm() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // ✅ Ref for OTP to avoid race condition
+  const otpRef = useRef('');
+
   // Institution types (matches backend slugs)
   const institutionTypes = [
     { value: 'training_institute', label: 'Training Institute' },
@@ -270,6 +273,7 @@ export default function SignupForm() {
         break;
       case 'otp':
         setOtp('');
+        otpRef.current = '';
         setOtpError(null);
         setOtpSuccess(null);
         if (accountType === 'institution') {
@@ -292,7 +296,9 @@ export default function SignupForm() {
     }
   };
 
+  // ✅ OTP change handler - updates both state and ref
   const handleOtpChange = (value: string) => {
+    otpRef.current = value;
     setOtp(value);
     setOtpError(null);
     setOtpSuccess(null);
@@ -419,8 +425,10 @@ export default function SignupForm() {
     }
   };
 
+  // ✅ Verify OTP - uses ref for latest value
   const handleVerifyOtp = () => {
-    if (otp.length !== 6) {
+    const code = otpRef.current;
+    if (code.length !== 6) {
       setOtpError('Please enter the full 6-digit code');
       return;
     }
@@ -434,7 +442,7 @@ export default function SignupForm() {
     setIsLoading(true);
     verifyOTP({
       email: email,
-      otp: otp,
+      otp: code,
     })
       .unwrap()
       .then(() => {
@@ -473,6 +481,7 @@ export default function SignupForm() {
       .then(() => {
         setOtpSuccess('New verification code sent to your email');
         setOtp('');
+        otpRef.current = '';
         setTimeout(() => {
           const input = document.getElementById('otp-input');
           if (input) (input as HTMLInputElement)?.focus();
@@ -901,21 +910,21 @@ export default function SignupForm() {
         </p>
       </div>
 
-      {/* ✅ Success Message */}
+      {/* Success Message */}
       {otpSuccess && (
         <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-xl text-sm">
           {otpSuccess}
         </div>
       )}
 
-      {/* ✅ Error Message */}
+      {/* Error Message */}
       {otpError && (
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm">
           {otpError}
         </div>
       )}
 
-      {/* ✅ Reusable OTP Input */}
+      {/* ✅ Reusable OTP Input - NO onComplete to avoid auto-verify */}
       <OtpInput
         id="otp-input"
         value={otp}
@@ -925,11 +934,7 @@ export default function SignupForm() {
         disabled={isLoadingCombined}
         error={otpError}
         autoFocus={true}
-        onComplete={(val) => {
-          if (val.length === 6) {
-            handleVerifyOtp();
-          }
-        }}
+        // ✅ No onComplete - API only called on button click
       />
 
       <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-xs sm:text-sm">
@@ -961,6 +966,7 @@ export default function SignupForm() {
         </button>
       </div>
 
+      {/* ✅ Verify button - API called only when clicked */}
       <Button
         onClick={handleVerifyOtp}
         disabled={isVerifyLoading || isLoading || otp.length !== 6}

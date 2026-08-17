@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -40,6 +40,9 @@ export function SignInForm() {
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorOtp, setTwoFactorOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+
+  // ✅ Ref for OTP to avoid race condition
+  const otpRef = useRef('');
 
   // ✅ DEBUG: Track where error is being set
   useEffect(() => {
@@ -85,7 +88,9 @@ export function SignInForm() {
     if (successMessage) setSuccessMessage(null);
   };
 
+  // ✅ OTP change handler - updates both state and ref
   const handleOtpChange = (value: string) => {
+    otpRef.current = value;
     setTwoFactorOtp(value);
     setError(null);
     setSuccessMessage(null);
@@ -120,6 +125,7 @@ export function SignInForm() {
         dispatch(setTwoFactorEmail(email));
         setShowTwoFactor(true);
         setTwoFactorOtp('');
+        otpRef.current = '';
         setResendTimer(60);
         setSuccessMessage('2FA code sent to your email');
         
@@ -155,6 +161,7 @@ export function SignInForm() {
         dispatch(setTwoFactorEmail(email));
         setShowTwoFactor(true);
         setTwoFactorOtp('');
+        otpRef.current = '';
         setResendTimer(60);
         setSuccessMessage('2FA code sent to your email');
         setTimeout(() => {
@@ -171,8 +178,10 @@ export function SignInForm() {
     }
   };
 
+  // ✅ Verify 2FA - uses ref for latest value
   const handleVerifyTwoFactor = async () => {
-    if (twoFactorOtp.length !== 6) {
+    const code = otpRef.current;
+    if (code.length !== 6) {
       setError('Please enter the full 6-digit code');
       return;
     }
@@ -184,7 +193,7 @@ export function SignInForm() {
     try {
       const response = await verifyTwoFactor({
         email: twoFactorEmail || formData.email,
-        otp: twoFactorOtp,
+        otp: code,
       }).unwrap();
 
       // ✅ Check if verification was successful
@@ -215,6 +224,7 @@ export function SignInForm() {
       setResendTimer(60);
       // Reset OTP input
       setTwoFactorOtp('');
+      otpRef.current = '';
       // Focus OTP input
       setTimeout(() => {
         const input = document.getElementById('2fa-otp-input');
@@ -286,7 +296,7 @@ export function SignInForm() {
                 </div>
               )}
 
-              {/* ✅ Reusable OTP Input */}
+              {/* ✅ Reusable OTP Input - NO onComplete */}
               <OtpInput
                 id="2fa-otp-input"
                 value={twoFactorOtp}
@@ -296,11 +306,7 @@ export function SignInForm() {
                 disabled={isLoadingCombined}
                 error={error}
                 autoFocus={true}
-                onComplete={(val) => {
-                  if (val.length === 6) {
-                    handleVerifyTwoFactor();
-                  }
-                }}
+                // ✅ No onComplete - API only called on button click
               />
 
               <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-sm">
@@ -332,6 +338,7 @@ export function SignInForm() {
                 </button>
               </div>
 
+              {/* ✅ Verify button - API called only when clicked */}
               <Button
                 onClick={handleVerifyTwoFactor}
                 disabled={isLoadingCombined || twoFactorOtp.length !== 6}
@@ -352,6 +359,7 @@ export function SignInForm() {
                 onClick={() => {
                   setShowTwoFactor(false);
                   setTwoFactorOtp('');
+                  otpRef.current = '';
                   setError(null);
                   setSuccessMessage(null);
                   dispatch(setTwoFactorEmail(null));
