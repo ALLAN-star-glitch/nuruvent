@@ -12,14 +12,14 @@ import {
   REGISTER,
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
-import { api } from './api/baseApi';
+import { authApi } from './api/authApi';
 import authReducer from './slices/authSlice';
 
 // ✅ Persist config for auth slice
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'isAuthenticated'], // Only persist these fields
+  whitelist: ['user', 'isAuthenticated'],
 };
 
 const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
@@ -27,7 +27,7 @@ const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
 // ✅ Root reducer
 const rootReducer = combineReducers({
   auth: persistedAuthReducer,
-  [api.reducerPath]: api.reducer,
+  [authApi.reducerPath]: authApi.reducer,
 });
 
 export const makeStore = () => {
@@ -38,7 +38,8 @@ export const makeStore = () => {
         serializableCheck: {
           ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
         },
-      }).concat(api.middleware),
+      }).concat(authApi.middleware),
+    devTools: process.env.NODE_ENV !== 'production',
   });
 
   return store;

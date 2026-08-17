@@ -35,6 +35,8 @@ export interface AuthState {
   otpEmail: string | null;
   registrationData: any | null;
   twoFactorEmail: string | null;
+  // ✅ Track login flow state
+  loginStep: 'idle' | 'password' | 'two_factor' | 'authenticated';
 }
 
 // ============================================================
@@ -68,6 +70,7 @@ const initialState: AuthState = {
   otpEmail: null,
   registrationData: null,
   twoFactorEmail: null,
+  loginStep: 'idle',
 };
 
 // ============================================================
@@ -83,6 +86,11 @@ const authSlice = createSlice({
     },
     setTwoFactorEmail: (state, action: PayloadAction<string | null>) => {
       state.twoFactorEmail = action.payload;
+      if (action.payload) {
+        state.loginStep = 'two_factor';
+      } else {
+        state.loginStep = 'idle';
+      }
     },
     setRegistrationData: (state, action: PayloadAction<any>) => {
       state.registrationData = action.payload;
@@ -90,6 +98,10 @@ const authSlice = createSlice({
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
       state.isAuthenticated = true;
+      state.loginStep = 'authenticated';
+    },
+    setLoginStep: (state, action: PayloadAction<AuthState['loginStep']>) => {
+      state.loginStep = action.payload;
     },
     clearAuth: (state) => {
       state.user = null;
@@ -97,6 +109,7 @@ const authSlice = createSlice({
       state.otpEmail = null;
       state.twoFactorEmail = null;
       state.registrationData = null;
+      state.loginStep = 'idle';
     },
   },
   extraReducers: (builder) => {
@@ -107,6 +120,7 @@ const authSlice = createSlice({
       .addMatcher(authApi.endpoints.registerPersonal.matchFulfilled, (state, { payload }) => {
         state.otpEmail = payload.data?.email || null;
         state.registrationData = payload.data;
+        state.loginStep = 'idle';
       })
       
       // ============================================================
@@ -115,10 +129,11 @@ const authSlice = createSlice({
       .addMatcher(authApi.endpoints.registerInstitution.matchFulfilled, (state, { payload }) => {
         state.otpEmail = payload.data?.email || null;
         state.registrationData = payload.data;
+        state.loginStep = 'idle';
       })
       
       // ============================================================
-      // VERIFY OTP
+      // VERIFY OTP - Complete Registration
       // ============================================================
       .addMatcher(authApi.endpoints.verifyOTP.matchFulfilled, (state, { payload }) => {
         const account = payload.data?.account;
@@ -137,18 +152,32 @@ const authSlice = createSlice({
           };
           state.otpEmail = null;
           state.registrationData = null;
+          state.loginStep = 'authenticated';
         }
       })
       
       // ============================================================
-      // LOGIN
+      // LOGIN - Check if 2FA is required
       // ============================================================
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-        state.twoFactorEmail = payload.data?.email || null;
+        // Check if 2FA is required from the response
+        const data = payload.data as any;
+        if (data?.requires_2fa === true) {
+          // 2FA required - store email for 2FA step
+          state.twoFactorEmail = data.email || null;
+          state.loginStep = 'two_factor';
+        } else if (data?.access_token) {
+          // Direct login successful (no 2FA)
+          state.isAuthenticated = true;
+          state.loginStep = 'authenticated';
+        } else {
+          // Neither 2FA nor token - something else
+          state.loginStep = 'idle';
+        }
       })
       
       // ============================================================
-      // VERIFY 2FA
+      // VERIFY 2FA - Complete Login
       // ============================================================
       .addMatcher(authApi.endpoints.verifyTwoFactor.matchFulfilled, (state, { payload }) => {
         const account = payload.data?.account;
@@ -166,6 +195,17 @@ const authSlice = createSlice({
             role: (account as any).role || mapAccountTypeToRole(account.account_type),
           };
           state.twoFactorEmail = null;
+          state.loginStep = 'authenticated';
+        }
+      })
+      
+      // ============================================================
+      // RESEND OTP - Keep state
+      // ============================================================
+      .addMatcher(authApi.endpoints.resendOTP.matchFulfilled, (state, { payload }) => {
+        // Just update OTP email if present
+        if (payload.data?.email) {
+          state.otpEmail = payload.data.email;
         }
       })
       
@@ -178,6 +218,7 @@ const authSlice = createSlice({
         state.otpEmail = null;
         state.twoFactorEmail = null;
         state.registrationData = null;
+        state.loginStep = 'idle';
       });
   },
 });
@@ -191,6 +232,7 @@ export const {
   setTwoFactorEmail, 
   setRegistrationData, 
   setUser,
+  setLoginStep,
   clearAuth,
 } = authSlice.actions;
 

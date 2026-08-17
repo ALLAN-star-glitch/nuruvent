@@ -8,23 +8,25 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, Shield, Sparkles, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Shield, Sparkles, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { OtpInput } from '@/components/ui/OtpInput';
 
 // Redux imports
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
-import { useLoginMutation, useVerifyTwoFactorMutation } from '@/lib/store/api/authApi';
+import { useLoginMutation, useVerifyTwoFactorMutation, useResendOTPMutation } from '@/lib/store/api/authApi';
 import { setTwoFactorEmail } from '@/lib/store/slices/authSlice';
 
 export function SignInForm() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, twoFactorEmail } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, twoFactorEmail, loginStep } = useAppSelector((state) => state.auth);
   
   // RTK Query hooks
   const [login, { isLoading: isLoginLoading }] = useLoginMutation();
   const [verifyTwoFactor, { isLoading: isVerifyLoading }] = useVerifyTwoFactorMutation();
+  const [resendOTP, { isLoading: isResendLoading }] = useResendOTPMutation();
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,8 +36,18 @@ export function SignInForm() {
     rememberMe: false,
   });
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const [twoFactorOtp, setTwoFactorOtp] = useState(['', '', '', '', '', '']);
+  const [twoFactorOtp, setTwoFactorOtp] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // ✅ DEBUG: Track where error is being set
+  useEffect(() => {
+    if (error) {
+      console.log('🔴 Error was set to:', error);
+      console.trace('Stack trace:');
+    }
+  }, [error]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -44,12 +56,24 @@ export function SignInForm() {
     }
   }, [isAuthenticated, router]);
 
-  // If 2FA is required, show the 2FA input
+  // If 2FA is required from Redux state, show the 2FA input
   useEffect(() => {
-    if (twoFactorEmail) {
+    if (loginStep === 'two_factor' && twoFactorEmail) {
       setShowTwoFactor(true);
+      setResendTimer(60);
+      setSuccessMessage('2FA code sent to your email');
+      // Clear any lingering error
+      setError(null);
     }
-  }, [twoFactorEmail]);
+  }, [loginStep, twoFactorEmail]);
+
+  // Resend timer countdown
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -58,31 +82,25 @@ export function SignInForm() {
       [name]: type === 'checkbox' ? checked : value,
     });
     if (error) setError(null);
+    if (successMessage) setSuccessMessage(null);
   };
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) return;
-    const newOtp = [...twoFactorOtp];
-    newOtp[index] = value;
-    setTwoFactorOtp(newOtp);
-    
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      if (nextInput) (nextInput as HTMLInputElement)?.focus();
-    }
+  const handleOtpChange = (value: string) => {
+    setTwoFactorOtp(value);
+    setError(null);
+    setSuccessMessage(null);
   };
 
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !twoFactorOtp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      if (prevInput) (prevInput as HTMLInputElement)?.focus();
-    }
-  };
-
+  // ✅ Updated handleSubmit with proper 2FA handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // ✅ Clear ALL states at the very beginning
     setError(null);
+    setSuccessMessage(null);
     setIsLoading(true);
+
+    console.log('🔍 Login attempt for:', formData.email);
 
     try {
       const response = await login({
@@ -90,45 +108,91 @@ export function SignInForm() {
         password: formData.password,
       }).unwrap();
 
-      // If 2FA is required, the response will contain the email
-      if (response.data?.email) {
-        dispatch(setTwoFactorEmail(response.data.email));
+      console.log('✅ Login response:', response);
+
+      // ✅ Check for requires_2fa in response.data
+      if (response.data && 'requires_2fa' in response.data && response.data.requires_2fa === true) {
+        console.log('✅ 2FA required, showing 2FA screen');
+        
+        // ✅ CRITICAL: Clear error before showing 2FA
+        setError(null);
+        const email = response.data.email || formData.email;
+        dispatch(setTwoFactorEmail(email));
         setShowTwoFactor(true);
-        // Reset OTP when 2FA is shown
-        setTwoFactorOtp(['', '', '', '', '', '']);
-        // Focus first OTP input
+        setTwoFactorOtp('');
+        setResendTimer(60);
+        setSuccessMessage('2FA code sent to your email');
+        
         setTimeout(() => {
-          const firstInput = document.getElementById('otp-0');
-          if (firstInput) (firstInput as HTMLInputElement)?.focus();
+          const input = document.getElementById('2fa-otp-input');
+          if (input) (input as HTMLInputElement)?.focus();
         }, 100);
-      } else {
-        // Direct login (if 2FA not required)
-        router.push('/dashboard');
+        
+        setIsLoading(false);
+        return;
       }
+
+      // ✅ Check for access_token (direct login)
+      if (response.data && 'access_token' in response.data) {
+        console.log('✅ Direct login successful');
+        router.push('/dashboard');
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ Fallback
+      router.push('/dashboard');
+      setIsLoading(false);
+      
     } catch (err: any) {
+      console.error('❌ Login error caught:', err);
+      
+      // ✅ Check if error contains 2FA data (fallback)
+      if (err.data?.data?.requires_2fa === true) {
+        console.log('✅ 2FA found in error response');
+        setError(null);
+        const email = err.data.data.email || formData.email;
+        dispatch(setTwoFactorEmail(email));
+        setShowTwoFactor(true);
+        setTwoFactorOtp('');
+        setResendTimer(60);
+        setSuccessMessage('2FA code sent to your email');
+        setTimeout(() => {
+          const input = document.getElementById('2fa-otp-input');
+          if (input) (input as HTMLInputElement)?.focus();
+        }, 100);
+        setIsLoading(false);
+        return;
+      }
+      
+      // ✅ Real error - show message
       setError(err.data?.message || 'Invalid email or password. Please try again.');
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleVerifyTwoFactor = async () => {
-    const otpValue = twoFactorOtp.join('');
-    if (otpValue.length !== 6) {
+    if (twoFactorOtp.length !== 6) {
       setError('Please enter the full 6-digit code');
       return;
     }
 
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
-      await verifyTwoFactor({
+      const response = await verifyTwoFactor({
         email: twoFactorEmail || formData.email,
-        otp: otpValue,
+        otp: twoFactorOtp,
       }).unwrap();
 
-      router.push('/dashboard');
+      // ✅ Check if verification was successful
+      if (response.data?.account) {
+        router.push('/dashboard');
+      } else {
+        setError('Verification failed. Please try again.');
+      }
     } catch (err: any) {
       setError(err.data?.message || 'Invalid 2FA code. Please try again.');
     } finally {
@@ -136,16 +200,36 @@ export function SignInForm() {
     }
   };
 
-  // ✅ Placeholder function - no API call
-  const handleResendCode = () => {
-    // UI-only: shows feedback without making an API call
-    console.log('Resend code clicked - functionality coming soon');
-    // You could add a simple toast notification here if you have one
+  // ✅ Resend 2FA OTP
+  const handleResendCode = async () => {
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      await resendOTP({
+        email: twoFactorEmail || formData.email,
+        purpose: 'two_factor',
+      }).unwrap();
+      
+      setSuccessMessage('New 2FA code sent to your email');
+      setResendTimer(60);
+      // Reset OTP input
+      setTwoFactorOtp('');
+      // Focus OTP input
+      setTimeout(() => {
+        const input = document.getElementById('2fa-otp-input');
+        if (input) (input as HTMLInputElement)?.focus();
+      }, 100);
+    } catch (err: any) {
+      setError(err.data?.message || 'Failed to resend code. Please try again.');
+    }
   };
 
-  const isLoadingCombined = isLoading || isLoginLoading || isVerifyLoading;
+  const isLoadingCombined = isLoading || isLoginLoading || isVerifyLoading || isResendLoading;
 
-  // Render 2FA Step
+  // ============================================================
+  // RENDER 2FA STEP
+  // ============================================================
   if (showTwoFactor) {
     return (
       <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
@@ -178,7 +262,7 @@ export function SignInForm() {
           >
             <h1 className="text-2xl font-bold text-gray-800 mt-2">Two-Factor Authentication</h1>
             <p className="text-sm text-gray-600 mt-0.5">Enter the 6-digit code sent to your email</p>
-            <p className="text-xs text-[#1A73E8] font-medium mt-1">{twoFactorEmail || formData.email}</p>
+            <p className="text-xs text-[#1A73E8] font-medium mt-1 break-all">{twoFactorEmail || formData.email}</p>
           </motion.div>
 
           <motion.div
@@ -188,40 +272,69 @@ export function SignInForm() {
             className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8"
           >
             <div className="space-y-6 text-center">
-              <div className="flex justify-center gap-2">
-                {twoFactorOtp.map((digit, index) => (
-                  <input
-                    key={index}
-                    id={`otp-${index}`}
-                    type="text"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleOtpChange(index, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    className={cn(
-                      "w-12 h-14 text-center text-xl font-semibold rounded-xl border-2 transition-all bg-white focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 cursor-text",
-                      error && !digit ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "border-gray-200 focus:border-[#1A73E8]"
-                    )}
-                    autoFocus={index === 0}
-                  />
-                ))}
-              </div>
-              {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+              {/* Success Message */}
+              {successMessage && (
+                <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-xl text-sm">
+                  {successMessage}
+                </div>
+              )}
+              
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm">
+                  {error}
+                </div>
+              )}
 
-              <div className="flex items-center justify-center gap-4 text-sm">
-                <span className="text-gray-500">Code expires in 4:59</span>
+              {/* ✅ Reusable OTP Input */}
+              <OtpInput
+                id="2fa-otp-input"
+                value={twoFactorOtp}
+                onChange={handleOtpChange}
+                length={6}
+                placeholder="Enter 2FA code"
+                disabled={isLoadingCombined}
+                error={error}
+                autoFocus={true}
+                onComplete={(val) => {
+                  if (val.length === 6) {
+                    handleVerifyTwoFactor();
+                  }
+                }}
+              />
+
+              <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-sm">
+                <span className="text-gray-500">
+                  Code expires in {resendTimer > 0 ? resendTimer : 0}s
+                </span>
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  className="text-[#1A73E8] font-medium hover:underline transition-colors cursor-pointer"
+                  disabled={resendTimer > 0 || isResendLoading}
+                  className={cn(
+                    "flex items-center gap-1.5 font-medium transition-colors cursor-pointer",
+                    resendTimer > 0 || isResendLoading
+                      ? "text-gray-400 cursor-not-allowed"
+                      : "text-[#1A73E8] hover:underline"
+                  )}
                 >
-                  Resend code
+                  {isResendLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Resend code
+                    </>
+                  )}
                 </button>
               </div>
 
               <Button
                 onClick={handleVerifyTwoFactor}
-                disabled={isLoadingCombined || twoFactorOtp.join('').length !== 6}
+                disabled={isLoadingCombined || twoFactorOtp.length !== 6}
                 className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isLoadingCombined ? (
@@ -238,8 +351,9 @@ export function SignInForm() {
                 type="button"
                 onClick={() => {
                   setShowTwoFactor(false);
-                  setTwoFactorOtp(['', '', '', '', '', '']);
+                  setTwoFactorOtp('');
                   setError(null);
+                  setSuccessMessage(null);
                   dispatch(setTwoFactorEmail(null));
                 }}
                 className="text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
@@ -263,7 +377,9 @@ export function SignInForm() {
     );
   }
 
-  // Main Sign In Form
+  // ============================================================
+  // RENDER MAIN SIGN IN FORM
+  // ============================================================
   return (
     <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
       <div 
@@ -305,6 +421,7 @@ export function SignInForm() {
           className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Only show error on the main form, not on 2FA */}
             {error && !showTwoFactor && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
                 {error}

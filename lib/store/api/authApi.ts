@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/store/api/authApi.ts
 
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-
-// ============================================================
-// BASE URL
-// ============================================================
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+import { api } from './baseApi';
 
 // ============================================================
 // REQUEST TYPES
@@ -63,6 +57,7 @@ export interface VerifyResetOTPRequest {
 
 export interface ResendOTPRequest {
   email: string;
+  purpose?: 'registration' | 'two_factor' | 'password_reset' | 'email_change' | 'phone_change';
 }
 
 // ============================================================
@@ -104,11 +99,25 @@ export interface PasswordResetResponse {
   expires_in: number;
 }
 
-export interface AuthResponse {
+export interface BaseResponse<T = any> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+export type LoginResponseData = TwoFactorResponse | TokenResponse;
+
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  data: LoginResponseData;
+}
+
+export interface VerifyOTPResponse {
   success: boolean;
   message: string;
   data: TokenResponse & {
-    account?: AccountResponse;
+    account: AccountResponse;
     institution?: {
       id: string;
       name: string;
@@ -116,39 +125,85 @@ export interface AuthResponse {
       phone: string;
       type: string;
     };
-    email?: string;
-    expires_at?: string;
-    message?: string;
   };
 }
 
-export interface BaseResponse {
+export interface VerifyTwoFactorResponse {
   success: boolean;
   message: string;
-  data?: any;
+  data: TokenResponse & {
+    account: AccountResponse;
+  };
+}
+
+export interface RegisterResponse {
+  success: boolean;
+  message: string;
+  data: {
+    email: string;
+    expires_at: string;
+    message: string;
+  };
+}
+
+export interface RefreshTokenResponse {
+  success: boolean;
+  message: string;
+  data: TokenResponse;
+}
+
+export interface ResendOTPResponse {
+  success: boolean;
+  message: string;
+  data: {
+    email: string;
+    expires_at: string;
+    message: string;
+  };
+}
+
+export interface ForgotPasswordResponse {
+  success: boolean;
+  message: string;
+  data: {
+    message: string;
+    expires_in: number;
+  };
+}
+
+export interface VerifyResetOTPResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
 }
 
 // ============================================================
-// API SLICE
+// TYPE GUARDS
 // ============================================================
 
-export const authApi = createApi({
-  reducerPath: 'authApi',
-  baseQuery: fetchBaseQuery({
-    baseUrl: API_URL,
-    credentials: 'include',
-    prepareHeaders: (headers) => {
-      headers.set('Content-Type', 'application/json');
-      return headers;
-    },
-  }),
-  tagTypes: ['User', 'Auth'],
+export function isTwoFactorResponse(data: LoginResponseData): data is TwoFactorResponse {
+  return data && typeof data === 'object' && 'requires_2fa' in data && data.requires_2fa === true;
+}
+
+export function isTokenResponse(data: LoginResponseData): data is TokenResponse {
+  return data && typeof data === 'object' && 'access_token' in data;
+}
+
+// ============================================================
+// ✅ INJECT ENDPOINTS INTO BASE API
+// ============================================================
+
+export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     // ============================================================
     // REGISTER
     // POST /api/v1/auth/register
     // ============================================================
-    registerPersonal: builder.mutation<AuthResponse, RegisterPersonalRequest>({
+    registerPersonal: builder.mutation<RegisterResponse, RegisterPersonalRequest>({
       query: (data) => ({
         url: '/auth/register',
         method: 'POST',
@@ -157,7 +212,7 @@ export const authApi = createApi({
       invalidatesTags: ['Auth'],
     }),
 
-    registerInstitution: builder.mutation<AuthResponse, RegisterInstitutionRequest>({
+    registerInstitution: builder.mutation<RegisterResponse, RegisterInstitutionRequest>({
       query: (data) => ({
         url: '/auth/register',
         method: 'POST',
@@ -170,7 +225,7 @@ export const authApi = createApi({
     // VERIFY OTP
     // POST /api/v1/auth/verify-otp
     // ============================================================
-    verifyOTP: builder.mutation<AuthResponse, VerifyOTPRequest>({
+    verifyOTP: builder.mutation<VerifyOTPResponse, VerifyOTPRequest>({
       query: (data) => ({
         url: '/auth/verify-otp',
         method: 'POST',
@@ -180,22 +235,28 @@ export const authApi = createApi({
     }),
 
     // ============================================================
-    // RESEND OTP
+    // RESEND OTP - UNIFIED (with purpose)
     // POST /api/v1/auth/resend-otp
     // ============================================================
-    resendOTP: builder.mutation<BaseResponse, ResendOTPRequest>({
-      query: (data) => ({
-        url: '/auth/resend-otp',
-        method: 'POST',
-        body: data,
-      }),
+    resendOTP: builder.mutation<ResendOTPResponse, ResendOTPRequest>({
+      query: (data) => {
+        const payload = {
+          email: data.email,
+          purpose: data.purpose || 'registration',
+        };
+        return {
+          url: '/auth/resend-otp',
+          method: 'POST',
+          body: payload,
+        };
+      },
     }),
 
     // ============================================================
     // LOGIN
     // POST /api/v1/auth/login
     // ============================================================
-    login: builder.mutation<BaseResponse, LoginRequest>({
+    login: builder.mutation<LoginResponse, LoginRequest>({
       query: (data) => ({
         url: '/auth/login',
         method: 'POST',
@@ -208,7 +269,7 @@ export const authApi = createApi({
     // VERIFY 2FA
     // POST /api/v1/auth/verify-2fa
     // ============================================================
-    verifyTwoFactor: builder.mutation<AuthResponse, VerifyTwoFactorRequest>({
+    verifyTwoFactor: builder.mutation<VerifyTwoFactorResponse, VerifyTwoFactorRequest>({
       query: (data) => ({
         url: '/auth/verify-2fa',
         method: 'POST',
@@ -221,7 +282,7 @@ export const authApi = createApi({
     // REFRESH TOKEN
     // POST /api/v1/auth/refresh
     // ============================================================
-    refreshToken: builder.mutation<AuthResponse, RefreshTokenRequest>({
+    refreshToken: builder.mutation<RefreshTokenResponse, RefreshTokenRequest>({
       query: (data) => ({
         url: '/auth/refresh',
         method: 'POST',
@@ -233,20 +294,19 @@ export const authApi = createApi({
     // LOGOUT
     // POST /api/v1/auth/logout
     // ============================================================
-    logout: builder.mutation<BaseResponse, void>({
-    query: () => ({
+    logout: builder.mutation<LogoutResponse, void>({
+      query: () => ({
         url: '/auth/logout',
         method: 'POST',
-        // No body needed - cookie handles the refresh token
-    }),
-    invalidatesTags: ['User', 'Auth'],
+      }),
+      invalidatesTags: ['User', 'Auth'],
     }),
 
     // ============================================================
     // FORGOT PASSWORD
     // POST /api/v1/auth/forgot-password
     // ============================================================
-    forgotPassword: builder.mutation<BaseResponse, ForgotPasswordRequest>({
+    forgotPassword: builder.mutation<ForgotPasswordResponse, ForgotPasswordRequest>({
       query: (data) => ({
         url: '/auth/forgot-password',
         method: 'POST',
@@ -258,7 +318,7 @@ export const authApi = createApi({
     // VERIFY RESET OTP
     // POST /api/v1/auth/verify-reset-otp
     // ============================================================
-    verifyResetOTP: builder.mutation<BaseResponse, VerifyResetOTPRequest>({
+    verifyResetOTP: builder.mutation<VerifyResetOTPResponse, VerifyResetOTPRequest>({
       query: (data) => ({
         url: '/auth/verify-reset-otp',
         method: 'POST',
@@ -266,6 +326,7 @@ export const authApi = createApi({
       }),
     }),
   }),
+  overrideExisting: false,
 });
 
 // ============================================================

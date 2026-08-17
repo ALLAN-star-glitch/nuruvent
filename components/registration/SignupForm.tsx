@@ -23,7 +23,8 @@ import {
   UserCheck,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 // Shadcn components
@@ -49,6 +50,9 @@ import {
   useResendOTPMutation,
 } from '@/lib/store/api/authApi';
 import { setOtpEmail, setRegistrationData } from '@/lib/store/slices/authSlice';
+import { validatePassword, generateStrongPassword } from '@/lib/utils/password';
+import { PasswordInput } from '../ui/PasswordInput';
+import { OtpInput } from '../ui/OtpInput';
 
 // ============================================================
 // TYPES
@@ -89,19 +93,19 @@ const Stepper = ({
   labels: string[];
 }) => {
   return (
-    <div className="flex items-center justify-between w-full max-w-2xl mx-auto px-2">
+    <div className="flex items-center justify-between w-full max-w-2xl mx-auto px-1 sm:px-2">
       {Array.from({ length: totalSteps }).map((_, index) => {
         const stepNumber = index + 1;
         const isActive = stepNumber === currentStep;
         const isCompleted = stepNumber < currentStep;
 
         return (
-          <div key={index} className="flex items-center flex-1 last:flex-none">
-            <div className="flex items-center gap-1.5 sm:gap-2">
+          <div key={index} className="flex items-center flex-1 last:flex-none min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2">
               <div
                 className={cn(
-                  "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-all flex-shrink-0",
-                  isActive && "bg-[#1A73E8] text-white ring-4 ring-[#1A73E8]/20",
+                  "w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-sm font-medium transition-all flex-shrink-0",
+                  isActive && "bg-[#1A73E8] text-white ring-2 sm:ring-4 ring-[#1A73E8]/20",
                   isCompleted && "bg-green-500 text-white",
                   !isActive && !isCompleted && "bg-gray-200 text-gray-500"
                 )}
@@ -110,7 +114,7 @@ const Stepper = ({
               </div>
               <span
                 className={cn(
-                  "text-[10px] sm:text-xs font-medium hidden xs:block",
+                  "text-[8px] sm:text-xs font-medium hidden xs:block truncate max-w-[40px] sm:max-w-none",
                   isActive && "text-gray-900",
                   isCompleted && "text-gray-600",
                   !isActive && !isCompleted && "text-gray-400"
@@ -120,7 +124,7 @@ const Stepper = ({
               </span>
             </div>
             {index < totalSteps - 1 && (
-              <div className="flex-1 mx-1 sm:mx-2 h-0.5 bg-gray-200">
+              <div className="flex-1 mx-1 sm:mx-2 h-0.5 bg-gray-200 min-w-[10px]">
                 <div
                   className={cn(
                     "h-full transition-all duration-300",
@@ -146,7 +150,7 @@ export default function SignupForm() {
   
   // Redux state
   const { otpEmail, registrationData, isAuthenticated } = useAppSelector((state) => state.auth);
-  
+
   // RTK Query hooks
   const [registerPersonal, { isLoading: isRegisterPersonalLoading }] = useRegisterPersonalMutation();
   const [registerInstitution, { isLoading: isRegisterInstitutionLoading }] = useRegisterInstitutionMutation();
@@ -156,11 +160,13 @@ export default function SignupForm() {
   // Local state
   const [accountType, setAccountType] = useState<AccountType>(null);
   const [currentStep, setCurrentStep] = useState<Step>('account-type');
-  const [showPassword, setShowPassword] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpSuccess, setOtpSuccess] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -207,7 +213,7 @@ export default function SignupForm() {
   // Get step info
   const getSteps = () => {
     if (accountType === 'institution') {
-      return { total: 5, labels: ['Type', 'Admin', 'Institution', 'OTP', 'Done'] };
+      return { total: 5, labels: ['Type', 'Admin', 'Inst.', 'OTP', 'Done'] };
     }
     return { total: 4, labels: ['Type', 'Details', 'OTP', 'Done'] };
   };
@@ -227,7 +233,26 @@ export default function SignupForm() {
   const currentStepNumber = getStepNumber();
   const isLoadingCombined = isRegisterPersonalLoading || isRegisterInstitutionLoading || isVerifyLoading || isResendLoading || isLoading;
 
-  // Handlers
+  // ✅ Generate strong password
+  const handleGeneratePassword = () => {
+    const newPassword = generateStrongPassword();
+    setFormData(prev => ({ ...prev, password: newPassword }));
+    const validation = validatePassword(newPassword);
+    if (validation.isValid) {
+      setPasswordError(null);
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setFormData(prev => ({ ...prev, password: value }));
+    const validation = validatePassword(value);
+    if (!validation.isValid && value.length > 0) {
+      setPasswordError(validation.errors[0] || null);
+    } else {
+      setPasswordError(null);
+    }
+  };
+
   const handleAccountTypeSelect = (type: AccountType) => {
     setAccountType(type);
     setCurrentStep('details');
@@ -244,7 +269,9 @@ export default function SignupForm() {
         setCurrentStep('details');
         break;
       case 'otp':
-        setOtp(['', '', '', '', '', '']);
+        setOtp('');
+        setOtpError(null);
+        setOtpSuccess(null);
         if (accountType === 'institution') {
           setCurrentStep('institution-details');
         } else {
@@ -265,23 +292,10 @@ export default function SignupForm() {
     }
   };
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) return;
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    
-    if (value && index < 5) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      if (nextInput) (nextInput as HTMLInputElement)?.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      if (prevInput) (prevInput as HTMLInputElement)?.focus();
-    }
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    setOtpError(null);
+    setOtpSuccess(null);
   };
 
   const validatePersonal = (): boolean => {
@@ -292,8 +306,6 @@ export default function SignupForm() {
     if (!formData.phone) newErrors.phone = 'Phone number is required';
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
     }
 
     setErrors(newErrors);
@@ -308,8 +320,6 @@ export default function SignupForm() {
     if (!formData.adminPhone) newErrors.adminPhone = 'Admin phone is required';
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
     }
 
     setErrors(newErrors);
@@ -332,6 +342,13 @@ export default function SignupForm() {
     if (accountType === 'personal') {
       if (!validatePersonal()) return;
       
+      // Check if password is valid
+      const validation = validatePassword(formData.password);
+      if (!validation.isValid) {
+        setPasswordError(validation.errors[0] || 'Please choose a stronger password');
+        return;
+      }
+      
       setIsLoading(true);
       registerPersonal({
         email: formData.email,
@@ -346,6 +363,7 @@ export default function SignupForm() {
           dispatch(setOtpEmail(email));
           dispatch(setRegistrationData(response.data));
           setCurrentStep('otp');
+          setResendTimer(60);
         })
         .catch((error) => {
           const message = error.data?.message || 'Registration failed. Please try again.';
@@ -358,6 +376,14 @@ export default function SignupForm() {
       // Institution flow
       if (currentStep === 'details') {
         if (!validateAdmin()) return;
+        
+        // Check if password is valid
+        const validation = validatePassword(formData.password);
+        if (!validation.isValid) {
+          setPasswordError(validation.errors[0] || 'Please choose a stronger password');
+          return;
+        }
+        
         setCurrentStep('institution-details');
       } else if (currentStep === 'institution-details') {
         if (!validateInstitution()) return;
@@ -380,6 +406,7 @@ export default function SignupForm() {
             dispatch(setOtpEmail(email));
             dispatch(setRegistrationData(response.data));
             setCurrentStep('otp');
+            setResendTimer(60);
           })
           .catch((error) => {
             const message = error.data?.message || 'Registration failed. Please try again.';
@@ -393,57 +420,75 @@ export default function SignupForm() {
   };
 
   const handleVerifyOtp = () => {
-    const otpValue = otp.join('');
-    if (otpValue.length !== 6) {
-      setErrors({ otp: 'Please enter the full 6-digit code' });
+    if (otp.length !== 6) {
+      setOtpError('Please enter the full 6-digit code');
       return;
     }
 
     const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
     if (!email) {
-      setErrors({ otp: 'Email not found. Please try again.' });
+      setOtpError('Email not found. Please try again.');
       return;
     }
 
     setIsLoading(true);
     verifyOTP({
       email: email,
-      otp: otpValue,
+      otp: otp,
     })
       .unwrap()
       .then(() => {
         setCurrentStep('success');
-        // Redirect after a moment
         setTimeout(() => {
           router.push('/dashboard');
         }, 1500);
       })
       .catch((error) => {
         const message = error.data?.message || 'Invalid OTP. Please try again.';
-        setErrors({ otp: message });
+        setOtpError(message);
       })
       .finally(() => {
         setIsLoading(false);
       });
   };
 
+  // ✅ Unified Resend OTP with purpose
   const handleResendOtp = () => {
-    setResendTimer(60);
+    setOtpError(null);
+    setOtpSuccess(null);
+    
     const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
-    if (email) {
-      resendOTP({ email })
-        .unwrap()
-        .catch((error) => {
-          console.error('Failed to resend OTP:', error);
-        });
+    if (!email) {
+      setOtpError('Email not found. Please try again.');
+      return;
     }
+
+    setResendTimer(60);
+    
+    resendOTP({ 
+      email: email,
+      purpose: 'registration'
+    })
+      .unwrap()
+      .then(() => {
+        setOtpSuccess('New verification code sent to your email');
+        setOtp('');
+        setTimeout(() => {
+          const input = document.getElementById('otp-input');
+          if (input) (input as HTMLInputElement)?.focus();
+        }, 100);
+      })
+      .catch((error) => {
+        const message = error.data?.message || 'Failed to resend OTP. Please try again.';
+        setOtpError(message);
+        setResendTimer(0);
+      });
   };
 
   const handleGoogleSignUp = async () => {
     setIsGoogleLoading(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsGoogleLoading(false);
-    // window.location.href = '/api/auth/google';
   };
 
   const getStepTitle = () => {
@@ -476,9 +521,9 @@ export default function SignupForm() {
   // ============================================================
 
   const renderAccountTypeStep = () => (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-col items-center">
-        <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full max-w-md">
           {[
             { 
               type: 'personal' as AccountType, 
@@ -501,28 +546,28 @@ export default function SignupForm() {
                 key={option.type}
                 onClick={() => handleAccountTypeSelect(option.type)}
                 className={cn(
-                  "relative flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer",
+                  "relative flex flex-col items-center justify-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer",
                   isSelected
                     ? "border-[#1A73E8] bg-[#1A73E8]/5 shadow-md"
                     : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                 )}
               >
                 <div className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                  "w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors",
                   isSelected ? "bg-[#1A73E8] text-white" : "bg-gray-100 text-gray-500"
                 )}>
-                  <OptionIcon className="h-5 w-5" />
+                  <OptionIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <span className={cn(
-                  "text-sm font-medium",
+                  "text-xs sm:text-sm font-medium",
                   isSelected ? "text-gray-900" : "text-gray-700"
                 )}>
                   {option.label}
                 </span>
-                <span className="text-[10px] text-gray-400">{option.description}</span>
+                <span className="text-[8px] sm:text-[10px] text-gray-400">{option.description}</span>
                 {isSelected && (
-                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#1A73E8] flex items-center justify-center shadow-sm">
-                    <Check className="h-3 w-3 text-white" />
+                  <div className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-[#1A73E8] flex items-center justify-center shadow-sm">
+                    <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
                   </div>
                 )}
               </button>
@@ -531,8 +576,8 @@ export default function SignupForm() {
         </div>
         
         {accountType && (
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-green-600 font-medium">
-            <Check className="h-3.5 w-3.5" />
+          <div className="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-green-600 font-medium">
+            <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span>{accountType === 'personal' ? 'Personal' : 'Institution'} account selected</span>
           </div>
         )}
@@ -541,19 +586,19 @@ export default function SignupForm() {
   );
 
   const renderPersonalDetails = () => (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Button
         type="button"
         variant="outline"
         onClick={handleGoogleSignUp}
         disabled={isGoogleLoading}
-        className="w-full h-12 border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 cursor-pointer flex items-center justify-center gap-3 text-base font-medium text-gray-700"
+        className="w-full h-10 sm:h-12 border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base font-medium text-gray-700"
       >
         {isGoogleLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
         ) : (
           <>
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
                 fill="#4285F4"
@@ -580,270 +625,240 @@ export default function SignupForm() {
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-gray-200" />
         </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-white text-gray-500">or sign up with email</span>
+        <div className="relative flex justify-center text-xs sm:text-sm">
+          <span className="px-3 sm:px-4 bg-white text-gray-500">or sign up with email</span>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-1">
+          <Label className="text-xs sm:text-sm font-medium text-gray-700">
             Full Name <span className="text-red-500">*</span>
           </Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <Input
               name="name"
               value={formData.name}
               onChange={handleChange}
               placeholder="John Doe"
-              className={cn("pl-9 cursor-text", errors.name && "border-red-500")}
+              className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.name && "border-red-500")}
             />
           </div>
-          {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+          {errors.name && <p className="text-[10px] sm:text-xs text-red-500">{errors.name}</p>}
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700">
+        <div className="space-y-1">
+          <Label className="text-xs sm:text-sm font-medium text-gray-700">
             Email <span className="text-red-500">*</span>
           </Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <Input
               name="email"
               type="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
-              className={cn("pl-9 cursor-text", errors.email && "border-red-500")}
+              className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.email && "border-red-500")}
             />
           </div>
-          {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+          {errors.email && <p className="text-[10px] sm:text-xs text-red-500">{errors.email}</p>}
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700">
+        <div className="space-y-1">
+          <Label className="text-xs sm:text-sm font-medium text-gray-700">
             Phone <span className="text-red-500">*</span>
           </Label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <Input
               name="phone"
               type="tel"
               value={formData.phone}
               onChange={handleChange}
               placeholder="0712345678"
-              className={cn("pl-9 cursor-text", errors.phone && "border-red-500")}
+              className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.phone && "border-red-500")}
             />
           </div>
-          {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
+          {errors.phone && <p className="text-[10px] sm:text-xs text-red-500">{errors.phone}</p>}
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700">
-            Password <span className="text-red-500">*</span>
-          </Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Min 8 characters"
-              className={cn("pl-9 pr-10 cursor-text", errors.password && "border-red-500")}
-            />
-            <button
+        {/* Password Section - Generate button beside label */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs sm:text-sm font-medium text-gray-700">
+              Password <span className="text-red-500">*</span>
+            </Label>
+            <Button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              variant="ghost"
+              onClick={handleGeneratePassword}
+              className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:bg-[#1A73E8]/10 flex items-center gap-1 cursor-pointer"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+              <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              Generate
+            </Button>
           </div>
-          {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-              <div
-                className={cn(
-                  "h-full transition-all duration-300",
-                  formData.password.length === 0 && "w-0",
-                  formData.password.length > 0 && formData.password.length < 4 && "w-1/3 bg-red-500",
-                  formData.password.length >= 4 && formData.password.length < 8 && "w-2/3 bg-yellow-500",
-                  formData.password.length >= 8 && "w-full bg-green-500"
-                )}
-              />
-            </div>
-            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
-              {formData.password.length === 0 && 'Enter password'}
-              {formData.password.length > 0 && formData.password.length < 4 && 'Weak'}
-              {formData.password.length >= 4 && formData.password.length < 8 && 'Medium'}
-              {formData.password.length >= 8 && 'Strong'}
-            </span>
-          </div>
+          
+          <PasswordInput
+            value={formData.password}
+            onChange={handlePasswordChange}
+            placeholder="Create a strong password"
+            required
+            showStrength
+            showRequirements
+            error={passwordError || undefined}
+            label={false}
+          />
         </div>
       </div>
     </div>
   );
 
   const renderAdminDetails = () => (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Admin Full Name <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <User className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="adminName"
             value={formData.adminName}
             onChange={handleChange}
             placeholder="Jane Smith"
-            className={cn("pl-9 cursor-text", errors.adminName && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.adminName && "border-red-500")}
           />
         </div>
-        {errors.adminName && <p className="text-xs text-red-500">{errors.adminName}</p>}
+        {errors.adminName && <p className="text-[10px] sm:text-xs text-red-500">{errors.adminName}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Admin Email <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="adminEmail"
             type="email"
             value={formData.adminEmail}
             onChange={handleChange}
             placeholder="admin@example.com"
-            className={cn("pl-9 cursor-text", errors.adminEmail && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.adminEmail && "border-red-500")}
           />
         </div>
-        {errors.adminEmail && <p className="text-xs text-red-500">{errors.adminEmail}</p>}
+        {errors.adminEmail && <p className="text-[10px] sm:text-xs text-red-500">{errors.adminEmail}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Admin Phone <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="adminPhone"
             type="tel"
             value={formData.adminPhone}
             onChange={handleChange}
             placeholder="0712345678"
-            className={cn("pl-9 cursor-text", errors.adminPhone && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.adminPhone && "border-red-500")}
           />
         </div>
-        {errors.adminPhone && <p className="text-xs text-red-500">{errors.adminPhone}</p>}
+        {errors.adminPhone && <p className="text-[10px] sm:text-xs text-red-500">{errors.adminPhone}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
-          Password <span className="text-red-500">*</span>
-        </Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            type={showPassword ? 'text' : 'password'}
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder="Min 8 characters"
-            className={cn("pl-9 pr-10 cursor-text", errors.password && "border-red-500")}
-          />
-          <button
+      {/* Password Section - Generate button beside label */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs sm:text-sm font-medium text-gray-700">
+            Password <span className="text-red-500">*</span>
+          </Label>
+          <Button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            variant="ghost"
+            onClick={handleGeneratePassword}
+            className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:bg-[#1A73E8]/10 flex items-center gap-1 cursor-pointer"
           >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+            <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            Generate
+          </Button>
         </div>
-        {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-        <div className="flex items-center gap-2 mt-1">
-          <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-            <div
-              className={cn(
-                "h-full transition-all duration-300",
-                formData.password.length === 0 && "w-0",
-                formData.password.length > 0 && formData.password.length < 4 && "w-1/3 bg-red-500",
-                formData.password.length >= 4 && formData.password.length < 8 && "w-2/3 bg-yellow-500",
-                formData.password.length >= 8 && "w-full bg-green-500"
-              )}
-            />
-          </div>
-          <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
-            {formData.password.length === 0 && 'Enter password'}
-            {formData.password.length > 0 && formData.password.length < 4 && 'Weak'}
-            {formData.password.length >= 4 && formData.password.length < 8 && 'Medium'}
-            {formData.password.length >= 8 && 'Strong'}
-          </span>
-        </div>
+        
+        <PasswordInput
+          value={formData.password}
+          onChange={handlePasswordChange}
+          placeholder="Create a strong password"
+          required
+          showStrength
+          showRequirements
+          error={passwordError || undefined}
+          label={false}
+        />
       </div>
     </div>
   );
 
   const renderInstitutionDetails = () => (
-    <div className="space-y-4">
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Institution Name <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Building2 className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="institutionName"
             value={formData.institutionName}
             onChange={handleChange}
             placeholder="Nairobi Training Institute"
-            className={cn("pl-9 cursor-text", errors.institutionName && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.institutionName && "border-red-500")}
           />
         </div>
-        {errors.institutionName && <p className="text-xs text-red-500">{errors.institutionName}</p>}
+        {errors.institutionName && <p className="text-[10px] sm:text-xs text-red-500">{errors.institutionName}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Institution Email <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="institutionEmail"
             type="email"
             value={formData.institutionEmail}
             onChange={handleChange}
             placeholder="info@institute.com"
-            className={cn("pl-9 cursor-text", errors.institutionEmail && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.institutionEmail && "border-red-500")}
           />
         </div>
-        {errors.institutionEmail && <p className="text-xs text-red-500">{errors.institutionEmail}</p>}
+        {errors.institutionEmail && <p className="text-[10px] sm:text-xs text-red-500">{errors.institutionEmail}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Institution Phone <span className="text-red-500">*</span>
         </Label>
         <div className="relative">
-          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             name="institutionPhone"
             type="tel"
             value={formData.institutionPhone}
             onChange={handleChange}
             placeholder="0712345678"
-            className={cn("pl-9 cursor-text", errors.institutionPhone && "border-red-500")}
+            className={cn("pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text", errors.institutionPhone && "border-red-500")}
           />
         </div>
-        {errors.institutionPhone && <p className="text-xs text-red-500">{errors.institutionPhone}</p>}
+        {errors.institutionPhone && <p className="text-[10px] sm:text-xs text-red-500">{errors.institutionPhone}</p>}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700">
+      <div className="space-y-1">
+        <Label className="text-xs sm:text-sm font-medium text-gray-700">
           Institution Type <span className="text-red-500">*</span>
         </Label>
         <Select
@@ -853,84 +868,107 @@ export default function SignupForm() {
             if (errors.institutionType) setErrors(prev => ({ ...prev, institutionType: '' }));
           }}
         >
-          <SelectTrigger className={cn("cursor-pointer", errors.institutionType && "border-red-500")}>
+          <SelectTrigger className={cn("h-9 sm:h-10 text-sm cursor-pointer", errors.institutionType && "border-red-500")}>
             <SelectValue placeholder="Select institution type" />
           </SelectTrigger>
           <SelectContent>
             {institutionTypes.map((type) => (
-              <SelectItem key={type.value} value={type.value} className="cursor-pointer">
+              <SelectItem key={type.value} value={type.value} className="cursor-pointer text-sm">
                 {type.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {errors.institutionType && <p className="text-xs text-red-500">{errors.institutionType}</p>}
+        {errors.institutionType && <p className="text-[10px] sm:text-xs text-red-500">{errors.institutionType}</p>}
       </div>
     </div>
   );
 
   const renderOtpStep = () => (
-    <div className="space-y-6 text-center">
+    <div className="space-y-4 sm:space-y-6 text-center">
       <div className="flex justify-center">
-        <div className="p-4 rounded-full bg-[#1A73E8]/10">
-          <Mail className="h-8 w-8 text-[#1A73E8]" />
+        <div className="p-3 sm:p-4 rounded-full bg-[#1A73E8]/10">
+          <Mail className="h-6 w-6 sm:h-8 sm:w-8 text-[#1A73E8]" />
         </div>
       </div>
 
       <div>
-        <p className="text-sm text-gray-500">
+        <p className="text-xs sm:text-sm text-gray-500">
           We&apos;ve sent a verification code to:
         </p>
-        <p className="text-[#1A73E8] font-medium text-sm mt-1">
+        <p className="text-[#1A73E8] font-medium text-xs sm:text-sm mt-1 break-all">
           {accountType === 'institution' ? formData.adminEmail : formData.email}
         </p>
       </div>
 
-      <div className="flex justify-center gap-2">
-        {otp.map((digit, index) => (
-          <input
-            key={index}
-            id={`otp-${index}`}
-            type="text"
-            maxLength={1}
-            value={digit}
-            onChange={(e) => handleOtpChange(index, e.target.value)}
-            onKeyDown={(e) => handleOtpKeyDown(index, e)}
-            className={cn(
-              "w-11 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-semibold rounded-xl border-2 transition-all bg-white focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 cursor-text",
-              errors.otp
-                ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                : "border-gray-200 focus:border-[#1A73E8]"
-            )}
-            autoFocus={index === 0}
-          />
-        ))}
-      </div>
-      {errors.otp && <p className="text-xs text-red-500 text-center">{errors.otp}</p>}
+      {/* ✅ Success Message */}
+      {otpSuccess && (
+        <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-xl text-sm">
+          {otpSuccess}
+        </div>
+      )}
 
-      <div className="flex items-center justify-center gap-4 text-sm">
-        <span className="text-gray-500">Code expires in 4:59</span>
+      {/* ✅ Error Message */}
+      {otpError && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm">
+          {otpError}
+        </div>
+      )}
+
+      {/* ✅ Reusable OTP Input */}
+      <OtpInput
+        id="otp-input"
+        value={otp}
+        onChange={handleOtpChange}
+        length={6}
+        placeholder="Enter verification code"
+        disabled={isLoadingCombined}
+        error={otpError}
+        autoFocus={true}
+        onComplete={(val) => {
+          if (val.length === 6) {
+            handleVerifyOtp();
+          }
+        }}
+      />
+
+      <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-xs sm:text-sm">
+        <span className="text-gray-500">
+          Code expires in {resendTimer > 0 ? resendTimer : 0}s
+        </span>
         <button
           type="button"
           onClick={handleResendOtp}
           disabled={resendTimer > 0 || isResendLoading}
           className={cn(
-            "text-[#1A73E8] font-medium hover:underline transition-colors cursor-pointer",
-            (resendTimer > 0 || isResendLoading) && "text-gray-400 hover:no-underline cursor-not-allowed"
+            "flex items-center gap-1.5 font-medium transition-colors cursor-pointer",
+            (resendTimer > 0 || isResendLoading)
+              ? "text-gray-400 cursor-not-allowed"
+              : "text-[#1A73E8] hover:underline"
           )}
         >
-          {isResendLoading ? 'Sending...' : resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend code'}
+          {isResendLoading ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Resend code
+            </>
+          )}
         </button>
       </div>
 
       <Button
         onClick={handleVerifyOtp}
-        disabled={isVerifyLoading || isLoading}
-        className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer"
+        disabled={isVerifyLoading || isLoading || otp.length !== 6}
+        className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-5 sm:py-6 text-sm sm:text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
       >
         {isVerifyLoading || isLoading ? (
           <span className="flex items-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
             Verifying...
           </span>
         ) : (
@@ -948,58 +986,58 @@ export default function SignupForm() {
     const accountLabel = accountType === 'institution' ? 'Institution' : 'Personal';
 
     return (
-      <div className="space-y-6 text-center">
+      <div className="space-y-4 sm:space-y-6 text-center">
         <div className="flex justify-center">
-          <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center">
-            <CheckCircle className="h-10 w-10 text-green-500" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-500/10 flex items-center justify-center">
+            <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-green-500" />
           </div>
         </div>
 
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Account Created!</h2>
-          <p className="text-gray-500 mt-1">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Account Created!</h2>
+          <p className="text-gray-500 text-sm sm:text-base mt-1">
             Welcome to Nuruvent,{' '}
             <span className="font-medium text-gray-900">{displayName}</span>
           </p>
-          <p className="text-sm text-gray-400">Manage Your Events. Get Paid. Build Your Brand.</p>
+          <p className="text-xs sm:text-sm text-gray-400">Manage Your Events. Get Paid. Build Your Brand.</p>
         </div>
 
-        <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 border border-gray-100">
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-4 w-4 text-gray-400" />
+        <div className="bg-gray-50 rounded-xl p-3 sm:p-4 text-left space-y-1.5 sm:space-y-2 border border-gray-100">
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <span className="text-gray-500">Email:</span>
-            <span className="font-medium text-gray-900">
+            <span className="font-medium text-gray-900 truncate">
               {accountType === 'institution' ? formData.adminEmail : formData.email}
             </span>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-gray-400" />
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <span className="text-gray-500">Account Type:</span>
             <span className="font-medium text-gray-900">{accountLabel}</span>
           </div>
           {accountType === 'institution' && (
-            <div className="flex items-center gap-2 text-sm">
-              <Building2 className="h-4 w-4 text-gray-400" />
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
+              <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
               <span className="text-gray-500">Institution:</span>
-              <span className="font-medium text-gray-900">{formData.institutionName}</span>
+              <span className="font-medium text-gray-900 truncate">{formData.institutionName}</span>
             </div>
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           <Button
             onClick={() => router.push('/dashboard')}
-            className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer"
+            className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-5 sm:py-6 text-sm sm:text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer"
           >
             <span className="flex items-center gap-2">
               Go to Dashboard
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
           </Button>
           <Button
             variant="outline"
             onClick={() => router.push('/')}
-            className="w-full border-gray-200 hover:border-[#1A73E8]/50 text-gray-600 hover:text-[#1A73E8] font-medium py-5 rounded-xl transition-all duration-300 cursor-pointer"
+            className="w-full border-gray-200 hover:border-[#1A73E8]/50 text-gray-600 hover:text-[#1A73E8] font-medium py-4 sm:py-5 text-sm sm:text-base rounded-xl transition-all duration-300 cursor-pointer"
           >
             Explore Events
           </Button>
@@ -1013,7 +1051,7 @@ export default function SignupForm() {
   // ============================================================
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
+    <div className="relative min-h-screen flex items-center justify-center py-8 sm:py-12 px-3 sm:px-4 overflow-hidden bg-white">
       {/* Background */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -1021,9 +1059,9 @@ export default function SignupForm() {
       />
       <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
       
-      {/* Dot Pattern */}
-      <div className="absolute inset-0 pointer-events-none">
-        <svg className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
+      {/* Dot Pattern - Hidden on mobile */}
+      <div className="absolute inset-0 pointer-events-none hidden sm:block">
+        <svg className="absolute left-4 sm:left-8 top-4 sm:top-8 h-48 w-48 sm:h-64 sm:w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
           <pattern id="dotPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
             <circle cx="10" cy="10" r="2" fill="#1A73E8" opacity="0.3" />
           </pattern>
@@ -1031,38 +1069,38 @@ export default function SignupForm() {
         </svg>
       </div>
 
-      {/* Background Glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-12 w-96 h-96 bg-[#1A73E8]/5 rounded-full blur-3xl -translate-y-1/2" />
-        <div className="absolute bottom-12 left-1/4 w-80 h-80 bg-[#FBBC04]/5 rounded-full blur-3xl" />
+      {/* Background Glow - Hidden on mobile */}
+      <div className="absolute inset-0 pointer-events-none hidden sm:block">
+        <div className="absolute top-1/3 left-8 sm:left-12 w-64 h-64 sm:w-96 sm:h-96 bg-[#1A73E8]/5 rounded-full blur-3xl -translate-y-1/2" />
+        <div className="absolute bottom-8 sm:bottom-12 left-1/4 w-64 h-64 sm:w-80 sm:h-80 bg-[#FBBC04]/5 rounded-full blur-3xl" />
       </div>
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-3xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create Your Account</h1>
-          <p className="text-gray-500 mt-1">Join Nuruvent and start your professional journey</p>
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create Your Account</h1>
+          <p className="text-gray-500 text-sm sm:text-base mt-0.5 sm:mt-1">Join Nuruvent and start your professional journey</p>
         </div>
 
         {/* Card */}
         <Card className="relative bg-white/80 backdrop-blur-xl shadow-2xl border border-white/60">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
             {showBackButton && (
-              <div className="flex justify-start mb-2">
+              <div className="flex justify-start mb-1.5 sm:mb-2">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleBack}
-                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100/80 px-3 py-1.5 h-auto text-sm font-medium cursor-pointer"
+                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100/80 px-2 sm:px-3 py-1 h-auto text-xs sm:text-sm font-medium cursor-pointer"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                   Back
                 </Button>
               </div>
             )}
 
-            <div className="mb-4 pt-1">
+            <div className="mb-3 sm:mb-4 pt-0.5 sm:pt-1">
               <Stepper 
                 currentStep={currentStepNumber} 
                 totalSteps={steps.total} 
@@ -1070,19 +1108,19 @@ export default function SignupForm() {
               />
             </div>
 
-            <div className="text-center mt-2">
+            <div className="text-center mt-1.5 sm:mt-2">
               <div className="p-0">
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                   {stepInfo.title}
                 </h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
                   {stepInfo.description}
                 </p>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="pt-2">
+          <CardContent className="pt-1 sm:pt-2 px-4 sm:px-6 pb-4 sm:pb-6">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -1100,15 +1138,15 @@ export default function SignupForm() {
                 {currentStep === 'success' && renderSuccessStep()}
 
                 {currentStep !== 'account-type' && currentStep !== 'otp' && currentStep !== 'success' && (
-                  <div className="mt-6">
+                  <div className="mt-4 sm:mt-6">
                     <Button
                       onClick={handleNext}
                       disabled={isLoadingCombined}
-                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-5 sm:py-6 text-sm sm:text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isLoadingCombined ? (
                         <span className="flex items-center gap-2">
-                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
                           {accountType === 'institution' && currentStep === 'institution-details' 
                             ? 'Creating Account...' 
                             : 'Loading...'}
@@ -1118,7 +1156,7 @@ export default function SignupForm() {
                           {accountType === 'institution' && currentStep === 'institution-details' 
                             ? 'Create Account' 
                             : 'Continue'}
-                          <ArrowRight className="h-5 w-5" />
+                          <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
                         </span>
                       )}
                     </Button>
@@ -1130,8 +1168,8 @@ export default function SignupForm() {
         </Card>
 
         {currentStep !== 'success' && (
-          <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
+          <div className="text-center mt-4 sm:mt-6">
+            <p className="text-xs sm:text-sm text-gray-600">
               Already have an account?{' '}
               <Link href="/signin" className="text-[#1A73E8] font-medium hover:underline cursor-pointer">
                 Sign In
@@ -1140,12 +1178,12 @@ export default function SignupForm() {
           </div>
         )}
 
-        <div className="text-center mt-6">
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-            <Shield className="h-3 w-3" />
+        <div className="text-center mt-4 sm:mt-6">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-400">
+            <Shield className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             <span>Secure & encrypted</span>
-            <span className="w-px h-3 bg-gray-300" />
-            <Sparkles className="h-3 w-3" />
+            <span className="w-px h-2.5 sm:h-3 bg-gray-300" />
+            <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             <span>Powered by Nuruvent</span>
           </div>
         </div>
