@@ -6,9 +6,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, Shield, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Shield, Sparkles, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { OtpInput } from '@/components/ui/OtpInput';
@@ -20,8 +20,12 @@ import { setTwoFactorEmail } from '@/lib/store/slices/authSlice';
 
 export function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const dispatch = useAppDispatch();
   const { isAuthenticated, twoFactorEmail, loginStep } = useAppSelector((state) => state.auth);
+  
+  // ✅ Check if session expired
+  const sessionExpired = searchParams.get('session') === 'expired';
   
   // RTK Query hooks
   const [login, { isLoading: isLoginLoading }] = useLoginMutation();
@@ -40,9 +44,26 @@ export function SignInForm() {
   const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [twoFactorOtp, setTwoFactorOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
 
   // ✅ Ref for OTP to avoid race condition
   const otpRef = useRef('');
+
+  // ✅ Show session expired message
+  useEffect(() => {
+    if (sessionExpired) {
+      setSessionExpiredMessage(true);
+      // Auto-hide after 10 seconds
+      const timer = setTimeout(() => {
+        setSessionExpiredMessage(false);
+        // Clean up URL without reload
+        const url = new URL(window.location.href);
+        url.searchParams.delete('session');
+        window.history.replaceState({}, '', url.toString());
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [sessionExpired]);
 
   // ✅ DEBUG: Track where error is being set
   useEffect(() => {
@@ -65,7 +86,6 @@ export function SignInForm() {
       setShowTwoFactor(true);
       setResendTimer(60);
       setSuccessMessage('2FA code sent to your email');
-      // Clear any lingering error
       setError(null);
     }
   }, [loginStep, twoFactorEmail]);
@@ -86,6 +106,7 @@ export function SignInForm() {
     });
     if (error) setError(null);
     if (successMessage) setSuccessMessage(null);
+    if (sessionExpiredMessage) setSessionExpiredMessage(false);
   };
 
   // ✅ OTP change handler - updates both state and ref
@@ -103,6 +124,7 @@ export function SignInForm() {
     // ✅ Clear ALL states at the very beginning
     setError(null);
     setSuccessMessage(null);
+    setSessionExpiredMessage(false);
     setIsLoading(true);
 
     console.log('🔍 Login attempt for:', formData.email);
@@ -119,7 +141,6 @@ export function SignInForm() {
       if (response.data && 'requires_2fa' in response.data && response.data.requires_2fa === true) {
         console.log('✅ 2FA required, showing 2FA screen');
         
-        // ✅ CRITICAL: Clear error before showing 2FA
         setError(null);
         const email = response.data.email || formData.email;
         dispatch(setTwoFactorEmail(email));
@@ -222,10 +243,8 @@ export function SignInForm() {
       
       setSuccessMessage('New 2FA code sent to your email');
       setResendTimer(60);
-      // Reset OTP input
       setTwoFactorOtp('');
       otpRef.current = '';
-      // Focus OTP input
       setTimeout(() => {
         const input = document.getElementById('2fa-otp-input');
         if (input) (input as HTMLInputElement)?.focus();
@@ -282,21 +301,18 @@ export function SignInForm() {
             className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8"
           >
             <div className="space-y-6 text-center">
-              {/* Success Message */}
               {successMessage && (
                 <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-xl text-sm">
                   {successMessage}
                 </div>
               )}
               
-              {/* Error Message */}
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm">
                   {error}
                 </div>
               )}
 
-              {/* ✅ Reusable OTP Input - NO onComplete */}
               <OtpInput
                 id="2fa-otp-input"
                 value={twoFactorOtp}
@@ -306,7 +322,6 @@ export function SignInForm() {
                 disabled={isLoadingCombined}
                 error={error}
                 autoFocus={true}
-                // ✅ No onComplete - API only called on button click
               />
 
               <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-sm">
@@ -338,7 +353,6 @@ export function SignInForm() {
                 </button>
               </div>
 
-              {/* ✅ Verify button - API called only when clicked */}
               <Button
                 onClick={handleVerifyTwoFactor}
                 disabled={isLoadingCombined || twoFactorOtp.length !== 6}
@@ -428,8 +442,20 @@ export function SignInForm() {
           transition={{ duration: 0.4 }}
           className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8"
         >
+          {/* ✅ Session Expired Message */}
+          {sessionExpiredMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm flex items-center gap-2"
+            >
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Your session has expired. Please log in again.</span>
+            </motion.div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Only show error on the main form, not on 2FA */}
             {error && !showTwoFactor && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
                 {error}

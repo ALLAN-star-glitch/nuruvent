@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -17,12 +18,9 @@ import {
   CheckCircle2,
   Video,
   Filter,
-  TrendingUp,
   Check,
-  Send,
   Eye,
   MapPin,
-  DollarSign,
   Award,
   Globe,
   XCircle,
@@ -35,11 +33,15 @@ import {
   ChevronRight,
   X,
   ArrowRight,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+  LogIn,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Table,
   TableBody,
@@ -93,133 +95,143 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { useAppSelector, useAppDispatch } from '@/lib/store/hooks';
+import {
+  useGetEventsByAccountQuery,
+  useSearchEventsQuery,
+  useDeleteEventMutation,
+  usePublishEventMutation,
+  useGetEventStatusesQuery,
+  useGetEventTypesQuery,
+  EventResponse,
+} from '@/lib/store/api/eventsApi';
+import {
+  setCurrentPage,
+  setPageSize,
+  setTotalEvents,
+} from '@/lib/store/slices/eventsSlice';
+import { clearAuth } from '@/lib/store/slices/authSlice';
+import { toast } from 'sonner';
 
-interface EventItem {
-  id: string;
-  title: string;
-  type: string;
-  status: string;
-  date: string;
-  time?: string;
-  registered: number;
-  capacity: number;
-  price: string;
-  platform: string;
-  cpdHours: number;
-  description?: string;
-  host?: string;
-  location?: string;
-  image?: string;
-}
-
-// Mock Events Data
-const mockEvents: EventItem[] = [
-  {
-    id: 'evt_1',
-    title: 'Advanced NestJS Microservices Architecture',
-    type: 'Bootcamp',
-    status: 'Live',
-    date: 'Aug 5, 2026',
-    time: '14:00 EAT',
-    registered: 142,
-    capacity: 200,
-    price: 'KES 2,500',
-    platform: 'Zoom',
-    cpdHours: 4,
-    description: 'Learn advanced NestJS microservices patterns and best practices for building scalable applications.',
-    host: 'TechAcademy Kenya',
-    location: 'Virtual (Zoom)',
-  },
-  {
-    id: 'evt_2',
-    title: 'Mobile Test Automation with Appium & Robot Framework',
-    type: 'Workshop',
-    status: 'Upcoming',
-    date: 'Aug 12, 2026',
-    time: '10:00 EAT',
-    registered: 89,
-    capacity: 150,
-    price: 'Free',
-    platform: 'Google Meet',
-    cpdHours: 3,
-    description: 'Hands-on workshop on mobile test automation using Appium and Robot Framework.',
-    host: 'DevSchool',
-    location: 'Virtual (Google Meet)',
-  },
-  {
-    id: 'evt_3',
-    title: 'Fintech Security Compliance & M-Pesa API Integration',
-    type: 'Webinar',
-    status: 'Draft',
-    date: 'Aug 20, 2026',
-    time: '15:30 EAT',
-    registered: 0,
-    capacity: 300,
-    price: 'KES 1,000',
-    platform: 'Zoom',
-    cpdHours: 2,
-    description: 'Comprehensive webinar on fintech security compliance and integrating M-Pesa APIs.',
-    host: 'Fintech Kenya',
-    location: 'Virtual (Zoom)',
-  },
-  {
-    id: 'evt_4',
-    title: 'Full-Stack Scaling Strategies with Next.js & Go',
-    type: 'Meetup',
-    status: 'Ended',
-    date: 'Jul 28, 2026',
-    time: '18:00 EAT',
-    registered: 215,
-    capacity: 215,
-    price: 'Free',
-    platform: 'Zoom',
-    cpdHours: 2,
-    description: 'Learn how to build and scale full-stack applications using Next.js and Go.',
-    host: 'Nairobi Devs',
-    location: 'Virtual (Zoom)',
-  },
-];
-
-const statusConfig = {
-  Live: { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
-  Upcoming: { color: 'text-blue-600 bg-blue-50 border-blue-100', dot: 'bg-blue-500' },
-  Draft: { color: 'text-amber-600 bg-amber-50 border-amber-100', dot: 'bg-amber-500' },
-  Ended: { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
+// Helper to format price
+const formatPrice = (price: number): string => {
+  if (price === 0) return 'Free';
+  return `KES ${price.toLocaleString()}`;
 };
 
-const typeConfig = {
-  Bootcamp: 'bg-purple-100 text-purple-700',
-  Workshop: 'bg-blue-100 text-blue-700',
-  Webinar: 'bg-green-100 text-green-700',
-  Meetup: 'bg-orange-100 text-orange-700',
+// Helper to format date for display
+const formatDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return 'N/A';
+  }
 };
 
-type SortField = 'title' | 'date' | 'registered' | 'price' | 'status';
+// Helper to get status color config based on status name
+const getStatusConfig = (statusName: string) => {
+  const statusMap: Record<string, { color: string; dot: string }> = {
+    'Draft': { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
+    'Published': { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
+    'Cancelled': { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
+    'Completed': { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
+  };
+  return statusMap[statusName] || statusMap.Draft;
+};
+
+// Helper to get type color config based on type name
+const getTypeConfig = (typeName: string) => {
+  const typeMap: Record<string, string> = {
+    'Workshop': 'bg-purple-100 text-purple-700',
+    'Webinar': 'bg-blue-100 text-blue-700',
+    'Meetup': 'bg-amber-100 text-amber-700',
+    'Bootcamp': 'bg-red-100 text-red-700',
+  };
+  return typeMap[typeName] || 'bg-gray-100 text-gray-700';
+};
+
+type SortField = 'name' | 'eventDate' | 'addedDate' | 'current_attendees' | 'price' | 'status';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
+// Convert API event to UI event with mapping data
+const convertApiEventToUI = (
+  event: EventResponse,
+  typesMap: Record<string, string>,
+  statusesMap: Record<string, string>
+): any => ({
+  id: event.ID,
+  title: event.Name,
+  type: typesMap[event.EventTypeID] || event.EventTypeID,
+  status: statusesMap[event.EventStatusID] || event.EventStatusID,
+  date: new Date(event.Date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+  time: event.Time || 'TBD',
+  registered: event.CurrentAttendees || 0,
+  capacity: event.MaxAttendees || 0,
+  price: formatPrice(event.Price || 0),
+  platform: event.IsVirtual ? (event.ZoomLink ? 'Zoom' : event.MeetLink ? 'Google Meet' : 'Virtual') : 'In-Person',
+  cpdHours: Math.round(event.Duration / 60) || 0,
+  description: event.Description,
+  host: event.AccountID,
+  location: event.Location || 'Virtual',
+  image: event.ImageURL,
+  slug: event.Slug,
+  eventTypeId: event.EventTypeID,
+  eventStatusId: event.EventStatusID,
+  rawDate: event.Date,
+  rawTime: event.Time,
+  duration: event.Duration,
+  certificatePrice: event.CertificatePrice,
+  isVirtual: event.IsVirtual,
+  zoomLink: event.ZoomLink,
+  meetLink: event.MeetLink,
+  currentAttendees: event.CurrentAttendees,
+  maxAttendees: event.MaxAttendees,
+  accountId: event.AccountID,
+  isActive: event.IsActive,
+  // Add date tracking fields
+  createdAt: event.CreatedAt || event.Date, // Fallback to event date if createdAt not available
+  updatedAt: event.UpdatedAt || event.Date,
+});
+
 export default function EventsDashboardPage() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  
+  // Get auth state
+  const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
+  
+  // Use account.id for the accountId, fallback to user.id
+  const accountId = account?.id || user?.id || '';
+
+  // Get events state from Redux
+  const { currentPage, pageSize } = useAppSelector((state) => state.events);
+  
+  // Local state
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+
+  const [publishError, setPublishError] = useState<{ message: string; details: string[] } | null>(null);
+  const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] = useState(false);
+  const [publishingEventId, setPublishingEventId] = useState<string | null>(null);
   
+
   // Sort and view state
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortField, setSortField] = useState<SortField>('eventDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   // Check if mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -233,32 +245,194 @@ export default function EventsDashboardPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter logic
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    dispatch(setCurrentPage(1));
+  }, [debouncedSearchQuery, dispatch]);
+
+  // ============================================================
+  // STEP 1: Fetch Statuses and Types (mapping data)
+  // ============================================================
+  const { 
+    data: statusesData, 
+    isLoading: isStatusesLoading,
+    error: statusesError,
+  } = useGetEventStatusesQuery(undefined, {
+    skip: !accountId || !isAuthenticated,
+  });
+  
+  const { 
+    data: typesData, 
+    isLoading: isTypesLoading,
+    error: typesError,
+  } = useGetEventTypesQuery(undefined, {
+    skip: !accountId || !isAuthenticated,
+  });
+
+  // Create maps for quick lookups: ID → Name
+  const statusesMap = useMemo(() => {
+    if (!statusesData) return {};
+    
+    const statusesArray = Array.isArray(statusesData) 
+      ? statusesData 
+      : (statusesData as any)?.data || [];
+    
+    return statusesArray.reduce((acc: any, status: { ID: any; Name: any; }) => ({
+      ...acc,
+      [status.ID]: status.Name
+    }), {});
+  }, [statusesData]);
+
+  const typesMap = useMemo(() => {
+    if (!typesData) return {};
+    
+    const typesArray = Array.isArray(typesData) 
+      ? typesData 
+      : (typesData as any)?.data || [];
+    
+    return typesArray.reduce((acc: any, type: { ID: any; Name: any; }) => ({
+      ...acc,
+      [type.ID]: type.Name
+    }), {});
+  }, [typesData]);
+
+  // Determine if we should search
+  const shouldSearch = debouncedSearchQuery.trim().length > 0;
+
+  // ============================================================
+  // STEP 2: Fetch Events with cache invalidation for fresh data
+  // ============================================================
+  const {
+    data: browseData,
+    isLoading: isBrowseLoading,
+    isFetching: isBrowseFetching,
+    error: browseError,
+    refetch: refetchBrowse,
+  } = useGetEventsByAccountQuery({
+    accountId: accountId || '',
+    page: currentPage,
+    page_size: pageSize,
+  }, {
+    skip: shouldSearch || !accountId || !isAuthenticated,
+    // Ensure fresh data by not using cache
+    refetchOnMountOrArgChange: true,
+    refetchOnReconnect: true,
+    refetchOnFocus: true,
+  });
+
+  const {
+    data: searchData,
+    isLoading: isSearchLoading,
+    isFetching: isSearchFetching,
+    error: searchError,
+    refetch: refetchSearch,
+  } = useSearchEventsQuery({
+    q: debouncedSearchQuery,
+    account_id: accountId || '',
+    page: currentPage,
+    page_size: pageSize,
+  }, {
+    skip: !shouldSearch || !accountId || !isAuthenticated,
+    refetchOnMountOrArgChange: true,
+    refetchOnReconnect: true,
+    refetchOnFocus: true,
+  });
+
+  // Mutations with cache invalidation
+  const [deleteEvent] = useDeleteEventMutation();
+  const [publishEvent] = usePublishEventMutation();
+
+  // Use the appropriate data
+  const activeData = shouldSearch ? searchData : browseData;
+  const isLoading = isStatusesLoading || isTypesLoading || (shouldSearch ? isSearchLoading : isBrowseLoading);
+  const isFetching = shouldSearch ? isSearchFetching : isBrowseFetching;
+  const error = shouldSearch ? searchError : browseError;
+  const refetch = shouldSearch ? refetchSearch : refetchBrowse;
+
+  // Update Redux state when data changes
+  useEffect(() => {
+    if (activeData) {
+      dispatch(setTotalEvents(activeData.total || 0));
+    }
+  }, [activeData, dispatch]);
+
+  // ============================================================
+  // HANDLE 401 UNAUTHORIZED - Redirect to Login
+  // ============================================================
+  useEffect(() => {
+    if (error && (error as any)?.status === 401) {
+      // Clear auth state
+      dispatch(clearAuth());
+      toast.error('Your session has expired. Please log in again.');
+      
+      // Redirect to the correct login page
+      router.push('/signin?session=expired');
+    }
+  }, [error, dispatch, router]);
+
+  // ============================================================
+  // STEP 3: Convert API events to UI format with mapping
+  // ============================================================
+  const uiEvents = useMemo(() => {
+    if (!activeData?.data) return [];
+    return activeData.data.map((event) => 
+      convertApiEventToUI(event, typesMap, statusesMap)
+    );
+  }, [activeData, typesMap, statusesMap]);
+
+  // Filter and sort events
   const filteredEvents = useMemo(() => {
-    const filtered = mockEvents.filter((event: EventItem) => {
-      const matchesTab =
-        activeTab === 'all' || event.status.toLowerCase() === activeTab;
-      const matchesSearch = event.title
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      return matchesTab && matchesSearch;
-    });
+    let filtered = [...uiEvents];
+
+    // Filter by tab (status)
+    if (activeTab !== 'all') {
+      const statusNameMap: Record<string, string> = {
+        'live': 'Published',
+        'upcoming': 'Published',
+        'draft': 'Draft',
+        'ended': 'Completed',
+      };
+      const targetStatusName = statusNameMap[activeTab];
+      
+      if (targetStatusName) {
+        filtered = filtered.filter((event) => 
+          event.status === targetStatusName
+        );
+      }
+    }
 
     // Sort logic
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'title':
+        case 'name':
           comparison = a.title.localeCompare(b.title);
           break;
-        case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+        case 'eventDate':
+          comparison = new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime();
           break;
-        case 'registered':
+        case 'addedDate': {
+          // Use publishedAt if available, otherwise use createdAt
+          const dateA = a.publishedAt || a.createdAt;
+          const dateB = b.publishedAt || b.createdAt;
+          comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+          break;
+        }
+        case 'current_attendees':
           comparison = a.registered - b.registered;
           break;
         case 'price':
-          comparison = parseFloat(a.price.replace(/[^0-9.-]+/g, '')) - parseFloat(b.price.replace(/[^0-9.-]+/g, ''));
+          comparison = parseFloat(a.price.replace(/[^0-9.-]+/g, '')) - 
+                       parseFloat(b.price.replace(/[^0-9.-]+/g, ''));
           break;
         case 'status':
           comparison = a.status.localeCompare(b.status);
@@ -270,30 +444,26 @@ export default function EventsDashboardPage() {
     });
 
     return filtered;
-  }, [activeTab, searchQuery, sortField, sortDirection]);
+  }, [uiEvents, activeTab, sortField, sortDirection]);
 
-  // Paginate events
-  const paginatedEvents = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredEvents.slice(startIndex, endIndex);
-  }, [filteredEvents, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+  // Get total from API or filtered length
+  const totalItems = activeData?.total || filteredEvents.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
 
   // Stats
-  const totalEvents = mockEvents.length;
-  const totalRegistered = mockEvents.reduce((acc, e) => acc + e.registered, 0);
-  const liveEvents = mockEvents.filter(e => e.status === 'Live').length;
-  const cpdEvents = mockEvents.filter(e => e.cpdHours > 0).length;
+  const totalEvents = activeData?.total || uiEvents.length;
+  const totalRegistered = uiEvents.reduce((acc, e) => acc + (e.registered || 0), 0);
+  const liveEvents = uiEvents.filter(e => e.status === 'Published').length;
+  const cpdEvents = uiEvents.filter(e => e.cpdHours > 0).length;
 
+  // Handler functions
   const handleRowClick = (eventId: string) => {
     if (!isMobile) {
       handleSelectEvent(eventId);
     }
   };
 
-  const handleCardClick = (event: EventItem) => {
+  const handleCardClick = (event: any) => {
     if (isMobile) {
       handleViewEvent(event);
     } else {
@@ -301,21 +471,108 @@ export default function EventsDashboardPage() {
     }
   };
 
-  const handleViewEvent = (event: EventItem) => {
+  const handleViewEvent = (event: any) => {
     setSelectedEvent(event);
     setIsViewDialogOpen(true);
   };
 
-  const handleDeleteEvent = (event: EventItem) => {
+  const handleDeleteEvent = async (event: any) => {
     setSelectedEvent(event);
     setIsDeleteDialogOpen(true);
   };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedEvent) return;
+    try {
+      await deleteEvent(selectedEvent.id).unwrap();
+      setIsDeleteDialogOpen(false);
+      setSelectedEvent(null);
+      // Refetch to get fresh data
+      await refetch();
+      toast.success('Event deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+      toast.error('Failed to delete event');
+    }
+  };
+
+
+const handlePublishEvent = async (event: any) => {
+  setPublishingEventId(event.id);
+  setPublishError(null);
+  
+  // ✅ Show loading toast
+  const loadingToast = toast.loading(`Publishing "${event.title}"...`);
+  
+  try {
+    await publishEvent({ 
+      id: event.id, 
+      accountId: accountId 
+    }).unwrap();
+    
+    // ✅ Dismiss loading toast
+    toast.dismiss(loadingToast);
+    
+    // ✅ Show success toast
+    toast.success(`"${event.title}" published successfully!`, {
+      duration: 4000,
+      position: 'top-right',
+    });
+    
+    // Refetch to get fresh data
+    await refetch();
+  } catch (err: any) {
+    console.error('Failed to publish event:', err);
+    
+    // ✅ Dismiss loading toast
+    toast.dismiss(loadingToast);
+    
+    // Parse the error response
+    const errorData = err?.data;
+    let errorMessage = 'Failed to publish event';
+    let errorDetails: string[] = [];
+    
+    if (errorData) {
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+      
+      if (errorData.errors) {
+        if (typeof errorData.errors === 'string') {
+          errorDetails = [errorData.errors];
+        } else if (Array.isArray(errorData.errors)) {
+          errorDetails = errorData.errors;
+        } else if (typeof errorData.errors === 'object') {
+          errorDetails = Object.values(errorData.errors).map(v => String(v));
+        }
+      }
+      
+      if (errorDetails.length === 0 && errorData.message) {
+        errorDetails = [errorData.message];
+      }
+    }
+    
+    if (errorDetails.length === 0) {
+      errorDetails = [err?.message || 'Failed to publish event'];
+    }
+    
+    setPublishError({
+      message: errorMessage,
+      details: errorDetails
+    });
+    setIsPublishErrorDialogOpen(true);
+  } finally {
+    setPublishingEventId(null);
+  }
+};
 
   const handleSelectAll = () => {
     if (selectAll) {
       setSelectedEvents([]);
     } else {
-      setSelectedEvents(paginatedEvents.map(e => e.id));
+      setSelectedEvents(filteredEvents.map(e => e.id));
     }
     setSelectAll(!selectAll);
   };
@@ -332,7 +589,7 @@ export default function EventsDashboardPage() {
 
   const handleViewSelected = () => {
     if (selectedEvents.length === 1) {
-      const event = mockEvents.find(e => e.id === selectedEvents[0]);
+      const event = uiEvents.find(e => e.id === selectedEvents[0]);
       if (event) {
         handleViewEvent(event);
       }
@@ -344,17 +601,89 @@ export default function EventsDashboardPage() {
     setIsBulkActionDialogOpen(true);
   };
 
-  const handleBulkDelete = () => {
-    setIsBulkActionDialogOpen(false);
-    setSelectedEvents([]);
-    setSelectAll(false);
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all(selectedEvents.map(id => deleteEvent(id).unwrap()));
+      setIsBulkActionDialogOpen(false);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      // Refetch to get fresh data
+      await refetch();
+      toast.success('Events deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete events:', err);
+      toast.error('Failed to delete events');
+    }
   };
 
-  const handleBulkPublish = () => {
+const handleBulkPublish = async () => {
+  const count = selectedEvents.length;
+  const loadingToast = toast.loading(`Publishing ${count} events...`);
+  
+  try {
+    await Promise.all(
+      selectedEvents.map(id => 
+        publishEvent({ 
+          id, 
+          accountId: accountId
+        }).unwrap()
+      )
+    );
+    
+    toast.dismiss(loadingToast);
+    toast.success(`${count} events published successfully!`, {
+      duration: 4000,
+      position: 'top-right',
+    });
+    
     setIsBulkActionDialogOpen(false);
     setSelectedEvents([]);
     setSelectAll(false);
-  };
+    await refetch();
+  } catch (err: any) {
+    console.error('Failed to publish events:', err);
+    toast.dismiss(loadingToast);
+    
+    // ✅ Parse the error response for bulk publish
+    const errorData = err?.data;
+    let errorMessage = 'Failed to publish events';
+    let errorDetails: string[] = [];
+    
+    if (errorData) {
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      }
+      
+      if (errorData.errors) {
+        if (typeof errorData.errors === 'string') {
+          errorDetails = [errorData.errors];
+        } else if (Array.isArray(errorData.errors)) {
+          errorDetails = errorData.errors;
+        } else if (typeof errorData.errors === 'object') {
+          errorDetails = Object.values(errorData.errors).map(v => String(v));
+        }
+      }
+      
+      if (errorDetails.length === 0 && errorData.message) {
+        errorDetails = [errorData.message];
+      }
+    }
+    
+    if (errorDetails.length === 0) {
+      errorDetails = [err?.message || 'Failed to publish events'];
+    }
+    
+    // ✅ Show error in dialog instead of toast
+    setPublishError({
+      message: errorMessage,
+      details: errorDetails
+    });
+    setIsPublishErrorDialogOpen(true);
+    setIsBulkActionDialogOpen(false);
+  }
+};
 
   const handleBulkDuplicate = () => {
     setIsBulkActionDialogOpen(false);
@@ -363,15 +692,6 @@ export default function EventsDashboardPage() {
   };
 
   const getSelectedCount = () => selectedEvents.length;
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -391,7 +711,6 @@ export default function EventsDashboardPage() {
       : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
   };
 
-  // Action handlers for modal
   const handleModalEdit = () => {
     if (selectedEvent) {
       setIsViewDialogOpen(false);
@@ -401,7 +720,7 @@ export default function EventsDashboardPage() {
 
   const handleModalDuplicate = () => {
     if (selectedEvent) {
-      navigator.clipboard.writeText(`${window.location.origin}/events/${selectedEvent.id}`);
+      navigator.clipboard.writeText(`${window.location.origin}/events/${selectedEvent.slug || selectedEvent.id}`);
       setIsViewDialogOpen(false);
     }
   };
@@ -409,7 +728,7 @@ export default function EventsDashboardPage() {
   const handleModalPublicPage = () => {
     if (selectedEvent) {
       setIsViewDialogOpen(false);
-      window.open(`/events/${selectedEvent.id}`, '_blank');
+      window.open(`/events/${selectedEvent.slug || selectedEvent.id}`, '_blank');
     }
   };
 
@@ -427,7 +746,6 @@ export default function EventsDashboardPage() {
     }
   };
 
-  // Get active filter count
   const getActiveFilterCount = () => {
     let count = 0;
     if (searchQuery) count++;
@@ -435,33 +753,141 @@ export default function EventsDashboardPage() {
     return count;
   };
 
-  // Get sort label
   const getSortLabel = () => {
     const labels = {
-      title: 'Title',
-      date: 'Date',
-      registered: 'Registrations',
+      name: 'Title',
+      eventDate: 'Event Date',
+      addedDate: 'Added Date',
+      current_attendees: 'Registrations',
       price: 'Price',
       status: 'Status'
     };
     return labels[sortField];
   };
 
-  // Handle reset on mobile
   const handleMobileReset = () => {
     setSearchQuery('');
+    setDebouncedSearchQuery('');
     setActiveTab('all');
-    setSortField('date');
+    setSortField('eventDate');
     setSortDirection('desc');
-    setCurrentPage(1);
+    dispatch(setCurrentPage(1));
     setIsFilterSheetOpen(false);
   };
 
-  // Handle apply on mobile
   const handleMobileApply = () => {
     setIsFilterSheetOpen(false);
   };
 
+  const handlePageChange = (page: number) => {
+    dispatch(setCurrentPage(page));
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    dispatch(setPageSize(size));
+    dispatch(setCurrentPage(1));
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+    dispatch(setCurrentPage(1));
+  };
+
+  // Manual refresh handler
+const handleRefresh = async () => {
+  toast.promise(
+    new Promise(async (resolve, reject) => {
+      try {
+        const result = await refetch();
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    }),
+    {
+      loading: 'Refreshing events...',
+      success: 'Events refreshed successfully!',
+      error: 'Failed to refresh events',
+    }
+  );
+};
+
+  // ============================================================
+  // AUTHENTICATION CHECK
+  // ============================================================
+  
+ if (!isAuthenticated) {
+  return (
+    <div className="flex items-center justify-center min-h-[500px]">
+      <Card className="max-w-md w-full border-neutral-light shadow-sm">
+        <CardContent className="pt-8 pb-6 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-4 bg-amber-50 rounded-full">
+              <LogIn className="h-10 w-10 text-amber-600" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            Please log in to view and manage your events.
+          </p>
+          <Button 
+            className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
+            onClick={() => router.push('/signin')}
+          >
+            <LogIn className="h-4 w-4 mr-2" />
+            Go to Login
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+  if (!accountId) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="max-w-md w-full border-neutral-light shadow-sm">
+          <CardContent className="pt-8 pb-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-red-50 rounded-full">
+                <AlertTriangle className="h-10 w-10 text-red-600" />
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Account Not Found</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              We couldn&apos;t find your account information. Please contact support.
+            </p>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer"
+              onClick={() => router.push('/dashboard')}
+            >
+              Go to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Loading state
+  if (isLoading && !activeData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-gray-500">
+            {shouldSearch ? 'Searching events...' : 'Loading events...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
@@ -472,12 +898,24 @@ export default function EventsDashboardPage() {
             Create, monitor, and manage your training sessions, workshops, and webinars.
           </p>
         </div>
-        <Link href="/dashboard/events/new" className="cursor-pointer">
-          <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all cursor-pointer">
-            <Plus className="h-4 w-4" />
-            Create Event
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            className="cursor-pointer"
+            onClick={handleRefresh}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        </Link>
+          <Link href="/dashboard/events/new" className="cursor-pointer">
+            <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all cursor-pointer">
+              <Plus className="h-4 w-4" />
+              Create Event
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -539,7 +977,7 @@ export default function EventsDashboardPage() {
         </Card>
       </div>
 
-      {/* Desktop Filters - Hidden on Mobile */}
+      {/* Desktop Filters */}
       {!isMobile && (
         <Card>
           <CardContent className="p-4">
@@ -550,7 +988,10 @@ export default function EventsDashboardPage() {
                   {['all', 'live', 'upcoming', 'draft', 'ended'].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setActiveTab(tab)}
+                      onClick={() => {
+                        setActiveTab(tab);
+                        dispatch(setCurrentPage(1));
+                      }}
                       className={`px-3.5 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors whitespace-nowrap cursor-pointer ${
                         activeTab === tab
                           ? 'bg-primary text-white shadow-sm'
@@ -569,8 +1010,17 @@ export default function EventsDashboardPage() {
                     placeholder="Search events..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 w-full cursor-text"
+                    className="pl-9 pr-9 w-full cursor-text"
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -613,13 +1063,14 @@ export default function EventsDashboardPage() {
                         setSortDirection('asc');
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[110px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="title" className="cursor-pointer text-sm">Title</SelectItem>
-                        <SelectItem value="date" className="cursor-pointer text-sm">Date</SelectItem>
-                        <SelectItem value="registered" className="cursor-pointer text-sm">Registrations</SelectItem>
+                        <SelectItem value="name" className="cursor-pointer text-sm">Title</SelectItem>
+                        <SelectItem value="eventDate" className="cursor-pointer text-sm">Event Date</SelectItem>
+                        <SelectItem value="addedDate" className="cursor-pointer text-sm">Added Date</SelectItem>
+                        <SelectItem value="current_attendees" className="cursor-pointer text-sm">Registrations</SelectItem>
                         <SelectItem value="price" className="cursor-pointer text-sm">Price</SelectItem>
                         <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
                       </SelectContent>
@@ -640,7 +1091,15 @@ export default function EventsDashboardPage() {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   <span className="text-xs text-gray-400">
+                    {isFetching && (
+                      <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />
+                    )}
                     {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+                    {shouldSearch && searchQuery && (
+                      <span className="text-gray-400 ml-1">
+                        (searching &quot;{searchQuery}&quot;)
+                      </span>
+                    )}
                   </span>
                   <Button 
                     variant="ghost" 
@@ -648,10 +1107,11 @@ export default function EventsDashboardPage() {
                     className="h-8 text-xs cursor-pointer"
                     onClick={() => {
                       setSearchQuery('');
+                      setDebouncedSearchQuery('');
                       setActiveTab('all');
-                      setSortField('date');
+                      setSortField('eventDate');
                       setSortDirection('desc');
-                      setCurrentPage(1);
+                      dispatch(setCurrentPage(1));
                     }}
                   >
                     <Filter className="h-3.5 w-3.5 mr-1" />
@@ -661,27 +1121,32 @@ export default function EventsDashboardPage() {
               </div>
             </div>
 
-            {/* Bulk Actions Bar - Desktop Only */}
-            {getSelectedCount() > 0 && (
-              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-gray-700">
-                    {getSelectedCount()} event{getSelectedCount() > 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {getSelectedCount() === 1 && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="cursor-pointer"
-                      onClick={handleViewSelected}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
-                    </Button>
-                  )}
+           {/* Bulk Actions Bar - Update the Publish button */}
+          {getSelectedCount() > 0 && (
+            <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-gray-700">
+                  {getSelectedCount()} event{getSelectedCount() > 1 ? 's' : ''} selected
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {getSelectedCount() === 1 && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={handleViewSelected}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View
+                  </Button>
+                )}
+                {/* ✅ Only show Publish button if ALL selected events are drafts */}
+                {selectedEvents.every(id => {
+                  const event = uiEvents.find(e => e.id === id);
+                  return event?.status === 'Draft';
+                }) && (
                   <Button 
                     size="sm" 
                     variant="outline" 
@@ -691,45 +1156,46 @@ export default function EventsDashboardPage() {
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Publish
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="cursor-pointer"
-                    onClick={() => handleBulkAction('duplicate')}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    Duplicate
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="cursor-pointer"
-                    onClick={() => handleBulkAction('delete')}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setSelectedEvents([]);
-                      setSelectAll(false);
-                    }}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Clear
-                  </Button>
-                </div>
+                )}
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="cursor-pointer"
+                  onClick={() => handleBulkAction('duplicate')}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplicate
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="cursor-pointer"
+                  onClick={() => handleBulkAction('delete')}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setSelectedEvents([]);
+                    setSelectAll(false);
+                  }}
+                >
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Clear
+                </Button>
               </div>
-            )}
+            </div>
+          )}
           </CardContent>
         </Card>
       )}
 
-      {/* Events Table or Grid View */}
-      {!isMobile && viewMode === 'table' ? (
+      {/* Events Table View */}
+      {!isMobile && viewMode === 'table' && (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -741,25 +1207,32 @@ export default function EventsDashboardPage() {
                         checked={selectAll}
                         onCheckedChange={handleSelectAll}
                         className="cursor-pointer"
+                        disabled={filteredEvents.length === 0}
                       />
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('title')}>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
                       <div className="flex items-center">
                         Event Title
-                        {getSortIcon('title')}
+                        {getSortIcon('name')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4">Type</TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('date')}>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventDate')}>
                       <div className="flex items-center">
-                        Date & Time
-                        {getSortIcon('date')}
+                        Event Date
+                        {getSortIcon('eventDate')}
                       </div>
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('registered')}>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('addedDate')}>
+                      <div className="flex items-center">
+                        Added
+                        {getSortIcon('addedDate')}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('current_attendees')}>
                       <div className="flex items-center">
                         Registrations
-                        {getSortIcon('registered')}
+                        {getSortIcon('current_attendees')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
@@ -772,11 +1245,19 @@ export default function EventsDashboardPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedEvents.length > 0 ? (
-                    paginatedEvents.map((event: EventItem) => {
-                      const percentage = Math.round((event.registered / event.capacity) * 100);
-                      const status = statusConfig[event.status as keyof typeof statusConfig] || statusConfig.Draft;
+                  {filteredEvents.length > 0 ? (
+                    filteredEvents.map((event) => {
+                      const percentage = event.capacity > 0 
+                        ? Math.round((event.registered / event.capacity) * 100) 
+                        : 0;
+                      const statusConfig = getStatusConfig(event.status);
+                      const typeClassName = getTypeConfig(event.type);
                       const isSelected = selectedEvents.includes(event.id);
+                      
+                      // For draft events, show creation date. For published, use createdAt (or a separate tracking)
+                      const addedDate = event.createdAt;
+                      const addedLabel = event.status === 'Published' ? 'Published' : 'Created';
+                      const addedDateFormatted = formatDate(addedDate);
 
                       return (
                         <TableRow 
@@ -806,7 +1287,7 @@ export default function EventsDashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${typeConfig[event.type as keyof typeof typeConfig] || 'bg-gray-100 text-gray-700'}`}>
+                            <Badge variant="outline" className={typeClassName}>
                               {event.type}
                             </Badge>
                           </TableCell>
@@ -814,6 +1295,12 @@ export default function EventsDashboardPage() {
                             <div className="flex flex-col">
                               <span className="text-sm">{event.date}</span>
                               <span className="text-xs text-gray-400">{event.time}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="text-sm">{addedDateFormatted}</span>
+                              <span className="text-xs text-gray-400">{addedLabel}</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -831,8 +1318,8 @@ export default function EventsDashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${status.color} border`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${status.dot} mr-1`} />
+                            <Badge variant="outline" className={`${statusConfig.color} border`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
                               {event.status}
                             </Badge>
                           </TableCell>
@@ -870,17 +1357,30 @@ export default function EventsDashboardPage() {
                                   className="cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigator.clipboard.writeText(`${window.location.origin}/events/${event.id}`);
+                                    handleModalDuplicate();
                                   }}
                                 >
                                   <Copy className="h-4 w-4 mr-2" />
                                   Duplicate
                                 </DropdownMenuItem>
+                                {/* ✅ ADD PUBLISH OPTION HERE - after Duplicate, before View Public Page */}
+                                {event.status === 'Draft' && (
+                                  <DropdownMenuItem 
+                                    className="cursor-pointer text-green-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePublishEvent(event);
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Publish
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem 
                                   className="cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    window.open(`/events/${event.id}`, '_blank');
+                                    window.open(`/events/${event.slug || event.id}`, '_blank');
                                   }}
                                 >
                                   <ExternalLink className="h-4 w-4 mr-2" />
@@ -915,11 +1415,25 @@ export default function EventsDashboardPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-gray-500">
+                      <TableCell colSpan={8} className="py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
                           <Search className="h-8 w-8 text-gray-300" />
-                          <p className="font-medium">No events found</p>
-                          <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                          <p className="font-medium">
+                            {shouldSearch && searchQuery 
+                              ? `No events match "${searchQuery}"`
+                              : activeTab !== 'all'
+                              ? `No ${activeTab} events found`
+                              : 'No events found'
+                            }
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {shouldSearch && searchQuery 
+                              ? 'Try adjusting your search terms or filters.'
+                              : activeTab !== 'all'
+                              ? 'Try changing the status filter.'
+                              : 'Create your first event to get started.'
+                            }
+                          </p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -929,16 +1443,13 @@ export default function EventsDashboardPage() {
             </div>
 
             {/* Pagination */}
-            {filteredEvents.length > 0 && (
+            {totalItems > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">Rows per page:</span>
                   <Select
-                    value={itemsPerPage.toString()}
-                    onValueChange={(value) => {
-                      setItemsPerPage(Number(value));
-                      setCurrentPage(1);
-                    }}
+                    value={pageSize.toString()}
+                    onValueChange={(value) => handlePageSizeChange(Number(value))}
                   >
                     <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                       <SelectValue />
@@ -953,16 +1464,17 @@ export default function EventsDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">
-                    {filteredEvents.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} -{' '}
-                    {Math.min(currentPage * itemsPerPage, filteredEvents.length)} of{' '}
-                    {filteredEvents.length}
+                    {totalItems > 0 
+                      ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
+                      : '0 of 0'
+                    }
                   </span>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                       disabled={currentPage === 1}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -971,8 +1483,8 @@ export default function EventsDashboardPage() {
                       variant="outline"
                       size="sm"
                       className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                      disabled={currentPage === totalPages || totalPages === 0}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -982,14 +1494,20 @@ export default function EventsDashboardPage() {
             )}
           </CardContent>
         </Card>
-      ) : (
-        // Grid View
+      )}
+
+      {/* Grid View */}
+      {!isMobile && viewMode === 'grid' && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paginatedEvents.length > 0 ? (
-              paginatedEvents.map((event: EventItem) => {
-                const status = statusConfig[event.status as keyof typeof statusConfig] || statusConfig.Draft;
+            {filteredEvents.length > 0 ? (
+              filteredEvents.map((event) => {
+                const statusConfig = getStatusConfig(event.status);
+                const typeClassName = getTypeConfig(event.type);
                 const isSelected = selectedEvents.includes(event.id);
+                const addedDate = event.publishedAt || event.createdAt;
+                const addedLabel = event.publishedAt ? 'Published' : 'Created';
+                const addedDateFormatted = formatDate(addedDate);
 
                 return (
                   <Card 
@@ -1002,20 +1520,12 @@ export default function EventsDashboardPage() {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
-                          {!isMobile && (
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => handleSelectEvent(event.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="cursor-pointer"
-                            />
-                          )}
-                          <Badge variant="outline" className={`${typeConfig[event.type as keyof typeof typeConfig] || 'bg-gray-100 text-gray-700'}`}>
+                          <Badge variant="outline" className={typeClassName}>
                             {event.type}
                           </Badge>
                         </div>
-                        <Badge variant="outline" className={`${status.color} border`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${status.dot} mr-1`} />
+                        <Badge variant="outline" className={`${statusConfig.color} border`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
                           {event.status}
                         </Badge>
                       </div>
@@ -1043,6 +1553,12 @@ export default function EventsDashboardPage() {
                       </div>
 
                       <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="text-gray-400">Added:</span>
+                        <span>{addedDateFormatted}</span>
+                        <span className="text-gray-400">({addedLabel})</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Users className="h-3.5 w-3.5" />
                         <span>{event.registered} / {event.capacity} registered</span>
                       </div>
@@ -1059,71 +1575,71 @@ export default function EventsDashboardPage() {
                           <Globe className="h-3.5 w-3.5" />
                           <span>{event.platform}</span>
                         </div>
-                        {isMobile ? (
-                          <div 
-                            className="flex items-center gap-1 text-xs text-primary font-medium cursor-pointer hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewEvent(event);
-                            }}
-                          >
-                            View Details
-                            <ArrowRight className="h-3 w-3" />
-                          </div>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
-                                <MoreVertical className="h-4 w-4 text-gray-400" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewEvent(event);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/events/${event.id}/edit`);
-                                }}
-                              >
-                                <Edit3 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleModalDuplicate();
-                                }}
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-red-600 cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteEvent(event);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
+                              <MoreVertical className="h-4 w-4 text-gray-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewEvent(event);
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/events/${event.id}/edit`);
+                              }}
+                            >
+                              <Edit3 className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleModalDuplicate();
+                              }}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Duplicate
+                            </DropdownMenuItem>
+                            {/* ✅ ADD PUBLISH OPTION HERE - after Duplicate, before separator */}
+                              {event.status === 'Draft' && (
+                                <DropdownMenuItem 
+                                  className="cursor-pointer text-green-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePublishEvent(event);
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Publish
+                                </DropdownMenuItem>
+                              )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-red-600 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteEvent(event);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </CardContent>
                   </Card>
@@ -1133,24 +1649,35 @@ export default function EventsDashboardPage() {
               <div className="col-span-full py-12 text-center text-gray-500">
                 <div className="flex flex-col items-center gap-2">
                   <Search className="h-8 w-8 text-gray-300" />
-                  <p className="font-medium">No events found</p>
-                  <p className="text-sm text-gray-400">Try adjusting your search or filter criteria.</p>
+                  <p className="font-medium">
+                    {shouldSearch && searchQuery 
+                      ? `No events match "${searchQuery}"`
+                      : activeTab !== 'all'
+                      ? `No ${activeTab} events found`
+                      : 'No events found'
+                    }
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    {shouldSearch && searchQuery 
+                      ? 'Try adjusting your search terms or filters.'
+                      : activeTab !== 'all'
+                      ? 'Try changing the status filter.'
+                      : 'Create your first event to get started.'
+                    }
+                  </p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Pagination for Grid View */}
-          {filteredEvents.length > 0 && (
+          {totalItems > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">Rows per page:</span>
                 <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
+                  value={pageSize.toString()}
+                  onValueChange={(value) => handlePageSizeChange(Number(value))}
                 >
                   <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                     <SelectValue />
@@ -1165,16 +1692,17 @@ export default function EventsDashboardPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">
-                  {filteredEvents.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} -{' '}
-                  {Math.min(currentPage * itemsPerPage, filteredEvents.length)} of{' '}
-                  {filteredEvents.length}
+                  {totalItems > 0 
+                    ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
+                    : '0 of 0'
+                  }
                 </span>
                 <div className="flex items-center gap-1">
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                     disabled={currentPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -1183,8 +1711,8 @@ export default function EventsDashboardPage() {
                     variant="outline"
                     size="sm"
                     className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -1200,7 +1728,6 @@ export default function EventsDashboardPage() {
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
           <div className="pointer-events-auto mx-auto max-w-md bg-white rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm bg-white/95">
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
-              {/* Search */}
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
                 className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
@@ -1211,10 +1738,8 @@ export default function EventsDashboardPage() {
                 </span>
               </button>
 
-              {/* Divider */}
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
 
-              {/* Filters */}
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
                 className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors relative"
@@ -1228,10 +1753,8 @@ export default function EventsDashboardPage() {
                 )}
               </button>
 
-              {/* Divider */}
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
 
-              {/* Sort */}
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
                 className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
@@ -1251,137 +1774,144 @@ export default function EventsDashboardPage() {
         </div>
       )}
 
-     {/* Mobile Filter Bottom Sheet */}
-<Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-  <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
-    <div className="px-6 pt-6 pb-8 h-full flex flex-col">
-      <SheetHeader className="text-left space-y-1">
-        <div className="flex items-center justify-between">
-          <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
-          <button
-            onClick={() => setIsFilterSheetOpen(false)}
-            className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <SheetDescription className="text-sm text-gray-500">
-          Refine your event list
-        </SheetDescription>
-      </SheetHeader>
-      
-      <div className="flex-1 overflow-y-auto mt-6 pb-6">
-        {/* Search - Full width */}
-        <div className="space-y-1.5 mb-5">
-          <Label className="text-sm font-medium text-gray-700">Search</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-11 cursor-text border-gray-200 focus:border-primary focus:ring-primary/20 rounded-xl"
-            />
-          </div>
-        </div>
-
-        {/* Grid Layout for Filters */}
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          {/* Status Filter */}
-          <div className="space-y-1.5 min-w-0 overflow-hidden">
-            <Label className="text-sm font-medium text-gray-700 truncate">Status</Label>
-            <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
-                <div className="truncate w-full text-left">
-                  <SelectValue placeholder="All" />
+      {/* Mobile Filter Bottom Sheet */}
+      <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
+          <div className="px-6 pt-6 pb-8 h-full flex flex-col">
+            <SheetHeader className="text-left space-y-1">
+              <div className="flex items-center justify-between">
+                <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
+                <button
+                  onClick={() => setIsFilterSheetOpen(false)}
+                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+              <SheetDescription className="text-sm text-gray-500">
+                Refine your event list
+              </SheetDescription>
+            </SheetHeader>
+            
+            <div className="flex-1 overflow-y-auto mt-6 pb-6">
+              <div className="space-y-1.5 mb-5">
+                <Label className="text-sm font-medium text-gray-700">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search events..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-9 h-11 cursor-text border-gray-200 focus:border-primary focus:ring-primary/20 rounded-xl"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={handleClearSearch}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                      aria-label="Clear search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">All</SelectItem>
-                <SelectItem value="live" className="cursor-pointer">Live</SelectItem>
-                <SelectItem value="upcoming" className="cursor-pointer">Upcoming</SelectItem>
-                <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
-                <SelectItem value="ended" className="cursor-pointer">Ended</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
 
-          {/* Sort By */}
-          <div className="space-y-1.5 min-w-0 overflow-hidden">
-            <Label className="text-sm font-medium text-gray-700 truncate">Sort By</Label>
-            <Select
-              value={sortField}
-              onValueChange={(value: SortField) => {
-                setSortField(value);
-              }}
-            >
-              <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
-                <div className="truncate w-full text-left">
-                  <SelectValue />
+              <div className="grid grid-cols-2 gap-4 mb-5">
+                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-700 truncate">Status</Label>
+                  <Select value={activeTab} onValueChange={(value) => {
+                    setActiveTab(value);
+                    dispatch(setCurrentPage(1));
+                  }}>
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
+                      <div className="truncate w-full text-left">
+                        <SelectValue placeholder="All" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="cursor-pointer">All</SelectItem>
+                      <SelectItem value="live" className="cursor-pointer">Live</SelectItem>
+                      <SelectItem value="upcoming" className="cursor-pointer">Upcoming</SelectItem>
+                      <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
+                      <SelectItem value="ended" className="cursor-pointer">Ended</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="title" className="cursor-pointer">Title</SelectItem>
-                <SelectItem value="date" className="cursor-pointer">Date</SelectItem>
-                <SelectItem value="registered" className="cursor-pointer">Registrations</SelectItem>
-                <SelectItem value="price" className="cursor-pointer">Price</SelectItem>
-                <SelectItem value="status" className="cursor-pointer">Status</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        {/* Sort Direction - Full width */}
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700">Sort Direction</Label>
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant={sortDirection === 'asc' ? 'default' : 'outline'}
-              className={`h-11 rounded-xl cursor-pointer transition-all ${
-                sortDirection === 'asc' 
-                  ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-              onClick={() => setSortDirection('asc')}
-            >
-              <ArrowUp className="h-4 w-4 mr-2" />
-              Ascending
-            </Button>
-            <Button
-              variant={sortDirection === 'desc' ? 'default' : 'outline'}
-              className={`h-11 rounded-xl cursor-pointer transition-all ${
-                sortDirection === 'desc' 
-                  ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
-                  : 'border-gray-200 hover:bg-gray-50'
-              }`}
-              onClick={() => setSortDirection('desc')}
-            >
-              <ArrowDown className="h-4 w-4 mr-2" />
-              Descending
-            </Button>
-          </div>
-        </div>
-      </div>
+                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-700 truncate">Sort By</Label>
+                  <Select
+                    value={sortField}
+                    onValueChange={(value: SortField) => {
+                      setSortField(value);
+                    }}
+                  >
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
+                      <div className="truncate w-full text-left">
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name" className="cursor-pointer">Title</SelectItem>
+                      <SelectItem value="eventDate" className="cursor-pointer">Event Date</SelectItem>
+                      <SelectItem value="addedDate" className="cursor-pointer">Added Date</SelectItem>
+                      <SelectItem value="current_attendees" className="cursor-pointer">Registrations</SelectItem>
+                      <SelectItem value="price" className="cursor-pointer">Price</SelectItem>
+                      <SelectItem value="status" className="cursor-pointer">Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-      {/* Actions - Fixed at bottom */}
-      <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
-        <Button
-          variant="outline"
-          className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50 transition-colors"
-          onClick={handleMobileReset}
-        >
-          Reset All
-        </Button>
-        <Button
-          className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm transition-all"
-          onClick={handleMobileApply}
-        >
-          Apply Filters
-        </Button>
-      </div>
-    </div>
-  </SheetContent>
-</Sheet>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-gray-700">Sort Direction</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    variant={sortDirection === 'asc' ? 'default' : 'outline'}
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${
+                      sortDirection === 'asc' 
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSortDirection('asc')}
+                  >
+                    <ArrowUp className="h-4 w-4 mr-2" />
+                    Ascending
+                  </Button>
+                  <Button
+                    variant={sortDirection === 'desc' ? 'default' : 'outline'}
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${
+                      sortDirection === 'desc' 
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setSortDirection('desc')}
+                  >
+                    <ArrowDown className="h-4 w-4 mr-2" />
+                    Descending
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50 transition-colors"
+                onClick={handleMobileReset}
+              >
+                Reset All
+              </Button>
+              <Button
+                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm transition-all"
+                onClick={handleMobileApply}
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* View Event Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -1394,15 +1924,14 @@ export default function EventsDashboardPage() {
           </DialogHeader>
           {selectedEvent && (
             <div className="space-y-4 sm:space-y-6">
-              {/* Event Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="outline" className={`${typeConfig[selectedEvent.type as keyof typeof typeConfig] || 'bg-gray-100 text-gray-700'} shrink-0`}>
+                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
                       {selectedEvent.type}
                     </Badge>
-                    <Badge variant="outline" className={`${statusConfig[selectedEvent.status as keyof typeof statusConfig]?.color || 'bg-gray-50 text-gray-600 border-gray-200'} shrink-0`}>
+                    <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
                       {selectedEvent.status}
                     </Badge>
                   </div>
@@ -1415,15 +1944,21 @@ export default function EventsDashboardPage() {
 
               <Separator />
 
-              {/* Event Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Date</Label>
+                  <Label className="text-xs text-gray-500">Event Date</Label>
                   <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-gray-500">Time</Label>
                   <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Added</Label>
+                  <p className="text-sm sm:text-base font-medium">
+                    {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
+                    {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-gray-500">Platform</Label>
@@ -1440,13 +1975,6 @@ export default function EventsDashboardPage() {
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Host</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <Users className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedEvent.host || 'Not specified'}</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
                   <Label className="text-xs text-gray-500">CPD Hours</Label>
                   <p className="text-sm sm:text-base font-medium flex items-center gap-1">
                     <Award className="h-4 w-4 text-amber-500 shrink-0" />
@@ -1455,24 +1983,22 @@ export default function EventsDashboardPage() {
                 </div>
               </div>
 
-              {/* Registrations */}
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Registrations</Label>
                 <div className="mt-2">
                   <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
                     <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
-                    <span>{Math.round((selectedEvent.registered / selectedEvent.capacity) * 100)}%</span>
+                    <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100)}%` }}
+                      style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Description */}
               {selectedEvent.description && (
                 <div className="space-y-1">
                   <Label className="text-xs text-gray-500">Description</Label>
@@ -1482,7 +2008,6 @@ export default function EventsDashboardPage() {
 
               <Separator />
 
-              {/* Actions */}
               <div className="space-y-3">
                 <Label className="text-xs text-gray-500 font-medium">Actions</Label>
                 <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
@@ -1567,7 +2092,7 @@ export default function EventsDashboardPage() {
           <div className="py-4">
             <ScrollArea className="h-32 border rounded-lg p-2">
               {selectedEvents.map(id => {
-                const event = mockEvents.find(e => e.id === id);
+                const event = uiEvents.find(e => e.id === id);
                 return event ? (
                   <div key={id} className="flex items-center gap-2 py-1 text-sm">
                     <Calendar className="h-4 w-4 text-gray-400" />
@@ -1588,9 +2113,15 @@ export default function EventsDashboardPage() {
                 bulkAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary/90'
               }`}
               onClick={() => {
-                if (bulkAction === 'publish') handleBulkPublish();
-                else if (bulkAction === 'duplicate') handleBulkDuplicate();
-                else if (bulkAction === 'delete') handleBulkDelete();
+                if (bulkAction === 'publish') {
+                  // Close the dialog first, then handle publish
+                  setIsBulkActionDialogOpen(false);
+                  handleBulkPublish();
+                } else if (bulkAction === 'duplicate') {
+                  handleBulkDuplicate();
+                } else if (bulkAction === 'delete') {
+                  handleBulkDelete();
+                }
               }}
             >
               {bulkAction === 'publish' && <CheckCircle2 className="h-4 w-4 mr-2" />}
@@ -1637,11 +2168,59 @@ export default function EventsDashboardPage() {
             <Button 
               variant="destructive" 
               className="cursor-pointer"
-              onClick={() => {
-                setIsDeleteDialogOpen(false);
-              }}
+              onClick={handleConfirmDelete}
             >
               Delete Event
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+        {/* Publish Error Dialog */}
+      <Dialog open={isPublishErrorDialogOpen} onOpenChange={setIsPublishErrorDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              Cannot Publish Event
+            </DialogTitle>
+            <DialogDescription className="text-red-600">
+              {publishError?.message || 'Failed to publish event'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {publishError?.details && publishError.details.length > 0 && (
+            <div className="py-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Please fix the following issues:</p>
+              <ul className="space-y-2">
+                {publishError.details.map((detail, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
+                    <span>{detail}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsPublishErrorDialogOpen(false)}
+              className="w-full sm:w-auto cursor-pointer"
+            >
+              Close
+            </Button>
+            <Button 
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              onClick={() => {
+                setIsPublishErrorDialogOpen(false);
+                // Navigate to edit page for the draft
+                router.push(`/dashboard/events/${publishingEventId || selectedEvent?.id}/edit`);
+              }}
+            >
+              <Edit3 className="h-4 w-4 mr-2" />
+              Edit Event
             </Button>
           </DialogFooter>
         </DialogContent>

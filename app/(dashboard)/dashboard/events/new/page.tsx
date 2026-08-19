@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Save,
-  Plus,
-  X,
   Calendar,
   Clock,
   MapPin,
@@ -16,34 +14,26 @@ import {
   DollarSign,
   Award,
   Video,
-  Globe,
+  Shield,
   CheckCircle2,
-  AlertCircle,
+  Loader2,
   Upload,
-  Image,
-  Link as LinkIcon,
   Trash2,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  User,
-  Eye,
-  Send,
-  RefreshCw,
   ChevronRight,
-  Maximize2,
-  Minimize2,
+  Send,
+  Eye,
+  Lightbulb,
+  AlertCircle,
+  Check,
+  XCircle,
 } from 'lucide-react';
 
 // Shadcn components
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -61,128 +51,145 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
-// Types
+// Redux imports
+import { useAppSelector } from '@/lib/store/hooks';
+import { 
+  useCreateDraftMutation,
+  useCreateEventMutation,
+  useUpdateEventMutation,
+  useGetEventTypesQuery, 
+  useGetEventStatusesQuery, 
+  usePublishEventMutation,
+  useUploadEventImageMutation
+} from '@/lib/store/api/eventsApi';
+import { AnimatePresence, motion } from 'framer-motion';
+
+// ============================================================
+// TYPES
+// ============================================================
+
 interface EventFormData {
-  title: string;
-  type: 'workshop' | 'webinar' | 'bootcamp' | 'meetup';
+  name: string;
   description: string;
-  status: 'draft' | 'published' | 'scheduled';
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  timezone: string;
-  price: string;
-  currency: string;
-  capacity: string;
-  platform: 'zoom' | 'google-meet' | 'teams' | 'custom';
-  platformLink: string;
+  event_type_id: string;
+  date: string;
+  time: string;
+  duration: number | null;
+  price: number | null;
+  certificate_price: number | null;
   location: string;
-  isVirtual: boolean;
-  hostName: string;
-  hostEmail: string;
-  hostBio: string;
-  cpdHours: string;
-  cpdAccredited: boolean;
-  cpdBody: string;
-  tags: string[];
+  is_virtual: boolean;
+  slug?: string;
+  zoom_link: string;
+  meet_link: string;
+  max_attendees: number | null;
   image?: File;
   imagePreview?: string;
 }
 
-const defaultFormData: EventFormData = {
-  title: '',
-  type: 'workshop',
-  description: '',
-  status: 'draft',
-  startDate: '',
-  startTime: '',
-  endDate: '',
-  endTime: '',
-  timezone: 'Africa/Nairobi',
-  price: '',
-  currency: 'KES',
-  capacity: '',
-  platform: 'zoom',
-  platformLink: '',
-  location: '',
-  isVirtual: true,
-  hostName: '',
-  hostEmail: '',
-  hostBio: '',
-  cpdHours: '0',
-  cpdAccredited: false,
-  cpdBody: '',
-  tags: [],
+interface FormErrors {
+  name?: string;
+  description?: string;
+  event_type_id?: string;
+  date?: string;
+  time?: string;
+  duration?: string;
+  price?: string;
+  certificate_price?: string;
+  location?: string;
+  is_virtual?: string;
+  slug?: string;
+  zoom_link?: string;
+  meet_link?: string;
+  max_attendees?: string;
+  image?: string;
+  imagePreview?: string;
+}
+
+// ============================================================
+// SAVE STATUS INDICATOR - Shows Saving... immediately when typing
+// ============================================================
+
+const SaveStatusIndicator = ({ 
+  status 
+}: { 
+  status: 'idle' | 'saving' | 'saved' 
+}) => {
+  const [dots, setDots] = useState('');
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (status === 'saving') {
+      intervalRef.current = setInterval(() => {
+        setDots(prev => {
+          if (prev === '') return '.';
+          if (prev === '.') return '..';
+          if (prev === '..') return '...';
+          return '';
+        });
+      }, 400);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDots('');
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [status]);
+
+  if (status === 'idle') return null;
+
+  return (
+    <div className="flex items-center gap-2 text-sm min-w-[120px] transition-all duration-300">
+      {status === 'saving' && (
+        <span className="font-medium text-primary transition-opacity duration-300">
+          Saving draft<span className="inline-block w-[24px] text-left">{dots}</span>
+        </span>
+      )}
+      {status === 'saved' && (
+        <div className="flex items-center gap-2 animate-in fade-in duration-300">
+          <CheckCircle2 className="h-4 w-4 text-tertiary-500" />
+          <span className="font-medium text-tertiary-600">Draft saved</span>
+        </div>
+      )}
+    </div>
+  );
 };
 
-const timezones = [
-  'Africa/Nairobi',
-  'Africa/Lagos',
-  'Africa/Cairo',
-  'Africa/Johannesburg',
-  'Africa/Casablanca',
-  'Europe/London',
-  'America/New_York',
-  'Asia/Dubai',
-];
+const defaultFormData: EventFormData = {
+  name: '',
+  description: '',
+  event_type_id: '',
+  date: '',
+  time: '',
+  duration: null,
+  price: null,
+  certificate_price: null,
+  location: '',
+  is_virtual: true,
+  zoom_link: '',
+  meet_link: '',
+  max_attendees: null,
+  image: undefined,
+  imagePreview: '',
+};
 
-const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'TZS', 'UGX'];
+// ============================================================
+// COMPONENTS
+// ============================================================
 
-const eventTypes = [
-  { value: 'workshop', label: 'Workshop', icon: '🔧' },
-  { value: 'webinar', label: 'Webinar', icon: '💻' },
-  { value: 'bootcamp', label: 'Bootcamp', icon: '🚀' },
-  { value: 'meetup', label: 'Meetup', icon: '🤝' },
-];
-
-const platforms = [
-  { value: 'zoom', label: 'Zoom' },
-  { value: 'google-meet', label: 'Google Meet' },
-  { value: 'teams', label: 'Microsoft Teams' },
-  { value: 'custom', label: 'Custom Link' },
-];
-
-const cpdBodies = [
-  'ICPAK',
-  'LSK',
-  'IHRM',
-  'KIM',
-  'NITA',
-  'Other',
-];
-
-// ============= EVENT PREVIEW CARD =============
-const EventPreviewCard = ({ data }: { data: EventFormData }) => {
-  const getEventTypeIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      workshop: '🔧',
-      webinar: '💻',
-      bootcamp: '🚀',
-      meetup: '🤝',
-    };
-    return icons[type] || '📌';
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: 'bg-gray-100 text-gray-700 border-gray-200',
-      scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
-      published: 'bg-green-100 text-green-700 border-green-200',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-700';
-  };
-
+const EventPreviewCard = ({ data, eventType }: { data: EventFormData; eventType?: string }) => {
   const formatDate = (date: string) => {
     if (!date) return 'TBD';
     const d = new Date(date);
@@ -190,119 +197,80 @@ const EventPreviewCard = ({ data }: { data: EventFormData }) => {
   };
 
   return (
-    <div className="event-preview-card">
-      <div className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-        {/* Image */}
-        {data.imagePreview ? (
-          <div className="w-full h-48 bg-gray-100 overflow-hidden">
-            <img 
-              src={data.imagePreview} 
-              alt={data.title || 'Event preview'} 
-              className="w-full h-full object-cover"
-            />
+    <div className="border border-neutral-light rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+      {data.imagePreview ? (
+        <div className="w-full h-48 bg-neutral-light overflow-hidden">
+          <img 
+            src={data.imagePreview} 
+            alt={data.name || 'Event preview'} 
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="w-full h-48 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+          <div className="text-center">
+            <Calendar className="h-10 w-10 text-primary-300 mx-auto" />
+            <p className="text-sm text-neutral-gray mt-2">Event Image</p>
           </div>
-        ) : (
-          <div className="w-full h-48 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-4xl mb-2">{getEventTypeIcon(data.type)}</div>
-              <p className="text-sm text-gray-400">Event Image</p>
+        </div>
+      )}
+
+      <div className="p-4 space-y-3">
+        <h3 className="text-lg font-bold text-neutral-dark line-clamp-2">
+          {data.name || 'Untitled Event'}
+        </h3>
+
+        {eventType && (
+          <div className="flex items-center gap-2 text-sm text-neutral-gray">
+            <span className="capitalize">{eventType}</span>
+          </div>
+        )}
+
+        {(data.date || data.time) && (
+          <div className="flex items-start gap-2 text-sm text-neutral-gray">
+            <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <div>
+              {formatDate(data.date)}
+              {data.time && ` at ${data.time}`}
             </div>
           </div>
         )}
 
-        <div className="p-4 space-y-3">
-          {/* Status Badge */}
-          <div className="flex items-center justify-between">
-            <Badge className={cn("text-xs font-medium border", getStatusColor(data.status))}>
-              {data.status.charAt(0).toUpperCase() + data.status.slice(1)}
-            </Badge>
-            {data.cpdAccredited && (
-              <Badge variant="outline" className="text-xs border-amber-200 bg-amber-50 text-amber-700">
-                <Award className="h-3 w-3 mr-1" />
-                CPD
-              </Badge>
-            )}
-          </div>
-
-          {/* Title */}
-          <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
-            {data.title || 'Untitled Event'}
-          </h3>
-
-          {/* Type */}
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span>{getEventTypeIcon(data.type)}</span>
-            <span className="capitalize">{data.type}</span>
-          </div>
-
-          {/* Date & Time */}
-          {(data.startDate || data.startTime) && (
-            <div className="flex items-start gap-2 text-sm text-gray-600">
-              <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div>
-                {formatDate(data.startDate)}
-                {data.startTime && ` at ${data.startTime}`}
-                {data.endDate && ` - ${formatDate(data.endDate)}`}
-              </div>
-            </div>
+        <div className="flex items-center gap-2 text-sm text-neutral-gray">
+          {data.is_virtual ? (
+            <Video className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <MapPin className="h-4 w-4 flex-shrink-0" />
           )}
+          <span>
+            {data.is_virtual ? 'Virtual Event' : data.location || 'Location TBD'}
+          </span>
+        </div>
 
-          {/* Location */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            {data.isVirtual ? (
-              <Video className="h-4 w-4 flex-shrink-0" />
-            ) : (
-              <MapPin className="h-4 w-4 flex-shrink-0" />
-            )}
-            <span>
-              {data.isVirtual ? 'Virtual Event' : data.location || 'Location TBD'}
-            </span>
+        <div className="flex items-center justify-between pt-2 border-t border-neutral-light">
+          <div className="flex items-center gap-1 text-sm font-semibold text-neutral-dark">
+            <DollarSign className="h-4 w-4 text-neutral-gray" />
+            {data.price && data.price > 0 ? `${data.price} KES` : 'Free'}
           </div>
-
-          {/* Host */}
-          {data.hostName && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <User className="h-4 w-4 flex-shrink-0" />
-              <span>Hosted by {data.hostName}</span>
-            </div>
-          )}
-
-          {/* Price & Capacity */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-1 text-sm font-semibold text-gray-900">
-              <DollarSign className="h-4 w-4 text-gray-500" />
-              {data.price && Number(data.price) > 0 ? `${data.price} ${data.currency}` : 'Free'}
-            </div>
-            {data.capacity && (
-              <div className="flex items-center gap-1 text-sm text-gray-500">
-                <Users className="h-4 w-4" />
-                <span>{data.capacity} spots</span>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          {data.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 pt-1">
-              {data.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {data.tags.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{data.tags.length - 3} more
-                </Badge>
-              )}
+          {data.max_attendees && data.max_attendees > 0 && (
+            <div className="flex items-center gap-1 text-sm text-neutral-gray">
+              <Users className="h-4 w-4" />
+              <span>{data.max_attendees} spots</span>
             </div>
           )}
         </div>
+
+        {data.duration && data.duration > 0 && (
+          <div className="flex items-center gap-2 text-sm text-neutral-gray">
+            <Clock className="h-4 w-4" />
+            <span>{data.duration} minutes</span>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// ============= STEPPER =============
 const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] }) => {
   return (
     <div className="flex items-center justify-between w-full max-w-2xl mx-auto">
@@ -316,10 +284,10 @@ const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] 
             <div className="flex items-center gap-2">
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all cursor-pointer",
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
                   isActive && "bg-primary text-white ring-4 ring-primary/20",
-                  isCompleted && "bg-green-500 text-white",
-                  !isActive && !isCompleted && "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                  isCompleted && "bg-tertiary-500 text-white",
+                  !isActive && !isCompleted && "bg-neutral-light text-neutral-gray"
                 )}
               >
                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : stepNumber}
@@ -327,20 +295,20 @@ const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] 
               <span
                 className={cn(
                   "text-sm font-medium hidden sm:block",
-                  isActive && "text-gray-900",
-                  isCompleted && "text-gray-600",
-                  !isActive && !isCompleted && "text-gray-400"
+                  isActive && "text-neutral-dark",
+                  isCompleted && "text-neutral-gray",
+                  !isActive && !isCompleted && "text-neutral-gray"
                 )}
               >
                 {label}
               </span>
             </div>
             {index < steps.length - 1 && (
-              <div className="flex-1 mx-2 h-0.5 bg-gray-200">
+              <div className="flex-1 mx-2 h-0.5 bg-neutral-light">
                 <div
                   className={cn(
                     "h-full transition-all duration-300",
-                    isCompleted ? "w-full bg-green-500" : "w-0 bg-primary"
+                    isCompleted ? "w-full bg-tertiary-500" : "w-0 bg-primary"
                   )}
                 />
               </div>
@@ -352,75 +320,799 @@ const Stepper = ({ currentStep, steps }: { currentStep: number; steps: string[] 
   );
 };
 
+const PreviewModal = ({ 
+  open, 
+  onOpenChange, 
+  data, 
+  eventType 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  data: EventFormData; 
+  eventType?: string;
+}) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-neutral-dark">Event Preview</DialogTitle>
+        <DialogDescription className="text-neutral-gray">
+          Preview of your event as it will appear to attendees
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4">
+        <EventPreviewCard data={data} eventType={eventType} />
+      </div>
+      <DialogFooter>
+        <Button 
+          variant="outline" 
+          onClick={() => onOpenChange(false)}
+          className="w-full cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+        >
+          Close Preview
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
 export default function CreateEventPage() {
   const router = useRouter();
+  
+  const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
+  
+  const accountId = useMemo(() => {
+    const id = account?.id || user?.id || '';
+    if (!id) {
+      console.warn('⚠️ No account ID found in CreateEventPage');
+    }
+    return id;
+  }, [account, user]);
+  
+  // ✅ RTK Query hooks
+  const [createDraft, { isLoading: isCreatingDraft }] = useCreateDraftMutation();
+  const [createEvent, { isLoading: isCreatingEvent }] = useCreateEventMutation();
+  const [updateEvent, { isLoading: isUpdating }] = useUpdateEventMutation();
+  const [publishEvent, { isLoading: isPublishing }] = usePublishEventMutation();
+  const [uploadEventImage, { isLoading: isUploading }] = useUploadEventImageMutation(); // ✅ Add this
+  const { data: eventTypes = [] } = useGetEventTypesQuery();
+  const { data: eventStatuses = [] } = useGetEventStatusesQuery();
+
   const [formData, setFormData] = useState<EventFormData>(defaultFormData);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [tagInput, setTagInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  
+  // ✅ Draft ID tracking
+  const [draftId, setDraftId] = useState<string | null>(null);
+  
+  // Auto-save state
+  const [lastSavedData, setLastSavedData] = useState<EventFormData | null>(null);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isAutoSavingRef = useRef(false);
 
-  const STEPS = ['Basic Info', 'Details', 'Host Info'];
+  const STEPS = ['Basic Info', 'Details', 'Preview'];
+  const isCreating = isCreatingDraft || isCreatingEvent || isUpdating;
+
+  // ============================================================
+  // CHECK IF PUBLISH IS READY
+  // ============================================================
+
+  const isPublishReady = useMemo(() => {
+    const hasName = formData.name && formData.name.trim().length > 0;
+    const hasEventType = !!formData.event_type_id;
+    const hasDate = !!formData.date;
+    const hasTime = !!formData.time;
+    const hasDuration = formData.duration && formData.duration > 0;
+    
+    let hasLocationOrLink = true;
+    if (formData.is_virtual) {
+      hasLocationOrLink = !!(formData.zoom_link || formData.meet_link);
+    } else {
+      hasLocationOrLink = !!formData.location;
+    }
+    
+    return hasName && hasEventType && hasDate && hasTime && hasDuration && hasLocationOrLink;
+  }, [formData]);
+
+  // ============================================================
+  // DETECT CHANGES - Show Saving... immediately when typing
+  // ============================================================
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
+    if (!lastSavedData) {
+      const hasAnyData = formData.name || formData.event_type_id || formData.date || formData.time;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHasChanges(!!hasAnyData);
+      // ✅ Show "Saving..." immediately when user starts typing
+      if (hasAnyData && saveStatus !== 'saving') {
+        setSaveStatus('saving');
+      }
+      return;
+    }
+
+    const currentData = {
+      ...formData,
+      imagePreview: formData.imagePreview || undefined,
+      image: formData.image || undefined,
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+    const savedData = {
+      ...lastSavedData,
+      imagePreview: lastSavedData.imagePreview || undefined,
+      image: lastSavedData.image || undefined,
+    };
+    
+    const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
+    setHasChanges(hasChanged);
+    // ✅ Show "Saving..." immediately when changes are detected
+    if (hasChanged && saveStatus !== 'saving') {
+      setSaveStatus('saving');
+    } else if (!hasChanged && !isAutoSaving) {
+      setSaveStatus('saved');
+    }
+  }, [formData, lastSavedData, isAutoSaving]);
 
-  const handleChange = (field: keyof EventFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  // ============================================================
+  // AUTO-SAVE LOGIC - Creates or Updates Draft
+  // ============================================================
 
-  const handleTagAdd = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, tagInput.trim()],
-      }));
-      setTagInput('');
+  const performAutoSave = useCallback(async () => {
+  if (isAutoSavingRef.current || isSaving || isCreating) return;
+  
+  if (!accountId) {
+    console.warn('⚠️ Cannot auto-save: No account ID found');
+    return;
+  }
+
+  const hasName = !!formData.name?.trim();
+  const hasEventType = !!formData.event_type_id;
+  const hasDate = !!formData.date;
+
+  if (!hasName && !hasEventType && !hasDate) {
+    console.log('⏭️ Skipping auto-save: No data yet');
+    return;
+  }
+
+  isAutoSavingRef.current = true;
+  setIsAutoSaving(true);
+
+  try {
+    let response;
+    
+    if (draftId) {
+      // ✅ UPDATE existing draft (JSON only)
+      console.log('🔄 Updating existing draft:', draftId);
+      response = await updateEvent({
+        id: draftId,
+        data: {
+          name: formData.name?.trim() || 'Untitled Event',
+          description: formData.description || '',
+          event_type_id: formData.event_type_id || '',
+          date: formData.date || '',
+          time: formData.time || '',
+          duration: formData.duration || 60,
+          price: formData.price || 0,
+          certificate_price: formData.certificate_price || 0,
+          location: formData.location || '',
+          is_virtual: formData.is_virtual,
+          zoom_link: formData.zoom_link || '',
+          meet_link: formData.meet_link || '',
+          max_attendees: formData.max_attendees || 0,
+        }
+      }).unwrap();
+      
+      // ✅ If image was added, upload it separately
+      if (imageFile) {
+        console.log('📤 Uploading image for draft:', draftId);
+        await uploadEventImage({
+          accountId,
+          eventId: draftId,
+          image: imageFile,
+        }).unwrap();
+        // Don't clear imageFile here - it will be cleared on success
+      }
+      
+    } else {
+      // ✅ CREATE new draft with FormData (includes image)
+      console.log('🔄 Creating new draft...');
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
+      formDataToSend.append('description', formData.description || '');
+      formDataToSend.append('event_type_id', formData.event_type_id || '');
+      formDataToSend.append('date', formData.date || '');
+      formDataToSend.append('time', formData.time || '');
+      formDataToSend.append('duration', formData.duration?.toString() || '60');
+      formDataToSend.append('price', (formData.price || 0).toString());
+      formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
+      formDataToSend.append('location', formData.location || '');
+      formDataToSend.append('is_virtual', formData.is_virtual.toString());
+      formDataToSend.append('zoom_link', formData.zoom_link || '');
+      formDataToSend.append('meet_link', formData.meet_link || '');
+      formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
+
+      if (imageFile) {
+        formDataToSend.append('image', imageFile);
+      }
+
+      response = await createDraft({
+        accountId,
+        data: formDataToSend,
+      }).unwrap();
+      
+      const newDraftId = response.ID || response.ID;
+      setDraftId(newDraftId);
+      setCreatedEventId(newDraftId);
+      // Clear image state after successful upload
+      setImageFile(null);
+      setImagePreview(null);
+    }
+
+    setLastSavedData({ ...formData });
+    setHasChanges(false);
+    setSaveStatus('saved');
+    
+    console.log('✅ Auto-save successful');
+    
+  } catch (err: any) {
+    console.error('❌ Auto-save error:', err);
+  } finally {
+    isAutoSavingRef.current = false;
+    setIsAutoSaving(false);
+  }
+}, [
+  accountId,
+  formData,
+  imageFile,
+  isSaving,
+  isCreating,
+  createDraft,
+  updateEvent,
+  uploadEventImage,
+  draftId,
+]);
+
+  // ✅ Auto-save after 1.5 seconds of inactivity
+  useEffect(() => {
+    if (!accountId) return;
+    
+    const hasData = !!formData.name?.trim() || !!formData.event_type_id || !!formData.date;
+    if (!hasData) return;
+    if (isSaving || isCreating || isAutoSaving) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (hasChanges) {
+        performAutoSave();
+      }
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [
+    accountId,
+    formData.name,
+    formData.event_type_id,
+    formData.date,
+    hasChanges,
+    isSaving,
+    isCreating,
+    isAutoSaving,
+    performAutoSave,
+  ]);
+
+  // ✅ Immediate save on blur
+  const handleFieldBlurWithSave = useCallback((field: keyof EventFormData) => {
+    // eslint-disable-next-line react-hooks/immutability
+    handleFieldBlur(field);
+    if (hasChanges && !isAutoSaving && !isSaving && !isCreating) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      performAutoSave();
+    }
+  }, [hasChanges, isAutoSaving, isSaving, isCreating, performAutoSave]);
+
+  // ✅ Immediate save on select/switch changes
+  const handleSelectChange = (field: keyof EventFormData, value: any) => {
+    handleChange(field, value);
+    if (!isAutoSaving && !isSaving && !isCreating) {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      setTimeout(() => {
+        performAutoSave();
+      }, 100);
     }
   };
 
-  const handleTagRemove = (tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag),
-    }));
+  // Save on beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
+
+  // ============================================================
+  // VALIDATION
+  // ============================================================
+
+  const validateForDraft = (): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+
+    if (formData.name && formData.name.length > 100) {
+      newErrors.name = 'Event name must be less than 100 characters';
+      isValid = false;
+    }
+
+    if (formData.date) {
+      const selectedDate = new Date(formData.date);
+      if (isNaN(selectedDate.getTime())) {
+        newErrors.date = 'Invalid date format';
+        isValid = false;
+      }
+    }
+
+    if (formData.duration !== null && formData.duration !== undefined) {
+      if (formData.duration < 0) {
+        newErrors.duration = 'Duration cannot be negative';
+        isValid = false;
+      }
+      if (formData.duration > 1440) {
+        newErrors.duration = 'Duration cannot exceed 1440 minutes (24 hours)';
+        isValid = false;
+      }
+    }
+
+    if (formData.price !== null && formData.price < 0) {
+      newErrors.price = 'Price cannot be negative';
+      isValid = false;
+    }
+
+    if (formData.certificate_price !== null && formData.certificate_price < 0) {
+      newErrors.certificate_price = 'Certificate price cannot be negative';
+      isValid = false;
+    }
+
+    if (formData.max_attendees !== null && formData.max_attendees < 0) {
+      newErrors.max_attendees = 'Maximum attendees cannot be negative';
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const validateForPublish = (): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+
+    if (!formData.name || formData.name.trim() === '') {
+      newErrors.name = 'Event name is required';
+      isValid = false;
+    } else if (formData.name.length > 100) {
+      newErrors.name = 'Event name must be less than 100 characters';
+      isValid = false;
+    }
+
+    if (!formData.event_type_id) {
+      newErrors.event_type_id = 'Event type is required';
+      isValid = false;
+    }
+
+    if (!formData.date) {
+      newErrors.date = 'Event date is required';
+      isValid = false;
+    } else {
+      const selectedDate = new Date(formData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (selectedDate < today) {
+        newErrors.date = 'Event date cannot be in the past';
+        isValid = false;
+      }
+    }
+
+    if (!formData.time) {
+      newErrors.time = 'Event time is required';
+      isValid = false;
+    }
+
+    if (!formData.duration || formData.duration <= 0) {
+      newErrors.duration = 'Duration must be greater than 0';
+      isValid = false;
+    } else if (formData.duration < 15) {
+      newErrors.duration = 'Duration must be at least 15 minutes';
+      isValid = false;
+    } else if (formData.duration > 1440) {
+      newErrors.duration = 'Duration cannot exceed 1440 minutes (24 hours)';
+      isValid = false;
+    }
+
+    if (!formData.is_virtual && !formData.location) {
+      newErrors.location = 'Location is required for in-person events';
+      isValid = false;
+    }
+
+    if (formData.is_virtual) {
+      if (!formData.zoom_link && !formData.meet_link) {
+        newErrors.zoom_link = 'At least one meeting link is required for virtual events';
+        isValid = false;
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const isValidUrl = (string: string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const validateField = (field: keyof EventFormData, value: any): string | undefined => {
+    switch (field) {
+      case 'name':
+        if (value && value.length > 100) return 'Event name must be less than 100 characters';
+        return undefined;
+      case 'date':
+        if (value) {
+          const selectedDate = new Date(value);
+          if (isNaN(selectedDate.getTime())) return 'Invalid date format';
+        }
+        return undefined;
+      case 'duration':
+        if (value !== null && value !== undefined) {
+          if (value < 0) return 'Duration cannot be negative';
+          if (value > 1440) return 'Duration cannot exceed 1440 minutes (24 hours)';
+        }
+        return undefined;
+      case 'price':
+        if (value !== null && value < 0) return 'Price cannot be negative';
+        return undefined;
+      case 'certificate_price':
+        if (value !== null && value < 0) return 'Certificate price cannot be negative';
+        return undefined;
+      case 'max_attendees':
+        if (value !== null && value < 0) return 'Maximum attendees cannot be negative';
+        return undefined;
+      case 'zoom_link':
+        if (value && !isValidUrl(value)) return 'Please enter a valid Zoom URL';
+        return undefined;
+      case 'meet_link':
+        if (value && !isValidUrl(value)) return 'Please enter a valid Google Meet URL';
+        return undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  const handleFieldBlur = (field: keyof EventFormData) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    const error = validateField(field, formData[field]);
+    const errorKey = field as keyof FormErrors;
+    if (error) {
+      setErrors(prev => ({ ...prev, [errorKey]: error }));
+    } else {
+      setErrors(prev => {
+        const { [errorKey]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  const handleChange = (field: keyof EventFormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
+    // ✅ Show "Saving..." immediately when user types
+    setSaveStatus('saving');
+    
+    const errorKey = field as keyof FormErrors;
+    if (errors[errorKey]) {
+      setErrors(prev => {
+        const { [errorKey]: _, ...rest } = prev;
+        return rest;
+      });
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(prev => ({ ...prev, image: 'Image must be less than 5MB' }));
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setErrors(prev => ({ ...prev, image: 'Only JPG, PNG, and WEBP images are supported' }));
+        return;
+      }
+      
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
         handleChange('imagePreview', reader.result as string);
+        setErrors(prev => {
+          const { image, ...rest } = prev;
+          return rest;
+        });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = (publish: boolean = false) => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setIsPublished(publish);
-      setIsSaveDialogOpen(true);
-    }, 1500);
+  // ============================================================
+  // SUBMIT
+  // ============================================================
+
+const handleSubmit = async (statusSlug: 'draft' | 'published') => {
+  setError(null);
+
+  // ✅ Check authentication
+  if (!accountId) {
+    setError('Please log in to create events.');
+    toast.error('Please log in to create events');
+    return;
+  }
+
+  // ✅ Validate based on status
+  let isValid = false;
+  if (statusSlug === 'published') {
+    isValid = validateForPublish();
+  } else {
+    isValid = validateForDraft();
+  }
+
+  if (!isValid) {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      const element = document.getElementById(`field-${firstErrorField}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
+      }
+    }
+    setError(statusSlug === 'published' 
+      ? 'Please fix all errors before publishing.' 
+      : 'Please fix validation errors before saving.');
+    return;
+  }
+
+  setIsSaving(true);
+  setSaveStatus('saving');
+
+  try {
+    let response;
+    
+    // ============================================================
+    // PUBLISH FLOW
+    // ============================================================
+    if (statusSlug === 'published') {
+      if (draftId) {
+        // ✅ 1. Upload image if exists
+        if (imageFile) {
+          console.log('📤 Uploading image for draft:', draftId);
+          await uploadEventImage({
+            accountId,
+            eventId: draftId,
+            image: imageFile,
+          }).unwrap();
+          console.log('✅ Image uploaded successfully');
+          // Clear image state after upload
+          setImageFile(null);
+          setImagePreview(null);
+        }
+        
+        // ✅ 2. Update draft with latest data
+        console.log('📤 Updating draft with latest data:', draftId);
+        await updateEvent({
+          id: draftId,
+          data: {
+            name: formData.name?.trim() || 'Untitled Event',
+            description: formData.description || '',
+            event_type_id: formData.event_type_id || '',
+            date: formData.date || '',
+            time: formData.time || '',
+            duration: formData.duration || 60,
+            price: formData.price || 0,
+            certificate_price: formData.certificate_price || 0,
+            location: formData.location || '',
+            is_virtual: formData.is_virtual,
+            zoom_link: formData.zoom_link || '',
+            meet_link: formData.meet_link || '',
+            max_attendees: formData.max_attendees || 0,
+          }
+        }).unwrap();
+        console.log('✅ Draft updated successfully');
+        
+        // ✅ 3. Publish the draft
+        console.log('📤 Publishing draft:', draftId);
+        await publishEvent({ 
+      id: draftId, 
+      accountId: accountId 
+    }).unwrap();
+        console.log('✅ Event published successfully');
+        
+        setCreatedEventId(draftId);
+        setDraftId(null);
+        
+      } else {
+        // ✅ No draft - create published event directly with image
+        console.log('📤 Creating published event directly...');
+        const formDataToSend = new FormData();
+        formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
+        formDataToSend.append('description', formData.description || '');
+        formDataToSend.append('event_type_id', formData.event_type_id || '');
+        formDataToSend.append('date', formData.date || '');
+        formDataToSend.append('time', formData.time || '');
+        formDataToSend.append('duration', formData.duration?.toString() || '60');
+        formDataToSend.append('price', (formData.price || 0).toString());
+        formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
+        formDataToSend.append('location', formData.location || '');
+        formDataToSend.append('is_virtual', formData.is_virtual.toString());
+        formDataToSend.append('zoom_link', formData.zoom_link || '');
+        formDataToSend.append('meet_link', formData.meet_link || '');
+        formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
+
+        if (imageFile) {
+          formDataToSend.append('image', imageFile);
+        }
+
+        response = await createEvent({
+          accountId,
+          data: formDataToSend,
+        }).unwrap();
+        
+        setCreatedEventId(response.ID || response.ID);
+        // Clear image state after upload
+        setImageFile(null);
+        setImagePreview(null);
+      }
+      
+    // ============================================================
+    // SAVE DRAFT FLOW
+    // ============================================================
+    } else {
+      if (draftId) {
+        // ✅ Update existing draft
+        // Upload image if there's a new one
+        if (imageFile) {
+          console.log('📤 Uploading image for draft:', draftId);
+          await uploadEventImage({
+            accountId,
+            eventId: draftId,
+            image: imageFile,
+          }).unwrap();
+          setImageFile(null);
+          setImagePreview(null);
+        }
+        
+        response = await updateEvent({
+          id: draftId,
+          data: {
+            name: formData.name?.trim() || 'Untitled Event',
+            description: formData.description || '',
+            event_type_id: formData.event_type_id || '',
+            date: formData.date || '',
+            time: formData.time || '',
+            duration: formData.duration || 60,
+            price: formData.price || 0,
+            certificate_price: formData.certificate_price || 0,
+            location: formData.location || '',
+            is_virtual: formData.is_virtual,
+            zoom_link: formData.zoom_link || '',
+            meet_link: formData.meet_link || '',
+            max_attendees: formData.max_attendees || 0,
+          }
+        }).unwrap();
+        setCreatedEventId(response.ID || response.ID);
+        
+      } else {
+        // ✅ Create new draft with image in FormData
+        console.log('📤 Creating new draft...');
+        const formDataToSend = new FormData();
+        formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
+        formDataToSend.append('description', formData.description || '');
+        formDataToSend.append('event_type_id', formData.event_type_id || '');
+        formDataToSend.append('date', formData.date || '');
+        formDataToSend.append('time', formData.time || '');
+        formDataToSend.append('duration', formData.duration?.toString() || '60');
+        formDataToSend.append('price', (formData.price || 0).toString());
+        formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
+        formDataToSend.append('location', formData.location || '');
+        formDataToSend.append('is_virtual', formData.is_virtual.toString());
+        formDataToSend.append('zoom_link', formData.zoom_link || '');
+        formDataToSend.append('meet_link', formData.meet_link || '');
+        formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
+
+        if (imageFile) {
+          formDataToSend.append('image', imageFile);
+        }
+
+        response = await createDraft({
+          accountId,
+          data: formDataToSend,
+        }).unwrap();
+        
+        const newDraftId = response.ID || response.ID;
+        setDraftId(newDraftId);
+        setCreatedEventId(newDraftId);
+        // Clear image state after upload
+        setImageFile(null);
+        setImagePreview(null);
+      }
+    }
+
+    // ✅ Update state and show success
+    setLastSavedData({ ...formData });
+    setHasChanges(false);
+    setSaveStatus('saved');
+    
+    setIsPublished(statusSlug === 'published');
+    setIsSaveDialogOpen(true);
+    
+    if (statusSlug === 'draft') {
+      setFormData(defaultFormData);
+      setImagePreview(null);
+      setImageFile(null);
+      setErrors({});
+      setTouched({});
+      setDraftId(null);
+    }
+    
+  } catch (err: any) {
+    console.error('Create event error:', err);
+    setError(err?.data?.message || 'Failed to create event. Please try again.');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+  const handleManualSave = () => {
+    if (hasChanges) {
+      performAutoSave();
+    }
   };
 
   const handleNext = () => {
     if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
+      if (validateForDraft()) {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -430,137 +1122,167 @@ export default function CreateEventPage() {
     }
   };
 
-  // Render step content
+  const selectedEventType = eventTypes.find((t: any) => t.ID === formData.event_type_id);
+
+  // ============================================================
+  // RENDER STEP CONTENT
+  // ============================================================
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="space-y-6">
-            {/* Event Title & Type */}
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Event Title <span className="text-red-500">*</span></Label>
+                  <div id="field-name" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">
+                      Event Name
+                      <span className="text-error-500 ml-1">*</span>
+                    </Label>
                     <Input
                       placeholder="e.g., Advanced Data Science Workshop"
-                      value={formData.title}
-                      onChange={(e) => handleChange('title', e.target.value)}
-                      className="mt-1 cursor-text"
+                      value={formData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      onBlur={() => handleFieldBlurWithSave('name')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.name && errors.name && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
                     />
-                    <p className="text-xs text-gray-400 mt-1">
-                      A clear, descriptive title for your event.
-                    </p>
+                    {touched.name && errors.name && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Event Type <span className="text-red-500">*</span></Label>
+                    <div id="field-event_type_id" className="space-y-2">
+                      <Label className="text-sm font-medium text-neutral-dark">
+                        Event Type
+                        <span className="text-error-500 ml-1">*</span>
+                      </Label>
                       <Select
-                        value={formData.type}
-                        onValueChange={(value: any) => handleChange('type', value)}
+                        value={formData.event_type_id}
+                        onValueChange={(value) => {
+                          handleSelectChange('event_type_id', value);
+                          setTouched(prev => ({ ...prev, event_type_id: true }));
+                        }}
                       >
-                        <SelectTrigger className="mt-1 cursor-pointer">
-                          <SelectValue />
+                        <SelectTrigger className={cn(
+                          "cursor-pointer",
+                          touched.event_type_id && errors.event_type_id && "border-error-500"
+                        )}>
+                          <SelectValue placeholder="Select event type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {eventTypes.map((type) => (
-                            <SelectItem key={type.value} value={type.value} className="cursor-pointer">
-                              {type.icon} {type.label}
+                          {eventTypes.map((type: any) => (
+                            <SelectItem key={type.ID} value={type.ID} className="cursor-pointer">
+                              {type.Name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      {touched.event_type_id && errors.event_type_id && (
+                        <p className="text-sm text-error-500 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.event_type_id}
+                        </p>
+                      )}
                     </div>
 
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value: any) => handleChange('status', value)}
-                      >
-                        <SelectTrigger className="mt-1 cursor-pointer">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
-                          <SelectItem value="scheduled" className="cursor-pointer">Scheduled</SelectItem>
-                          <SelectItem value="published" className="cursor-pointer">Published</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div id="field-duration" className="space-y-2">
+                      <Label className="text-sm font-medium text-neutral-dark">
+                        Duration (minutes)
+                        <span className="text-error-500 ml-1">*</span>
+                      </Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 60"
+                        value={formData.duration || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleChange('duration', val === '' ? null : parseInt(val) || 0);
+                        }}
+                        onBlur={() => handleFieldBlurWithSave('duration')}
+                        className={cn(
+                          "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                          touched.duration && errors.duration && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        )}
+                        min={1}
+                      />
+                      {touched.duration && errors.duration && (
+                        <p className="text-sm text-error-500 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.duration}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Description <span className="text-red-500">*</span></Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Description</Label>
                     <Textarea
-                      placeholder="Describe your event, what attendees will learn, and any prerequisites..."
+                      placeholder="Describe your event, what attendees will learn..."
                       value={formData.description}
                       onChange={(e) => handleChange('description', e.target.value)}
-                      className="mt-1 min-h-[120px] cursor-text"
+                      onBlur={() => handleFieldBlurWithSave('description')}
+                      className="min-h-[120px] cursor-text focus:ring-primary-500 focus:border-primary-500"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Date & Time */}
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Start Date <span className="text-red-500">*</span></Label>
+                  <div id="field-date" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">
+                      Date
+                      <span className="text-error-500 ml-1">*</span>
+                    </Label>
                     <Input
                       type="date"
-                      value={formData.startDate}
-                      onChange={(e) => handleChange('startDate', e.target.value)}
-                      className="mt-1 cursor-text"
+                      value={formData.date}
+                      onChange={(e) => handleChange('date', e.target.value)}
+                      onBlur={() => handleFieldBlurWithSave('date')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.date && errors.date && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
                     />
+                    {touched.date && errors.date && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.date}
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Start Time <span className="text-red-500">*</span></Label>
+                  <div id="field-time" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">
+                      Time
+                      <span className="text-error-500 ml-1">*</span>
+                    </Label>
                     <Input
                       type="time"
-                      value={formData.startTime}
-                      onChange={(e) => handleChange('startTime', e.target.value)}
-                      className="mt-1 cursor-text"
+                      value={formData.time}
+                      onChange={(e) => handleChange('time', e.target.value)}
+                      onBlur={() => handleFieldBlurWithSave('time')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.time && errors.time && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
                     />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">End Date</Label>
-                    <Input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => handleChange('endDate', e.target.value)}
-                      className="mt-1 cursor-text"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">End Time</Label>
-                    <Input
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => handleChange('endTime', e.target.value)}
-                      className="mt-1 cursor-text"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Time Zone <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={formData.timezone}
-                      onValueChange={(value) => handleChange('timezone', value)}
-                    >
-                      <SelectTrigger className="mt-1 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timezones.map((tz) => (
-                          <SelectItem key={tz} value={tz} className="cursor-pointer">
-                            {tz}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {touched.time && errors.time && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.time}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -571,218 +1293,183 @@ export default function CreateEventPage() {
       case 2:
         return (
           <div className="space-y-6">
-            {/* Pricing & Capacity */}
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Price <span className="text-red-500">*</span></Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div id="field-price" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Price (KES)</Label>
                     <Input
                       type="number"
-                      placeholder="0 for free"
-                      value={formData.price}
-                      onChange={(e) => handleChange('price', e.target.value)}
-                      className="mt-1 cursor-text"
+                      placeholder="0"
+                      value={formData.price || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleChange('price', val === '' ? null : parseFloat(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlurWithSave('price')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.price && errors.price && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
                     />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Currency <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={formData.currency}
-                      onValueChange={(value) => handleChange('currency', value)}
-                    >
-                      <SelectTrigger className="mt-1 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {currencies.map((currency) => (
-                          <SelectItem key={currency} value={currency} className="cursor-pointer">
-                            {currency}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Capacity <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="number"
-                      placeholder="Max attendees"
-                      value={formData.capacity}
-                      onChange={(e) => handleChange('capacity', e.target.value)}
-                      className="mt-1 cursor-text"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Platform & Location */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Virtual Event</Label>
-                      <p className="text-xs text-gray-400">Toggle if this is an online event</p>
-                    </div>
-                    <Switch
-                      checked={formData.isVirtual}
-                      onCheckedChange={(checked) => handleChange('isVirtual', checked)}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Platform <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.platform}
-                        onValueChange={(value: any) => handleChange('platform', value)}
-                      >
-                        <SelectTrigger className="mt-1 cursor-pointer">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {platforms.map((platform) => (
-                            <SelectItem key={platform.value} value={platform.value} className="cursor-pointer">
-                              {platform.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Platform Link <span className="text-red-500">*</span></Label>
-                      <Input
-                        placeholder="https://zoom.us/meeting/..."
-                        value={formData.platformLink}
-                        onChange={(e) => handleChange('platformLink', e.target.value)}
-                        className="mt-1 cursor-text"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">
-                        The link attendees will use to join the event.
+                    <p className="text-xs text-neutral-gray">Set to 0 for free events</p>
+                    {touched.price && errors.price && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.price}
                       </p>
-                    </div>
-
-                    {!formData.isVirtual && (
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Physical Location</Label>
-                        <Input
-                          placeholder="e.g., Nairobi, Kenya"
-                          value={formData.location}
-                          onChange={(e) => handleChange('location', e.target.value)}
-                          className="mt-1 cursor-text"
-                        />
-                      </div>
+                    )}
+                  </div>
+                  <div id="field-certificate_price" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Certificate Price (KES)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={formData.certificate_price || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleChange('certificate_price', val === '' ? null : parseFloat(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlurWithSave('certificate_price')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.certificate_price && errors.certificate_price && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
+                    />
+                    {touched.certificate_price && errors.certificate_price && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.certificate_price}
+                      </p>
                     )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* CPD Accreditation */}
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-3 bg-neutral-light rounded-lg">
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">CPD Accredited</Label>
-                      <p className="text-xs text-gray-400">Enable for professional body accreditation</p>
+                      <Label className="text-sm font-medium text-neutral-dark">Virtual Event</Label>
+                      <p className="text-xs text-neutral-gray">Toggle if this is an online event</p>
                     </div>
                     <Switch
-                      checked={formData.cpdAccredited}
-                      onCheckedChange={(checked) => handleChange('cpdAccredited', checked)}
+                      checked={formData.is_virtual}
+                      onCheckedChange={(checked) => {
+                        handleSelectChange('is_virtual', checked);
+                        if (!checked) {
+                          handleChange('zoom_link', '');
+                          handleChange('meet_link', '');
+                        } else {
+                          handleChange('location', '');
+                        }
+                      }}
+                      className="cursor-pointer"
                     />
                   </div>
 
-                  {formData.cpdAccredited && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">CPD Hours</Label>
+                  {formData.is_virtual ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div id="field-zoom_link" className="space-y-2">
+                        <Label className="text-sm font-medium text-neutral-dark">Zoom Link</Label>
                         <Input
-                          type="number"
-                          placeholder="e.g., 4"
-                          value={formData.cpdHours}
-                          onChange={(e) => handleChange('cpdHours', e.target.value)}
-                          className="mt-1 cursor-text"
+                          placeholder="https://zoom.us/meeting/..."
+                          value={formData.zoom_link}
+                          onChange={(e) => handleChange('zoom_link', e.target.value)}
+                          onBlur={() => handleFieldBlurWithSave('zoom_link')}
+                          className={cn(
+                            "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                            touched.zoom_link && errors.zoom_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                          )}
                         />
+                        {touched.zoom_link && errors.zoom_link && (
+                          <p className="text-sm text-error-500 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {errors.zoom_link}
+                          </p>
+                        )}
                       </div>
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Accrediting Body</Label>
-                        <Select
-                          value={formData.cpdBody}
-                          onValueChange={(value) => handleChange('cpdBody', value)}
-                        >
-                          <SelectTrigger className="mt-1 cursor-pointer">
-                            <SelectValue placeholder="Select accrediting body" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cpdBodies.map((body) => (
-                              <SelectItem key={body} value={body} className="cursor-pointer">
-                                {body}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div id="field-meet_link" className="space-y-2">
+                        <Label className="text-sm font-medium text-neutral-dark">Google Meet Link</Label>
+                        <Input
+                          placeholder="https://meet.google.com/..."
+                          value={formData.meet_link}
+                          onChange={(e) => handleChange('meet_link', e.target.value)}
+                          onBlur={() => handleFieldBlurWithSave('meet_link')}
+                          className={cn(
+                            "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                            touched.meet_link && errors.meet_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                          )}
+                        />
+                        {touched.meet_link && errors.meet_link && (
+                          <p className="text-sm text-error-500 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {errors.meet_link}
+                          </p>
+                        )}
                       </div>
                     </div>
+                  ) : (
+                    <div id="field-location" className="space-y-2">
+                      <Label className="text-sm font-medium text-neutral-dark">
+                        Location
+                        <span className="text-error-500 ml-1">*</span>
+                      </Label>
+                      <Input
+                        placeholder="e.g., Nairobi, Kenya"
+                        value={formData.location}
+                        onChange={(e) => handleChange('location', e.target.value)}
+                        onBlur={() => handleFieldBlurWithSave('location')}
+                        className={cn(
+                          "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                          touched.location && errors.location && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        )}
+                      />
+                      {touched.location && errors.location && (
+                        <p className="text-sm text-error-500 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {errors.location}
+                        </p>
+                      )}
+                    </div>
                   )}
+
+                  <div id="field-max_attendees" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Maximum Attendees</Label>
+                    <Input
+                      type="number"
+                      placeholder="0 for unlimited"
+                      value={formData.max_attendees || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleChange('max_attendees', val === '' ? null : parseInt(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlurWithSave('max_attendees')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        touched.max_attendees && errors.max_attendees && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
+                    />
+                    {touched.max_attendees && errors.max_attendees && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {errors.max_attendees}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Tags */}
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
-                <Label className="text-sm font-medium text-gray-700">Tags</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    placeholder="Add tags (e.g., Data Science, AI)"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleTagAdd();
-                      }
-                    }}
-                    className="cursor-text"
-                  />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={handleTagAdd}
-                    className="cursor-pointer"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {formData.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => handleTagRemove(tag)}
-                        className="hover:text-red-600 cursor-pointer"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                  {formData.tags.length === 0 && (
-                    <p className="text-xs text-gray-400">No tags added yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Event Image */}
-            <Card>
-              <CardContent className="pt-6">
-                <Label className="text-sm font-medium text-gray-700">Event Image</Label>
-                <div className="mt-1">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-neutral-dark">Event Image</Label>
                   {imagePreview ? (
                     <div className="relative">
                       <img
@@ -796,18 +1483,33 @@ export default function CreateEventPage() {
                           setImagePreview(null);
                           setImageFile(null);
                           handleChange('imagePreview', '');
+                          setErrors(prev => {
+                            const { image, ...rest } = prev;
+                            return rest;
+                          });
                         }}
-                        className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors cursor-pointer"
+                        className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
-                    <label className="flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <label className={cn(
+                      "flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
+                      errors.image ? "border-error-500 bg-error-50" : "border-neutral-light hover:border-primary-300 hover:bg-primary-50"
+                    )}>
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <Upload className="h-10 w-10 text-gray-400" />
-                        <p className="text-sm text-gray-500">Click to upload event image</p>
-                        <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                        <Upload className={cn(
+                          "h-10 w-10",
+                          errors.image ? "text-error-500" : "text-neutral-gray"
+                        )} />
+                        <p className={cn(
+                          "text-sm mt-2",
+                          errors.image ? "text-error-500" : "text-neutral-gray"
+                        )}>
+                          {errors.image || 'Click to upload event image'}
+                        </p>
+                        <p className="text-xs text-neutral-gray">PNG, JPG, WEBP up to 5MB</p>
                       </div>
                       <input
                         type="file"
@@ -816,6 +1518,12 @@ export default function CreateEventPage() {
                         onChange={handleImageUpload}
                       />
                     </label>
+                  )}
+                  {errors.image && (
+                    <p className="text-sm text-error-500 flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      {errors.image}
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -826,40 +1534,93 @@ export default function CreateEventPage() {
       case 3:
         return (
           <div className="space-y-6">
-            <Card>
+            <Card className="border border-neutral-light">
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Host Name <span className="text-red-500">*</span></Label>
-                    <Input
-                      placeholder="e.g., John Doe"
-                      value={formData.hostName}
-                      onChange={(e) => handleChange('hostName', e.target.value)}
-                      className="mt-1 cursor-text"
-                    />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-neutral-gray">
+                    <Shield className="h-4 w-4 text-primary-500" />
+                    <span>Review your event details before publishing</span>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Host Email <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="email"
-                      placeholder="host@example.com"
-                      value={formData.hostEmail}
-                      onChange={(e) => handleChange('hostEmail', e.target.value)}
-                      className="mt-1 cursor-text"
-                    />
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-neutral-gray">Event Name</p>
+                      <p className="font-medium text-neutral-dark">{formData.name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Type</p>
+                      <p className="font-medium text-neutral-dark">{selectedEventType?.Name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Date</p>
+                      <p className="font-medium text-neutral-dark">{formData.date || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Time</p>
+                      <p className="font-medium text-neutral-dark">{formData.time || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Duration</p>
+                      <p className="font-medium text-neutral-dark">{formData.duration || 0} minutes</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Price</p>
+                      <p className="font-medium text-neutral-dark">
+                        {formData.price && formData.price > 0 ? `${formData.price} KES` : 'Free'}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Virtual</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_virtual ? 'Yes' : 'No'}</p>
+                    </div>
+                    {formData.is_virtual && formData.zoom_link && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Zoom Link</p>
+                        <p className="font-medium text-neutral-dark truncate">{formData.zoom_link}</p>
+                      </div>
+                    )}
+                    {formData.is_virtual && formData.meet_link && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Meet Link</p>
+                        <p className="font-medium text-neutral-dark truncate">{formData.meet_link}</p>
+                      </div>
+                    )}
+                    {!formData.is_virtual && formData.location && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Location</p>
+                        <p className="font-medium text-neutral-dark">{formData.location}</p>
+                      </div>
+                    )}
+                    {formData.max_attendees && formData.max_attendees > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Max Attendees</p>
+                        <p className="font-medium text-neutral-dark">{formData.max_attendees}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Host Bio</Label>
-                    <Textarea
-                      placeholder="Tell attendees about the host's experience and expertise..."
-                      value={formData.hostBio}
-                      onChange={(e) => handleChange('hostBio', e.target.value)}
-                      className="mt-1 min-h-[100px] cursor-text"
-                    />
-                  </div>
+
+                  {formData.description && (
+                    <div className="pt-4 border-t border-neutral-light">
+                      <p className="text-neutral-gray text-sm">Description</p>
+                      <p className="text-sm text-neutral-dark mt-1">{formData.description}</p>
+                    </div>
+                  )}
+
+                  {formData.imagePreview && (
+                    <div className="pt-4 border-t border-neutral-light">
+                      <p className="text-neutral-gray text-sm">Event Image</p>
+                      <img
+                        src={formData.imagePreview}
+                        alt="Event preview"
+                        className="mt-2 w-full max-w-xs h-32 object-cover rounded-lg"
+                      />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
+
+            <EventPreviewCard data={formData} eventType={selectedEventType?.Name} />
           </div>
         );
 
@@ -868,6 +1629,8 @@ export default function CreateEventPage() {
     }
   };
 
+  const isLoading = isSaving || isCreating || isAutoSaving;
+
   return (
     <div className="w-full">
       {/* Header */}
@@ -875,50 +1638,71 @@ export default function CreateEventPage() {
         <div className="flex items-center gap-3">
           <Link 
             href="/dashboard/events" 
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
+            <ArrowLeft className="h-5 w-5 text-neutral-gray" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Create Event</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-bold text-neutral-dark">Create Event</h1>
+            <p className="text-sm text-neutral-gray mt-1">
               Create a new training event, workshop, or webinar.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Mobile Preview Button */}
+        
+        {/* Action Buttons with Save Status */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* ✅ Google Docs-style Save Status - Shows Saving... immediately */}
+          <SaveStatusIndicator status={saveStatus} />
+          
           {isMobile && (
             <Button 
-              variant="outline" 
-              className="cursor-pointer"
-              onClick={() => {
-                // Show preview in sheet
-              }}
+              variant="outline"
+              onClick={() => setIsPreviewModalOpen(true)}
+              className="flex-1 sm:flex-none cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
             >
               <Eye className="h-4 w-4 mr-2" />
               Preview
             </Button>
           )}
+          
           <Button 
-            className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-            onClick={() => handleSubmit(true)}
-            disabled={isSaving}
+            variant="outline"
+            onClick={handleManualSave}
+            disabled={isLoading || !hasChanges}
+            className="flex-1 sm:flex-none cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+          
+          <Button 
+            className="flex-1 sm:flex-none bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => handleSubmit('published')}
+            disabled={!isPublishReady || isLoading}
           >
             {isSaving ? (
               <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Publishing...
               </>
             ) : (
               <>
                 <Send className="h-4 w-4 mr-2" />
-                Publish Event
+                Publish
               </>
             )}
           </Button>
         </div>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mb-4 p-3 bg-error-50 border border-error-200 text-error-600 rounded-lg text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="py-4">
@@ -932,17 +1716,17 @@ export default function CreateEventPage() {
       )}>
         {/* Left Column - Editor */}
         <div className="min-w-0">
-          <Card>
+          <Card className="border border-neutral-light">
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="text-neutral-dark">
                 {currentStep === 1 && 'Basic Information'}
                 {currentStep === 2 && 'Event Details'}
-                {currentStep === 3 && 'Host Information'}
+                {currentStep === 3 && 'Review & Publish'}
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-neutral-gray">
                 {currentStep === 1 && 'Enter the basic details about your event.'}
-                {currentStep === 2 && 'Configure pricing, platform, and CPD settings.'}
-                {currentStep === 3 && 'Provide information about the event host.'}
+                {currentStep === 2 && 'Configure pricing, virtual/physical settings.'}
+                {currentStep === 3 && 'Review your event before publishing.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -954,9 +1738,9 @@ export default function CreateEventPage() {
           <div className="flex items-center justify-between gap-3 mt-6">
             <Button
               variant="outline"
-              className="cursor-pointer"
               onClick={handlePrev}
               disabled={currentStep === 1}
+              className="cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
@@ -964,27 +1748,27 @@ export default function CreateEventPage() {
 
             {currentStep < 3 ? (
               <Button
-                className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+                className="bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
                 onClick={handleNext}
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Button 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleSubmit(false)}
-                  disabled={isSaving}
+                  variant="outline"
+                  onClick={() => handleSubmit('draft')}
+                  disabled={isLoading}
+                  className="flex-1 sm:flex-none cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Draft
                 </Button>
                 <Button 
-                  className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
-                  onClick={() => handleSubmit(true)}
-                  disabled={isSaving}
+                  className="flex-1 sm:flex-none bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => handleSubmit('published')}
+                  disabled={!isPublishReady || isLoading}
                 >
                   <Send className="h-4 w-4 mr-2" />
                   Publish
@@ -995,34 +1779,101 @@ export default function CreateEventPage() {
         </div>
 
         {/* Right Column - Desktop Preview */}
-        {!isMobile && (
-          <div className="sticky top-24 h-fit">
-            <Card>
+        {!isMobile && currentStep !== 3 && (
+          <div className="sticky top-24 h-fit space-y-4">
+            <Card className="border border-neutral-light">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Live Preview</CardTitle>
-                    <CardDescription>Real-time preview of your event</CardDescription>
+                    <CardTitle className="text-lg text-neutral-dark">Live Preview</CardTitle>
+                    <CardDescription className="text-neutral-gray">Real-time preview of your event</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <EventPreviewCard data={formData} />
+                <EventPreviewCard data={formData} eventType={selectedEventType?.Name} />
+              </CardContent>
+            </Card>
+
+            {/* Validation Summary */}
+            {Object.keys(errors).length > 0 && (
+              <Card className="border border-error-200 bg-error-50">
+                <CardContent className="pt-4">
+                  <p className="text-sm font-medium text-error-700 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Please fix the following errors:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-sm text-error-600">
+                    {Object.values(errors).map((message, index) => (
+                      <li key={index} className="flex items-center gap-1">
+                        • {message}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Publish Readiness Indicator */}
+            <Card className={cn(
+              "border",
+              isPublishReady ? "border-tertiary-200 bg-tertiary-50" : "border-neutral-light"
+            )}>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-2 text-sm">
+                  {isPublishReady ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-tertiary-500" />
+                      <span className="text-tertiary-700">Ready to publish</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      <span className="text-amber-700">Complete all required fields to publish</span>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tips Card */}
+            <Card className="border border-neutral-light">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4 text-secondary-500" />
+                  Tips
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-neutral-gray">
+                <p>• Use a clear, descriptive event name</p>
+                <p>• Add a detailed description to attract attendees</p>
+                <p>• Set realistic ticket prices</p>
+                <p>• Include all relevant links and location details</p>
+                <p>• Auto-save saves your work after 1.5 seconds of inactivity</p>
               </CardContent>
             </Card>
           </div>
         )}
       </div>
 
+      {isMobile && (
+        <PreviewModal 
+          open={isPreviewModalOpen}
+          onOpenChange={setIsPreviewModalOpen}
+          data={formData}
+          eventType={selectedEventType?.Name}
+        />
+      )}
+
       {/* Success Dialog */}
       <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-              {isPublished ? 'Event Published!' : 'Draft Saved!'}
+            <DialogTitle className="flex items-center gap-2 text-neutral-dark">
+              <CheckCircle2 className="h-6 w-6 text-tertiary-500" />
+              {isPublished ? 'Event Published' : 'Draft Saved'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-neutral-gray">
               {isPublished 
                 ? 'Your event has been published and is now visible to attendees.'
                 : 'Your event has been saved as a draft. You can publish it anytime.'
@@ -1030,16 +1881,16 @@ export default function CreateEventPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 flex flex-col items-center gap-4">
-            <div className="w-full p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="w-full p-4 bg-neutral-light rounded-lg border border-neutral-light">
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{formData.title || 'Untitled Event'}</p>
-                  <p className="text-sm text-gray-500">
-                    {formData.startDate || 'TBD'} • {formData.type}
+                  <p className="font-medium text-neutral-dark">{formData.name || 'Untitled Event'}</p>
+                  <p className="text-sm text-neutral-gray">
+                    {formData.date || 'TBD'} • {selectedEventType?.Name || 'No type'}
                   </p>
                 </div>
                 <Badge variant="outline" className={cn(
-                  isPublished ? 'text-green-600 border-green-200 bg-green-50' : 'text-gray-600 border-gray-200 bg-gray-50'
+                  isPublished ? 'text-tertiary-600 border-tertiary-200 bg-tertiary-50' : 'text-neutral-gray border-neutral-light bg-neutral-light'
                 )}>
                   {isPublished ? 'Published' : 'Draft'}
                 </Badge>
@@ -1048,7 +1899,7 @@ export default function CreateEventPage() {
             <div className="flex gap-2 w-full">
               <Button 
                 variant="outline" 
-                className="flex-1 cursor-pointer"
+                className="flex-1 cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
                 onClick={() => {
                   setIsSaveDialogOpen(false);
                   router.push('/dashboard/events');
@@ -1056,15 +1907,15 @@ export default function CreateEventPage() {
               >
                 Go to Events
               </Button>
-              {isPublished && (
+              {isPublished && createdEventId && (
                 <Button 
-                  className="flex-1 bg-primary hover:bg-primary/90 cursor-pointer"
+                  className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
                   onClick={() => {
                     setIsSaveDialogOpen(false);
-                    window.open(`/events/${Date.now()}`, '_blank');
+                    router.push(`/dashboard/events/${createdEventId}`);
                   }}
                 >
-                  View Public Page
+                  View Event
                 </Button>
               )}
             </div>
@@ -1072,14 +1923,17 @@ export default function CreateEventPage() {
           <DialogFooter>
             <Button 
               variant="ghost" 
-              className="w-full cursor-pointer"
+              className="w-full cursor-pointer hover:bg-primary-50 hover:text-primary transition-colors"
               onClick={() => {
                 setIsSaveDialogOpen(false);
                 if (!isPublished) {
                   setFormData(defaultFormData);
                   setImagePreview(null);
                   setImageFile(null);
-                  setTagInput('');
+                  setErrors({});
+                  setTouched({});
+                  setDraftId(null);
+                  setCurrentStep(1);
                 }
               }}
             >

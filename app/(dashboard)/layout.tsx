@@ -3,6 +3,7 @@
 import type { Metadata } from 'next';
 import { Header } from '@/components/layout/Header';
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Nuruvent',
@@ -25,6 +26,26 @@ export default function DashboardLayout({
       <DashboardLayoutClient>
         {children}
       </DashboardLayoutClient>
+
+      {/* ✅ Toaster - placed at the end so it appears on top of everything */}
+      <Toaster 
+        position="top-right"
+        richColors
+        closeButton
+        expand={false}
+        duration={4000}
+        visibleToasts={3}
+        toastOptions={{
+          style: {
+            background: 'white',
+            border: '1px solid #e5e7eb',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          },
+          className: 'font-sans',
+        }}
+      />
     </div>
   );
 }

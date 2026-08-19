@@ -64,15 +64,21 @@ export interface ResendOTPRequest {
 // RESPONSE TYPES
 // ============================================================
 
+// ✅ Updated AccountResponse to match actual response
 export interface AccountResponse {
   id: string;
-  email: string;
+  slug: string;
   name: string;
+  display_name: string;
+  email: string;
   phone: string;
   account_type: string;
+  account_type_id: string;
   email_verified: boolean;
+  identity_verified: boolean;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface TokenResponse {
@@ -105,12 +111,16 @@ export interface BaseResponse<T = any> {
   data: T;
 }
 
-export type LoginResponseData = TwoFactorResponse | TokenResponse;
+// ✅ Login response with token and account
+export interface LoginData {
+  token: TokenResponse;
+  account: AccountResponse;
+}
 
 export interface LoginResponse {
   success: boolean;
   message: string;
-  data: LoginResponseData;
+  data: LoginData | TwoFactorResponse;
 }
 
 export interface VerifyOTPResponse {
@@ -185,12 +195,16 @@ export interface LogoutResponse {
 // TYPE GUARDS
 // ============================================================
 
-export function isTwoFactorResponse(data: LoginResponseData): data is TwoFactorResponse {
+export function isTwoFactorResponse(data: any): data is TwoFactorResponse {
   return data && typeof data === 'object' && 'requires_2fa' in data && data.requires_2fa === true;
 }
 
-export function isTokenResponse(data: LoginResponseData): data is TokenResponse {
-  return data && typeof data === 'object' && 'access_token' in data;
+export function isLoginData(data: any): data is LoginData {
+  return data && typeof data === 'object' && 'token' in data && 'account' in data;
+}
+
+export function isTokenResponse(data: LoginData | TwoFactorResponse): data is LoginData {
+  return data && typeof data === 'object' && 'token' in data && 'account' in data;
 }
 
 // ============================================================
