@@ -1121,7 +1121,7 @@ const handleRefresh = async () => {
               </div>
             </div>
 
-           {/* Bulk Actions Bar - Update the Publish button */}
+          {/* Bulk Actions Bar */}
           {getSelectedCount() > 0 && (
             <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1131,6 +1131,7 @@ const handleRefresh = async () => {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {/* ✅ Edit button - only when exactly 1 event is selected */}
                 {getSelectedCount() === 1 && (
                   <Button 
                     size="sm" 
@@ -1142,7 +1143,24 @@ const handleRefresh = async () => {
                     View
                   </Button>
                 )}
-                {/* ✅ Only show Publish button if ALL selected events are drafts */}
+                
+                {/* ✅ Edit button - only when exactly 1 event is selected */}
+                {getSelectedCount() === 1 && (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="cursor-pointer"
+                    onClick={() => {
+                      const eventId = selectedEvents[0];
+                      router.push(`/dashboard/events/${eventId}/edit`);
+                    }}
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+                
+                {/* ✅ Publish button - only if ALL selected events are drafts */}
                 {selectedEvents.every(id => {
                   const event = uiEvents.find(e => e.id === id);
                   return event?.status === 'Draft';
@@ -1157,6 +1175,7 @@ const handleRefresh = async () => {
                     Publish
                   </Button>
                 )}
+                
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -1166,6 +1185,7 @@ const handleRefresh = async () => {
                   <Copy className="h-4 w-4 mr-2" />
                   Duplicate
                 </Button>
+                
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -1175,6 +1195,7 @@ const handleRefresh = async () => {
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </Button>
+                
                 <Button 
                   size="sm" 
                   variant="ghost" 
@@ -1189,7 +1210,7 @@ const handleRefresh = async () => {
                 </Button>
               </div>
             </div>
-          )}
+          )}    
           </CardContent>
         </Card>
       )}
@@ -1913,160 +1934,186 @@ const handleRefresh = async () => {
         </SheetContent>
       </Sheet>
 
-      {/* View Event Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Event Details</DialogTitle>
-            <DialogDescription>
-              View and manage event information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
-                      {selectedEvent.type}
-                    </Badge>
-                    <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
-                      {selectedEvent.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xl sm:text-2xl font-bold text-primary">{selectedEvent.price}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-500">Ticket Price</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Event Date</Label>
-                  <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Time</Label>
-                  <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Added</Label>
-                  <p className="text-sm sm:text-base font-medium">
-                    {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
-                    {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Platform</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <Video className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedEvent.platform}</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Location</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedEvent.location || 'Virtual'}</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">CPD Hours</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <Award className="h-4 w-4 text-amber-500 shrink-0" />
-                    {selectedEvent.cpdHours} hours
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Registrations</Label>
-                <div className="mt-2">
-                  <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
-                    <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {selectedEvent.description && (
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Description</Label>
-                  <p className="text-sm text-gray-600 mt-1">{selectedEvent.description}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="space-y-3">
-                <Label className="text-xs text-gray-500 font-medium">Actions</Label>
-                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="w-full cursor-pointer justify-start text-sm"
-                    onClick={handleModalEdit}
-                  >
-                    <Edit3 className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">Edit Event</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full cursor-pointer justify-start text-sm"
-                    onClick={handleModalDuplicate}
-                  >
-                    <Copy className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">Duplicate</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full cursor-pointer justify-start text-sm"
-                    onClick={handleModalPublicPage}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">View Public Page</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full cursor-pointer justify-start text-sm"
-                    onClick={handleModalManageAttendees}
-                  >
-                    <Users className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">Manage Attendees</span>
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    className="w-full cursor-pointer justify-start text-sm col-span-1 xs:col-span-2"
-                    onClick={handleModalDelete}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">Delete Event</span>
-                  </Button>
-                </div>
-              </div>
-
-              <DialogFooter className="gap-2 flex-col sm:flex-row">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewDialogOpen(false)}
-                  className="w-full sm:w-auto cursor-pointer"
-                >
-                  Close
-                </Button>
-              </DialogFooter>
+     {/* View Event Dialog */}
+<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+  <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle>Event Details</DialogTitle>
+      <DialogDescription>
+        View and manage event information.
+      </DialogDescription>
+    </DialogHeader>
+    {selectedEvent && (
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
+                {selectedEvent.type}
+              </Badge>
+              <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
+                {selectedEvent.status}
+              </Badge>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xl sm:text-2xl font-bold text-primary">{selectedEvent.price}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500">Ticket Price</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Event Date</Label>
+            <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Time</Label>
+            <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Added</Label>
+            <p className="text-sm sm:text-base font-medium">
+              {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
+              {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Platform</Label>
+            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+              <Video className="h-4 w-4 text-gray-400 shrink-0" />
+              <span className="truncate">{selectedEvent.platform}</span>
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Location</Label>
+            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+              <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+              <span className="truncate">{selectedEvent.location || 'Virtual'}</span>
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">CPD Hours</Label>
+            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+              <Award className="h-4 w-4 text-amber-500 shrink-0" />
+              {selectedEvent.cpdHours} hours
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-500">Registrations</Label>
+          <div className="mt-2">
+            <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
+              <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
+              <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {selectedEvent.description && (
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-500">Description</Label>
+            <p className="text-sm text-gray-600 mt-1">{selectedEvent.description}</p>
+          </div>
+        )}
+
+        <Separator />
+
+        {/* ✅ Updated Actions Section - Better Grid Layout */}
+        <div className="space-y-3">
+          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+          
+          {/* Primary Actions - 2 columns on desktop, 1 on mobile */}
+          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+              onClick={handleModalEdit}
+            >
+              <Edit3 className="h-4 w-4 mr-2 shrink-0" />
+              Edit Event
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+              onClick={handleModalDuplicate}
+            >
+              <Copy className="h-4 w-4 mr-2 shrink-0" />
+              Duplicate
+            </Button>
+          </div>
+
+          {/* Secondary Actions - 3 columns on desktop, 2 on mobile */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+              onClick={handleModalPublicPage}
+            >
+              <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">View Public</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+              onClick={handleModalManageAttendees}
+            >
+              <Users className="h-4 w-4 mr-2 shrink-0" />
+              <span className="truncate">Attendees</span>
+            </Button>
+            
+            {/* ✅ Publish button - only for draft events */}
+            {selectedEvent.status === 'Draft' && (
+              <Button 
+                variant="default"
+                className="w-full cursor-pointer justify-center text-sm bg-green-600 hover:bg-green-700 text-white transition-colors col-span-2 sm:col-span-1"
+                onClick={() => {
+                  setIsViewDialogOpen(false);
+                  handlePublishEvent(selectedEvent);
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2 shrink-0" />
+                Publish
+              </Button>
+            )}
+          </div>
+
+          {/* Danger Zone - Full width */}
+          <div className="grid grid-cols-1 gap-2 mt-1">
+            <Button 
+              variant="destructive" 
+              className="w-full cursor-pointer justify-center text-sm"
+              onClick={handleModalDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+              Delete Event
+            </Button>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 flex-col sm:flex-row">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsViewDialogOpen(false)}
+            className="w-full sm:w-auto cursor-pointer"
+          >
+            Close
+          </Button>
+        </DialogFooter>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
       {/* Bulk Action Confirmation Dialog */}
       <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
