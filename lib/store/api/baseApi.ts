@@ -38,6 +38,6 @@ export const api = createApi({
     }
     return undefined;
   },
-  tagTypes: ['User', 'Auth', 'Events', 'EventTypes', 'EventStatuses'],
+  tagTypes: ['User', 'Auth', 'Events', 'EventTypes', 'EventStatuses', 'TrashCount'],
   endpoints: () => ({}),
 });

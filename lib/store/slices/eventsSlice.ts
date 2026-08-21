@@ -11,6 +11,7 @@ export interface Event {
   id: string;
   slug: string;
   name: string;
+  display_name?: string;
   description?: string;
   event_type_id: string;
   event_status_id: string;
@@ -23,16 +24,19 @@ export interface Event {
   certificate_price: number;
   location?: string;
   is_virtual: boolean;
+  is_featured?: boolean;
+  is_private?: boolean;
   zoom_link?: string;
   meet_link?: string;
-  max_attendees?: number;
+  max_attendees: number;
   current_attendees: number;
   image_url?: string;
-  certificate_template_url?: string;
-  is_published: boolean;
-  published_at?: string;
-  cancelled_at?: string;
-  completed_at?: string;
+  thumbnail_url?: string;
+  is_active: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string;
+  restored_at?: string | null;
+  restored_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +57,15 @@ export interface EventStatus {
   color?: string;
 }
 
+export interface MediaInfo {
+  id: string;
+  url: string;
+  media_type: string;
+  entity_id: string;
+  uploaded_by: string;
+  created_at: string;
+}
+
 export interface EventsState {
   // Current selected event
   currentEvent: Event | null;
@@ -71,6 +84,7 @@ export interface EventsState {
     eventTypeId?: string;
     eventStatusId?: string;
     searchQuery?: string;
+    includeDeleted?: boolean;
   };
 }
 
@@ -134,6 +148,10 @@ const eventsSlice = createSlice({
       state.filters.searchQuery = action.payload;
       state.currentPage = 1;
     },
+    setIncludeDeleted: (state, action: PayloadAction<boolean>) => {
+      state.filters.includeDeleted = action.payload;
+      state.currentPage = 1;
+    },
     clearFilters: (state) => {
       state.filters = {};
       state.currentPage = 1;
@@ -162,6 +180,7 @@ export const {
   setEventTypeFilter,
   setEventStatusFilter,
   setSearchQuery,
+  setIncludeDeleted,
   clearFilters,
   clearEventsState,
 } = eventsSlice.actions;

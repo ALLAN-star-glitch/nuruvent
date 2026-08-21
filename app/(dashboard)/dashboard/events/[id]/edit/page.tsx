@@ -31,6 +31,8 @@ import {
   Check,
   XCircle,
   RefreshCw,
+  Star,
+  Lock,
 } from 'lucide-react';
 
 // Shadcn components
@@ -88,6 +90,8 @@ interface EventFormData {
   certificate_price: number | null;
   location: string;
   is_virtual: boolean;
+  is_featured: boolean;
+  is_private: boolean;
   slug?: string;
   zoom_link: string;
   meet_link: string;
@@ -192,6 +196,8 @@ const defaultFormData: EventFormData = {
   certificate_price: null,
   location: '',
   is_virtual: true,
+  is_featured: false,
+  is_private: false,
   zoom_link: '',
   meet_link: '',
   max_attendees: null,
@@ -270,9 +276,25 @@ const EventPreviewCard = ({ data, eventType }: { data: EventFormData; eventType?
       )}
 
       <div className="p-4 space-y-3">
-        <h3 className="text-lg font-bold text-neutral-dark line-clamp-2">
-          {data.name || 'Untitled Event'}
-        </h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-lg font-bold text-neutral-dark line-clamp-2 flex-1">
+            {data.name || 'Untitled Event'}
+          </h3>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {data.is_featured && (
+              <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                <Star className="h-3 w-3 mr-1" />
+                Featured
+              </Badge>
+            )}
+            {data.is_private && (
+              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                <Lock className="h-3 w-3 mr-1" />
+                Private
+              </Badge>
+            )}
+          </div>
+        </div>
 
         {eventType && (
           <div className="flex items-center gap-2 text-sm text-neutral-gray">
@@ -408,14 +430,25 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const { data: eventTypes = [] } = useGetEventTypesQuery();
   const { data: eventStatuses = [] } = useGetEventStatusesQuery();
 
-  // ✅ Create statuses map for lookup
+  // ✅ Create statuses map for lookup (supports both cases)
   const statusesMap = useMemo(() => {
     if (!eventStatuses) return {};
-    return eventStatuses.reduce((acc: Record<string, string>, status: any) => ({
+    const array = Array.isArray(eventStatuses) ? eventStatuses : (eventStatuses as any)?.data || [];
+    return array.reduce((acc: Record<string, string>, status: any) => ({
       ...acc,
-      [status.ID]: status.Name
+      [status.id || status.ID]: status.name || status.Name
     }), {});
   }, [eventStatuses]);
+
+  // ✅ Create types map for lookup (supports both cases)
+  const typesMap = useMemo(() => {
+    if (!eventTypes) return {};
+    const array = Array.isArray(eventTypes) ? eventTypes : (eventTypes as any)?.data || [];
+    return array.reduce((acc: Record<string, string>, type: any) => ({
+      ...acc,
+      [type.id || type.ID]: type.name || type.Name
+    }), {});
+  }, [eventTypes]);
 
   const [formData, setFormData] = useState<EventFormData>(defaultFormData);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -440,9 +473,12 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
+  const formDataRef = useRef(formData);
 
   const STEPS = ['Basic Info', 'Details', 'Preview'];
   const isCreating = isUpdating || isPublishing || isUploading;
+
+  
 
   // Check if mobile
   useEffect(() => {
@@ -454,46 +490,94 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ✅ Load event data when available
+  // Update the ref whenever formData changes
+useEffect(() => {
+  formDataRef.current = formData;
+}, [formData]);
+
+
+
+// ============================================================
+// DETECT CHANGES
+// ============================================================
+
+useEffect(() => {
+  if (!lastSavedData) return;
+
+  const currentData = {
+    ...formData,
+    imagePreview: formData.imagePreview || undefined,
+    image: formData.image || undefined,
+    existingImage: formData.existingImage || undefined,
+  };
+  const savedData = {
+    ...lastSavedData,
+    imagePreview: lastSavedData.imagePreview || undefined,
+    image: lastSavedData.image || undefined,
+    existingImage: lastSavedData.existingImage || undefined,
+  };
+  
+  const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
+  setHasChanges(hasChanged);
+
+  if (hasChanged) {
+    setSaveStatus('saving');
+  } else if (!isAutoSaving) {
+    setSaveStatus('saved');
+  }
+}, [formData, lastSavedData, isAutoSaving]);
+
+
+  // ✅ Load event data when available - USING LOWERCASE FIELDS
   useEffect(() => {
     if (eventData) {
       console.log('📋 Loading event data for edit:', eventData);
       
       const mappedData: EventFormData = {
-        name: eventData.Name || '',
-        description: eventData.Description || '',
-        event_type_id: eventData.EventTypeID || '',
-        date: formatDateForInput(eventData.Date),
-        time: eventData.Time || '',
-        duration: eventData.Duration || null,
-        price: eventData.Price || null,
-        certificate_price: eventData.CertificatePrice || null,
-        location: eventData.Location || '',
-        is_virtual: eventData.IsVirtual ?? true,
-        zoom_link: eventData.ZoomLink || '',
-        meet_link: eventData.MeetLink || '',
-        max_attendees: eventData.MaxAttendees || null,
-        imagePreview: eventData.ImageURL || '',
-        existingImage: eventData.ImageURL || '',
-        slug: eventData.Slug || '',
+        name: eventData.name || '',
+        description: eventData.description || '',
+        event_type_id: eventData.event_type_id || '',
+        date: formatDateForInput(eventData.date),
+        time: eventData.time || '',
+        duration: eventData.duration || null,
+        price: eventData.price || null,
+        certificate_price: eventData.certificate_price || null,
+        location: eventData.location || '',
+        is_virtual: eventData.is_virtual ?? true,
+        is_featured: eventData.is_featured ?? false,
+        is_private: eventData.is_private ?? false,
+        zoom_link: eventData.zoom_link || '',
+        meet_link: eventData.meet_link || '',
+        max_attendees: eventData.max_attendees || null,
+        imagePreview: eventData.image_url || '',
+        existingImage: eventData.image_url || '',
+        slug: eventData.slug || '',
       };
       
       setFormData(mappedData);
-      setExistingImage(eventData.ImageURL || '');
+      setExistingImage(eventData.image_url || '');
       setLastSavedData(mappedData);
     }
   }, [eventData]);
 
   // ✅ Get current status name from status ID
   const currentStatusName = useMemo(() => {
-    if (eventData?.EventStatusID) {
-      return getStatusNameFromId(eventData.EventStatusID, statusesMap);
+    if (eventData?.event_status_id) {
+      return getStatusNameFromId(eventData.event_status_id, statusesMap);
     }
     return 'Draft';
   }, [eventData, statusesMap]);
 
   const statusConfig = getStatusConfig(currentStatusName);
   const isPublishedStatus = currentStatusName === 'Published';
+
+  // ✅ Get event type name
+  const eventTypeName = useMemo(() => {
+    if (formData.event_type_id) {
+      return typesMap[formData.event_type_id] || formData.event_type_id;
+    }
+    return undefined;
+  }, [formData.event_type_id, typesMap]);
 
   // ============================================================
   // CHECK IF PUBLISH IS READY
@@ -520,114 +604,160 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   // DETECT CHANGES
   // ============================================================
 
-  useEffect(() => {
-    if (!lastSavedData) return;
+useEffect(() => {
+  if (!lastSavedData) return;
 
-    const currentData = {
-      ...formData,
-      imagePreview: formData.imagePreview || undefined,
-      image: formData.image || undefined,
-      existingImage: formData.existingImage || undefined,
-    };
-    const savedData = {
-      ...lastSavedData,
-      imagePreview: lastSavedData.imagePreview || undefined,
-      image: lastSavedData.image || undefined,
-      existingImage: lastSavedData.existingImage || undefined,
-    };
-    
-    const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
-    setHasChanges(hasChanged);
-    
-    if (hasChanged && saveStatus !== 'saving' && !isAutoSaving) {
-      setSaveStatus('saving');
-    } else if (!hasChanged && !isAutoSaving) {
-      setSaveStatus('saved');
-    }
-  }, [formData, lastSavedData, isAutoSaving]);
+  const currentData = {
+    ...formData,
+    imagePreview: formData.imagePreview || undefined,
+    image: formData.image || undefined,
+    existingImage: formData.existingImage || undefined,
+  };
+  const savedData = {
+    ...lastSavedData,
+    imagePreview: lastSavedData.imagePreview || undefined,
+    image: lastSavedData.image || undefined,
+    existingImage: lastSavedData.existingImage || undefined,
+  };
+  
+  const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
+  setHasChanges(hasChanged);
+  
+
+  if (hasChanged) {
+    setSaveStatus('saving');
+  } else if (!isAutoSaving) {
+    setSaveStatus('saved');
+  }
+}, [formData, lastSavedData, isAutoSaving]); 
+
 
   // ============================================================
-  // AUTO-SAVE LOGIC
-  // ============================================================
+// AUTO-SAVE LOGIC - UPDATED TO USE REF
+// ============================================================
 
-  const performAutoSave = useCallback(async () => {
-    if (isAutoSavingRef.current || isSaving || isCreating) return;
-    
-    if (!accountId) {
-      console.warn('⚠️ Cannot auto-save: No account ID found');
-      return;
-    }
+const performAutoSave = useCallback(async () => {
+  if (isAutoSavingRef.current || isSaving || isCreating) return;
+  
+  if (!accountId) {
+    console.warn('⚠️ Cannot auto-save: No account ID found');
+    return;
+  }
 
-    const hasName = !!formData.name?.trim();
-    const hasEventType = !!formData.event_type_id;
-    const hasDate = !!formData.date;
+  // ✅ Get the latest form data from the ref
+  const currentFormData = formDataRef.current;
 
-    if (!hasName && !hasEventType && !hasDate) {
-      console.log('⏭️ Skipping auto-save: No data yet');
-      return;
-    }
+  const hasName = !!currentFormData.name?.trim();
+  const hasEventType = !!currentFormData.event_type_id;
+  const hasDate = !!currentFormData.date;
 
-    isAutoSavingRef.current = true;
-    setIsAutoSaving(true);
+  if (!hasName && !hasEventType && !hasDate) {
+    console.log('⏭️ Skipping auto-save: No data yet');
+    return;
+  }
 
-    try {
-      // ✅ Upload image if new
-      if (imageFile) {
-        console.log('📤 Uploading image for event:', eventId);
-        await uploadEventImage({
-          accountId,
-          eventId: eventId,
-          image: imageFile,
-        }).unwrap();
-        setImageFile(null);
-        setImagePreview(null);
-        setIsImageRemoved(false);
-      }
+  isAutoSavingRef.current = true;
+  setIsAutoSaving(true);
 
-      // ✅ Update event
-      console.log('🔄 Auto-saving event:', eventId);
-      await updateEvent({
-        id: eventId,
-        data: {
-          name: formData.name?.trim() || 'Untitled Event',
-          description: formData.description || '',
-          event_type_id: formData.event_type_id || '',
-          date: formData.date || '',
-          time: formData.time || '',
-          duration: formData.duration || 60,
-          price: formData.price || 0,
-          certificate_price: formData.certificate_price || 0,
-          location: formData.location || '',
-          is_virtual: formData.is_virtual,
-          zoom_link: formData.zoom_link || '',
-          meet_link: formData.meet_link || '',
-          max_attendees: formData.max_attendees || 0,
-        }
+  try {
+    // ✅ Upload image if new
+    if (imageFile) {
+      console.log('📤 Uploading image for event:', eventId);
+      await uploadEventImage({
+        accountId,
+        eventId: eventId,
+        image: imageFile,
       }).unwrap();
-
-      setLastSavedData({ ...formData });
-      setHasChanges(false);
-      setSaveStatus('saved');
-      
-      console.log('✅ Auto-save successful');
-      
-    } catch (err: any) {
-      console.error('❌ Auto-save error:', err);
-      setError(err?.data?.message || 'Failed to auto-save changes');
-    } finally {
-      isAutoSavingRef.current = false;
-      setIsAutoSaving(false);
+      setImageFile(null);
+      setImagePreview(null);
+      setIsImageRemoved(false);
     }
-  }, [
-    accountId,
-    eventId,
-    formData,
-    imageFile,
-    isSaving,
-    isCreating,
-    updateEvent,
-    uploadEventImage,
-  ]);
+
+    // ✅ Build update data with the latest values
+    const updateData = {
+      name: currentFormData.name?.trim() || 'Untitled Event',
+      description: currentFormData.description || '',
+      event_type_id: currentFormData.event_type_id || '',
+      date: currentFormData.date || '',
+      time: currentFormData.time || '',
+      duration: currentFormData.duration || 60,
+      price: currentFormData.price || 0,
+      certificate_price: currentFormData.certificate_price || 0,
+      location: currentFormData.location || '',
+      is_virtual: currentFormData.is_virtual,
+      is_featured: currentFormData.is_featured,
+      is_private: currentFormData.is_private,
+      zoom_link: currentFormData.zoom_link || '',
+      meet_link: currentFormData.meet_link || '',
+      max_attendees: currentFormData.max_attendees || 0,
+    };
+
+    console.log('📤 AUTO-SAVE DATA BEING SENT:', updateData);
+
+    // ✅ Update event
+    await updateEvent({
+      id: eventId,
+      data: updateData,
+    }).unwrap();
+
+    setLastSavedData({ ...currentFormData });
+    setHasChanges(false);
+    setSaveStatus('saved');
+    
+    console.log('✅ Auto-save successful');
+    
+  } catch (err: any) {
+    console.error('❌ Auto-save error:', err);
+    setError(err?.data?.message || 'Failed to auto-save changes');
+  } finally {
+    isAutoSavingRef.current = false;
+    setIsAutoSaving(false);
+  }
+}, [
+  accountId,
+  eventId,
+  imageFile,
+  isSaving,
+  isCreating,
+  updateEvent,
+  uploadEventImage,
+  // ✅ No formData dependency - we use the ref
+]);
+
+// ✅ Auto-save after 1.5 seconds of inactivity - UPDATED
+useEffect(() => {
+  if (!accountId || !eventData) return;
+  
+  const currentFormData = formDataRef.current;
+  const hasData = !!currentFormData.name?.trim() || !!currentFormData.event_type_id || !!currentFormData.date;
+  if (!hasData) return;
+  if (isSaving || isCreating || isAutoSaving) return;
+
+  if (autoSaveTimerRef.current) {
+    clearTimeout(autoSaveTimerRef.current);
+  }
+
+  autoSaveTimerRef.current = setTimeout(() => {
+    if (hasChanges) {
+      performAutoSave();
+    }
+  }, 1500);
+
+  return () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+  };
+}, [
+  accountId,
+  eventData,
+  hasChanges,
+  isSaving,
+  isCreating,
+  isAutoSaving,
+  performAutoSave,
+  // ✅ No formData fields - we use the ref
+]);
 
   // ✅ Auto-save after 1.5 seconds of inactivity
   useEffect(() => {
@@ -919,105 +1049,108 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   // SUBMIT
   // ============================================================
 
-  const handleSubmit = async (statusSlug: 'draft' | 'published') => {
-    setError(null);
+  // ============================================================
+// SUBMIT
+// ============================================================
 
-    if (!accountId) {
-      setError('Please log in to update events.');
-      toast.error('Please log in to update events');
-      return;
-    }
+const handleSubmit = async (statusSlug: 'draft' | 'published') => {
+  setError(null);
 
-    let isValid = false;
-    if (statusSlug === 'published') {
-      isValid = validateForPublish();
-    } else {
-      isValid = validateForDraft();
-    }
+  if (!accountId) {
+    setError('Please log in to update events.');
+    toast.error('Please log in to update events');
+    return;
+  }
 
-    if (!isValid) {
-      const firstErrorField = Object.keys(errors)[0];
-      if (firstErrorField) {
-        const element = document.getElementById(`field-${firstErrorField}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.focus();
-        }
+  let isValid = false;
+  if (statusSlug === 'published') {
+    isValid = validateForPublish();
+  } else {
+    isValid = validateForDraft();
+  }
+
+  if (!isValid) {
+    const firstErrorField = Object.keys(errors)[0];
+    if (firstErrorField) {
+      const element = document.getElementById(`field-${firstErrorField}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
       }
-      setError(statusSlug === 'published' 
-        ? 'Please fix all errors before publishing.' 
-        : 'Please fix validation errors before saving.');
-      return;
     }
+    setError(statusSlug === 'published' 
+      ? 'Please fix all errors before publishing.' 
+      : 'Please fix validation errors before saving.');
+    return;
+  }
 
-    setIsSaving(true);
-    setSaveStatus('saving');
+  setIsSaving(true);
+  setSaveStatus('saving');
 
-    try {
-      // ✅ Upload image if new
-      if (imageFile) {
-        console.log('📤 Uploading image for event:', eventId);
-        await uploadEventImage({
-          accountId,
-          eventId: eventId,
-          image: imageFile,
-        }).unwrap();
-        setImageFile(null);
-        setImagePreview(null);
-        setIsImageRemoved(false);
-      }
-
-      // ✅ Update event
-      console.log('📤 Updating event:', eventId);
-      await updateEvent({
-        id: eventId,
-        data: {
-          name: formData.name?.trim() || 'Untitled Event',
-          description: formData.description || '',
-          event_type_id: formData.event_type_id || '',
-          date: formData.date || '',
-          time: formData.time || '',
-          duration: formData.duration || 60,
-          price: formData.price || 0,
-          certificate_price: formData.certificate_price || 0,
-          location: formData.location || '',
-          is_virtual: formData.is_virtual,
-          zoom_link: formData.zoom_link || '',
-          meet_link: formData.meet_link || '',
-          max_attendees: formData.max_attendees || 0,
-        }
+  try {
+    // ✅ Upload image if new
+    if (imageFile) {
+      console.log('📤 Uploading image for event:', eventId);
+      await uploadEventImage({
+        accountId,
+        eventId: eventId,
+        image: imageFile,
       }).unwrap();
-
-      // ✅ If publishing, publish the event
-      if (statusSlug === 'published') {
-        console.log('📤 Publishing event:', eventId);
-        await publishEvent({ 
-          id: eventId, 
-          accountId: accountId 
-        }).unwrap();
-        setIsPublished(true);
-      }
-
-      setLastSavedData({ ...formData });
-      setHasChanges(false);
-      setSaveStatus('saved');
-      
-      setIsSaveDialogOpen(true);
-      
-      if (statusSlug === 'draft') {
-        toast.success('Draft saved successfully!');
-      } else {
-        toast.success('Event published successfully!');
-      }
-      
-    } catch (err: any) {
-      console.error('Update event error:', err);
-      setError(err?.data?.message || 'Failed to update event. Please try again.');
-      toast.error(err?.data?.message || 'Failed to update event');
-    } finally {
-      setIsSaving(false);
+      setImageFile(null);
+      setImagePreview(null);
+      setIsImageRemoved(false);
     }
-  };
+
+    // ✅ Update event with lowercase fields
+    console.log('📤 Updating event:', eventId);
+    await updateEvent({
+      id: eventId,
+      data: {
+        name: formData.name?.trim() || 'Untitled Event',
+        description: formData.description || '',
+        event_type_id: formData.event_type_id || '',
+        date: formData.date || '',
+        time: formData.time || '',
+        duration: formData.duration || 60,
+        price: formData.price || 0,
+        certificate_price: formData.certificate_price || 0,
+        location: formData.location || '',
+        is_virtual: formData.is_virtual,
+        is_featured: formData.is_featured,
+        is_private: formData.is_private,
+        zoom_link: formData.zoom_link || '',
+        meet_link: formData.meet_link || '',
+        max_attendees: formData.max_attendees || 0,
+      }
+    }).unwrap();
+
+    // ✅ If publishing, publish the event - PASS THE STRING ID ONLY
+    if (statusSlug === 'published') {
+      console.log('📤 Publishing event:', eventId);
+      await publishEvent(eventId).unwrap();  // ✅ Fixed - just pass the ID
+      setIsPublished(true);
+    }
+
+    setLastSavedData({ ...formData });
+    setHasChanges(false);
+    setSaveStatus('saved');
+    
+    setIsSaveDialogOpen(true);
+    
+    if (statusSlug === 'draft') {
+      toast.success('Draft saved successfully!');
+    } else {
+      toast.success('Event published successfully!');
+    }
+    
+  } catch (err: any) {
+    console.error('Update event error:', err);
+    setError(err?.data?.message || 'Failed to update event. Please try again.');
+    toast.error(err?.data?.message || 'Failed to update event');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   const handleManualSave = () => {
     if (hasChanges) {
@@ -1050,8 +1183,6 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
       setCurrentStep(currentStep - 1);
     }
   };
-
-  const selectedEventType = eventTypes.find((t: any) => t.ID === formData.event_type_id);
 
   // ============================================================
   // RENDER STEP CONTENT
@@ -1109,8 +1240,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                         </SelectTrigger>
                         <SelectContent>
                           {eventTypes.map((type: any) => (
-                            <SelectItem key={type.ID} value={type.ID} className="cursor-pointer">
-                              {type.Name}
+                            <SelectItem key={type.id || type.ID} value={type.id || type.ID} className="cursor-pointer">
+                              {type.name || type.Name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1241,6 +1372,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                         touched.price && errors.price && "border-error-500 focus:ring-error-500 focus:border-error-500"
                       )}
                       min={0}
+                      step="0.01"
                     />
                     <p className="text-xs text-neutral-gray">Set to 0 for free events</p>
                     {touched.price && errors.price && (
@@ -1266,6 +1398,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                         touched.certificate_price && errors.certificate_price && "border-error-500 focus:ring-error-500 focus:border-error-500"
                       )}
                       min={0}
+                      step="0.01"
                     />
                     {touched.certificate_price && errors.certificate_price && (
                       <p className="text-sm text-error-500 flex items-center gap-1">
@@ -1395,6 +1528,96 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </CardContent>
             </Card>
 
+          {/* ✅ NEW: Featured & Private Toggles */}
+          <Card className="border border-neutral-light">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-neutral-dark">Event Visibility</CardTitle>
+              <CardDescription className="text-xs text-neutral-gray">
+                Control how your event appears to users
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Featured Toggle */}
+              <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
+                <div>
+                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                    <Star className="h-4 w-4 text-secondary-500" />
+                    Featured Event
+                  </Label>
+                  <p className="text-xs text-neutral-gray">Featured events appear prominently on the homepage</p>
+                </div>
+                <Switch
+                  checked={formData.is_featured}
+                  onCheckedChange={(checked) => {
+                    console.log('🔵 Featured switch clicked, new value:', checked);
+                    console.log('🔵 Current formData.is_featured:', formData.is_featured);
+                    setFormData(prev => {
+                      console.log('🔵 Updating formData, prev.is_featured:', prev.is_featured);
+                      return { ...prev, is_featured: checked };
+                    });
+                    setSaveStatus('saving');
+                    
+                    setErrors(prev => {
+                      const { is_featured, ...rest } = prev as any;
+                      return rest;
+                    });
+                    
+                    if (!isAutoSaving && !isSaving && !isCreating) {
+                      if (autoSaveTimerRef.current) {
+                        clearTimeout(autoSaveTimerRef.current);
+                        autoSaveTimerRef.current = null;
+                      }
+                      setTimeout(() => {
+                        performAutoSave();
+                      }, 300);
+                    }
+                  }}
+                  className="cursor-pointer data-[state=checked]:bg-secondary-500"
+                />
+              </div>
+
+              {/* Private Toggle - ✅ FIXED */}
+              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
+                <div>
+                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                    <Lock className="h-4 w-4 text-amber-500" />
+                    Private Event
+                  </Label>
+                  <p className="text-xs text-neutral-gray">Private events are hidden from public listings</p>
+                </div>
+                <Switch
+                  checked={formData.is_private}
+                  onCheckedChange={(checked) => {
+                    console.log('🔵 Private switch clicked, new value:', checked);
+                    console.log('🔵 Current formData.is_private:', formData.is_private);
+                    setFormData(prev => {
+                      console.log('🔵 Updating formData, prev.is_private:', prev.is_private);
+                      return { ...prev, is_private: checked };
+                    });
+                    setSaveStatus('saving');
+                    
+                    setErrors(prev => {
+                      const { is_private, ...rest } = prev as any;
+                      return rest;
+                    });
+                    
+                    if (!isAutoSaving && !isSaving && !isCreating) {
+                      if (autoSaveTimerRef.current) {
+                        clearTimeout(autoSaveTimerRef.current);
+                        autoSaveTimerRef.current = null;
+                      }
+                      setTimeout(() => {
+                        performAutoSave();
+                      }, 300);
+                    }
+                  }}
+                  className="cursor-pointer data-[state=checked]:bg-amber-500"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+            {/* Image Upload */}
             <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="space-y-2">
@@ -1408,7 +1631,10 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                       />
                       <button
                         type="button"
-                        onClick={handleRemoveImage}
+                        onClick={(e) => {
+                          e.stopPropagation(); //  Prevent event bubbling
+                          handleRemoveImage();
+                        }}
                         className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -1470,7 +1696,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     </div>
                     <div>
                       <p className="text-neutral-gray">Type</p>
-                      <p className="font-medium text-neutral-dark">{selectedEventType?.Name || 'Not set'}</p>
+                      <p className="font-medium text-neutral-dark">{eventTypeName || 'Not set'}</p>
                     </div>
                     <div>
                       <p className="text-neutral-gray">Date</p>
@@ -1493,6 +1719,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                     <div className="col-span-2">
                       <p className="text-neutral-gray">Virtual</p>
                       <p className="font-medium text-neutral-dark">{formData.is_virtual ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Featured</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_featured ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Private</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_private ? 'Yes' : 'No'}</p>
                     </div>
                     {formData.is_virtual && formData.zoom_link && (
                       <div className="col-span-2">
@@ -1541,7 +1775,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </CardContent>
             </Card>
 
-            <EventPreviewCard data={formData} eventType={selectedEventType?.Name} />
+            <EventPreviewCard data={formData} eventType={eventTypeName} />
           </div>
         );
 
@@ -1684,7 +1918,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </CardTitle>
               <CardDescription className="text-neutral-gray">
                 {currentStep === 1 && 'Edit the basic details about your event.'}
-                {currentStep === 2 && 'Configure pricing, virtual/physical settings.'}
+                {currentStep === 2 && 'Configure pricing, virtual/physical settings, and visibility.'}
                 {currentStep === 3 && 'Review your event before publishing.'}
               </CardDescription>
             </CardHeader>
@@ -1758,7 +1992,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 </div>
               </CardHeader>
               <CardContent>
-                <EventPreviewCard data={formData} eventType={selectedEventType?.Name} />
+                <EventPreviewCard data={formData} eventType={eventTypeName} />
               </CardContent>
             </Card>
 
@@ -1818,6 +2052,8 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 <p>• Changes are auto-saved as you type</p>
                 <p>• Review the preview before publishing</p>
                 <p>• Update your event image if needed</p>
+                <p>• Mark as <strong>Featured</strong> to highlight on homepage</p>
+                <p>• Mark as <strong>Private</strong> to hide from public listings</p>
                 <p>• Auto-save saves your work after 1.5 seconds of inactivity</p>
               </CardContent>
             </Card>
@@ -1836,7 +2072,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              <EventPreviewCard data={formData} eventType={selectedEventType?.Name} />
+              <EventPreviewCard data={formData} eventType={eventTypeName} />
             </div>
             <DialogFooter>
               <Button 
@@ -1870,9 +2106,9 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   <Calendar className="h-5 w-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{eventData.Name}</p>
+                  <p className="font-medium text-gray-900">{eventData.name}</p>
                   <p className="text-sm text-gray-500">
-                    {formatDateForDisplay(eventData.Date)} • {eventData.Time || 'TBD'}
+                    {formatDateForDisplay(eventData.date)} • {eventData.time || 'TBD'}
                   </p>
                 </div>
               </div>
@@ -1918,7 +2154,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                 <div className="flex-1">
                   <p className="font-medium text-neutral-dark">{formData.name || 'Untitled Event'}</p>
                   <p className="text-sm text-neutral-gray">
-                    {formData.date || 'TBD'} • {selectedEventType?.Name || 'No type'}
+                    {formData.date || 'TBD'} • {eventTypeName || 'No type'}
                   </p>
                 </div>
                 <Badge variant="outline" className={cn(
@@ -1927,6 +2163,22 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   {isPublished ? 'Published' : 'Updated'}
                 </Badge>
               </div>
+              {(formData.is_featured || formData.is_private) && (
+                <div className="mt-2 flex items-center gap-2">
+                  {formData.is_featured && (
+                    <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                      <Star className="h-3 w-3 mr-1" />
+                      Featured
+                    </Badge>
+                  )}
+                  {formData.is_private && (
+                    <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Private
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2 w-full">
               <Button 
@@ -1944,7 +2196,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
                   className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
                   onClick={() => {
                     setIsSaveDialogOpen(false);
-                    router.push(`/events/${eventData?.Slug || eventId}`);
+                    router.push(`/events/${eventData?.slug || eventId}`);
                   }}
                 >
                   View Event

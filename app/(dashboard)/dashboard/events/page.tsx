@@ -38,6 +38,10 @@ import {
   AlertTriangle,
   LogIn,
   AlertCircle,
+  Star,
+  Lock,
+  Trash,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -100,17 +104,23 @@ import {
   useGetEventsByAccountQuery,
   useSearchEventsQuery,
   useDeleteEventMutation,
+  usePermanentlyDeleteEventMutation,
+  useRestoreEventMutation,
   usePublishEventMutation,
   useGetEventStatusesQuery,
   useGetEventTypesQuery,
   EventResponse,
+  useBulkDeleteEventsMutation,
+  useBulkPermanentlyDeleteEventsMutation,
+  useBulkRestoreEventsMutation,
+  useBulkPublishEventsMutation,
+  useGetTrashedEventsCountQuery,
 } from '@/lib/store/api/eventsApi';
 import {
   setCurrentPage,
   setPageSize,
   setTotalEvents,
 } from '@/lib/store/slices/eventsSlice';
-import { clearAuth } from '@/lib/store/slices/authSlice';
 import { toast } from 'sonner';
 
 // Helper to format price
@@ -141,6 +151,7 @@ const getStatusConfig = (statusName: string) => {
   return statusMap[statusName] || statusMap.Draft;
 };
 
+
 // Helper to get type color config based on type name
 const getTypeConfig = (typeName: string) => {
   const typeMap: Record<string, string> = {
@@ -156,45 +167,87 @@ type SortField = 'name' | 'eventDate' | 'addedDate' | 'current_attendees' | 'pri
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
-// Convert API event to UI event with mapping data
+// Convert API event to UI event with mapping data - SUPPORTS BOTH CASES
 const convertApiEventToUI = (
   event: EventResponse,
   typesMap: Record<string, string>,
   statusesMap: Record<string, string>
-): any => ({
-  id: event.ID,
-  title: event.Name,
-  type: typesMap[event.EventTypeID] || event.EventTypeID,
-  status: statusesMap[event.EventStatusID] || event.EventStatusID,
-  date: new Date(event.Date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-  time: event.Time || 'TBD',
-  registered: event.CurrentAttendees || 0,
-  capacity: event.MaxAttendees || 0,
-  price: formatPrice(event.Price || 0),
-  platform: event.IsVirtual ? (event.ZoomLink ? 'Zoom' : event.MeetLink ? 'Google Meet' : 'Virtual') : 'In-Person',
-  cpdHours: Math.round(event.Duration / 60) || 0,
-  description: event.Description,
-  host: event.AccountID,
-  location: event.Location || 'Virtual',
-  image: event.ImageURL,
-  slug: event.Slug,
-  eventTypeId: event.EventTypeID,
-  eventStatusId: event.EventStatusID,
-  rawDate: event.Date,
-  rawTime: event.Time,
-  duration: event.Duration,
-  certificatePrice: event.CertificatePrice,
-  isVirtual: event.IsVirtual,
-  zoomLink: event.ZoomLink,
-  meetLink: event.MeetLink,
-  currentAttendees: event.CurrentAttendees,
-  maxAttendees: event.MaxAttendees,
-  accountId: event.AccountID,
-  isActive: event.IsActive,
-  // Add date tracking fields
-  createdAt: event.CreatedAt || event.Date, // Fallback to event date if createdAt not available
-  updatedAt: event.UpdatedAt || event.Date,
-});
+): any => {
+  // Helper to get value from either camelCase or snake_case
+  const getVal = (camel: string, snake: string) => {
+    return (event as any)[camel] ?? (event as any)[snake];
+  };
+
+  const id = getVal('id', 'ID');
+  const name = getVal('name', 'Name');
+  const eventTypeId = getVal('event_type_id', 'EventTypeID');
+  const eventStatusId = getVal('event_status_id', 'EventStatusID');
+  const date = getVal('date', 'Date');
+  const time = getVal('time', 'Time');
+  const currentAttendees = getVal('current_attendees', 'CurrentAttendees') || 0;
+  const maxAttendees = getVal('max_attendees', 'MaxAttendees') || 0;
+  const price = getVal('price', 'Price') || 0;
+  const isVirtual = getVal('is_virtual', 'IsVirtual') || false;
+  const zoomLink = getVal('zoom_link', 'ZoomLink');
+  const meetLink = getVal('meet_link', 'MeetLink');
+  const duration = getVal('duration', 'Duration') || 0;
+  const description = getVal('description', 'Description');
+  const location = getVal('location', 'Location') || 'Virtual';
+  const imageUrl = getVal('image_url', 'ImageURL');
+  const slug = getVal('slug', 'Slug');
+  const accountId = getVal('account_id', 'AccountID');
+  const isActive = getVal('is_active', 'IsActive');
+  const deletedAt = getVal('deleted_at', 'DeletedAt');
+  const deletedBy = getVal('deleted_by', 'DeletedBy');
+  const restoredAt = getVal('restored_at', 'RestoredAt');
+  const restoredBy = getVal('restored_by', 'RestoredBy');
+  const createdAt = getVal('created_at', 'CreatedAt') || date;
+  const updatedAt = getVal('updated_at', 'UpdatedAt') || date;
+  const isFeatured = getVal('is_featured', 'IsFeatured') || false;
+  const isPrivate = getVal('is_private', 'IsPrivate') || false;
+  const certificatePrice = getVal('certificate_price', 'CertificatePrice') || 0;
+
+  return {
+    id,
+    title: name,
+    type: typesMap[eventTypeId] || eventTypeId,
+    status: statusesMap[eventStatusId] || eventStatusId,
+    date: date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
+    time: time || 'TBD',
+    registered: currentAttendees,
+    capacity: maxAttendees,
+    price: formatPrice(price),
+    platform: isVirtual ? (zoomLink ? 'Zoom' : meetLink ? 'Google Meet' : 'Virtual') : 'In-Person',
+    cpdHours: Math.round(duration / 60) || 0,
+    description,
+    host: accountId,
+    location: location,
+    image: imageUrl,
+    slug,
+    eventTypeId,
+    eventStatusId,
+    rawDate: date,
+    rawTime: time,
+    duration,
+    certificatePrice,
+    isVirtual,
+    isFeatured,
+    isPrivate,
+    zoomLink,
+    meetLink,
+    currentAttendees,
+    maxAttendees,
+    accountId,
+    isActive,
+    deletedAt,
+    deletedBy,
+    restoredAt,
+    restoredBy,
+    createdAt,
+    updatedAt,
+    isDeleted: !!deletedAt,
+  };
+};
 
 export default function EventsDashboardPage() {
   const router = useRouter();
@@ -221,7 +274,8 @@ export default function EventsDashboardPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-
+  const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
+  const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
 
   const [publishError, setPublishError] = useState<{ message: string; details: string[] } | null>(null);
   const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] = useState(false);
@@ -278,7 +332,7 @@ export default function EventsDashboardPage() {
     skip: !accountId || !isAuthenticated,
   });
 
-  // Create maps for quick lookups: ID → Name
+  // Create maps for quick lookups: ID → Name (supports both cases)
   const statusesMap = useMemo(() => {
     if (!statusesData) return {};
     
@@ -286,9 +340,9 @@ export default function EventsDashboardPage() {
       ? statusesData 
       : (statusesData as any)?.data || [];
     
-    return statusesArray.reduce((acc: any, status: { ID: any; Name: any; }) => ({
+    return statusesArray.reduce((acc: any, status: any) => ({
       ...acc,
-      [status.ID]: status.Name
+      [status.id || status.ID]: status.name || status.Name
     }), {});
   }, [statusesData]);
 
@@ -299,9 +353,9 @@ export default function EventsDashboardPage() {
       ? typesData 
       : (typesData as any)?.data || [];
     
-    return typesArray.reduce((acc: any, type: { ID: any; Name: any; }) => ({
+    return typesArray.reduce((acc: any, type: any) => ({
       ...acc,
-      [type.ID]: type.Name
+      [type.id || type.ID]: type.name || type.Name
     }), {});
   }, [typesData]);
 
@@ -312,44 +366,61 @@ export default function EventsDashboardPage() {
   // STEP 2: Fetch Events with cache invalidation for fresh data
   // ============================================================
   const {
-    data: browseData,
-    isLoading: isBrowseLoading,
-    isFetching: isBrowseFetching,
-    error: browseError,
-    refetch: refetchBrowse,
-  } = useGetEventsByAccountQuery({
-    accountId: accountId || '',
-    page: currentPage,
-    page_size: pageSize,
-  }, {
-    skip: shouldSearch || !accountId || !isAuthenticated,
-    // Ensure fresh data by not using cache
-    refetchOnMountOrArgChange: true,
-    refetchOnReconnect: true,
-    refetchOnFocus: true,
-  });
+  data: browseData,
+  isLoading: isBrowseLoading,
+  isFetching: isBrowseFetching,
+  error: browseError,
+  refetch: refetchBrowse,
+} = useGetEventsByAccountQuery({
+  accountId: accountId || '',
+  page: currentPage,
+  page_size: pageSize,
+ 
+}, {
+  skip: shouldSearch || !accountId || !isAuthenticated,
+  refetchOnMountOrArgChange: true,
+  refetchOnReconnect: true,
+  refetchOnFocus: true,
+});
 
   const {
-    data: searchData,
-    isLoading: isSearchLoading,
-    isFetching: isSearchFetching,
-    error: searchError,
-    refetch: refetchSearch,
-  } = useSearchEventsQuery({
-    q: debouncedSearchQuery,
-    account_id: accountId || '',
-    page: currentPage,
-    page_size: pageSize,
+  data: searchData,
+  isLoading: isSearchLoading,
+  isFetching: isSearchFetching,
+  error: searchError,
+  refetch: refetchSearch,
+} = useSearchEventsQuery({
+  q: debouncedSearchQuery,
+  account_id: accountId || '',
+  page: currentPage,
+  page_size: pageSize,
+}, {
+  skip: !shouldSearch || !accountId || !isAuthenticated,
+  refetchOnMountOrArgChange: true,
+  refetchOnReconnect: true,
+  refetchOnFocus: true,
+});
+
+  // Mutations
+  const [deleteEvent] = useDeleteEventMutation();
+  const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
+  const [restoreEvent] = useRestoreEventMutation();
+  const [publishEvent] = usePublishEventMutation();
+  const [bulkDeleteEvents] = useBulkDeleteEventsMutation();
+  const [bulkPermanentlyDeleteEvents] = useBulkPermanentlyDeleteEventsMutation();
+  const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
+  const [bulkPublishEvents] = useBulkPublishEventsMutation();
+
+
+  const { data: trashCountData } = useGetTrashedEventsCountQuery({
+  account_id: accountId || '',
   }, {
-    skip: !shouldSearch || !accountId || !isAuthenticated,
+    skip: !accountId || !isAuthenticated,
     refetchOnMountOrArgChange: true,
-    refetchOnReconnect: true,
-    refetchOnFocus: true,
   });
 
-  // Mutations with cache invalidation
-  const [deleteEvent] = useDeleteEventMutation();
-  const [publishEvent] = usePublishEventMutation();
+  // Use this for the trash count
+  const trashedEvents = trashCountData?.count || 0;
 
   // Use the appropriate data
   const activeData = shouldSearch ? searchData : browseData;
@@ -366,20 +437,6 @@ export default function EventsDashboardPage() {
   }, [activeData, dispatch]);
 
   // ============================================================
-  // HANDLE 401 UNAUTHORIZED - Redirect to Login
-  // ============================================================
-  useEffect(() => {
-    if (error && (error as any)?.status === 401) {
-      // Clear auth state
-      dispatch(clearAuth());
-      toast.error('Your session has expired. Please log in again.');
-      
-      // Redirect to the correct login page
-      router.push('/signin?session=expired');
-    }
-  }, [error, dispatch, router]);
-
-  // ============================================================
   // STEP 3: Convert API events to UI format with mapping
   // ============================================================
   const uiEvents = useMemo(() => {
@@ -389,12 +446,14 @@ export default function EventsDashboardPage() {
     );
   }, [activeData, typesMap, statusesMap]);
 
-  // Filter and sort events
+  // Filter events based on active tab (including trash)
   const filteredEvents = useMemo(() => {
     let filtered = [...uiEvents];
 
-    // Filter by tab (status)
-    if (activeTab !== 'all') {
+    // Filter by tab (status or trash)
+    if (activeTab === 'trash') {
+      filtered = filtered.filter((event) => event.isDeleted);
+    } else if (activeTab !== 'all') {
       const statusNameMap: Record<string, string> = {
         'live': 'Published',
         'upcoming': 'Published',
@@ -405,9 +464,12 @@ export default function EventsDashboardPage() {
       
       if (targetStatusName) {
         filtered = filtered.filter((event) => 
-          event.status === targetStatusName
+          !event.isDeleted && event.status === targetStatusName
         );
       }
+    } else {
+      // 'all' - show only non-deleted events
+      filtered = filtered.filter((event) => !event.isDeleted);
     }
 
     // Sort logic
@@ -421,7 +483,6 @@ export default function EventsDashboardPage() {
           comparison = new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime();
           break;
         case 'addedDate': {
-          // Use publishedAt if available, otherwise use createdAt
           const dateA = a.publishedAt || a.createdAt;
           const dateB = b.publishedAt || b.createdAt;
           comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
@@ -450,11 +511,13 @@ export default function EventsDashboardPage() {
   const totalItems = activeData?.total || filteredEvents.length;
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  // Stats
-  const totalEvents = activeData?.total || uiEvents.length;
-  const totalRegistered = uiEvents.reduce((acc, e) => acc + (e.registered || 0), 0);
-  const liveEvents = uiEvents.filter(e => e.status === 'Published').length;
-  const cpdEvents = uiEvents.filter(e => e.cpdHours > 0).length;
+  // Stats (excluding deleted events)
+  const activeEvents = uiEvents.filter(e => !e.isDeleted);
+  const totalEvents = activeEvents.length;
+  const totalRegistered = activeEvents.reduce((acc, e) => acc + (e.registered || 0), 0);
+  const liveEvents = activeEvents.filter(e => e.status === 'Published').length;
+  const cpdEvents = activeEvents.filter(e => e.cpdHours > 0).length;
+
 
   // Handler functions
   const handleRowClick = (eventId: string) => {
@@ -481,92 +544,122 @@ export default function EventsDashboardPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
+ const handleConfirmDelete = async () => {
+  if (!selectedEvent) return;
+  try {
+    // ✅ This is the SINGLE delete API - uses DELETE /api/v1/events/{id}
+    await deleteEvent(selectedEvent.id).unwrap();
+    setIsDeleteDialogOpen(false);
+    setSelectedEvent(null);
+    await refetch();
+    toast.success('Event moved to trash');
+  } catch (err: any) {
+    console.error('Failed to delete event:', err);
+    const errorMsg = err?.data?.message || err?.message || 'Failed to delete event';
+    toast.error(errorMsg);
+  }
+};
+
+  // Permanent Delete
+  const handlePermanentDelete = async (event: any) => {
+    setSelectedEvent(event);
+    setIsPermanentDeleteDialogOpen(true);
+  };
+
+  const handleConfirmPermanentDelete = async () => {
     if (!selectedEvent) return;
     try {
-      await deleteEvent(selectedEvent.id).unwrap();
-      setIsDeleteDialogOpen(false);
+      await permanentlyDeleteEvent(selectedEvent.id).unwrap();
+      setIsPermanentDeleteDialogOpen(false);
       setSelectedEvent(null);
-      // Refetch to get fresh data
       await refetch();
-      toast.success('Event deleted successfully');
+      toast.success('Event permanently deleted');
     } catch (err) {
-      console.error('Failed to delete event:', err);
-      toast.error('Failed to delete event');
+      console.error('Failed to permanently delete event:', err);
+      toast.error('Failed to permanently delete event');
     }
   };
 
+  // Restore Event
+  const handleRestoreEvent = async (event: any) => {
+    setSelectedEvent(event);
+    setIsRestoreDialogOpen(true);
+  };
 
-const handlePublishEvent = async (event: any) => {
-  setPublishingEventId(event.id);
-  setPublishError(null);
-  
-  // ✅ Show loading toast
-  const loadingToast = toast.loading(`Publishing "${event.title}"...`);
-  
-  try {
-    await publishEvent({ 
-      id: event.id, 
-      accountId: accountId 
-    }).unwrap();
+  const handleConfirmRestore = async () => {
+    if (!selectedEvent) return;
+    try {
+      await restoreEvent(selectedEvent.id).unwrap();
+      setIsRestoreDialogOpen(false);
+      setSelectedEvent(null);
+      await refetch();
+      toast.success('Event restored successfully');
+    } catch (err) {
+      console.error('Failed to restore event:', err);
+      toast.error('Failed to restore event');
+    }
+  };
+
+  const handlePublishEvent = async (event: any) => {
+    setPublishingEventId(event.id);
+    setPublishError(null);
     
-    // ✅ Dismiss loading toast
-    toast.dismiss(loadingToast);
+    const loadingToast = toast.loading(`Publishing "${event.title}"...`);
     
-    // ✅ Show success toast
-    toast.success(`"${event.title}" published successfully!`, {
-      duration: 4000,
-      position: 'top-right',
-    });
-    
-    // Refetch to get fresh data
-    await refetch();
-  } catch (err: any) {
-    console.error('Failed to publish event:', err);
-    
-    // ✅ Dismiss loading toast
-    toast.dismiss(loadingToast);
-    
-    // Parse the error response
-    const errorData = err?.data;
-    let errorMessage = 'Failed to publish event';
-    let errorDetails: string[] = [];
-    
-    if (errorData) {
-      if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
+    try {
+      await publishEvent(event.id).unwrap();
       
-      if (errorData.errors) {
-        if (typeof errorData.errors === 'string') {
-          errorDetails = [errorData.errors];
-        } else if (Array.isArray(errorData.errors)) {
-          errorDetails = errorData.errors;
-        } else if (typeof errorData.errors === 'object') {
-          errorDetails = Object.values(errorData.errors).map(v => String(v));
+      toast.dismiss(loadingToast);
+      toast.success(`"${event.title}" published successfully!`, {
+        duration: 4000,
+        position: 'top-right',
+      });
+      
+      await refetch();
+    } catch (err: any) {
+      console.error('Failed to publish event:', err);
+      
+      toast.dismiss(loadingToast);
+      
+      const errorData = err?.data;
+      let errorMessage = 'Failed to publish event';
+      let errorDetails: string[] = [];
+      
+      if (errorData) {
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+        
+        if (errorData.errors) {
+          if (typeof errorData.errors === 'string') {
+            errorDetails = [errorData.errors];
+          } else if (Array.isArray(errorData.errors)) {
+            errorDetails = errorData.errors;
+          } else if (typeof errorData.errors === 'object') {
+            errorDetails = Object.values(errorData.errors).map(v => String(v));
+          }
+        }
+        
+        if (errorDetails.length === 0 && errorData.message) {
+          errorDetails = [errorData.message];
         }
       }
       
-      if (errorDetails.length === 0 && errorData.message) {
-        errorDetails = [errorData.message];
+      if (errorDetails.length === 0) {
+        errorDetails = [err?.message || 'Failed to publish event'];
       }
+      
+      setPublishError({
+        message: errorMessage,
+        details: errorDetails
+      });
+      setIsPublishErrorDialogOpen(true);
+    } finally {
+      setPublishingEventId(null);
     }
-    
-    if (errorDetails.length === 0) {
-      errorDetails = [err?.message || 'Failed to publish event'];
-    }
-    
-    setPublishError({
-      message: errorMessage,
-      details: errorDetails
-    });
-    setIsPublishErrorDialogOpen(true);
-  } finally {
-    setPublishingEventId(null);
-  }
-};
+  };
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -601,94 +694,126 @@ const handlePublishEvent = async (event: any) => {
     setIsBulkActionDialogOpen(true);
   };
 
-  const handleBulkDelete = async () => {
-    try {
-      await Promise.all(selectedEvents.map(id => deleteEvent(id).unwrap()));
-      setIsBulkActionDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
-      // Refetch to get fresh data
-      await refetch();
-      toast.success('Events deleted successfully');
-    } catch (err) {
-      console.error('Failed to delete events:', err);
-      toast.error('Failed to delete events');
-    }
-  };
-
-const handleBulkPublish = async () => {
-  const count = selectedEvents.length;
-  const loadingToast = toast.loading(`Publishing ${count} events...`);
+ const handleBulkDelete = async () => {
+  if (selectedEvents.length === 0) {
+    toast.error('No events selected');
+    return;
+  }
   
   try {
-    await Promise.all(
-      selectedEvents.map(id => 
-        publishEvent({ 
-          id, 
-          accountId: accountId
-        }).unwrap()
-      )
-    );
-    
-    toast.dismiss(loadingToast);
-    toast.success(`${count} events published successfully!`, {
-      duration: 4000,
-      position: 'top-right',
-    });
-    
+    // ✅ This is the BULK delete API - uses DELETE /api/v1/events/bulk
+    // Make sure we're passing the correct payload structure
+    await bulkDeleteEvents({ ids: selectedEvents }).unwrap();
     setIsBulkActionDialogOpen(false);
     setSelectedEvents([]);
     setSelectAll(false);
     await refetch();
+    toast.success(`${selectedEvents.length} events moved to trash`);
   } catch (err: any) {
-    console.error('Failed to publish events:', err);
-    toast.dismiss(loadingToast);
+    console.error('Failed to delete events:', err);
+    const errorMsg = err?.data?.message || err?.message || 'Failed to delete events';
+    toast.error(errorMsg);
+  }
+};
+
+  const handleBulkPermanentDelete = async () => {
+    try {
+      await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
+      setIsBulkActionDialogOpen(false);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      await refetch();
+      toast.success('Events permanently deleted');
+    } catch (err) {
+      console.error('Failed to permanently delete events:', err);
+      toast.error('Failed to permanently delete events');
+    }
+  };
+
+  const handleBulkRestore = async () => {
+    try {
+      await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
+      setIsBulkActionDialogOpen(false);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      await refetch();
+      toast.success('Events restored successfully');
+    } catch (err) {
+      console.error('Failed to restore events:', err);
+      toast.error('Failed to restore events');
+    }
+  };
+
+  const handleBulkPublish = async () => {
+    const count = selectedEvents.length;
+    const loadingToast = toast.loading(`Publishing ${count} events...`);
     
-    // ✅ Parse the error response for bulk publish
-    const errorData = err?.data;
-    let errorMessage = 'Failed to publish events';
-    let errorDetails: string[] = [];
-    
-    if (errorData) {
-      if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      }
+    try {
+      await bulkPublishEvents({ ids: selectedEvents }).unwrap();
       
-      if (errorData.errors) {
-        if (typeof errorData.errors === 'string') {
-          errorDetails = [errorData.errors];
-        } else if (Array.isArray(errorData.errors)) {
-          errorDetails = errorData.errors;
-        } else if (typeof errorData.errors === 'object') {
-          errorDetails = Object.values(errorData.errors).map(v => String(v));
+      toast.dismiss(loadingToast);
+      toast.success(`${count} events published successfully!`, {
+        duration: 4000,
+        position: 'top-right',
+      });
+      
+      setIsBulkActionDialogOpen(false);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      await refetch();
+    } catch (err: any) {
+      console.error('Failed to publish events:', err);
+      toast.dismiss(loadingToast);
+      
+      const errorData = err?.data;
+      let errorMessage = 'Failed to publish events';
+      let errorDetails: string[] = [];
+      
+      if (errorData) {
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+        
+        if (errorData.errors) {
+          if (typeof errorData.errors === 'string') {
+            errorDetails = [errorData.errors];
+          } else if (Array.isArray(errorData.errors)) {
+            errorDetails = errorData.errors;
+          } else if (typeof errorData.errors === 'object') {
+            errorDetails = Object.values(errorData.errors).map(v => String(v));
+          }
+        }
+        
+        if (errorDetails.length === 0 && errorData.message) {
+          errorDetails = [errorData.message];
         }
       }
       
-      if (errorDetails.length === 0 && errorData.message) {
-        errorDetails = [errorData.message];
+      if (errorDetails.length === 0) {
+        errorDetails = [err?.message || 'Failed to publish events'];
       }
+      
+      setPublishError({
+        message: errorMessage,
+        details: errorDetails
+      });
+      setIsPublishErrorDialogOpen(true);
+      setIsBulkActionDialogOpen(false);
     }
-    
-    if (errorDetails.length === 0) {
-      errorDetails = [err?.message || 'Failed to publish events'];
-    }
-    
-    // ✅ Show error in dialog instead of toast
-    setPublishError({
-      message: errorMessage,
-      details: errorDetails
-    });
-    setIsPublishErrorDialogOpen(true);
-    setIsBulkActionDialogOpen(false);
-  }
-};
+  };
 
   const handleBulkDuplicate = () => {
     setIsBulkActionDialogOpen(false);
     setSelectedEvents([]);
     setSelectAll(false);
+    // Navigate to create page with selected events as template
+    if (selectedEvents.length === 1) {
+      router.push(`/dashboard/events/new?duplicate=${selectedEvents[0]}`);
+    } else {
+      router.push(`/dashboard/events/new?duplicate=${selectedEvents.join(',')}`);
+    }
   };
 
   const getSelectedCount = () => selectedEvents.length;
@@ -720,8 +845,8 @@ const handleBulkPublish = async () => {
 
   const handleModalDuplicate = () => {
     if (selectedEvent) {
-      navigator.clipboard.writeText(`${window.location.origin}/events/${selectedEvent.slug || selectedEvent.id}`);
       setIsViewDialogOpen(false);
+      router.push(`/dashboard/events/new?duplicate=${selectedEvent.id}`);
     }
   };
 
@@ -749,7 +874,7 @@ const handleBulkPublish = async () => {
   const getActiveFilterCount = () => {
     let count = 0;
     if (searchQuery) count++;
-    if (activeTab !== 'all') count++;
+    if (activeTab !== 'all' && activeTab !== 'trash') count++;
     return count;
   };
 
@@ -794,55 +919,54 @@ const handleBulkPublish = async () => {
     dispatch(setCurrentPage(1));
   };
 
-  // Manual refresh handler
-const handleRefresh = async () => {
-  toast.promise(
-    new Promise(async (resolve, reject) => {
-      try {
-        const result = await refetch();
-        resolve(result);
-      } catch (error) {
-        reject(error);
+  const handleRefresh = async () => {
+    toast.promise(
+      new Promise(async (resolve, reject) => {
+        try {
+          const result = await refetch();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      }),
+      {
+        loading: 'Refreshing events...',
+        success: 'Events refreshed successfully!',
+        error: 'Failed to refresh events',
       }
-    }),
-    {
-      loading: 'Refreshing events...',
-      success: 'Events refreshed successfully!',
-      error: 'Failed to refresh events',
-    }
-  );
-};
+    );
+  };
 
   // ============================================================
   // AUTHENTICATION CHECK
   // ============================================================
   
- if (!isAuthenticated) {
-  return (
-    <div className="flex items-center justify-center min-h-[500px]">
-      <Card className="max-w-md w-full border-neutral-light shadow-sm">
-        <CardContent className="pt-8 pb-6 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-4 bg-amber-50 rounded-full">
-              <LogIn className="h-10 w-10 text-amber-600" />
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <Card className="max-w-md w-full border-neutral-light shadow-sm">
+          <CardContent className="pt-8 pb-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-amber-50 rounded-full">
+                <LogIn className="h-10 w-10 text-amber-600" />
+              </div>
             </div>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Please log in to view and manage your events.
-          </p>
-          <Button 
-            className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
-            onClick={() => router.push('/signin')}
-          >
-            <LogIn className="h-4 w-4 mr-2" />
-            Go to Login
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Please log in to view and manage your events.
+            </p>
+            <Button 
+              className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              onClick={() => router.push('/signin')}
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!accountId) {
     return (
@@ -918,14 +1042,18 @@ const handleRefresh = async () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    {/* // Stats Cards - Improved version with more accurate data */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Events */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
+                </p>
               </div>
               <div className="p-3 bg-primary/10 text-primary rounded-lg">
                 <Calendar className="h-5 w-5" />
@@ -934,12 +1062,16 @@ const handleRefresh = async () => {
           </CardContent>
         </Card>
 
+        {/* Registrations */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Registrations</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Across {activeEvents.filter(e => e.registered > 0).length} events
+                </p>
               </div>
               <div className="p-3 bg-green-50 text-green-600 rounded-lg">
                 <Users className="h-5 w-5" />
@@ -948,12 +1080,16 @@ const handleRefresh = async () => {
           </CardContent>
         </Card>
 
+        {/* Live Sessions */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
+                </p>
               </div>
               <div className="p-3 bg-red-50 text-red-600 rounded-lg">
                 <Video className="h-5 w-5" />
@@ -962,17 +1098,51 @@ const handleRefresh = async () => {
           </CardContent>
         </Card>
 
+        {/* CPD Accredited */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total CPD hours
+                </p>
               </div>
               <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-                <CheckCircle2 className="h-5 w-5" />
+                <Award className="h-5 w-5" />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Trash Card - Clickable */}
+        <Card 
+          className={`${trashedEvents > 0 ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/70 cursor-pointer' : 'cursor-pointer'} transition-colors`}
+          onClick={() => router.push('/dashboard/trash')}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trash</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{trashedEvents}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {trashedEvents > 0 ? (
+                    <span className="text-amber-600">Click to restore</span>
+                  ) : (
+                    'Empty'
+                  )}
+                </p>
+              </div>
+              <div className={`p-3 rounded-lg ${trashedEvents > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+                <Trash2 className="h-5 w-5" />
+              </div>
+            </div>
+            {trashedEvents > 0 && (
+              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                Click to view <ChevronRight className="h-3 w-3" />
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1001,6 +1171,27 @@ const handleRefresh = async () => {
                       {tab}
                     </button>
                   ))}
+                  
+                  {/* ✅ Trash Tab */}
+                  <button
+                    onClick={() => {
+                      setActiveTab('trash');
+                      dispatch(setCurrentPage(1));
+                    }}
+                    className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'trash'
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Trash
+                    {trashedEvents > 0 && (
+                      <span className={`ml-1 text-xs ${activeTab === 'trash' ? 'text-white' : 'text-gray-400'}`}>
+                        ({trashedEvents})
+                      </span>
+                    )}
+                  </button>
                 </div>
 
                 <div className="relative w-full md:w-72">
@@ -1121,96 +1312,147 @@ const handleRefresh = async () => {
               </div>
             </div>
 
-          {/* Bulk Actions Bar */}
-          {getSelectedCount() > 0 && (
-            <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium text-gray-700">
-                  {getSelectedCount()} event{getSelectedCount() > 1 ? 's' : ''} selected
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {/* ✅ Edit button - only when exactly 1 event is selected */}
-                {getSelectedCount() === 1 && (
+            {/* Bulk Actions Bar - FIXED */}
+            {getSelectedCount() > 0 && (
+              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {getSelectedCount()} event{getSelectedCount() > 1 ? 's' : ''} selected
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View button - always show for single selection */}
+                  {getSelectedCount() === 1 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="cursor-pointer"
+                      onClick={handleViewSelected}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View
+                    </Button>
+                  )}
+                  
+                  {/* Edit button - always show for single selection */}
+                  {getSelectedCount() === 1 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="cursor-pointer"
+                      onClick={() => {
+                        const eventId = selectedEvents[0];
+                        router.push(`/dashboard/events/${eventId}/edit`);
+                      }}
+                    >
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  )}
+                  
+                  {/* Bulk actions - only show when 2+ events selected */}
+                  {getSelectedCount() > 1 && (
+                    <>
+                      {/* Trash tab actions */}
+                      {activeTab === 'trash' ? (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
+                            onClick={() => handleBulkAction('restore')}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Restore
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handleBulkAction('permanentDelete')}
+                          >
+                            <Trash className="h-4 w-4 mr-2" />
+                            Delete Permanently
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {/* Publish - only if all selected are drafts */}
+                          {selectedEvents.every(id => {
+                            const event = uiEvents.find(e => e.id === id);
+                            return event?.status === 'Draft' && !event?.isDeleted;
+                          }) && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="cursor-pointer"
+                              onClick={() => handleBulkAction('publish')}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              Publish
+                            </Button>
+                          )}
+                          
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="cursor-pointer"
+                            onClick={() => handleBulkAction('duplicate')}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Duplicate
+                          </Button>
+                          
+                          {/* ✅ Bulk Delete - only for 2+ events */}
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+                            onClick={() => handleBulkAction('delete')}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Move to Trash
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* ✅ Single Delete - for exactly 1 event (uses single delete API) */}
+                  {getSelectedCount() === 1 && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+                      onClick={() => {
+                        const event = uiEvents.find(e => e.id === selectedEvents[0]);
+                        if (event) {
+                          handleDeleteEvent(event);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Move to Trash
+                    </Button>
+                  )}
+                  
+                  {/* Clear button - always show */}
                   <Button 
                     size="sm" 
-                    variant="outline" 
-                    className="cursor-pointer"
-                    onClick={handleViewSelected}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View
-                  </Button>
-                )}
-                
-                {/* ✅ Edit button - only when exactly 1 event is selected */}
-                {getSelectedCount() === 1 && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                    variant="ghost" 
                     className="cursor-pointer"
                     onClick={() => {
-                      const eventId = selectedEvents[0];
-                      router.push(`/dashboard/events/${eventId}/edit`);
+                      setSelectedEvents([]);
+                      setSelectAll(false);
                     }}
                   >
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Edit
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Clear
                   </Button>
-                )}
-                
-                {/* ✅ Publish button - only if ALL selected events are drafts */}
-                {selectedEvents.every(id => {
-                  const event = uiEvents.find(e => e.id === id);
-                  return event?.status === 'Draft';
-                }) && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="cursor-pointer"
-                    onClick={() => handleBulkAction('publish')}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Publish
-                  </Button>
-                )}
-                
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleBulkAction('duplicate')}
-                >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Duplicate
-                </Button>
-                
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  className="cursor-pointer"
-                  onClick={() => handleBulkAction('delete')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="cursor-pointer"
-                  onClick={() => {
-                    setSelectedEvents([]);
-                    setSelectAll(false);
-                  }}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                </div>
               </div>
-            </div>
-          )}    
+            )}
           </CardContent>
         </Card>
       )}
@@ -1274,8 +1516,8 @@ const handleRefresh = async () => {
                       const statusConfig = getStatusConfig(event.status);
                       const typeClassName = getTypeConfig(event.type);
                       const isSelected = selectedEvents.includes(event.id);
+                      const isTrashed = event.isDeleted;
                       
-                      // For draft events, show creation date. For published, use createdAt (or a separate tracking)
                       const addedDate = event.createdAt;
                       const addedLabel = event.status === 'Published' ? 'Published' : 'Created';
                       const addedDateFormatted = formatDate(addedDate);
@@ -1286,7 +1528,7 @@ const handleRefresh = async () => {
                           onClick={() => handleRowClick(event.id)}
                           className={`hover:bg-gray-50/60 transition-colors group cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
-                          }`}
+                          } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
                         >
                           <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
@@ -1298,6 +1540,26 @@ const handleRefresh = async () => {
                           <TableCell className="py-4 px-4">
                             <div className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
                               {event.title}
+                              {isTrashed && (
+                                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Trashed
+                                </Badge>
+                              )}
+                              {/* ✅ Featured Badge */}
+                              {event.isFeatured && !isTrashed && (
+                                <Badge variant="default" className="ml-2 bg-secondary-500 text-white text-xs">
+                                  <Star className="h-3 w-3 mr-1" />
+                                  Featured
+                                </Badge>
+                              )}
+                              {/* ✅ Private Badge */}
+                              {event.isPrivate && !isTrashed && (
+                                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                                  <Lock className="h-3 w-3 mr-1" />
+                                  Private
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                               <span className="text-gray-400">{event.platform}</span>
@@ -1339,10 +1601,17 @@ const handleRefresh = async () => {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${statusConfig.color} border`}>
-                              <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                              {event.status}
-                            </Badge>
+                            {isTrashed ? (
+                              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Trashed
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className={`${statusConfig.color} border`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
+                                {event.status}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="py-4 px-4 text-right">
                             <DropdownMenu>
@@ -1354,80 +1623,109 @@ const handleRefresh = async () => {
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewEvent(event);
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/dashboard/events/${event.id}/edit`);
-                                  }}
-                                >
-                                  <Edit3 className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleModalDuplicate();
-                                  }}
-                                >
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                {/* ✅ ADD PUBLISH OPTION HERE - after Duplicate, before View Public Page */}
-                                {event.status === 'Draft' && (
-                                  <DropdownMenuItem 
-                                    className="cursor-pointer text-green-600"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePublishEvent(event);
-                                    }}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Publish
-                                  </DropdownMenuItem>
+                                
+                                {isTrashed ? (
+                                  // ✅ Trash Actions
+                                  <>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-green-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRestoreEvent(event);
+                                      }}
+                                    >
+                                      <RotateCcw className="h-4 w-4 mr-2" />
+                                      Restore
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer text-red-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePermanentDelete(event);
+                                      }}
+                                    >
+                                      <Trash className="h-4 w-4 mr-2" />
+                                      Delete Permanently
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  // ✅ Normal Actions
+                                  <>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewEvent(event);
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/dashboard/events/${event.id}/edit`);
+                                      }}
+                                    >
+                                      <Edit3 className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/dashboard/events/new?duplicate=${event.id}`);
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4 mr-2" />
+                                      Duplicate
+                                    </DropdownMenuItem>
+                                    {event.status === 'Draft' && (
+                                      <DropdownMenuItem 
+                                        className="cursor-pointer text-green-600"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePublishEvent(event);
+                                        }}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Publish
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(`/events/${event.slug || event.id}`, '_blank');
+                                      }}
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      View Public Page
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/dashboard/attendees?eventId=${event.id}`);
+                                      }}
+                                    >
+                                      <Users className="h-4 w-4 mr-2" />
+                                      Manage Attendees
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      className="text-amber-600 cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteEvent(event);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Move to Trash
+                                    </DropdownMenuItem>
+                                  </>
                                 )}
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(`/events/${event.slug || event.id}`, '_blank');
-                                  }}
-                                >
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  View Public Page
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/dashboard/attendees?eventId=${event.id}`);
-                                  }}
-                                >
-                                  <Users className="h-4 w-4 mr-2" />
-                                  Manage Attendees
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  className="text-red-600 cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteEvent(event);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1438,9 +1736,15 @@ const handleRefresh = async () => {
                     <TableRow>
                       <TableCell colSpan={8} className="py-12 text-center text-gray-500">
                         <div className="flex flex-col items-center gap-2">
-                          <Search className="h-8 w-8 text-gray-300" />
+                          {activeTab === 'trash' ? (
+                            <Trash2 className="h-8 w-8 text-gray-300" />
+                          ) : (
+                            <Search className="h-8 w-8 text-gray-300" />
+                          )}
                           <p className="font-medium">
-                            {shouldSearch && searchQuery 
+                            {activeTab === 'trash' 
+                              ? 'No events in trash'
+                              : shouldSearch && searchQuery 
                               ? `No events match "${searchQuery}"`
                               : activeTab !== 'all'
                               ? `No ${activeTab} events found`
@@ -1448,7 +1752,9 @@ const handleRefresh = async () => {
                             }
                           </p>
                           <p className="text-sm text-gray-400">
-                            {shouldSearch && searchQuery 
+                            {activeTab === 'trash' 
+                              ? 'Deleted events will appear here. You can restore or permanently delete them.'
+                              : shouldSearch && searchQuery 
                               ? 'Try adjusting your search terms or filters.'
                               : activeTab !== 'all'
                               ? 'Try changing the status filter.'
@@ -1526,6 +1832,7 @@ const handleRefresh = async () => {
                 const statusConfig = getStatusConfig(event.status);
                 const typeClassName = getTypeConfig(event.type);
                 const isSelected = selectedEvents.includes(event.id);
+                const isTrashed = event.isDeleted;
                 const addedDate = event.publishedAt || event.createdAt;
                 const addedLabel = event.publishedAt ? 'Published' : 'Created';
                 const addedDateFormatted = formatDate(addedDate);
@@ -1535,20 +1842,41 @@ const handleRefresh = async () => {
                     key={event.id} 
                     className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
                       isSelected ? 'border-primary/50 bg-primary/5' : ''
-                    }`}
+                    } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
                     onClick={() => handleCardClick(event)}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className={typeClassName}>
                             {event.type}
                           </Badge>
+                          {/* ✅ Featured Badge in Grid */}
+                          {event.isFeatured && !isTrashed && (
+                            <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                              <Star className="h-3 w-3 mr-1" />
+                              Featured
+                            </Badge>
+                          )}
+                          {/* ✅ Private Badge in Grid */}
+                          {event.isPrivate && !isTrashed && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                              <Lock className="h-3 w-3 mr-1" />
+                              Private
+                            </Badge>
+                          )}
                         </div>
-                        <Badge variant="outline" className={`${statusConfig.color} border`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                          {event.status}
-                        </Badge>
+                        {isTrashed ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Trashed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className={`${statusConfig.color} border`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
+                            {event.status}
+                          </Badge>
+                        )}
                       </div>
 
                       <div>
@@ -1605,60 +1933,89 @@ const handleRefresh = async () => {
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewEvent(event);
-                              }}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/dashboard/events/${event.id}/edit`);
-                              }}
-                            >
-                              <Edit3 className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleModalDuplicate();
-                              }}
-                            >
-                              <Copy className="h-4 w-4 mr-2" />
-                              Duplicate
-                            </DropdownMenuItem>
-                            {/* ✅ ADD PUBLISH OPTION HERE - after Duplicate, before separator */}
-                              {event.status === 'Draft' && (
+                            
+                            {isTrashed ? (
+                              // ✅ Trash Actions in Grid
+                              <>
                                 <DropdownMenuItem 
                                   className="cursor-pointer text-green-600"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handlePublishEvent(event);
+                                    handleRestoreEvent(event);
                                   }}
                                 >
-                                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                                  Publish
+                                  <RotateCcw className="h-4 w-4 mr-2" />
+                                  Restore
                                 </DropdownMenuItem>
-                              )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              className="text-red-600 cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteEvent(event);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer text-red-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePermanentDelete(event);
+                                  }}
+                                >
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  Delete Permanently
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              // ✅ Normal Actions in Grid
+                              <>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewEvent(event);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/dashboard/events/${event.id}/edit`);
+                                  }}
+                                >
+                                  <Edit3 className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/dashboard/events/new?duplicate=${event.id}`);
+                                  }}
+                                >
+                                  <Copy className="h-4 w-4 mr-2" />
+                                  Duplicate
+                                </DropdownMenuItem>
+                                {event.status === 'Draft' && (
+                                  <DropdownMenuItem 
+                                    className="cursor-pointer text-green-600"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handlePublishEvent(event);
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Publish
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  className="text-amber-600 cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteEvent(event);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Move to Trash
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -1669,9 +2026,15 @@ const handleRefresh = async () => {
             ) : (
               <div className="col-span-full py-12 text-center text-gray-500">
                 <div className="flex flex-col items-center gap-2">
-                  <Search className="h-8 w-8 text-gray-300" />
+                  {activeTab === 'trash' ? (
+                    <Trash2 className="h-8 w-8 text-gray-300" />
+                  ) : (
+                    <Search className="h-8 w-8 text-gray-300" />
+                  )}
                   <p className="font-medium">
-                    {shouldSearch && searchQuery 
+                    {activeTab === 'trash' 
+                      ? 'No events in trash'
+                      : shouldSearch && searchQuery 
                       ? `No events match "${searchQuery}"`
                       : activeTab !== 'all'
                       ? `No ${activeTab} events found`
@@ -1679,7 +2042,9 @@ const handleRefresh = async () => {
                     }
                   </p>
                   <p className="text-sm text-gray-400">
-                    {shouldSearch && searchQuery 
+                    {activeTab === 'trash' 
+                      ? 'Deleted events will appear here. You can restore or permanently delete them.'
+                      : shouldSearch && searchQuery 
                       ? 'Try adjusting your search terms or filters.'
                       : activeTab !== 'all'
                       ? 'Try changing the status filter.'
@@ -1855,6 +2220,7 @@ const handleRefresh = async () => {
                       <SelectItem value="upcoming" className="cursor-pointer">Upcoming</SelectItem>
                       <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
                       <SelectItem value="ended" className="cursor-pointer">Ended</SelectItem>
+                      <SelectItem value="trash" className="cursor-pointer text-amber-600">Trash</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1934,268 +2300,334 @@ const handleRefresh = async () => {
         </SheetContent>
       </Sheet>
 
-     {/* View Event Dialog */}
-<Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-  <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle>Event Details</DialogTitle>
-      <DialogDescription>
-        View and manage event information.
-      </DialogDescription>
-    </DialogHeader>
-    {selectedEvent && (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
-            <div className="flex flex-wrap items-center gap-2 mt-1">
-              <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
-                {selectedEvent.type}
-              </Badge>
-              <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
-                {selectedEvent.status}
-              </Badge>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-xl sm:text-2xl font-bold text-primary">{selectedEvent.price}</p>
-            <p className="text-[10px] sm:text-xs text-gray-500">Ticket Price</p>
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Event Date</Label>
-            <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Time</Label>
-            <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Added</Label>
-            <p className="text-sm sm:text-base font-medium">
-              {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
-              {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Platform</Label>
-            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-              <Video className="h-4 w-4 text-gray-400 shrink-0" />
-              <span className="truncate">{selectedEvent.platform}</span>
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Location</Label>
-            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-              <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-              <span className="truncate">{selectedEvent.location || 'Virtual'}</span>
-            </p>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">CPD Hours</Label>
-            <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-              <Award className="h-4 w-4 text-amber-500 shrink-0" />
-              {selectedEvent.cpdHours} hours
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-xs text-gray-500">Registrations</Label>
-          <div className="mt-2">
-            <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
-              <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
-              <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-primary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {selectedEvent.description && (
-          <div className="space-y-1">
-            <Label className="text-xs text-gray-500">Description</Label>
-            <p className="text-sm text-gray-600 mt-1">{selectedEvent.description}</p>
-          </div>
-        )}
-
-        <Separator />
-
-        {/* ✅ Updated Actions Section - Better Grid Layout */}
-        <div className="space-y-3">
-          <Label className="text-xs text-gray-500 font-medium">Actions</Label>
-          
-          {/* Primary Actions - 2 columns on desktop, 1 on mobile */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-              onClick={handleModalEdit}
-            >
-              <Edit3 className="h-4 w-4 mr-2 shrink-0" />
-              Edit Event
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-              onClick={handleModalDuplicate}
-            >
-              <Copy className="h-4 w-4 mr-2 shrink-0" />
-              Duplicate
-            </Button>
-          </div>
-
-          {/* Secondary Actions - 3 columns on desktop, 2 on mobile */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-              onClick={handleModalPublicPage}
-            >
-              <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">View Public</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-              onClick={handleModalManageAttendees}
-            >
-              <Users className="h-4 w-4 mr-2 shrink-0" />
-              <span className="truncate">Attendees</span>
-            </Button>
-            
-            {/* ✅ Publish button - only for draft events */}
-            {selectedEvent.status === 'Draft' && (
-              <Button 
-                variant="default"
-                className="w-full cursor-pointer justify-center text-sm bg-green-600 hover:bg-green-700 text-white transition-colors col-span-2 sm:col-span-1"
-                onClick={() => {
-                  setIsViewDialogOpen(false);
-                  handlePublishEvent(selectedEvent);
-                }}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2 shrink-0" />
-                Publish
-              </Button>
-            )}
-          </div>
-
-          {/* Danger Zone - Full width */}
-          <div className="grid grid-cols-1 gap-2 mt-1">
-            <Button 
-              variant="destructive" 
-              className="w-full cursor-pointer justify-center text-sm"
-              onClick={handleModalDelete}
-            >
-              <Trash2 className="h-4 w-4 mr-2 shrink-0" />
-              Delete Event
-            </Button>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2 flex-col sm:flex-row">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsViewDialogOpen(false)}
-            className="w-full sm:w-auto cursor-pointer"
-          >
-            Close
-          </Button>
-        </DialogFooter>
-      </div>
-    )}
-  </DialogContent>
-</Dialog>
-
-      {/* Bulk Action Confirmation Dialog */}
-      <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {bulkAction === 'publish' && 'Publish Events'}
-              {bulkAction === 'duplicate' && 'Duplicate Events'}
-              {bulkAction === 'delete' && 'Delete Events'}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {bulkAction === 'publish' && (
-                <>You are about to publish <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-              )}
-              {bulkAction === 'duplicate' && (
-                <>You are about to duplicate <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-              )}
-              {bulkAction === 'delete' && (
-                <>You are about to delete <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}. This action cannot be undone.</>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4">
-            <ScrollArea className="h-32 border rounded-lg p-2">
-              {selectedEvents.map(id => {
-                const event = uiEvents.find(e => e.id === id);
-                return event ? (
-                  <div key={id} className="flex items-center gap-2 py-1 text-sm">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span>{event.title}</span>
-                    <span className="text-gray-400">—</span>
-                    <Badge variant="outline" className="text-xs">
-                      {event.status}
+      {/* View Event Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Event Details</DialogTitle>
+            <DialogDescription>
+              View and manage event information.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
+                      {selectedEvent.type}
                     </Badge>
+                    {selectedEvent.isDeleted ? (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Trashed
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
+                        {selectedEvent.status}
+                      </Badge>
+                    )}
+                    {/* ✅ Featured Badge in View Dialog */}
+                    {selectedEvent.isFeatured && !selectedEvent.isDeleted && (
+                      <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                        <Star className="h-3 w-3 mr-1" />
+                        Featured
+                      </Badge>
+                    )}
+                    {/* ✅ Private Badge in View Dialog */}
+                    {selectedEvent.isPrivate && !selectedEvent.isDeleted && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Private
+                      </Badge>
+                    )}
                   </div>
-                ) : null;
-              })}
-            </ScrollArea>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className={`cursor-pointer ${
-                bulkAction === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary/90'
-              }`}
-              onClick={() => {
-                if (bulkAction === 'publish') {
-                  // Close the dialog first, then handle publish
-                  setIsBulkActionDialogOpen(false);
-                  handleBulkPublish();
-                } else if (bulkAction === 'duplicate') {
-                  handleBulkDuplicate();
-                } else if (bulkAction === 'delete') {
-                  handleBulkDelete();
-                }
-              }}
-            >
-              {bulkAction === 'publish' && <CheckCircle2 className="h-4 w-4 mr-2" />}
-              {bulkAction === 'duplicate' && <Copy className="h-4 w-4 mr-2" />}
-              {bulkAction === 'delete' && <Trash2 className="h-4 w-4 mr-2" />}
-              {bulkAction === 'publish' && 'Publish All'}
-              {bulkAction === 'duplicate' && 'Duplicate All'}
-              {bulkAction === 'delete' && 'Delete All'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xl sm:text-2xl font-bold text-primary">{selectedEvent.price}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500">Ticket Price</p>
+                </div>
+              </div>
 
-      {/* Delete Confirmation Dialog */}
+              <Separator />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Event Date</Label>
+                  <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Time</Label>
+                  <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Added</Label>
+                  <p className="text-sm sm:text-base font-medium">
+                    {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
+                    {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Platform</Label>
+                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+                    <Video className="h-4 w-4 text-gray-400 shrink-0" />
+                    <span className="truncate">{selectedEvent.platform}</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Location</Label>
+                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+                    <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                    <span className="truncate">{selectedEvent.location || 'Virtual'}</span>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">CPD Hours</Label>
+                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
+                    <Award className="h-4 w-4 text-amber-500 shrink-0" />
+                    {selectedEvent.cpdHours} hours
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Registrations</Label>
+                <div className="mt-2">
+                  <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
+                    <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {selectedEvent.description && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Description</Label>
+                  <p className="text-sm text-gray-600 mt-1">{selectedEvent.description}</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-xs text-gray-500 font-medium">Actions</Label>
+                
+                {selectedEvent.isDeleted ? (
+                  // ✅ Trash actions in View Dialog
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full cursor-pointer justify-center text-sm text-green-600 border-green-200 hover:bg-green-50"
+                      onClick={() => {
+                        setIsViewDialogOpen(false);
+                        handleRestoreEvent(selectedEvent);
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2 shrink-0" />
+                      Restore Event
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      className="w-full cursor-pointer justify-center text-sm"
+                      onClick={() => {
+                        setIsViewDialogOpen(false);
+                        handlePermanentDelete(selectedEvent);
+                      }}
+                    >
+                      <Trash className="h-4 w-4 mr-2 shrink-0" />
+                      Delete Permanently
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                        onClick={handleModalEdit}
+                      >
+                        <Edit3 className="h-4 w-4 mr-2 shrink-0" />
+                        Edit Event
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                        onClick={handleModalDuplicate}
+                      >
+                        <Copy className="h-4 w-4 mr-2 shrink-0" />
+                        Duplicate
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                        onClick={handleModalPublicPage}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">View Public</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                        onClick={handleModalManageAttendees}
+                      >
+                        <Users className="h-4 w-4 mr-2 shrink-0" />
+                        <span className="truncate">Attendees</span>
+                      </Button>
+                      
+                      {selectedEvent.status === 'Draft' && (
+                        <Button 
+                          variant="default"
+                          className="w-full cursor-pointer justify-center text-sm bg-green-600 hover:bg-green-700 text-white transition-colors col-span-2 sm:col-span-1"
+                          onClick={() => {
+                            setIsViewDialogOpen(false);
+                            handlePublishEvent(selectedEvent);
+                          }}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-2 shrink-0" />
+                          Publish
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 mt-1">
+                      <Button 
+                        variant="outline" 
+                        className="w-full cursor-pointer justify-center text-sm text-amber-600 border-amber-200 hover:bg-amber-50"
+                        onClick={handleModalDelete}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2 shrink-0" />
+                        Move to Trash
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                <DialogFooter className="gap-2 flex-col sm:flex-row">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsViewDialogOpen(false)}
+                    className="w-full sm:w-auto cursor-pointer"
+                  >
+                    Close
+                  </Button>
+                </DialogFooter>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+    {/* Bulk Action Confirmation Dialog - FIXED */}
+    <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {bulkAction === 'publish' && 'Publish Events'}
+            {bulkAction === 'duplicate' && 'Duplicate Events'}
+            {bulkAction === 'delete' && 'Move to Trash'}
+            {bulkAction === 'permanentDelete' && 'Permanently Delete Events'}
+            {bulkAction === 'restore' && 'Restore Events'}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {bulkAction === 'publish' && (
+              <>You are about to publish <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
+            )}
+            {bulkAction === 'duplicate' && (
+              <>You are about to duplicate <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
+            )}
+            {bulkAction === 'delete' && (
+              <>You are about to move <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} to trash.</>
+            )}
+            {bulkAction === 'permanentDelete' && (
+              <>You are about to permanently delete <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}. This action cannot be undone.</>
+            )}
+            {bulkAction === 'restore' && (
+              <>You are about to restore <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} from trash.</>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="py-4">
+          <ScrollArea className="h-32 border rounded-lg p-2">
+            {selectedEvents.map(id => {
+              const event = uiEvents.find(e => e.id === id);
+              return event ? (
+                <div key={id} className="flex items-center gap-2 py-1 text-sm">
+                  <Calendar className="h-4 w-4 text-gray-400" />
+                  <span>{event.title}</span>
+                  <span className="text-gray-400">—</span>
+                  <Badge variant="outline" className="text-xs">
+                    {event.isDeleted ? 'Trashed' : event.status}
+                  </Badge>
+                </div>
+              ) : null;
+            })}
+          </ScrollArea>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            className={`cursor-pointer ${
+              bulkAction === 'permanentDelete' || bulkAction === 'delete'
+                ? 'bg-red-600 hover:bg-red-700' 
+                : bulkAction === 'restore'
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-primary hover:bg-primary/90'
+            }`}
+            onClick={() => {
+              if (bulkAction === 'publish') {
+                setIsBulkActionDialogOpen(false);
+                handleBulkPublish();
+              } else if (bulkAction === 'duplicate') {
+                handleBulkDuplicate();
+              } else if (bulkAction === 'delete') {
+                // ✅ This now only gets called for 2+ events
+                handleBulkDelete();
+              } else if (bulkAction === 'permanentDelete') {
+                handleBulkPermanentDelete();
+              } else if (bulkAction === 'restore') {
+                handleBulkRestore();
+              }
+            }}
+          >
+            {bulkAction === 'publish' && <CheckCircle2 className="h-4 w-4 mr-2" />}
+            {bulkAction === 'duplicate' && <Copy className="h-4 w-4 mr-2" />}
+            {bulkAction === 'delete' && <Trash2 className="h-4 w-4 mr-2" />}
+            {bulkAction === 'permanentDelete' && <Trash className="h-4 w-4 mr-2" />}
+            {bulkAction === 'restore' && <RotateCcw className="h-4 w-4 mr-2" />}
+            {bulkAction === 'publish' && 'Publish All'}
+            {bulkAction === 'duplicate' && 'Duplicate All'}
+            {bulkAction === 'delete' && 'Move to Trash'}
+            {bulkAction === 'permanentDelete' && 'Delete Permanently'}
+            {bulkAction === 'restore' && 'Restore All'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+      {/* Delete (Move to Trash) Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Event</DialogTitle>
+            <DialogTitle>Move to Trash</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this event? This action cannot be undone.
+              Are you sure you want to move this event to trash? You can restore it later.
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                <div className="p-2 bg-red-100 rounded-full">
-                  <Trash2 className="h-5 w-5 text-red-600" />
+              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                <div className="p-2 bg-amber-100 rounded-full">
+                  <Trash2 className="h-5 w-5 text-amber-600" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">{selectedEvent.title}</p>
@@ -2213,17 +2645,102 @@ const handleRefresh = async () => {
               Cancel
             </Button>
             <Button 
-              variant="destructive" 
-              className="cursor-pointer"
+              variant="outline" 
+              className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
               onClick={handleConfirmDelete}
             >
-              Delete Event
+              <Trash2 className="h-4 w-4 mr-2" />
+              Move to Trash
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-        {/* Publish Error Dialog */}
+      {/* Permanent Delete Confirmation Dialog */}
+      <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this event? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="py-4">
+              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
+                <div className="p-2 bg-red-100 rounded-full">
+                  <Trash className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
+                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsPermanentDeleteDialogOpen(false)}
+              className="cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="cursor-pointer"
+              onClick={handleConfirmPermanentDelete}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore Confirmation Dialog */}
+      <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-green-600">Restore Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to restore this event from trash?
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="py-4">
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                <div className="p-2 bg-green-100 rounded-full">
+                  <RotateCcw className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
+                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsRestoreDialogOpen(false)}
+              className="cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleConfirmRestore}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Restore Event
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Publish Error Dialog */}
       <Dialog open={isPublishErrorDialogOpen} onOpenChange={setIsPublishErrorDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -2262,7 +2779,6 @@ const handleRefresh = async () => {
               className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white cursor-pointer"
               onClick={() => {
                 setIsPublishErrorDialogOpen(false);
-                // Navigate to edit page for the draft
                 router.push(`/dashboard/events/${publishingEventId || selectedEvent?.id}/edit`);
               }}
             >
