@@ -40,6 +40,31 @@
       ]
     },
     {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://revisionary-leanne-diffusely.ngrok-free.dev"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Origin, Content-Type, Accept, Authorization, X-Requested-With"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Max-Age",
+          "value": "86400"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -63,6 +88,12 @@
           "value": "default-src 'self' https:; script-src 'unsafe-inline' 'unsafe-eval' https: https://*.tawk.to https://embed.tawk.to https://www.googletagmanager.com https://*.google-analytics.com; style-src 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self' https: https://*.tawk.to https://embed.tawk.to https://*.google-analytics.com https://www.googletagmanager.com https://www.google.com https://www.google-analytics.com; frame-src 'self' https: https://*.tawk.to https://embed.tawk.to; font-src 'self' https: data:; worker-src 'self' blob:;"
         }
       ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }
