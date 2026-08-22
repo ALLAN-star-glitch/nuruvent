@@ -467,29 +467,32 @@ export const eventsApi = api.injectEndpoints({
 
     // ✅ NEW: GET /api/v1/events?only_deleted=true - Get ONLY trashed events
    getTrashedEvents: builder.query<PaginatedEventsResponse, GetTrashedEventsParams>({
-      query: ({ account_id, page = 1, page_size = 20 }) => ({
-        url: '/events',
-        method: 'GET',
-        params: {
-          account_id,
-          only_deleted: true,
-          limit: page_size,
-          offset: (page - 1) * page_size,
-        },
-      }),
-      transformResponse: (response: any) => {
-        return mapPaginatedEvents(response);
-      },
-      providesTags: (result) => {
-        if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-          return [
-            ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: 'TRASH' },
-          ];
-        }
-        return [{ type: 'Events', id: 'TRASH' }];
-      },
-    }),
+  query: ({ account_id, page = 1, page_size = 20 }) => ({
+    url: '/events',
+    method: 'GET',
+    params: {
+      account_id,
+      only_deleted: true,
+      limit: page_size,
+      offset: (page - 1) * page_size,
+    },
+  }),
+  transformResponse: (response: any) => {
+    console.log('🔄 getTrashedEvents response:', response);
+    return mapPaginatedEvents(response);
+  },
+  providesTags: (result) => {
+    console.log('🏷️ getTrashedEvents providesTags:', result);
+    if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
+      return [
+        ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
+      ];
+    }
+    return [{ type: 'Events', id: 'TRASH' }, 'TrashCount'];
+  },
+}),
 
 
     // GET /api/v1/events/search - Search events
@@ -649,10 +652,12 @@ export const eventsApi = api.injectEndpoints({
         const data = response?.data || response;
         return mapEventResponse(data);
       },
+      // ✅ Important: Invalidate trash cache
       invalidatesTags: (result, error, id) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
-        'TrashCount', 
+        { type: 'Events', id: 'TRASH' },  // ✅ This is the key!
+        'TrashCount',
       ],
     }),
 
@@ -877,21 +882,33 @@ export const eventsApi = api.injectEndpoints({
     }),
 
     // ✅ NEW: POST /api/v1/events/bulk/restore - Bulk restore
-    bulkRestoreEvents: builder.mutation<BulkRestoreResult, { ids: string[] }>({
-      query: ({ ids }) => ({
-        url: '/events/bulk/restore',
-        method: 'POST',
-        body: { ids },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
+   bulkRestoreEvents: builder.mutation<BulkRestoreResult, { ids: string[] }>({
+    query: ({ ids }) => ({
+      url: '/events/bulk/restore',
+      method: 'POST',
+      body: { ids },
+    }),
+    transformResponse: (response: any) => {
+      // ✅ Fix: Map backend response (capitalized) to frontend types
+      if (response?.data) {
+        return {
+          restored_count: response.data.RestoredCount || 0,
+          failed_ids: response.data.FailedIDs || [],
+          errors: response.data.Errors || [],
+        };
+      }
+      return {
+        restored_count: 0,
+        failed_ids: [],
+        errors: [],
+      };
+    },
+      // ✅ Important: Invalidate trash cache
       invalidatesTags: (result, error, { ids }) => [
         ...ids.map((id) => ({ type: 'Events' as const, id })),
         { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'TRASH' },  // ✅ This is the key!
+        'TrashCount',
       ],
     }),
 

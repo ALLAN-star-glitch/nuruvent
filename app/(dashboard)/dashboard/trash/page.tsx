@@ -22,7 +22,6 @@ import {
   RefreshCw,
   AlertTriangle,
   LogIn,
-  AlertCircle,
   RotateCcw,
   Trash,
   Star,
@@ -35,9 +34,6 @@ import {
   ArrowDown,
   Filter,
   Users,
-  Award,
-  Video,
-  MapPin,
   Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -88,7 +84,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
   SheetContent,
@@ -113,7 +108,10 @@ import {
 } from '@/lib/store/slices/eventsSlice';
 import { toast } from 'sonner';
 
-// Helper to format date
+// ============================================================
+// HELPERS
+// ============================================================
+
 const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
   try {
@@ -124,7 +122,6 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-// Helper to format time
 const formatTime = (dateString: string): string => {
   if (!dateString) return 'N/A';
   try {
@@ -135,7 +132,6 @@ const formatTime = (dateString: string): string => {
   }
 };
 
-// Helper to get status color config
 const getStatusConfig = (statusName: string) => {
   const statusMap: Record<string, { color: string; dot: string }> = {
     'Draft': { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
@@ -146,7 +142,6 @@ const getStatusConfig = (statusName: string) => {
   return statusMap[statusName] || statusMap.Draft;
 };
 
-// Helper to get type color config
 const getTypeConfig = (typeName: string) => {
   const typeMap: Record<string, string> = {
     'Workshop': 'bg-purple-100 text-purple-700',
@@ -157,7 +152,6 @@ const getTypeConfig = (typeName: string) => {
   return typeMap[typeName] || 'bg-gray-100 text-gray-700';
 };
 
-// Helper to format price
 const formatPrice = (price: number): string => {
   if (price === 0) return 'Free';
   return `KES ${price.toLocaleString()}`;
@@ -167,7 +161,6 @@ type SortField = 'name' | 'deletedDate' | 'status' | 'type';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
-// Convert API event to UI event
 const convertApiEventToUI = (event: any, typesMap: Record<string, string>, statusesMap: Record<string, string>) => ({
   id: event.id || event.ID,
   title: event.name || event.Name,
@@ -191,14 +184,18 @@ const convertApiEventToUI = (event: any, typesMap: Record<string, string>, statu
   accountId: event.account_id || event.AccountID,
 });
 
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
 export default function TrashPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  
+
   const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
   const accountId = account?.id || user?.id || '';
   const { currentPage, pageSize } = useAppSelector((state) => state.events);
-  
+
   // Local state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
@@ -211,50 +208,37 @@ export default function TrashPage() {
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-
-  // Sort and view state
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [sortField, setSortField] = useState<SortField>('deletedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Check if mobile
+  // ============================================================
+  // EFFECTS
+  // ============================================================
+
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch statuses and types for mapping
-  const { data: statusesData } = useGetEventStatusesQuery(undefined, { skip: !accountId || !isAuthenticated });
-  const { data: typesData } = useGetEventTypesQuery(undefined, { skip: !accountId || !isAuthenticated });
-
-  const statusesMap = useMemo(() => {
-    if (!statusesData) return {};
-    const array = Array.isArray(statusesData) ? statusesData : (statusesData as any)?.data || [];
-    return array.reduce((acc: any, s: any) => ({ ...acc, [s.id || s.ID]: s.name || s.Name }), {});
-  }, [statusesData]);
-
-  const typesMap = useMemo(() => {
-    if (!typesData) return {};
-    const array = Array.isArray(typesData) ? typesData : (typesData as any)?.data || [];
-    return array.reduce((acc: any, t: any) => ({ ...acc, [t.id || t.ID]: t.name || t.Name }), {});
-  }, [typesData]);
-
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset to page 1 when search changes
   useEffect(() => {
     dispatch(setCurrentPage(1));
   }, [debouncedSearchQuery, dispatch]);
 
-  // Fetch trashed events
+  // ============================================================
+  // API HOOKS
+  // ============================================================
+
+  const { data: statusesData } = useGetEventStatusesQuery(undefined, { skip: !accountId || !isAuthenticated });
+  const { data: typesData } = useGetEventTypesQuery(undefined, { skip: !accountId || !isAuthenticated });
+
   const {
     data: trashData,
     isLoading,
@@ -271,40 +255,49 @@ export default function TrashPage() {
     refetchOnFocus: true,
   });
 
-  // Mutations
+  // ✅ Add this to monitor refetching
+useEffect(() => {
+  console.log('🔄 Trash data updated:', trashData?.data?.length);
+}, [trashData]);
+
   const [restoreEvent] = useRestoreEventMutation();
   const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
   const [bulkPermanentlyDeleteEvents] = useBulkPermanentlyDeleteEventsMutation();
 
-  // Update Redux state
-  useEffect(() => {
-    if (trashData) {
-      dispatch(setTotalEvents(trashData.total || 0));
-    }
-  }, [trashData, dispatch]);
+  // ============================================================
+  // MEMOIZED VALUES
+  // ============================================================
 
-  // Convert events to UI format
+  const statusesMap = useMemo(() => {
+    if (!statusesData) return {};
+    const array = Array.isArray(statusesData) ? statusesData : (statusesData as any)?.data || [];
+    return array.reduce((acc: any, s: any) => ({ ...acc, [s.id || s.ID]: s.name || s.Name }), {});
+  }, [statusesData]);
+
+  const typesMap = useMemo(() => {
+    if (!typesData) return {};
+    const array = Array.isArray(typesData) ? typesData : (typesData as any)?.data || [];
+    return array.reduce((acc: any, t: any) => ({ ...acc, [t.id || t.ID]: t.name || t.Name }), {});
+  }, [typesData]);
+
   const uiEvents = useMemo(() => {
     if (!trashData?.data) return [];
     return trashData.data.map((event) => convertApiEventToUI(event, typesMap, statusesMap));
   }, [trashData, typesMap, statusesMap]);
 
-  // Filter by search and sort
   const filteredEvents = useMemo(() => {
     let filtered = [...uiEvents];
 
-    // Filter by search
     if (debouncedSearchQuery) {
       const query = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter((e) => 
+      filtered = filtered.filter((e) =>
         e.title.toLowerCase().includes(query) ||
         e.type.toLowerCase().includes(query) ||
         e.status.toLowerCase().includes(query)
       );
     }
 
-    // Sort logic
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
@@ -329,10 +322,14 @@ export default function TrashPage() {
     return filtered;
   }, [uiEvents, debouncedSearchQuery, sortField, sortDirection]);
 
+  useEffect(() => {
+    if (trashData) {
+      dispatch(setTotalEvents(trashData.total || 0));
+    }
+  }, [trashData, dispatch]);
+
   const totalItems = trashData?.total || filteredEvents.length;
   const totalPages = Math.ceil(totalItems / pageSize);
-
-  // Count drafts and published in trash
   const draftCount = uiEvents.filter(e => e.status === 'Draft').length;
   const publishedCount = uiEvents.filter(e => e.status === 'Published').length;
 
@@ -345,19 +342,31 @@ export default function TrashPage() {
     setIsRestoreDialogOpen(true);
   };
 
-  const handleConfirmRestore = async () => {
-    if (!selectedEvent) return;
-    try {
-      await restoreEvent(selectedEvent.id).unwrap();
-      setIsRestoreDialogOpen(false);
-      setSelectedEvent(null);
-      toast.success(`"${selectedEvent.title}" restored successfully`);
+
+const handleConfirmRestore = async () => {
+  if (!selectedEvent) return;
+  try {
+    await restoreEvent(selectedEvent.id).unwrap();
+    setIsRestoreDialogOpen(false);
+    setSelectedEvent(null);
+    setSelectedEvents([]);
+    setSelectAll(false);
+    toast.success(`"${selectedEvent.title}" restored successfully`);
+    
+    // ✅ Force refetch with different approach
+    await refetch();
+    
+    // ✅ Also manually update the trash data by calling refetch again after a delay
+    setTimeout(() => {
       refetch();
-    } catch (err: any) {
-      console.error('Failed to restore event:', err);
-      toast.error(err?.data?.message || 'Failed to restore event');
-    }
-  };
+    }, 100);
+  } catch (err: any) {
+    console.error('Failed to restore event:', err);
+    toast.error(err?.data?.message || 'Failed to restore event');
+  }
+};
+
+
 
   const handlePermanentDelete = (event: any) => {
     setSelectedEvent(event);
@@ -370,8 +379,10 @@ export default function TrashPage() {
       await permanentlyDeleteEvent(selectedEvent.id).unwrap();
       setIsPermanentDeleteDialogOpen(false);
       setSelectedEvent(null);
+      setSelectedEvents([]);
+      setSelectAll(false);
       toast.success(`"${selectedEvent.title}" permanently deleted`);
-      refetch();
+      await refetch();
     } catch (err: any) {
       console.error('Failed to permanently delete event:', err);
       toast.error(err?.data?.message || 'Failed to permanently delete event');
@@ -383,28 +394,57 @@ export default function TrashPage() {
     setIsBulkActionDialogOpen(true);
   };
 
-  const handleBulkRestore = async () => {
-    try {
-      await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
-      setIsBulkActionDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
-      toast.success(`${selectedEvents.length} events restored successfully`);
-      refetch();
-    } catch (err: any) {
-      console.error('Failed to restore events:', err);
-      toast.error(err?.data?.message || 'Failed to restore events');
+  const handleRestoreSelected = () => {
+    if (selectedEvents.length === 0) return;
+
+    if (selectedEvents.length === 1) {
+      const event = uiEvents.find(e => e.id === selectedEvents[0]);
+      if (event) {
+        handleRestoreEvent(event);
+      }
+    } else {
+      handleBulkAction('restore');
     }
   };
 
+  const handlePermanentDeleteSelected = () => {
+    if (selectedEvents.length === 0) return;
+
+    if (selectedEvents.length === 1) {
+      const event = uiEvents.find(e => e.id === selectedEvents[0]);
+      if (event) {
+        handlePermanentDelete(event);
+      }
+    } else {
+      handleBulkAction('permanentDelete');
+    }
+  };
+
+  const handleBulkRestore = async () => {
+  try {
+    await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
+    setIsBulkActionDialogOpen(false);
+    const count = selectedEvents.length;
+    setSelectedEvents([]);
+    setSelectAll(false);
+    toast.success(`${count} events restored successfully`);
+    // ✅ Await refetch to ensure cache is updated
+    await refetch();
+  } catch (err: any) {
+    console.error('Failed to restore events:', err);
+    toast.error(err?.data?.message || 'Failed to restore events');
+  }
+};
+
   const handleBulkPermanentDelete = async () => {
     try {
-      await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
+      const result = await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
       setIsBulkActionDialogOpen(false);
+      const count = selectedEvents.length;
       setSelectedEvents([]);
       setSelectAll(false);
-      toast.success(`${selectedEvents.length} events permanently deleted`);
-      refetch();
+      toast.success(`${count} events permanently deleted`);
+      await refetch();
     } catch (err: any) {
       console.error('Failed to permanently delete events:', err);
       toast.error(err?.data?.message || 'Failed to permanently delete events');
@@ -446,21 +486,12 @@ export default function TrashPage() {
   };
 
   const handleRefresh = async () => {
-    toast.promise(
-      new Promise(async (resolve, reject) => {
-        try {
-          const result = await refetch();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      }),
-      {
-        loading: 'Refreshing trash...',
-        success: 'Trash refreshed successfully!',
-        error: 'Failed to refresh trash',
-      }
-    );
+    try {
+      await refetch();
+      toast.success('Trash refreshed successfully!');
+    } catch (error) {
+      toast.error('Failed to refresh trash');
+    }
   };
 
   const getSelectedCount = () => selectedEvents.length;
@@ -478,18 +509,13 @@ export default function TrashPage() {
     if (sortField !== field) {
       return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
     }
-    return sortDirection === 'asc' 
+    return sortDirection === 'asc'
       ? <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
       : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
   };
 
   const getSortLabel = () => {
-    const labels = {
-      name: 'Title',
-      deletedDate: 'Deleted Date',
-      status: 'Status',
-      type: 'Type'
-    };
+    const labels = { name: 'Title', deletedDate: 'Deleted Date', status: 'Status', type: 'Type' };
     return labels[sortField];
   };
 
@@ -507,9 +533,9 @@ export default function TrashPage() {
   };
 
   // ============================================================
-  // AUTHENTICATION CHECK
+  // AUTHENTICATION CHECKS
   // ============================================================
-  
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -521,10 +547,8 @@ export default function TrashPage() {
               </div>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Please log in to view your trash.
-            </p>
-            <Button 
+            <p className="text-sm text-gray-500 mb-6">Please log in to view your trash.</p>
+            <Button
               className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
               onClick={() => router.push('/signin')}
             >
@@ -548,11 +572,9 @@ export default function TrashPage() {
               </div>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Account Not Found</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              We couldn&apos;t find your account information.
-            </p>
-            <Button 
-              variant="outline" 
+            <p className="text-sm text-gray-500 mb-6">We couldn&apos;t find your account information.</p>
+            <Button
+              variant="outline"
               className="w-full cursor-pointer"
               onClick={() => router.push('/dashboard')}
             >
@@ -564,7 +586,6 @@ export default function TrashPage() {
     );
   }
 
-  // Loading state
   if (isLoading && !trashData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -579,13 +600,14 @@ export default function TrashPage() {
   // ============================================================
   // RENDER
   // ============================================================
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link 
-            href="/dashboard/events" 
+          <Link
+            href="/dashboard/events"
             className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer"
           >
             <ArrowLeft className="h-5 w-5 text-gray-500" />
@@ -601,8 +623,8 @@ export default function TrashPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="cursor-pointer"
             onClick={handleRefresh}
@@ -614,7 +636,7 @@ export default function TrashPage() {
         </div>
       </div>
 
-      {/* Stats - Only show relevant cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -629,7 +651,6 @@ export default function TrashPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -643,7 +664,6 @@ export default function TrashPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -664,7 +684,7 @@ export default function TrashPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-              {/* Row 1: Search */}
+              {/* Search */}
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <div className="relative w-full md:w-72">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
@@ -687,28 +707,26 @@ export default function TrashPage() {
                 </div>
               </div>
 
-              {/* Row 2: View Options and Sort */}
+              {/* View Options and Sort */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'table' 
-                          ? 'bg-white text-primary shadow-sm' 
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'table'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700'
-                      }`}
+                        }`}
                       title="Table View"
                     >
                       <List className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'grid' 
-                          ? 'bg-white text-primary shadow-sm' 
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'grid'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700'
-                      }`}
+                        }`}
                       title="Grid View"
                     >
                       <Grid3x3 className="h-4 w-4" />
@@ -742,19 +760,16 @@ export default function TrashPage() {
                       className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
                       title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                     >
-                      {sortDirection === 'asc' 
+                      {sortDirection === 'asc'
                         ? <ArrowUp className="h-4 w-4 text-primary" />
-                        : <ArrowDown className="h-4 w-4 text-primary" />
-                      }
+                        : <ArrowDown className="h-4 w-4 text-primary" />}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   <span className="text-xs text-gray-400">
-                    {isFetching && (
-                      <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />
-                    )}
+                    {isFetching && <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />}
                     {filteredEvents.length} item{filteredEvents.length !== 1 ? 's' : ''} in trash
                     {debouncedSearchQuery && (
                       <span className="text-gray-400 ml-1">
@@ -762,9 +777,9 @@ export default function TrashPage() {
                       </span>
                     )}
                   </span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 text-xs cursor-pointer"
                     onClick={() => {
                       setSearchQuery('');
@@ -781,7 +796,7 @@ export default function TrashPage() {
               </div>
             </div>
 
-            {/* Bulk Actions Bar */}
+            {/* Bulk Actions Bar - Optimized */}
             {getSelectedCount() > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -791,27 +806,27 @@ export default function TrashPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
-                    onClick={() => handleBulkAction('restore')}
+                    onClick={handleRestoreSelected}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
-                    Restore All
+                    {getSelectedCount() === 1 ? 'Restore' : 'Restore All'}
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
-                    onClick={() => handleBulkAction('permanentDelete')}
+                    onClick={handlePermanentDeleteSelected}
                   >
                     <Trash className="h-4 w-4 mr-2" />
-                    Delete Permanently
+                    {getSelectedCount() === 1 ? 'Delete Permanently' : 'Delete All Permanently'}
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     className="cursor-pointer"
                     onClick={() => {
                       setSelectedEvents([]);
@@ -828,7 +843,7 @@ export default function TrashPage() {
         </Card>
       )}
 
-      {/* Events Table View */}
+      {/* Table View */}
       {!isMobile && viewMode === 'table' && (
         <Card>
           <CardContent className="p-0">
@@ -846,26 +861,22 @@ export default function TrashPage() {
                     </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
                       <div className="flex items-center">
-                        Event Title
-                        {getSortIcon('name')}
+                        Event Title {getSortIcon('name')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('type')}>
                       <div className="flex items-center">
-                        Type
-                        {getSortIcon('type')}
+                        Type {getSortIcon('type')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
                       <div className="flex items-center">
-                        Status
-                        {getSortIcon('status')}
+                        Status {getSortIcon('status')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('deletedDate')}>
                       <div className="flex items-center">
-                        Deleted At
-                        {getSortIcon('deletedDate')}
+                        Deleted At {getSortIcon('deletedDate')}
                       </div>
                     </TableHead>
                     <TableHead className="py-3 px-4 text-right">Actions</TableHead>
@@ -879,11 +890,10 @@ export default function TrashPage() {
                       const typeClassName = getTypeConfig(event.type);
 
                       return (
-                        <TableRow 
-                          key={event.id} 
-                          className={`hover:bg-gray-50/60 transition-colors group ${
-                            isSelected ? 'bg-primary/5' : ''
-                          }`}
+                        <TableRow
+                          key={event.id}
+                          className={`hover:bg-gray-50/60 transition-colors group ${isSelected ? 'bg-primary/5' : ''
+                            }`}
                         >
                           <TableCell className="py-4 px-4">
                             <Checkbox
@@ -943,14 +953,14 @@ export default function TrashPage() {
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   className="cursor-pointer text-green-600"
                                   onClick={() => handleRestoreEvent(event)}
                                 >
                                   <RotateCcw className="h-4 w-4 mr-2" />
                                   Restore
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   className="cursor-pointer text-red-600"
                                   onClick={() => handlePermanentDelete(event)}
                                 >
@@ -969,16 +979,14 @@ export default function TrashPage() {
                         <div className="flex flex-col items-center gap-2">
                           <Trash2 className="h-8 w-8 text-gray-300" />
                           <p className="font-medium">
-                            {searchQuery 
+                            {searchQuery
                               ? `No trashed events match "${searchQuery}"`
-                              : 'No events in trash'
-                            }
+                              : 'No events in trash'}
                           </p>
                           <p className="text-sm text-gray-400">
-                            {searchQuery 
+                            {searchQuery
                               ? 'Try adjusting your search terms.'
-                              : 'Deleted events will appear here. You can restore or permanently delete them.'
-                            }
+                              : 'Deleted events will appear here. You can restore or permanently delete them.'}
                           </p>
                         </div>
                       </TableCell>
@@ -1010,10 +1018,9 @@ export default function TrashPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-500">
-                    {totalItems > 0 
+                    {totalItems > 0
                       ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
-                      : '0 of 0'
-                    }
+                      : '0 of 0'}
                   </span>
                   <div className="flex items-center gap-1">
                     <Button
@@ -1053,11 +1060,10 @@ export default function TrashPage() {
                 const isSelected = selectedEvents.includes(event.id);
 
                 return (
-                  <Card 
-                    key={event.id} 
-                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
-                      isSelected ? 'border-primary/50 bg-primary/5' : ''
-                    }`}
+                  <Card
+                    key={event.id}
+                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${isSelected ? 'border-primary/50 bg-primary/5' : ''
+                      }`}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
@@ -1131,14 +1137,14 @@ export default function TrashPage() {
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="cursor-pointer text-green-600"
                               onClick={() => handleRestoreEvent(event)}
                             >
                               <RotateCcw className="h-4 w-4 mr-2" />
                               Restore
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="cursor-pointer text-red-600"
                               onClick={() => handlePermanentDelete(event)}
                             >
@@ -1157,16 +1163,14 @@ export default function TrashPage() {
                 <div className="flex flex-col items-center gap-2">
                   <Trash2 className="h-8 w-8 text-gray-300" />
                   <p className="font-medium">
-                    {searchQuery 
+                    {searchQuery
                       ? `No trashed events match "${searchQuery}"`
-                      : 'No events in trash'
-                    }
+                      : 'No events in trash'}
                   </p>
                   <p className="text-sm text-gray-400">
-                    {searchQuery 
+                    {searchQuery
                       ? 'Try adjusting your search terms.'
-                      : 'Deleted events will appear here. You can restore or permanently delete them.'
-                    }
+                      : 'Deleted events will appear here. You can restore or permanently delete them.'}
                   </p>
                 </div>
               </div>
@@ -1195,10 +1199,9 @@ export default function TrashPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500">
-                  {totalItems > 0 
+                  {totalItems > 0
                     ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
-                    : '0 of 0'
-                  }
+                    : '0 of 0'}
                 </span>
                 <div className="flex items-center gap-1">
                   <Button
@@ -1240,9 +1243,7 @@ export default function TrashPage() {
                   {searchQuery || 'Search trash'}
                 </span>
               </button>
-
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
                 className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors relative"
@@ -1251,13 +1252,11 @@ export default function TrashPage() {
                 <span className="text-sm text-gray-600">Filters</span>
                 {(searchQuery || sortField !== 'deletedDate') && (
                   <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
-                    {1}
+                    1
                   </span>
                 )}
               </button>
-
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
                 className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
@@ -1277,7 +1276,7 @@ export default function TrashPage() {
         </div>
       )}
 
-      {/* Mobile Filter Bottom Sheet */}
+      {/* Mobile Filter Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
           <div className="px-6 pt-6 pb-8 h-full flex flex-col">
@@ -1295,7 +1294,7 @@ export default function TrashPage() {
                 Refine your trash list
               </SheetDescription>
             </SheetHeader>
-            
+
             <div className="flex-1 overflow-y-auto mt-6 pb-6">
               <div className="space-y-1.5 mb-5">
                 <Label className="text-sm font-medium text-gray-700">Search</Label>
@@ -1366,11 +1365,10 @@ export default function TrashPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className={`h-11 rounded-xl cursor-pointer transition-all ${
-                      sortDirection === 'asc' 
-                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${sortDirection === 'asc'
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
                         : 'border-gray-200 hover:bg-gray-50'
-                    }`}
+                      }`}
                     onClick={() => setSortDirection('asc')}
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
@@ -1378,11 +1376,10 @@ export default function TrashPage() {
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className={`h-11 rounded-xl cursor-pointer transition-all ${
-                      sortDirection === 'desc' 
-                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                    className={`h-11 rounded-xl cursor-pointer transition-all ${sortDirection === 'desc'
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
                         : 'border-gray-200 hover:bg-gray-50'
-                    }`}
+                      }`}
                     onClick={() => setSortDirection('desc')}
                   >
                     <ArrowDown className="h-4 w-4 mr-2" />
@@ -1411,7 +1408,7 @@ export default function TrashPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Restore Confirmation Dialog */}
+      {/* Dialogs */}
       <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1434,18 +1431,10 @@ export default function TrashPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsRestoreDialogOpen(false)}
-              className="cursor-pointer"
-            >
+            <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} className="cursor-pointer">
               Cancel
             </Button>
-            <Button 
-              variant="default" 
-              className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
-              onClick={handleConfirmRestore}
-            >
+            <Button variant="default" className="cursor-pointer bg-green-600 hover:bg-green-700 text-white" onClick={handleConfirmRestore}>
               <RotateCcw className="h-4 w-4 mr-2" />
               Restore Event
             </Button>
@@ -1453,7 +1442,6 @@ export default function TrashPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Permanent Delete Confirmation Dialog */}
       <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1476,18 +1464,10 @@ export default function TrashPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsPermanentDeleteDialogOpen(false)}
-              className="cursor-pointer"
-            >
+            <Button variant="outline" onClick={() => setIsPermanentDeleteDialogOpen(false)} className="cursor-pointer">
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
-              className="cursor-pointer"
-              onClick={handleConfirmPermanentDelete}
-            >
+            <Button variant="destructive" className="cursor-pointer" onClick={handleConfirmPermanentDelete}>
               <Trash className="h-4 w-4 mr-2" />
               Delete Permanently
             </Button>
@@ -1495,7 +1475,6 @@ export default function TrashPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Action Confirmation Dialog */}
       <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1531,12 +1510,11 @@ export default function TrashPage() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className={`cursor-pointer ${
-                bulkAction === 'permanentDelete'
-                  ? 'bg-red-600 hover:bg-red-700' 
+            <AlertDialogAction
+              className={`cursor-pointer ${bulkAction === 'permanentDelete'
+                  ? 'bg-red-600 hover:bg-red-700'
                   : 'bg-green-600 hover:bg-green-700'
-              }`}
+                }`}
               onClick={() => {
                 if (bulkAction === 'restore') {
                   handleBulkRestore();
