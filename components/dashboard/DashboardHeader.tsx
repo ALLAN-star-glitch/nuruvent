@@ -16,6 +16,12 @@ import {
   DollarSign,
   Video,
   LogOut,
+  Sparkles,
+  ChevronDown,
+  Gift,
+  Zap,
+  Clock,
+  TrendingUp
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -36,7 +42,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth, UserRole } from '@/lib/store/slices/authSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface DashboardHeaderProps {
   user: {
@@ -47,7 +53,7 @@ interface DashboardHeaderProps {
   };
 }
 
-// Dashboard menu items - matching sidebar exactly
+// Dashboard menu items - for mobile drawer only
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
@@ -59,10 +65,20 @@ const dashboardNavItems = [
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
+// Quick action items for dropdown
+const quickActions = [
+  { href: '/dashboard/events/new', label: 'Create Event', icon: PlusCircle, color: 'text-primary' },
+  { href: '/dashboard/events', label: 'Manage Events', icon: Calendar, color: 'text-blue-500' },
+  { href: '/dashboard/attendees', label: 'View Attendees', icon: Users, color: 'text-emerald-500' },
+];
+
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const quickActionsRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
@@ -96,21 +112,41 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     }
   };
 
+  const handleCreateEvent = () => {
+    router.push('/dashboard/events/new');
+  };
+
+  // Close quick actions on click outside
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (quickActionsRef.current && !quickActionsRef.current.contains(event.target as Node)) {
+        setShowQuickActions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggleQuickActions = () => {
+    setShowQuickActions(!showQuickActions);
+  };
+
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
+    <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95">
+      <div className="container mx-auto px-3 sm:px-4">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2">
           {/* Left: Mobile Menu + Logo */}
-          <div className="flex items-center gap-2 shrink-0 h-full">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="lg:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer"
+                  className="lg:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
                   aria-label="Open navigation menu"
                 >
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </SheetTrigger>
 
@@ -137,7 +173,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                                 isActive
                                   ? 'bg-primary/10 text-primary'
                                   : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
@@ -170,7 +206,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             <Link
                               href={item.href}
                               className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                                 isActive
                                   ? 'bg-primary/10 text-primary'
                                   : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
@@ -204,7 +240,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                           <Link
                             href={settingsItem.href}
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                               pathname.startsWith(settingsItem.href)
                                 ? 'bg-primary/10 text-primary'
                                 : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
@@ -227,9 +263,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   {/* Logout Button */}
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={() => setShowLogoutDialog(true)}
                     disabled={isLoading}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors w-full text-red-500 hover:bg-red-50/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-red-500 hover:bg-red-50/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
                     {isLoading ? (
                       <div className="flex items-center gap-3">
@@ -241,15 +277,15 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       </div>
                     ) : (
                       <>
-                        <LogOut className="h-5 w-5 shrink-0 text-red-400" />
-                        <span className="text-sm font-medium">Logout</span>
+                        <LogOut className="h-5 w-5 shrink-0 text-red-400 group-hover:text-red-500 transition-colors" />
+                        <span className="text-sm font-medium group-hover:text-red-600 transition-colors">Logout</span>
                       </>
                     )}
                   </button>
 
                   {/* User Info */}
                   <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
-                    <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
                       {getInitials(user.name)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -262,21 +298,99 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </Sheet>
 
             {/* Logo */}
-            <div className="inline-flex items-center shrink-0">
+            <Link href="/dashboard" className="inline-flex items-center shrink-0 hover:opacity-80 transition-opacity cursor-pointer">
               <Logo />
-            </div>
+            </Link>
           </div>
 
-          {/* Search Bar */}
-          <div className="flex-1 max-w-2xl mx-4 hidden md:block">
+          {/* Search Bar - hidden on small screens */}
+          <div className="flex-1 max-w-xl mx-2 sm:mx-3 hidden md:block">
             <SearchBar />
           </div>
 
           {/* Right Header Controls */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 shrink-0">
+            {/* ✅ Create Event Button - Desktop */}
+            <Button
+              onClick={handleCreateEvent}
+              className="hidden sm:flex items-center gap-1.5 md:gap-2 rounded-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-sm hover:shadow-md transition-all cursor-pointer px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium"
+            >
+              <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Create Event</span>
+            </Button>
+
+            {/* ✅ Create Event Button - Mobile (full width clickable) */}
+            <Button
+              onClick={handleCreateEvent}
+              variant="ghost"
+              size="icon"
+              className="sm:hidden text-primary hover:bg-primary/10 rounded-full cursor-pointer h-8 w-8 transition-colors active:scale-95 touch-manipulation"
+              aria-label="Create Event"
+            >
+              <PlusCircle className="h-5 w-5" />
+            </Button>
+
             <NotificationBell />
+
+            {/* Quick Actions Dropdown */}
+            <div className="relative" ref={quickActionsRef}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 md:h-9 md:w-9 hidden sm:flex transition-colors active:scale-95 touch-manipulation"
+                onClick={toggleQuickActions}
+                aria-label="Quick actions"
+              >
+                <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              </Button>
+
+              {showQuickActions && (
+                <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white rounded-2xl shadow-xl border border-gray-100/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="px-3 sm:px-4 py-1.5 sm:py-2">
+                    <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">Quick Actions</p>
+                  </div>
+                  <div className="h-px bg-gradient-to-r from-gray-100 to-transparent mx-3 sm:mx-4" />
+                  {quickActions.map((action) => {
+                    const Icon = action.icon;
+                    return (
+                      <button
+                        key={action.href}
+                        onClick={() => {
+                          router.push(action.href);
+                          setShowQuickActions(false);
+                        }}
+                        className="flex items-center gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer group"
+                      >
+                        <div className={cn("h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors", action.color)}>
+                          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        </div>
+                        <span className="font-medium text-xs sm:text-sm">{action.label}</span>
+                        <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-400 ml-auto -rotate-90" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <UserMenu user={user} onLogout={handleLogout} />
+
+            {/* ✅ Create Event Button - Quick create for tablet */}
+            <Button
+              onClick={handleCreateEvent}
+              variant="outline"
+              size="sm"
+              className="hidden md:flex lg:hidden items-center gap-1 rounded-full border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm cursor-pointer px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95"
+            >
+              <PlusCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">New</span>
+            </Button>
           </div>
+        </div>
+
+        {/* Mobile Search - shown below header on small screens */}
+        <div className="md:hidden pb-2">
+          <SearchBar />
         </div>
       </div>
 
@@ -287,6 +401,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         onConfirm={handleLogout}
         isLoading={isLoading}
       />
-    </div>
+    </header>
   );
 }

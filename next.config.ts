@@ -56,6 +56,12 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '*.googleapis.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'cgyyvboqmiiqyvnruleq.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },

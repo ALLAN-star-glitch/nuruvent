@@ -144,6 +144,17 @@ export interface BulkDuplicateRequest {
 // RESPONSE TYPES - ALL LOWERCASE
 // ============================================================
 
+// ✅ NEW: Creator information from accounts
+export interface CreatorInfo {
+  id: string;
+  name: string;
+  display_name?: string;
+  email: string;
+  phone?: string;
+  account_type: string;
+  institution_name?: string;
+}
+
 export interface EventResponse {
   id: string;
   slug: string;
@@ -176,6 +187,9 @@ export interface EventResponse {
   restored_by?: string;
   created_at: string;
   updated_at: string;
+
+   // ✅ NEW: Creator information (replaces raw created_by)
+  creator: CreatorInfo;
 }
 
 export interface EventTypeResponse {

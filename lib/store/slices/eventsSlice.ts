@@ -7,6 +7,17 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 // TYPES
 // ============================================================
 
+// ✅ NEW: Creator information
+export interface CreatorInfo {
+  id: string;
+  name: string;
+  display_name?: string;
+  email: string;
+  phone?: string;
+  account_type: string;
+  institution_name?: string;
+}
+
 export interface Event {
   id: string;
   slug: string;
@@ -39,6 +50,8 @@ export interface Event {
   restored_by?: string;
   created_at: string;
   updated_at: string;
+  // ✅ NEW: Creator information
+  creator: CreatorInfo;
 }
 
 export interface EventType {
@@ -91,6 +104,17 @@ export interface EventsState {
 // ============================================================
 // INITIAL STATE
 // ============================================================
+
+// ✅ Helper to create empty creator
+const emptyCreator = (): CreatorInfo => ({
+  id: '',
+  name: '',
+  display_name: '',
+  email: '',
+  phone: '',
+  account_type: '',
+  institution_name: '',
+});
 
 const initialState: EventsState = {
   currentEvent: null,

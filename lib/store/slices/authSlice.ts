@@ -56,6 +56,7 @@ export interface AuthState {
   registrationData: any | null;
   twoFactorEmail: string | null;
   loginStep: 'idle' | 'password' | 'two_factor' | 'authenticated';
+  isHydrated: boolean; // ✅ Add this
 }
 
 // ============================================================
@@ -91,6 +92,7 @@ const initialState: AuthState = {
   registrationData: null,
   twoFactorEmail: null,
   loginStep: 'idle',
+  isHydrated: false,
 };
 
 // ============================================================
@@ -137,6 +139,16 @@ const authSlice = createSlice({
       state.twoFactorEmail = null;
       state.registrationData = null;
       state.loginStep = 'idle';
+    },
+    hydrateAuth: (state) => {
+      // With HTTP-only cookies, we can't read the token
+      // But we can check if the user was previously authenticated
+      // This is called after rehydration from redux-persist
+      state.isHydrated = true;
+    },
+    // ✅ Optional: fetch user on page load
+    setAuthenticated: (state, action: PayloadAction<boolean>) => {
+      state.isAuthenticated = action.payload;
     },
   },
   extraReducers: (builder) => {

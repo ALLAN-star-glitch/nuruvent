@@ -4,8 +4,20 @@
 import { 
   EventResponse, 
   EventTypeResponse, 
-  EventStatusResponse 
+  EventStatusResponse,
+  CreatorInfo
 } from '@/lib/store/api/eventsApi';
+
+// ✅ NEW: Map creator info from backend to frontend format
+export const mapCreatorInfo = (data: any): CreatorInfo => ({
+  id: data.id || '',
+  name: data.name || '',
+  display_name: data.display_name || '',
+  email: data.email || '',
+  phone: data.phone || '',
+  account_type: data.account_type || '',
+  institution_name: data.institution_name || '',
+});
 
 /**
  * Map backend event data (which may have uppercase fields like ID, Name)
@@ -43,6 +55,16 @@ export const mapEventResponse = (data: any): EventResponse => ({
   restored_by: data.restored_by || data.RestoredBy || '',
   created_at: data.created_at || data.CreatedAt || '',
   updated_at: data.updated_at || data.UpdatedAt || '',
+  // ✅ Map creator field
+  creator: data.creator ? mapCreatorInfo(data.creator) : {
+    id: '',
+    name: '',
+    display_name: '',
+    email: '',
+    phone: '',
+    account_type: '',
+    institution_name: '',
+  },
 });
 
 /**
