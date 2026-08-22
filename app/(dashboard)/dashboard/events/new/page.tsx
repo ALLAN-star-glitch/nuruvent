@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -132,7 +133,6 @@ const SaveStatusIndicator = ({ status }: { status: 'idle' | 'saving' | 'saved' }
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDots('');
     }
 
@@ -443,6 +443,20 @@ export default function CreateEventPage() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
   const formDataRef = useRef(formData);
+
+
+  // ✅ Check on page load if we should reset
+useEffect(() => {
+  const savedDraftId = localStorage.getItem(STORAGE_KEY);
+  const hasFormData = formData.name || formData.event_type_id || formData.date;
+  
+  // If there's a draft ID but no form data, clear it
+  if (savedDraftId && !hasFormData) {
+    console.log('🧹 Found draft ID but no data, clearing...');
+    localStorage.removeItem(STORAGE_KEY);
+    setDraftId(null);
+  }
+}, [formData]);
   
   // ✅ Update the ref whenever formData changes
   useEffect(() => {
@@ -553,7 +567,6 @@ export default function CreateEventPage() {
   useEffect(() => {
     if (!lastSavedData) {
       const hasAnyData = formData.name || formData.event_type_id || formData.date || formData.time;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHasChanges(!!hasAnyData);
       if (hasAnyData && saveStatus !== 'saving') {
         setSaveStatus('saving');
@@ -821,6 +834,38 @@ export default function CreateEventPage() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
+
+  // ============================================================
+  // ✅ CLEAR DRAFT STATE - New function for creating new events
+  // ============================================================
+
+ // ✅ CLEAR DRAFT STATE - Improved version
+const clearDraftState = useCallback(() => {
+  console.log('🗑️ Clearing draft state...');
+  
+  // Clear localStorage first
+  localStorage.removeItem(STORAGE_KEY);
+  
+  // Clear all state
+  setDraftId(null);
+  setFormData(defaultFormData);
+  setImagePreview(null);
+  setImageFile(null);
+  setErrors({});
+  setTouched({});
+  setSaveStatus('idle');
+  setHasChanges(false);
+  setLastSavedData(null);
+  setCreatedEventId(null);
+  setCurrentStep(1);
+  setValidationErrors({});
+  setError(null);
+  
+  // Clear the ref
+  formDataRef.current = defaultFormData;
+  
+  console.log('✅ Draft state cleared, localStorage removed:', localStorage.getItem(STORAGE_KEY));
+}, [STORAGE_KEY]);
 
   // ============================================================
   // NAVIGATION HANDLERS
@@ -1128,13 +1173,7 @@ export default function CreateEventPage() {
       setIsSaveDialogOpen(true);
       
       if (statusSlug === 'draft') {
-        setFormData(defaultFormData);
-        setImagePreview(null);
-        setImageFile(null);
-        setErrors({});
-        setTouched({});
-        setDraftId(null);
-        localStorage.removeItem(STORAGE_KEY);
+        clearDraftState();
       }
       
     } catch (err: any) {
@@ -1792,6 +1831,23 @@ export default function CreateEventPage() {
   const selectedEventType = eventTypes.find((t: any) => t.id === formData.event_type_id);
   const isLoading = isSaving || isCreating || isAutoSaving || isPublishing || isUploading;
 
+
+// ✅ HANDLE CREATE ANOTHER - With navigation after state clear
+const handleCreateAnother = useCallback(() => {
+  console.log('🔄 Creating another event...');
+  
+  // Clear everything
+  clearDraftState();
+  
+  // Close the dialog
+  setIsSaveDialogOpen(false);
+  
+  // Navigate after a small delay to ensure state is cleared
+  setTimeout(() => {
+    router.push('/dashboard/events/new');
+  }, 100);
+}, [clearDraftState, router]);
+
   // ============================================================
   // RETURN
   // ============================================================
@@ -2045,99 +2101,89 @@ export default function CreateEventPage() {
         />
       )}
 
-      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-neutral-dark">
-              <CheckCircle2 className="h-6 w-6 text-tertiary-500" />
-              {isPublished ? 'Event Published' : 'Draft Saved'}
-            </DialogTitle>
-            <DialogDescription className="text-neutral-gray">
-              {isPublished 
-                ? 'Your event has been published and is now visible to attendees.'
-                : 'Your event has been saved as a draft. You can publish it anytime.'
-              }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 flex flex-col items-center gap-4">
-            <div className="w-full p-4 bg-neutral-light rounded-lg border border-neutral-light">
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">{formData.name || 'Untitled Event'}</p>
-                  <p className="text-sm text-neutral-gray">
-                    {formData.date || 'TBD'} • {selectedEventType?.name || 'No type'}
-                  </p>
-                </div>
-                <Badge variant="outline" className={cn(
-                  isPublished ? 'text-tertiary-600 border-tertiary-200 bg-tertiary-50' : 'text-neutral-gray border-neutral-light bg-neutral-light'
-                )}>
-                  {isPublished ? 'Published' : 'Draft'}
-                </Badge>
-              </div>
-              {(formData.is_featured || formData.is_private) && (
-                <div className="mt-2 flex items-center gap-2">
-                  {formData.is_featured && (
-                    <Badge variant="default" className="bg-secondary-500 text-white text-xs">
-                      <Star className="h-3 w-3 mr-1" />
-                      Featured
-                    </Badge>
-                  )}
-                  {formData.is_private && (
-                    <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                      <Lock className="h-3 w-3 mr-1" />
-                      Private
-                    </Badge>
-                  )}
-                </div>
-              )}
+    <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2 text-neutral-dark">
+          <CheckCircle2 className="h-6 w-6 text-tertiary-500" />
+          {isPublished ? 'Event Published' : 'Draft Saved'}
+        </DialogTitle>
+        <DialogDescription className="text-neutral-gray">
+          {isPublished 
+            ? 'Your event has been published and is now visible to attendees.'
+            : 'Your event has been saved as a draft. You can publish it anytime.'
+          }
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4 flex flex-col items-center gap-4">
+        <div className="w-full p-4 bg-neutral-light rounded-lg border border-neutral-light">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="font-medium text-neutral-dark">{formData.name || 'Untitled Event'}</p>
+              <p className="text-sm text-neutral-gray">
+                {formData.date || 'TBD'} • {selectedEventType?.name || 'No type'}
+              </p>
             </div>
-            <div className="flex gap-2 w-full">
-              <Button 
-                variant="outline" 
-                className="flex-1 cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-                onClick={() => {
-                  setIsSaveDialogOpen(false);
-                  router.push('/dashboard/events');
-                }}
-              >
-                Go to Events
-              </Button>
-              {isPublished && createdEventId && (
-                <Button 
-                  className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
-                  onClick={() => {
-                    setIsSaveDialogOpen(false);
-                    router.push(`/dashboard/events/${createdEventId}`);
-                  }}
-                >
-                  View Event
-                </Button>
-              )}
-            </div>
+            <Badge variant="outline" className={cn(
+              isPublished ? 'text-tertiary-600 border-tertiary-200 bg-tertiary-50' : 'text-neutral-gray border-neutral-light bg-neutral-light'
+            )}>
+              {isPublished ? 'Published' : 'Draft'}
+            </Badge>
           </div>
-          <DialogFooter>
+          {(formData.is_featured || formData.is_private) && (
+            <div className="mt-2 flex items-center gap-2">
+              {formData.is_featured && (
+                <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                  <Star className="h-3 w-3 mr-1" />
+                  Featured
+                </Badge>
+              )}
+              {formData.is_private && (
+                <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Private
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2 w-full">
+          <Button 
+            variant="outline" 
+            className="flex-1 cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+            onClick={() => {
+              clearDraftState();
+              setIsSaveDialogOpen(false);
+              router.push('/dashboard/events');
+            }}
+          >
+            Go to Events
+          </Button>
+          {isPublished && createdEventId && (
             <Button 
-              variant="ghost" 
-              className="w-full cursor-pointer hover:bg-primary-50 hover:text-primary transition-colors"
+              className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
               onClick={() => {
+                // ✅ Don't clear for viewing the event
                 setIsSaveDialogOpen(false);
-                if (!isPublished) {
-                  setFormData(defaultFormData);
-                  setImagePreview(null);
-                  setImageFile(null);
-                  setErrors({});
-                  setTouched({});
-                  setDraftId(null);
-                  localStorage.removeItem(STORAGE_KEY);
-                  setCurrentStep(1);
-                }
+                router.push(`/dashboard/events/${createdEventId}`);
               }}
             >
-              {isPublished ? 'Done' : 'Create Another'}
+              View Event
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          )}
+        </div>
+      </div>
+      <DialogFooter>
+        <Button 
+          variant="ghost" 
+          className="w-full cursor-pointer hover:bg-primary-50 hover:text-primary transition-colors"
+          onClick={handleCreateAnother}
+        >
+          {isPublished ? 'Done' : 'Create Another'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
     </div>
   );
 }
