@@ -69,7 +69,6 @@ import {
   useUploadEventImageMutation,
   useDeleteEventImageMutation,
 } from '@/lib/store/api/eventsApi';
-import { AnimatePresence, motion } from 'framer-motion';
 
 // ============================================================
 // TYPES
@@ -88,11 +87,9 @@ interface EventFormData {
   is_virtual: boolean;
   is_featured: boolean;
   is_private: boolean;
-  slug?: string;
   zoom_link: string;
   meet_link: string;
   max_attendees: number | null;
-  image?: File;
   imagePreview?: string;
 }
 
@@ -106,24 +103,17 @@ interface FormErrors {
   price?: string;
   certificate_price?: string;
   location?: string;
-  is_virtual?: string;
-  slug?: string;
   zoom_link?: string;
   meet_link?: string;
   max_attendees?: string;
   image?: string;
-  imagePreview?: string;
 }
 
 // ============================================================
 // SAVE STATUS INDICATOR
 // ============================================================
 
-const SaveStatusIndicator = ({ 
-  status 
-}: { 
-  status: 'idle' | 'saving' | 'saved' 
-}) => {
+const SaveStatusIndicator = ({ status }: { status: 'idle' | 'saving' | 'saved' }) => {
   const [dots, setDots] = useState('');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -189,7 +179,6 @@ const defaultFormData: EventFormData = {
   zoom_link: '',
   meet_link: '',
   max_attendees: null,
-  image: undefined,
   imagePreview: '',
 };
 
@@ -385,8 +374,7 @@ const PreviewModal = ({
 
 export default function CreateEventPage() {
   const router = useRouter();
-  
-  const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { account, user } = useAppSelector((state) => state.auth);
   
   const accountId = useMemo(() => {
     const id = account?.id || user?.id || '';
@@ -419,7 +407,8 @@ export default function CreateEventPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  
+  const [validationErrors, setValidationErrors] = useState<FormErrors>({});
+
   // ✅ LocalStorage key for draft ID
   const STORAGE_KEY = 'nuruvent_draft_id';
   
@@ -453,8 +442,6 @@ export default function CreateEventPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
-  
-  // ✅ Add formDataRef to avoid stale closures
   const formDataRef = useRef(formData);
   
   // ✅ Update the ref whenever formData changes
@@ -464,6 +451,79 @@ export default function CreateEventPage() {
 
   const STEPS = ['Basic Info', 'Details', 'Preview'];
   const isCreating = isCreatingDraft || isCreatingEvent || isUpdating;
+
+  // ============================================================
+  // VALIDATION (DEFINED BEFORE USE)
+  // ============================================================
+
+  const validateStep = useCallback((step: number): FormErrors => {
+    const newErrors: FormErrors = {};
+    
+    switch (step) {
+      case 1: // Basic Info
+        if (!formData.name || formData.name.trim() === '') {
+          newErrors.name = 'Event name is required';
+        } else if (formData.name.length > 100) {
+          newErrors.name = 'Event name must be less than 100 characters';
+        }
+        
+        if (!formData.event_type_id) {
+          newErrors.event_type_id = 'Event type is required';
+        }
+        
+        if (!formData.date) {
+          newErrors.date = 'Event date is required';
+        }
+        
+        if (!formData.time) {
+          newErrors.time = 'Event time is required';
+        }
+        
+        if (!formData.duration || formData.duration <= 0) {
+          newErrors.duration = 'Duration is required';
+        } else if (formData.duration < 15) {
+          newErrors.duration = 'Duration must be at least 15 minutes';
+        } else if (formData.duration > 1440) {
+          newErrors.duration = 'Duration cannot exceed 1440 minutes (24 hours)';
+        }
+        break;
+        
+      case 2: // Event Details
+        if (formData.is_virtual) {
+          if (!formData.zoom_link && !formData.meet_link) {
+            newErrors.zoom_link = 'At least one meeting link is required for virtual events';
+          }
+        } else {
+          if (!formData.location) {
+            newErrors.location = 'Location is required for in-person events';
+          }
+        }
+        
+        if (formData.price !== null && formData.price < 0) {
+          newErrors.price = 'Price cannot be negative';
+        }
+        
+        if (formData.certificate_price !== null && formData.certificate_price < 0) {
+          newErrors.certificate_price = 'Certificate price cannot be negative';
+        }
+        
+        if (formData.max_attendees !== null && formData.max_attendees < 0) {
+          newErrors.max_attendees = 'Maximum attendees cannot be negative';
+        }
+        break;
+        
+      case 3: // Preview
+        break;
+    }
+    
+    return newErrors;
+  }, [formData]);
+
+  // ✅ Check if current step is valid
+  const isCurrentStepValid = useMemo(() => {
+    const errors = validateStep(currentStep);
+    return Object.keys(errors).length === 0;
+  }, [currentStep, formData, validateStep]);
 
   // ============================================================
   // CHECK IF PUBLISH IS READY
@@ -487,7 +547,7 @@ export default function CreateEventPage() {
   }, [formData]);
 
   // ============================================================
-  // DETECT CHANGES - FIXED (removed saveStatus from deps)
+  // DETECT CHANGES
   // ============================================================
 
   useEffect(() => {
@@ -501,16 +561,8 @@ export default function CreateEventPage() {
       return;
     }
 
-    const currentData = {
-      ...formData,
-      imagePreview: formData.imagePreview || undefined,
-      image: formData.image || undefined,
-    };
-    const savedData = {
-      ...lastSavedData,
-      imagePreview: lastSavedData.imagePreview || undefined,
-      image: lastSavedData.image || undefined,
-    };
+    const currentData = { ...formData, imagePreview: formData.imagePreview || undefined };
+    const savedData = { ...lastSavedData, imagePreview: lastSavedData.imagePreview || undefined };
     
     const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
     setHasChanges(hasChanged);
@@ -519,15 +571,13 @@ export default function CreateEventPage() {
     } else if (!hasChanged && !isAutoSaving) {
       setSaveStatus('saved');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, lastSavedData, isAutoSaving]); // ✅ Intentionally removed saveStatus
+  }, [formData, lastSavedData, isAutoSaving]);
 
   // ============================================================
-  // AUTO-SAVE LOGIC - FIXED with localStorage
+  // AUTO-SAVE LOGIC
   // ============================================================
 
- const performAutoSave = useCallback(async () => {
-    // ✅ Prevent multiple concurrent saves
+  const performAutoSave = useCallback(async () => {
     if (isAutoSavingRef.current || isSaving || isCreating) {
       console.log('⏭️ Skipping auto-save: Already saving');
       return;
@@ -538,27 +588,23 @@ export default function CreateEventPage() {
       return;
     }
 
-    // ✅ Get the latest form data from the ref
     const currentFormData = formDataRef.current;
 
     const hasName = !!currentFormData.name?.trim();
     const hasEventType = !!currentFormData.event_type_id;
     const hasDate = !!currentFormData.date;
 
-    // ✅ Don't save if there's no meaningful data yet
     if (!hasName && !hasEventType && !hasDate) {
       console.log('⏭️ Skipping auto-save: No data yet');
       return;
     }
 
-    // ✅ Get the latest draftId from localStorage
     const localStorageDraftId = localStorage.getItem(STORAGE_KEY);
     const stateDraftId = draftId;
     const currentDraftId = localStorageDraftId || stateDraftId;
     
     console.log(`🔍 Auto-save - FINAL draftId: ${currentDraftId || 'null'}`);
 
-    // ✅ Sync state with localStorage
     if (stateDraftId && !localStorageDraftId) {
       localStorage.setItem(STORAGE_KEY, stateDraftId);
       console.log('💾 Synced draftId to localStorage:', stateDraftId);
@@ -568,14 +614,12 @@ export default function CreateEventPage() {
     setIsAutoSaving(true);
 
     try {
-      let response;
       const finalDraftId = localStorage.getItem(STORAGE_KEY) || draftId;
       
       if (finalDraftId) {
-        // ✅ Try to update existing draft
         console.log(`📤 Calling updateEvent (PUT) with ID: ${finalDraftId}`);
         try {
-          response = await updateEvent({
+          await updateEvent({
             id: finalDraftId,
             data: {
               name: currentFormData.name?.trim() || 'Untitled Event',
@@ -597,7 +641,6 @@ export default function CreateEventPage() {
           }).unwrap();
           console.log(`✅ updateEvent successful for ID: ${finalDraftId}`);
           
-          // ✅ Upload image if exists
           if (imageFile) {
             console.log(`📤 Uploading image for draft: ${finalDraftId}`);
             await uploadEventImage({
@@ -610,15 +653,11 @@ export default function CreateEventPage() {
           }
           
         } catch (err: any) {
-          // ✅ If 404, the draft doesn't exist - create a new one
           if (err?.status === 404 || err?.data?.message === 'Event not found') {
             console.log('🔍 Draft not found (404), creating new draft...');
-            
-            // ✅ Clear stale draft ID
             localStorage.removeItem(STORAGE_KEY);
             setDraftId(null);
             
-            // ✅ Create new draft
             const formDataToSend = new FormData();
             formDataToSend.append('name', currentFormData.name?.trim() || 'Untitled Event');
             formDataToSend.append('description', currentFormData.description || '');
@@ -640,7 +679,7 @@ export default function CreateEventPage() {
               formDataToSend.append('image', imageFile);
             }
 
-            response = await createDraft({
+            const response = await createDraft({
               accountId,
               data: formDataToSend,
             }).unwrap();
@@ -654,13 +693,11 @@ export default function CreateEventPage() {
             setImageFile(null);
             setImagePreview(null);
           } else {
-            // ✅ Other error - rethrow
             throw err;
           }
         }
         
       } else {
-        // ✅ CREATE new draft
         console.log('📤 Calling createDraft (POST)...');
         const formDataToSend = new FormData();
         formDataToSend.append('name', currentFormData.name?.trim() || 'Untitled Event');
@@ -683,7 +720,7 @@ export default function CreateEventPage() {
           formDataToSend.append('image', imageFile);
         }
 
-        response = await createDraft({
+        const response = await createDraft({
           accountId,
           data: formDataToSend,
         }).unwrap();
@@ -701,12 +738,10 @@ export default function CreateEventPage() {
       setLastSavedData({ ...currentFormData });
       setHasChanges(false);
       setSaveStatus('saved');
-      
       console.log('✅ Auto-save completed successfully');
       
     } catch (err: any) {
       console.error('❌ Auto-save error:', err);
-      // ✅ Show user-friendly error message
       if (err?.status === 404) {
         toast.error('Draft not found. Please refresh the page.');
       } else {
@@ -728,7 +763,7 @@ export default function CreateEventPage() {
     STORAGE_KEY,
   ]);
 
-  // ✅ Single auto-save effect
+  // ✅ Auto-save effect
   useEffect(() => {
     if (!accountId) return;
     
@@ -788,88 +823,64 @@ export default function CreateEventPage() {
   }, [hasChanges]);
 
   // ============================================================
-  // VALIDATION - MOVED UP BEFORE HANDLERS
+  // NAVIGATION HANDLERS
   // ============================================================
 
-  const isValidUrl = useCallback((string: string) => {
-    try {
-      new URL(string);
-      return true;
-    } catch (_) {
-      return false;
+  const handleNext = useCallback(() => {
+    const errors = validateStep(currentStep);
+    setValidationErrors(errors);
+    
+    if (Object.keys(errors).length > 0) {
+      const firstErrorField = Object.keys(errors)[0];
+      const element = document.getElementById(`field-${firstErrorField}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.focus();
+      }
+      toast.error('Please fix all errors before proceeding');
+      return;
+    }
+    
+    if (currentStep < 3) {
+      setCurrentStep(currentStep + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentStep, validateStep]);
+
+  const handlePrev = useCallback(() => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, []);
 
-  const validateField = useCallback((field: keyof EventFormData, value: any): string | undefined => {
-    switch (field) {
-      case 'name':
-        if (value && value.length > 100) return 'Event name must be less than 100 characters';
-        return undefined;
-      case 'date':
-        if (value) {
-          const selectedDate = new Date(value);
-          if (isNaN(selectedDate.getTime())) return 'Invalid date format';
-        }
-        return undefined;
-      case 'duration':
-        if (value !== null && value !== undefined) {
-          if (value < 0) return 'Duration cannot be negative';
-          if (value > 1440) return 'Duration cannot exceed 1440 minutes (24 hours)';
-        }
-        return undefined;
-      case 'price':
-        if (value !== null && value < 0) return 'Price cannot be negative';
-        return undefined;
-      case 'certificate_price':
-        if (value !== null && value < 0) return 'Certificate price cannot be negative';
-        return undefined;
-      case 'max_attendees':
-        if (value !== null && value < 0) return 'Maximum attendees cannot be negative';
-        return undefined;
-      case 'zoom_link':
-        if (value && !isValidUrl(value)) return 'Please enter a valid Zoom URL';
-        return undefined;
-      case 'meet_link':
-        if (value && !isValidUrl(value)) return 'Please enter a valid Google Meet URL';
-        return undefined;
-      default:
-        return undefined;
-    }
-  }, [isValidUrl]);
-
   // ============================================================
-  // HANDLERS
+  // FIELD HANDLERS
   // ============================================================
 
-  const handleChange = useCallback((field: keyof EventFormData, value: any) => {
+  const handleFieldChange = useCallback((field: keyof EventFormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError(null);
     setSaveStatus('saving');
     
     const errorKey = field as keyof FormErrors;
-    if (errors[errorKey]) {
-      setErrors(prev => {
-        const { [errorKey]: _, ...rest } = prev;
-        return rest;
-      });
-    }
-  }, [errors]);
-
-  const handleFieldBlurWithSave = useCallback((field: keyof EventFormData) => {
-    // Validate field
-    setTouched(prev => ({ ...prev, [field]: true }));
-    const error = validateField(field, formData[field]);
-    const errorKey = field as keyof FormErrors;
-    if (error) {
-      setErrors(prev => ({ ...prev, [errorKey]: error }));
-    } else {
-      setErrors(prev => {
+    if (validationErrors[errorKey]) {
+      setValidationErrors(prev => {
         const { [errorKey]: _, ...rest } = prev;
         return rest;
       });
     }
     
-    // ✅ Only save if there are changes and not already saving
+    const stepErrors = validateStep(currentStep);
+    setValidationErrors(stepErrors);
+  }, [currentStep, validateStep]);
+
+  const handleFieldBlur = useCallback((field: keyof EventFormData) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    
+    const stepErrors = validateStep(currentStep);
+    setValidationErrors(stepErrors);
+    
     if (hasChanges && !isAutoSaving && !isSaving && !isCreating) {
       if (autoSaveTimerRef.current) {
         clearTimeout(autoSaveTimerRef.current);
@@ -879,32 +890,264 @@ export default function CreateEventPage() {
         performAutoSave();
       }, 100);
     }
-  }, [
-    hasChanges,
-    isAutoSaving,
-    isSaving,
-    isCreating,
-    performAutoSave,
-    formData,
-    validateField,
-  ]);
+  }, [currentStep, validateStep, hasChanges, isAutoSaving, isSaving, isCreating, performAutoSave]);
 
   const handleSelectChange = useCallback((field: keyof EventFormData, value: any) => {
-    handleChange(field, value);
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
+    setSaveStatus('saving');
     
-    if (hasChanges && !isAutoSaving && !isSaving && !isCreating) {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = null;
-      }
-      setTimeout(() => {
-        performAutoSave();
-      }, 200);
+    const errorKey = field as keyof FormErrors;
+    if (validationErrors[errorKey]) {
+      setValidationErrors(prev => {
+        const { [errorKey]: _, ...rest } = prev;
+        return rest;
+      });
     }
-  }, [hasChanges, isAutoSaving, isSaving, isCreating, performAutoSave, handleChange]);
+    
+    const stepErrors = validateStep(currentStep);
+    setValidationErrors(stepErrors);
+  }, [currentStep, validateStep]);
+
+  const handleManualSave = () => {
+    if (hasChanges) {
+      performAutoSave();
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors(prev => ({ ...prev, image: 'Image must be less than 5MB' }));
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setErrors(prev => ({ ...prev, image: 'Only JPG, PNG, and WEBP images are supported' }));
+        return;
+      }
+      
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setFormData(prev => ({ ...prev, imagePreview: reader.result as string }));
+        setErrors(prev => {
+          const { image, ...rest } = prev;
+          return rest;
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // ============================================================
-  // VALIDATION FUNCTIONS
+  // SUBMIT HANDLER
+  // ============================================================
+
+  const handleSubmit = async (statusSlug: 'draft' | 'published') => {
+    setError(null);
+
+    if (!accountId) {
+      setError('Please log in to create events.');
+      toast.error('Please log in to create events');
+      return;
+    }
+
+    // Validate based on status
+    let isValid = false;
+    if (statusSlug === 'published') {
+      isValid = validateForPublish();
+    } else {
+      isValid = validateForDraft();
+    }
+
+    if (!isValid) {
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        const element = document.getElementById(`field-${firstErrorField}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }
+      setError(statusSlug === 'published' 
+        ? 'Please fix all errors before publishing.' 
+        : 'Please fix validation errors before saving.');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveStatus('saving');
+
+    try {
+      const currentDraftId = localStorage.getItem(STORAGE_KEY) || draftId;
+      
+      if (statusSlug === 'published') {
+        if (currentDraftId) {
+          if (imageFile) {
+            console.log('📤 Uploading image for draft:', currentDraftId);
+            await uploadEventImage({
+              accountId,
+              eventId: currentDraftId,
+              image: imageFile,
+            }).unwrap();
+            setImageFile(null);
+            setImagePreview(null);
+          }
+          
+          await updateEvent({
+            id: currentDraftId,
+            data: {
+              name: formData.name?.trim() || 'Untitled Event',
+              description: formData.description || '',
+              event_type_id: formData.event_type_id || '',
+              date: formData.date || '',
+              time: formData.time || '',
+              duration: formData.duration || 60,
+              price: formData.price || 0,
+              certificate_price: formData.certificate_price || 0,
+              location: formData.location || '',
+              is_virtual: formData.is_virtual,
+              is_featured: formData.is_featured,
+              is_private: formData.is_private,
+              zoom_link: formData.zoom_link || '',
+              meet_link: formData.meet_link || '',
+              max_attendees: formData.max_attendees || 0,
+            }
+          }).unwrap();
+          
+          await publishEvent(currentDraftId).unwrap();
+          
+          setCreatedEventId(currentDraftId);
+          setDraftId(null);
+          localStorage.removeItem(STORAGE_KEY);
+        } else {
+          const formDataToSend = new FormData();
+          formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
+          formDataToSend.append('description', formData.description || '');
+          formDataToSend.append('event_type_id', formData.event_type_id || '');
+          formDataToSend.append('date', formData.date || '');
+          formDataToSend.append('time', formData.time || '');
+          formDataToSend.append('duration', formData.duration?.toString() || '60');
+          formDataToSend.append('price', (formData.price || 0).toString());
+          formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
+          formDataToSend.append('location', formData.location || '');
+          formDataToSend.append('is_virtual', formData.is_virtual.toString());
+          formDataToSend.append('is_featured', formData.is_featured.toString());
+          formDataToSend.append('is_private', formData.is_private.toString());
+          formDataToSend.append('zoom_link', formData.zoom_link || '');
+          formDataToSend.append('meet_link', formData.meet_link || '');
+          formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
+
+          if (imageFile) {
+            formDataToSend.append('image', imageFile);
+          }
+
+          const response = await createEvent({
+            accountId,
+            data: formDataToSend,
+          }).unwrap();
+          setCreatedEventId(response.id);
+          setImageFile(null);
+          setImagePreview(null);
+        }
+      } else {
+        // Save Draft
+        if (currentDraftId) {
+          if (imageFile) {
+            await uploadEventImage({
+              accountId,
+              eventId: currentDraftId,
+              image: imageFile,
+            }).unwrap();
+            setImageFile(null);
+            setImagePreview(null);
+          }
+          
+          const response = await updateEvent({
+            id: currentDraftId,
+            data: {
+              name: formData.name?.trim() || 'Untitled Event',
+              description: formData.description || '',
+              event_type_id: formData.event_type_id || '',
+              date: formData.date || '',
+              time: formData.time || '',
+              duration: formData.duration || 60,
+              price: formData.price || 0,
+              certificate_price: formData.certificate_price || 0,
+              location: formData.location || '',
+              is_virtual: formData.is_virtual,
+              is_featured: formData.is_featured,
+              is_private: formData.is_private,
+              zoom_link: formData.zoom_link || '',
+              meet_link: formData.meet_link || '',
+              max_attendees: formData.max_attendees || 0,
+            }
+          }).unwrap();
+          setCreatedEventId(response.id);
+        } else {
+          const formDataToSend = new FormData();
+          formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
+          formDataToSend.append('description', formData.description || '');
+          formDataToSend.append('event_type_id', formData.event_type_id || '');
+          formDataToSend.append('date', formData.date || '');
+          formDataToSend.append('time', formData.time || '');
+          formDataToSend.append('duration', formData.duration?.toString() || '60');
+          formDataToSend.append('price', (formData.price || 0).toString());
+          formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
+          formDataToSend.append('location', formData.location || '');
+          formDataToSend.append('is_virtual', formData.is_virtual.toString());
+          formDataToSend.append('is_featured', formData.is_featured.toString());
+          formDataToSend.append('is_private', formData.is_private.toString());
+          formDataToSend.append('zoom_link', formData.zoom_link || '');
+          formDataToSend.append('meet_link', formData.meet_link || '');
+          formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
+
+          if (imageFile) {
+            formDataToSend.append('image', imageFile);
+          }
+
+          const response = await createDraft({
+            accountId,
+            data: formDataToSend,
+          }).unwrap();
+          const newDraftId = response.id;
+          setDraftId(newDraftId);
+          localStorage.setItem(STORAGE_KEY, newDraftId);
+          setCreatedEventId(newDraftId);
+          setImageFile(null);
+          setImagePreview(null);
+        }
+      }
+
+      setLastSavedData({ ...formData });
+      setHasChanges(false);
+      setSaveStatus('saved');
+      setIsPublished(statusSlug === 'published');
+      setIsSaveDialogOpen(true);
+      
+      if (statusSlug === 'draft') {
+        setFormData(defaultFormData);
+        setImagePreview(null);
+        setImageFile(null);
+        setErrors({});
+        setTouched({});
+        setDraftId(null);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      
+    } catch (err: any) {
+      console.error('Create event error:', err);
+      setError(err?.data?.message || 'Failed to create event. Please try again.');
+      toast.error(err?.data?.message || 'Failed to create event');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ============================================================
+  // VALIDATION HELPERS
   // ============================================================
 
   const validateForDraft = (): boolean => {
@@ -914,14 +1157,6 @@ export default function CreateEventPage() {
     if (formData.name && formData.name.length > 100) {
       newErrors.name = 'Event name must be less than 100 characters';
       isValid = false;
-    }
-
-    if (formData.date) {
-      const selectedDate = new Date(formData.date);
-      if (isNaN(selectedDate.getTime())) {
-        newErrors.date = 'Invalid date format';
-        isValid = false;
-      }
     }
 
     if (formData.duration !== null && formData.duration !== undefined) {
@@ -974,14 +1209,6 @@ export default function CreateEventPage() {
     if (!formData.date) {
       newErrors.date = 'Event date is required';
       isValid = false;
-    } else {
-      const selectedDate = new Date(formData.date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (selectedDate < today) {
-        newErrors.date = 'Event date cannot be in the past';
-        isValid = false;
-      }
     }
 
     if (!formData.time) {
@@ -1016,336 +1243,43 @@ export default function CreateEventPage() {
     return isValid;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, image: 'Image must be less than 5MB' }));
-        return;
-      }
-      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-        setErrors(prev => ({ ...prev, image: 'Only JPG, PNG, and WEBP images are supported' }));
-        return;
-      }
-      
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-        handleChange('imagePreview', reader.result as string);
-        setErrors(prev => {
-          const { image, ...rest } = prev;
-          return rest;
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleManualSave = () => {
-    if (hasChanges) {
-      performAutoSave();
-    }
-  };
-
-  // ============================================================
-  // SUBMIT
-  // ============================================================
-
-  const handleSubmit = async (statusSlug: 'draft' | 'published') => {
-    setError(null);
-
-    // ✅ Check authentication
-    if (!accountId) {
-      setError('Please log in to create events.');
-      toast.error('Please log in to create events');
-      return;
-    }
-
-    // ✅ Validate based on status
-    let isValid = false;
-    if (statusSlug === 'published') {
-      isValid = validateForPublish();
-    } else {
-      isValid = validateForDraft();
-    }
-
-    if (!isValid) {
-      const firstErrorField = Object.keys(errors)[0];
-      if (firstErrorField) {
-        const element = document.getElementById(`field-${firstErrorField}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.focus();
-        }
-      }
-      setError(statusSlug === 'published' 
-        ? 'Please fix all errors before publishing.' 
-        : 'Please fix validation errors before saving.');
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveStatus('saving');
-
-    try {
-      let response;
-      
-      // ============================================================
-      // PUBLISH FLOW
-      // ============================================================
-      if (statusSlug === 'published') {
-        // ✅ Get the latest draftId from localStorage
-        const currentDraftId = localStorage.getItem(STORAGE_KEY) || draftId;
-        
-        if (currentDraftId) {
-          // ✅ 1. Upload image if exists (separate API)
-          if (imageFile) {
-            console.log('📤 Uploading image for draft:', currentDraftId);
-            await uploadEventImage({
-              accountId,
-              eventId: currentDraftId,
-              image: imageFile,
-            }).unwrap();
-            console.log('✅ Image uploaded successfully');
-            setImageFile(null);
-            setImagePreview(null);
-          }
-          
-          // ✅ 2. Update draft with latest data (application/json)
-          console.log('📤 Updating draft with latest data:', currentDraftId);
-          await updateEvent({
-            id: currentDraftId,
-            data: {
-              name: formData.name?.trim() || 'Untitled Event',
-              description: formData.description || '',
-              event_type_id: formData.event_type_id || '',
-              date: formData.date || '',
-              time: formData.time || '',
-              duration: formData.duration || 60,
-              price: formData.price || 0,
-              certificate_price: formData.certificate_price || 0,
-              location: formData.location || '',
-              is_virtual: formData.is_virtual,
-              is_featured: formData.is_featured,
-              is_private: formData.is_private,
-              zoom_link: formData.zoom_link || '',
-              meet_link: formData.meet_link || '',
-              max_attendees: formData.max_attendees || 0,
-            }
-          }).unwrap();
-          console.log('✅ Draft updated successfully');
-          
-          // ✅ 3. Publish the draft
-          console.log('📤 Publishing draft:', currentDraftId);
-          await publishEvent(currentDraftId).unwrap();
-          console.log('✅ Event published successfully');
-          
-          setCreatedEventId(currentDraftId);
-          // ✅ Clear draft ID from state and localStorage
-          setDraftId(null);
-          localStorage.removeItem(STORAGE_KEY);
-          
-        } else {
-          // ✅ No draft - create published event directly with image in FormData
-          console.log('📤 Creating published event directly...');
-          const formDataToSend = new FormData();
-          formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
-          formDataToSend.append('description', formData.description || '');
-          formDataToSend.append('event_type_id', formData.event_type_id || '');
-          formDataToSend.append('date', formData.date || '');
-          formDataToSend.append('time', formData.time || '');
-          formDataToSend.append('duration', formData.duration?.toString() || '60');
-          formDataToSend.append('price', (formData.price || 0).toString());
-          formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
-          formDataToSend.append('location', formData.location || '');
-          formDataToSend.append('is_virtual', formData.is_virtual.toString());
-          formDataToSend.append('is_featured', formData.is_featured.toString());
-          formDataToSend.append('is_private', formData.is_private.toString());
-          formDataToSend.append('zoom_link', formData.zoom_link || '');
-          formDataToSend.append('meet_link', formData.meet_link || '');
-          formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
-
-          if (imageFile) {
-            formDataToSend.append('image', imageFile);
-          }
-
-          response = await createEvent({
-            accountId,
-            data: formDataToSend,
-          }).unwrap();
-          
-          const newEventId = response.id || response.id;
-          setCreatedEventId(newEventId);
-          setImageFile(null);
-          setImagePreview(null);
-        }
-        
-      // ============================================================
-      // SAVE DRAFT FLOW
-      // ============================================================
-      } else {
-        // ✅ Get the latest draftId from localStorage
-        const currentDraftId = localStorage.getItem(STORAGE_KEY) || draftId;
-        
-        if (currentDraftId) {
-          // ✅ Update existing draft
-          if (imageFile) {
-            console.log('📤 Uploading image for draft:', currentDraftId);
-            await uploadEventImage({
-              accountId,
-              eventId: currentDraftId,
-              image: imageFile,
-            }).unwrap();
-            setImageFile(null);
-            setImagePreview(null);
-          }
-          
-          response = await updateEvent({
-            id: currentDraftId,
-            data: {
-              name: formData.name?.trim() || 'Untitled Event',
-              description: formData.description || '',
-              event_type_id: formData.event_type_id || '',
-              date: formData.date || '',
-              time: formData.time || '',
-              duration: formData.duration || 60,
-              price: formData.price || 0,
-              certificate_price: formData.certificate_price || 0,
-              location: formData.location || '',
-              is_virtual: formData.is_virtual,
-              is_featured: formData.is_featured,
-              is_private: formData.is_private,
-              zoom_link: formData.zoom_link || '',
-              meet_link: formData.meet_link || '',
-              max_attendees: formData.max_attendees || 0,
-            }
-          }).unwrap();
-          setCreatedEventId(response.id || response.id);
-          
-        } else {
-          // ✅ Create new draft with image in FormData
-          console.log('📤 Creating new draft...');
-          const formDataToSend = new FormData();
-          formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
-          formDataToSend.append('description', formData.description || '');
-          formDataToSend.append('event_type_id', formData.event_type_id || '');
-          formDataToSend.append('date', formData.date || '');
-          formDataToSend.append('time', formData.time || '');
-          formDataToSend.append('duration', formData.duration?.toString() || '60');
-          formDataToSend.append('price', (formData.price || 0).toString());
-          formDataToSend.append('certificate_price', (formData.certificate_price || 0).toString());
-          formDataToSend.append('location', formData.location || '');
-          formDataToSend.append('is_virtual', formData.is_virtual.toString());
-          formDataToSend.append('is_featured', formData.is_featured.toString());
-          formDataToSend.append('is_private', formData.is_private.toString());
-          formDataToSend.append('zoom_link', formData.zoom_link || '');
-          formDataToSend.append('meet_link', formData.meet_link || '');
-          formDataToSend.append('max_attendees', (formData.max_attendees || 0).toString());
-
-          if (imageFile) {
-            formDataToSend.append('image', imageFile);
-          }
-
-          response = await createDraft({
-            accountId,
-            data: formDataToSend,
-          }).unwrap();
-          
-          const newDraftId = response.id || response.id;
-          setDraftId(newDraftId);
-          localStorage.setItem(STORAGE_KEY, newDraftId);
-          setCreatedEventId(newDraftId);
-          setImageFile(null);
-          setImagePreview(null);
-        }
-      }
-
-      // ✅ Update state and show success
-      setLastSavedData({ ...formData });
-      setHasChanges(false);
-      setSaveStatus('saved');
-      
-      setIsPublished(statusSlug === 'published');
-      setIsSaveDialogOpen(true);
-      
-      if (statusSlug === 'draft') {
-        setFormData(defaultFormData);
-        setImagePreview(null);
-        setImageFile(null);
-        setErrors({});
-        setTouched({});
-        setDraftId(null);
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      
-    } catch (err: any) {
-      console.error('Create event error:', err);
-      setError(err?.data?.message || 'Failed to create event. Please try again.');
-      toast.error(err?.data?.message || 'Failed to create event');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep < 3) {
-      if (validateForDraft()) {
-        setCurrentStep(currentStep + 1);
-      }
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  // ✅ Fix 1: Use lowercase fields for event types
-  const selectedEventType = eventTypes.find((t: any) => t.id === formData.event_type_id);  
-     
-
   // ============================================================
   // RENDER STEP CONTENT
   // ============================================================
 
- const renderStepContent = () => {
-  switch (currentStep) {
-    case 1:
-      return (
-        <div className="space-y-6">
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 gap-4">
-                <div id="field-name" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">
-                    Event Name
-                    <span className="text-error-500 ml-1">*</span>
-                  </Label>
-                  <Input
-                    placeholder="e.g., Advanced Data Science Workshop"
-                    value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
-                    onBlur={() => handleFieldBlurWithSave('name')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.name && errors.name && "border-error-500 focus:ring-error-500 focus:border-error-500"
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6">
+            <Card className="border border-neutral-light">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div id="field-name" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">
+                      Event Name <span className="text-error-500 ml-1">*</span>
+                    </Label>
+                    <Input
+                      placeholder="e.g., Advanced Data Science Workshop"
+                      value={formData.name}
+                      onChange={(e) => handleFieldChange('name', e.target.value)}
+                      onBlur={() => handleFieldBlur('name')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        validationErrors.name && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                    />
+                    {validationErrors.name && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {validationErrors.name}
+                      </p>
                     )}
-                  />
-                  {touched.name && errors.name && (
-                    <p className="text-sm text-error-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.name}
-                    </p>
-                  )}
-                </div>
+                  </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div id="field-event_type_id" className="space-y-2">
                     <Label className="text-sm font-medium text-neutral-dark">
-                      Event Type
-                      <span className="text-error-500 ml-1">*</span>
+                      Event Type <span className="text-error-500 ml-1">*</span>
                     </Label>
                     <Select
                       value={formData.event_type_id}
@@ -1356,7 +1290,7 @@ export default function CreateEventPage() {
                     >
                       <SelectTrigger className={cn(
                         "cursor-pointer",
-                        touched.event_type_id && errors.event_type_id && "border-error-500"
+                        validationErrors.event_type_id && "border-error-500"
                       )}>
                         <SelectValue placeholder="Select event type" />
                       </SelectTrigger>
@@ -1368,18 +1302,17 @@ export default function CreateEventPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {touched.event_type_id && errors.event_type_id && (
+                    {validationErrors.event_type_id && (
                       <p className="text-sm text-error-500 flex items-center gap-1">
                         <AlertCircle className="h-3.5 w-3.5" />
-                        {errors.event_type_id}
+                        {validationErrors.event_type_id}
                       </p>
                     )}
                   </div>
 
                   <div id="field-duration" className="space-y-2">
                     <Label className="text-sm font-medium text-neutral-dark">
-                      Duration (minutes)
-                      <span className="text-error-500 ml-1">*</span>
+                      Duration (minutes) <span className="text-error-500 ml-1">*</span>
                     </Label>
                     <Input
                       type="number"
@@ -1387,489 +1320,481 @@ export default function CreateEventPage() {
                       value={formData.duration || ''}
                       onChange={(e) => {
                         const val = e.target.value;
-                        handleChange('duration', val === '' ? null : parseInt(val) || 0);
+                        handleFieldChange('duration', val === '' ? null : parseInt(val) || 0);
                       }}
-                      onBlur={() => handleFieldBlurWithSave('duration')}
+                      onBlur={() => handleFieldBlur('duration')}
                       className={cn(
                         "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                        touched.duration && errors.duration && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        validationErrors.duration && "border-error-500 focus:ring-error-500 focus:border-error-500"
                       )}
                       min={1}
                     />
-                    {touched.duration && errors.duration && (
+                    {validationErrors.duration && (
                       <p className="text-sm text-error-500 flex items-center gap-1">
                         <AlertCircle className="h-3.5 w-3.5" />
-                        {errors.duration}
+                        {validationErrors.duration}
                       </p>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">Description</Label>
-                  <Textarea
-                    placeholder="Describe your event, what attendees will learn..."
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    onBlur={() => handleFieldBlurWithSave('description')}
-                    className="min-h-[120px] cursor-text focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div id="field-date" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">
-                    Date
-                    <span className="text-error-500 ml-1">*</span>
-                  </Label>
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => handleChange('date', e.target.value)}
-                    onBlur={() => handleFieldBlurWithSave('date')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.date && errors.date && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                    )}
-                  />
-                  {touched.date && errors.date && (
-                    <p className="text-sm text-error-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.date}
-                    </p>
-                  )}
-                </div>
-                <div id="field-time" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">
-                    Time
-                    <span className="text-error-500 ml-1">*</span>
-                  </Label>
-                  <Input
-                    type="time"
-                    value={formData.time}
-                    onChange={(e) => handleChange('time', e.target.value)}
-                    onBlur={() => handleFieldBlurWithSave('time')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.time && errors.time && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                    )}
-                  />
-                  {touched.time && errors.time && (
-                    <p className="text-sm text-error-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.time}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      );
-
-    case 2:
-      return (
-        <div className="space-y-6">
-          {/* Pricing */}
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div id="field-price" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">Price (KES)</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={formData.price || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleChange('price', val === '' ? null : parseFloat(val) || 0);
-                    }}
-                    onBlur={() => handleFieldBlurWithSave('price')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.price && errors.price && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                    )}
-                    min={0}
-                    step="0.01"
-                  />
-                  <p className="text-xs text-neutral-gray">Set to 0 for free events</p>
-                  {touched.price && errors.price && (
-                    <p className="text-sm text-error-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.price}
-                    </p>
-                  )}
-                </div>
-                <div id="field-certificate_price" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">Certificate Price (KES)</Label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={formData.certificate_price || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleChange('certificate_price', val === '' ? null : parseFloat(val) || 0);
-                    }}
-                    onBlur={() => handleFieldBlurWithSave('certificate_price')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.certificate_price && errors.certificate_price && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                    )}
-                    min={0}
-                    step="0.01"
-                  />
-                  {touched.certificate_price && errors.certificate_price && (
-                    <p className="text-sm text-error-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.certificate_price}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Location & Virtual */}
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-neutral-light rounded-lg">
-                  <div>
-                    <Label className="text-sm font-medium text-neutral-dark">Virtual Event</Label>
-                    <p className="text-xs text-neutral-gray">Toggle if this is an online event</p>
-                  </div>
-                  <Switch
-                    checked={formData.is_virtual}
-                    onCheckedChange={(checked) => {
-                      handleSelectChange('is_virtual', checked);
-                      if (!checked) {
-                        handleChange('zoom_link', '');
-                        handleChange('meet_link', '');
-                      } else {
-                        handleChange('location', '');
-                      }
-                    }}
-                    className="cursor-pointer"
-                  />
-                </div>
-
-                {formData.is_virtual ? (
-                  <div className="grid grid-cols-1 gap-4">
-                    <div id="field-zoom_link" className="space-y-2">
-                      <Label className="text-sm font-medium text-neutral-dark">Zoom Link</Label>
-                      <Input
-                        placeholder="https://zoom.us/meeting/..."
-                        value={formData.zoom_link}
-                        onChange={(e) => handleChange('zoom_link', e.target.value)}
-                        onBlur={() => handleFieldBlurWithSave('zoom_link')}
-                        className={cn(
-                          "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                          touched.zoom_link && errors.zoom_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                        )}
-                      />
-                      {touched.zoom_link && errors.zoom_link && (
-                        <p className="text-sm text-error-500 flex items-center gap-1">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          {errors.zoom_link}
-                        </p>
-                      )}
-                    </div>
-                    <div id="field-meet_link" className="space-y-2">
-                      <Label className="text-sm font-medium text-neutral-dark">Google Meet Link</Label>
-                      <Input
-                        placeholder="https://meet.google.com/..."
-                        value={formData.meet_link}
-                        onChange={(e) => handleChange('meet_link', e.target.value)}
-                        onBlur={() => handleFieldBlurWithSave('meet_link')}
-                        className={cn(
-                          "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                          touched.meet_link && errors.meet_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
-                        )}
-                      />
-                      {touched.meet_link && errors.meet_link && (
-                        <p className="text-sm text-error-500 flex items-center gap-1">
-                          <AlertCircle className="h-3.5 w-3.5" />
-                          {errors.meet_link}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div id="field-location" className="space-y-2">
+                  <div id="field-date" className="space-y-2">
                     <Label className="text-sm font-medium text-neutral-dark">
-                      Location
-                      <span className="text-error-500 ml-1">*</span>
+                      Date <span className="text-error-500 ml-1">*</span>
                     </Label>
                     <Input
-                      placeholder="e.g., Nairobi, Kenya"
-                      value={formData.location}
-                      onChange={(e) => handleChange('location', e.target.value)}
-                      onBlur={() => handleFieldBlurWithSave('location')}
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => handleFieldChange('date', e.target.value)}
+                      onBlur={() => handleFieldBlur('date')}
                       className={cn(
                         "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                        touched.location && errors.location && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        validationErrors.date && "border-error-500 focus:ring-error-500 focus:border-error-500"
                       )}
                     />
-                    {touched.location && errors.location && (
+                    {validationErrors.date && (
                       <p className="text-sm text-error-500 flex items-center gap-1">
                         <AlertCircle className="h-3.5 w-3.5" />
-                        {errors.location}
+                        {validationErrors.date}
                       </p>
                     )}
                   </div>
-                )}
 
-                <div id="field-max_attendees" className="space-y-2">
-                  <Label className="text-sm font-medium text-neutral-dark">Maximum Attendees</Label>
-                  <Input
-                    type="number"
-                    placeholder="0 for unlimited"
-                    value={formData.max_attendees || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleChange('max_attendees', val === '' ? null : parseInt(val) || 0);
-                    }}
-                    onBlur={() => handleFieldBlurWithSave('max_attendees')}
-                    className={cn(
-                      "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                      touched.max_attendees && errors.max_attendees && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                  <div id="field-time" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">
+                      Time <span className="text-error-500 ml-1">*</span>
+                    </Label>
+                    <Input
+                      type="time"
+                      value={formData.time}
+                      onChange={(e) => handleFieldChange('time', e.target.value)}
+                      onBlur={() => handleFieldBlur('time')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        validationErrors.time && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                    />
+                    {validationErrors.time && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {validationErrors.time}
+                      </p>
                     )}
-                    min={0}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Description</Label>
+                    <Textarea
+                      placeholder="Describe your event, what attendees will learn..."
+                      value={formData.description}
+                      onChange={(e) => handleFieldChange('description', e.target.value)}
+                      onBlur={() => handleFieldBlur('description')}
+                      className="min-h-[120px] cursor-text focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <Card className="border border-neutral-light">
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div id="field-price" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Price (KES)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={formData.price || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleFieldChange('price', val === '' ? null : parseFloat(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlur('price')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        validationErrors.price && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
+                      step="0.01"
+                    />
+                    <p className="text-xs text-neutral-gray">Set to 0 for free events</p>
+                    {validationErrors.price && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {validationErrors.price}
+                      </p>
+                    )}
+                  </div>
+
+                  <div id="field-certificate_price" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Certificate Price (KES)</Label>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      value={formData.certificate_price || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleFieldChange('certificate_price', val === '' ? null : parseFloat(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlur('certificate_price')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        validationErrors.certificate_price && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
+                      step="0.01"
+                    />
+                    {validationErrors.certificate_price && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {validationErrors.certificate_price}
+                      </p>
+                    )}
+                  </div>
+
+                  <div id="field-max_attendees" className="space-y-2">
+                    <Label className="text-sm font-medium text-neutral-dark">Maximum Attendees</Label>
+                    <Input
+                      type="number"
+                      placeholder="0 for unlimited"
+                      value={formData.max_attendees || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleFieldChange('max_attendees', val === '' ? null : parseInt(val) || 0);
+                      }}
+                      onBlur={() => handleFieldBlur('max_attendees')}
+                      className={cn(
+                        "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                        validationErrors.max_attendees && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                      )}
+                      min={0}
+                    />
+                    {validationErrors.max_attendees && (
+                      <p className="text-sm text-error-500 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        {validationErrors.max_attendees}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-neutral-light">
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-neutral-light rounded-lg">
+                    <div>
+                      <Label className="text-sm font-medium text-neutral-dark">Virtual Event</Label>
+                      <p className="text-xs text-neutral-gray">Toggle if this is an online event</p>
+                    </div>
+                    <Switch
+                      checked={formData.is_virtual}
+                      onCheckedChange={(checked) => {
+                        handleSelectChange('is_virtual', checked);
+                        if (!checked) {
+                          handleFieldChange('zoom_link', '');
+                          handleFieldChange('meet_link', '');
+                        } else {
+                          handleFieldChange('location', '');
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                  </div>
+
+                  {formData.is_virtual ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div id="field-zoom_link" className="space-y-2">
+                        <Label className="text-sm font-medium text-neutral-dark">Zoom Link</Label>
+                        <Input
+                          placeholder="https://zoom.us/meeting/..."
+                          value={formData.zoom_link}
+                          onChange={(e) => handleFieldChange('zoom_link', e.target.value)}
+                          onBlur={() => handleFieldBlur('zoom_link')}
+                          className={cn(
+                            "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                            validationErrors.zoom_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                          )}
+                        />
+                        {validationErrors.zoom_link && (
+                          <p className="text-sm text-error-500 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {validationErrors.zoom_link}
+                          </p>
+                        )}
+                      </div>
+                      <div id="field-meet_link" className="space-y-2">
+                        <Label className="text-sm font-medium text-neutral-dark">Google Meet Link</Label>
+                        <Input
+                          placeholder="https://meet.google.com/..."
+                          value={formData.meet_link}
+                          onChange={(e) => handleFieldChange('meet_link', e.target.value)}
+                          onBlur={() => handleFieldBlur('meet_link')}
+                          className={cn(
+                            "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                            validationErrors.meet_link && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                          )}
+                        />
+                        {validationErrors.meet_link && (
+                          <p className="text-sm text-error-500 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {validationErrors.meet_link}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div id="field-location" className="space-y-2">
+                      <Label className="text-sm font-medium text-neutral-dark">
+                        Location <span className="text-error-500 ml-1">*</span>
+                      </Label>
+                      <Input
+                        placeholder="e.g., Nairobi, Kenya"
+                        value={formData.location}
+                        onChange={(e) => handleFieldChange('location', e.target.value)}
+                        onBlur={() => handleFieldBlur('location')}
+                        className={cn(
+                          "cursor-text focus:ring-primary-500 focus:border-primary-500",
+                          validationErrors.location && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        )}
+                      />
+                      {validationErrors.location && (
+                        <p className="text-sm text-error-500 flex items-center gap-1">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          {validationErrors.location}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-neutral-light">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-neutral-dark">Event Visibility</CardTitle>
+                <CardDescription className="text-xs text-neutral-gray">
+                  Control how your event appears to users
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
+                  <div>
+                    <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                      <Star className="h-4 w-4 text-secondary-500" />
+                      Featured Event
+                    </Label>
+                    <p className="text-xs text-neutral-gray">Featured events appear prominently on the homepage</p>
+                  </div>
+                  <Switch
+                    checked={formData.is_featured}
+                    onCheckedChange={(checked) => handleSelectChange('is_featured', checked)}
+                    className="cursor-pointer data-[state=checked]:bg-secondary-500"
                   />
-                  {touched.max_attendees && errors.max_attendees && (
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <div>
+                    <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-amber-500" />
+                      Private Event
+                    </Label>
+                    <p className="text-xs text-neutral-gray">Private events are hidden from public listings</p>
+                  </div>
+                  <Switch
+                    checked={formData.is_private}
+                    onCheckedChange={(checked) => handleSelectChange('is_private', checked)}
+                    className="cursor-pointer data-[state=checked]:bg-amber-500"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-neutral-light">
+              <CardContent className="pt-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-neutral-dark">Event Image</Label>
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Event preview"
+                        className="w-full max-w-md h-48 object-cover rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setImageFile(null);
+                          setFormData(prev => ({ ...prev, imagePreview: '' }));
+                          setErrors(prev => {
+                            const { image, ...rest } = prev;
+                            return rest;
+                          });
+                        }}
+                        className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className={cn(
+                      "flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
+                      errors.image ? "border-error-500 bg-error-50" : "border-neutral-light hover:border-primary-300 hover:bg-primary-50"
+                    )}>
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <Upload className={cn(
+                          "h-10 w-10",
+                          errors.image ? "text-error-500" : "text-neutral-gray"
+                        )} />
+                        <p className={cn(
+                          "text-sm mt-2",
+                          errors.image ? "text-error-500" : "text-neutral-gray"
+                        )}>
+                          {errors.image || 'Click to upload event image'}
+                        </p>
+                        <p className="text-xs text-neutral-gray">PNG, JPG, WEBP up to 5MB</p>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                  )}
+                  {errors.image && (
                     <p className="text-sm text-error-500 flex items-center gap-1">
                       <AlertCircle className="h-3.5 w-3.5" />
-                      {errors.max_attendees}
+                      {errors.image}
                     </p>
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
+        );
 
-          {/* Featured & Private Toggles */}
-          <Card className="border border-neutral-light">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-neutral-dark">Event Visibility</CardTitle>
-              <CardDescription className="text-xs text-neutral-gray">
-                Control how your event appears to users
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
-                <div>
-                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-                    <Star className="h-4 w-4 text-secondary-500" />
-                    Featured Event
-                  </Label>
-                  <p className="text-xs text-neutral-gray">Featured events appear prominently on the homepage</p>
-                </div>
-                <Switch
-                  checked={formData.is_featured}
-                  onCheckedChange={(checked) => {
-                    handleSelectChange('is_featured', checked);
-                  }}
-                  className="cursor-pointer data-[state=checked]:bg-secondary-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
-                <div>
-                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-                    <Lock className="h-4 w-4 text-amber-500" />
-                    Private Event
-                  </Label>
-                  <p className="text-xs text-neutral-gray">Private events are hidden from public listings</p>
-                </div>
-                <Switch
-                  checked={formData.is_private}
-                  onCheckedChange={(checked) => {
-                    handleSelectChange('is_private', checked);
-                  }}
-                  className="cursor-pointer data-[state=checked]:bg-amber-500"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Image Upload */}
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-neutral-dark">Event Image</Label>
-                {imagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Event preview"
-                      className="w-full max-w-md h-48 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImagePreview(null);
-                        setImageFile(null);
-                        handleChange('imagePreview', '');
-                        setErrors(prev => {
-                          const { image, ...rest } = prev;
-                          return rest;
-                        });
-                      }}
-                      className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+      case 3:
+        return (
+          <div className="space-y-6">
+            <Card className="border border-neutral-light">
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm text-neutral-gray">
+                    <Shield className="h-4 w-4 text-primary-500" />
+                    <span>Review your event details before publishing</span>
                   </div>
-                ) : (
-                  <label className={cn(
-                    "flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors",
-                    errors.image ? "border-error-500 bg-error-50" : "border-neutral-light hover:border-primary-300 hover:bg-primary-50"
-                  )}>
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className={cn(
-                        "h-10 w-10",
-                        errors.image ? "text-error-500" : "text-neutral-gray"
-                      )} />
-                      <p className={cn(
-                        "text-sm mt-2",
-                        errors.image ? "text-error-500" : "text-neutral-gray"
-                      )}>
-                        {errors.image || 'Click to upload event image'}
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-neutral-gray">Event Name</p>
+                      <p className="font-medium text-neutral-dark">{formData.name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Type</p>
+                      <p className="font-medium text-neutral-dark">{eventTypes.find((t: any) => t.id === formData.event_type_id)?.name || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Date</p>
+                      <p className="font-medium text-neutral-dark">{formData.date || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Time</p>
+                      <p className="font-medium text-neutral-dark">{formData.time || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Duration</p>
+                      <p className="font-medium text-neutral-dark">{formData.duration || 0} minutes</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-gray">Price</p>
+                      <p className="font-medium text-neutral-dark">
+                        {formData.price && formData.price > 0 ? `${formData.price} KES` : 'Free'}
                       </p>
-                      <p className="text-xs text-neutral-gray">PNG, JPG, WEBP up to 5MB</p>
                     </div>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                    />
-                  </label>
-                )}
-                {errors.image && (
-                  <p className="text-sm text-error-500 flex items-center gap-1">
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    {errors.image}
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      );
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Virtual</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_virtual ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Featured</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_featured ? 'Yes' : 'No'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-neutral-gray">Private</p>
+                      <p className="font-medium text-neutral-dark">{formData.is_private ? 'Yes' : 'No'}</p>
+                    </div>
+                    {formData.is_virtual && formData.zoom_link && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Zoom Link</p>
+                        <p className="font-medium text-neutral-dark truncate">{formData.zoom_link}</p>
+                      </div>
+                    )}
+                    {formData.is_virtual && formData.meet_link && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Meet Link</p>
+                        <p className="font-medium text-neutral-dark truncate">{formData.meet_link}</p>
+                      </div>
+                    )}
+                    {!formData.is_virtual && formData.location && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Location</p>
+                        <p className="font-medium text-neutral-dark">{formData.location}</p>
+                      </div>
+                    )}
+                    {formData.max_attendees && formData.max_attendees > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-neutral-gray">Max Attendees</p>
+                        <p className="font-medium text-neutral-dark">{formData.max_attendees}</p>
+                      </div>
+                    )}
+                  </div>
 
-    case 3:
-      return (
-        <div className="space-y-6">
-          <Card className="border border-neutral-light">
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-neutral-gray">
-                  <Shield className="h-4 w-4 text-primary-500" />
-                  <span>Review your event details before publishing</span>
-                </div>
+                  {formData.description && (
+                    <div className="pt-4 border-t border-neutral-light">
+                      <p className="text-neutral-gray text-sm">Description</p>
+                      <p className="text-sm text-neutral-dark mt-1">{formData.description}</p>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-neutral-gray">Event Name</p>
-                    <p className="font-medium text-neutral-dark">{formData.name || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-gray">Type</p>
-                    <p className="font-medium text-neutral-dark">{selectedEventType?.name || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-gray">Date</p>
-                    <p className="font-medium text-neutral-dark">{formData.date || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-gray">Time</p>
-                    <p className="font-medium text-neutral-dark">{formData.time || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-gray">Duration</p>
-                    <p className="font-medium text-neutral-dark">{formData.duration || 0} minutes</p>
-                  </div>
-                  <div>
-                    <p className="text-neutral-gray">Price</p>
-                    <p className="font-medium text-neutral-dark">
-                      {formData.price && formData.price > 0 ? `${formData.price} KES` : 'Free'}
-                    </p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-neutral-gray">Virtual</p>
-                    <p className="font-medium text-neutral-dark">{formData.is_virtual ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-neutral-gray">Featured</p>
-                    <p className="font-medium text-neutral-dark">{formData.is_featured ? 'Yes' : 'No'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-neutral-gray">Private</p>
-                    <p className="font-medium text-neutral-dark">{formData.is_private ? 'Yes' : 'No'}</p>
-                  </div>
-                  {formData.is_virtual && formData.zoom_link && (
-                    <div className="col-span-2">
-                      <p className="text-neutral-gray">Zoom Link</p>
-                      <p className="font-medium text-neutral-dark truncate">{formData.zoom_link}</p>
-                    </div>
-                  )}
-                  {formData.is_virtual && formData.meet_link && (
-                    <div className="col-span-2">
-                      <p className="text-neutral-gray">Meet Link</p>
-                      <p className="font-medium text-neutral-dark truncate">{formData.meet_link}</p>
-                    </div>
-                  )}
-                  {!formData.is_virtual && formData.location && (
-                    <div className="col-span-2">
-                      <p className="text-neutral-gray">Location</p>
-                      <p className="font-medium text-neutral-dark">{formData.location}</p>
-                    </div>
-                  )}
-                  {formData.max_attendees && formData.max_attendees > 0 && (
-                    <div className="col-span-2">
-                      <p className="text-neutral-gray">Max Attendees</p>
-                      <p className="font-medium text-neutral-dark">{formData.max_attendees}</p>
+                  {formData.imagePreview && (
+                    <div className="pt-4 border-t border-neutral-light">
+                      <p className="text-neutral-gray text-sm">Event Image</p>
+                      <img
+                        src={formData.imagePreview}
+                        alt="Event preview"
+                        className="mt-2 w-full max-w-xs h-32 object-cover rounded-lg"
+                      />
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
 
-                {formData.description && (
-                  <div className="pt-4 border-t border-neutral-light">
-                    <p className="text-neutral-gray text-sm">Description</p>
-                    <p className="text-sm text-neutral-dark mt-1">{formData.description}</p>
-                  </div>
-                )}
+            <EventPreviewCard 
+              data={formData} 
+              eventType={eventTypes.find((t: any) => t.id === formData.event_type_id)?.name} 
+            />
+          </div>
+        );
 
-                {formData.imagePreview && (
-                  <div className="pt-4 border-t border-neutral-light">
-                    <p className="text-neutral-gray text-sm">Event Image</p>
-                    <img
-                      src={formData.imagePreview}
-                      alt="Event preview"
-                      className="mt-2 w-full max-w-xs h-32 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+      default:
+        return null;
+    }
+  };
 
-          <EventPreviewCard data={formData} eventType={selectedEventType?.name} />
-        </div>
-      );
-
-    default:
-      return null;
-  }
-};
-
+  const selectedEventType = eventTypes.find((t: any) => t.id === formData.event_type_id);
   const isLoading = isSaving || isCreating || isAutoSaving || isPublishing || isUploading;
+
+  // ============================================================
+  // RETURN
+  // ============================================================
 
   return (
     <div className="w-full">
@@ -1890,7 +1815,6 @@ export default function CreateEventPage() {
           </div>
         </div>
         
-        {/* Action Buttons with Save Status */}
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <SaveStatusIndicator status={saveStatus} />
           
@@ -1935,7 +1859,6 @@ export default function CreateEventPage() {
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 text-error-600 rounded-lg text-sm flex items-center gap-2">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -1943,17 +1866,14 @@ export default function CreateEventPage() {
         </div>
       )}
 
-      {/* Stepper */}
       <div className="py-4">
         <Stepper currentStep={currentStep} steps={STEPS} />
       </div>
 
-      {/* Main Content - Grid Layout */}
       <div className={cn(
         "grid gap-6",
         !isMobile ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"
       )}>
-        {/* Left Column - Editor */}
         <div className="min-w-0">
           <Card className="border border-neutral-light">
             <CardHeader>
@@ -1973,7 +1893,20 @@ export default function CreateEventPage() {
             </CardContent>
           </Card>
 
-          {/* Navigation Buttons */}
+          <div className="flex items-center gap-2 mt-4">
+            {Object.keys(validationErrors).length > 0 ? (
+              <div className="flex items-center gap-2 text-sm text-error-500">
+                <AlertCircle className="h-4 w-4" />
+                <span>Please fix {Object.keys(validationErrors).length} error(s) before proceeding</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-tertiary-500">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>All fields are valid</span>
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between gap-3 mt-6">
             <Button
               variant="outline"
@@ -1989,6 +1922,7 @@ export default function CreateEventPage() {
               <Button
                 className="bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
                 onClick={handleNext}
+                disabled={Object.keys(validationErrors).length > 0}
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
@@ -2007,7 +1941,7 @@ export default function CreateEventPage() {
                 <Button 
                   className="flex-1 sm:flex-none bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => handleSubmit('published')}
-                  disabled={!isPublishReady || isLoading}
+                  disabled={!isPublishReady || isLoading || Object.keys(validationErrors).length > 0}
                 >
                   {isSaving || isPublishing ? (
                     <>
@@ -2026,7 +1960,6 @@ export default function CreateEventPage() {
           </div>
         </div>
 
-        {/* Right Column - Desktop Preview */}
         {!isMobile && currentStep !== 3 && (
           <div className="sticky top-24 h-fit space-y-4">
             <Card className="border border-neutral-light">
@@ -2043,7 +1976,6 @@ export default function CreateEventPage() {
               </CardContent>
             </Card>
 
-            {/* Validation Summary */}
             {Object.keys(errors).length > 0 && (
               <Card className="border border-error-200 bg-error-50">
                 <CardContent className="pt-4">
@@ -2062,7 +1994,6 @@ export default function CreateEventPage() {
               </Card>
             )}
 
-            {/* Publish Readiness Indicator */}
             <Card className={cn(
               "border",
               isPublishReady ? "border-tertiary-200 bg-tertiary-50" : "border-neutral-light"
@@ -2084,7 +2015,6 @@ export default function CreateEventPage() {
               </CardContent>
             </Card>
 
-            {/* Tips Card */}
             <Card className="border border-neutral-light">
               <CardHeader>
                 <CardTitle className="text-sm font-medium text-neutral-dark flex items-center gap-2">
@@ -2115,7 +2045,6 @@ export default function CreateEventPage() {
         />
       )}
 
-      {/* Success Dialog */}
       <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
