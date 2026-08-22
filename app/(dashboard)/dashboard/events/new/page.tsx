@@ -526,7 +526,7 @@ export default function CreateEventPage() {
   // AUTO-SAVE LOGIC - FIXED with localStorage
   // ============================================================
 
-  const performAutoSave = useCallback(async () => {
+ const performAutoSave = useCallback(async () => {
     // ✅ Prevent multiple concurrent saves
     if (isAutoSavingRef.current || isSaving || isCreating) {
       console.log('⏭️ Skipping auto-save: Already saving');
@@ -551,18 +551,14 @@ export default function CreateEventPage() {
       return;
     }
 
-    // ✅ CRITICAL: Get the latest draftId from localStorage FIRST
+    // ✅ Get the latest draftId from localStorage
     const localStorageDraftId = localStorage.getItem(STORAGE_KEY);
     const stateDraftId = draftId;
-    
-    // Use localStorage value first, fallback to state
     const currentDraftId = localStorageDraftId || stateDraftId;
     
-    console.log(`🔍 Auto-save - draftId from localStorage: ${localStorageDraftId || 'null'}`);
-    console.log(`🔍 Auto-save - draftId from state: ${stateDraftId || 'null'}`);
     console.log(`🔍 Auto-save - FINAL draftId: ${currentDraftId || 'null'}`);
-    
-    // ✅ If we have a draftId in state but not in localStorage, save it
+
+    // ✅ Sync state with localStorage
     if (stateDraftId && !localStorageDraftId) {
       localStorage.setItem(STORAGE_KEY, stateDraftId);
       console.log('💾 Synced draftId to localStorage:', stateDraftId);
@@ -573,49 +569,98 @@ export default function CreateEventPage() {
 
     try {
       let response;
-      
-      // ✅ Use the latest draftId - check localStorage first
       const finalDraftId = localStorage.getItem(STORAGE_KEY) || draftId;
       
       if (finalDraftId) {
-        // ✅ UPDATE existing draft - PUT request
+        // ✅ Try to update existing draft
         console.log(`📤 Calling updateEvent (PUT) with ID: ${finalDraftId}`);
-        response = await updateEvent({
-          id: finalDraftId,
-          data: {
-            name: currentFormData.name?.trim() || 'Untitled Event',
-            description: currentFormData.description || '',
-            event_type_id: currentFormData.event_type_id || '',
-            date: currentFormData.date || '',
-            time: currentFormData.time || '',
-            duration: currentFormData.duration || 60,
-            price: currentFormData.price || 0,
-            certificate_price: currentFormData.certificate_price || 0,
-            location: currentFormData.location || '',
-            is_virtual: currentFormData.is_virtual,
-            is_featured: currentFormData.is_featured,
-            is_private: currentFormData.is_private,
-            zoom_link: currentFormData.zoom_link || '',
-            meet_link: currentFormData.meet_link || '',
-            max_attendees: currentFormData.max_attendees || 0,
-          }
-        }).unwrap();
-        console.log(`✅ updateEvent successful for ID: ${finalDraftId}`);
-        
-        // ✅ If image was added, upload it separately
-        if (imageFile) {
-          console.log(`📤 Uploading image for draft: ${finalDraftId}`);
-          await uploadEventImage({
-            accountId,
-            eventId: finalDraftId,
-            image: imageFile,
+        try {
+          response = await updateEvent({
+            id: finalDraftId,
+            data: {
+              name: currentFormData.name?.trim() || 'Untitled Event',
+              description: currentFormData.description || '',
+              event_type_id: currentFormData.event_type_id || '',
+              date: currentFormData.date || '',
+              time: currentFormData.time || '',
+              duration: currentFormData.duration || 60,
+              price: currentFormData.price || 0,
+              certificate_price: currentFormData.certificate_price || 0,
+              location: currentFormData.location || '',
+              is_virtual: currentFormData.is_virtual,
+              is_featured: currentFormData.is_featured,
+              is_private: currentFormData.is_private,
+              zoom_link: currentFormData.zoom_link || '',
+              meet_link: currentFormData.meet_link || '',
+              max_attendees: currentFormData.max_attendees || 0,
+            }
           }).unwrap();
-          setImageFile(null);
-          setImagePreview(null);
+          console.log(`✅ updateEvent successful for ID: ${finalDraftId}`);
+          
+          // ✅ Upload image if exists
+          if (imageFile) {
+            console.log(`📤 Uploading image for draft: ${finalDraftId}`);
+            await uploadEventImage({
+              accountId,
+              eventId: finalDraftId,
+              image: imageFile,
+            }).unwrap();
+            setImageFile(null);
+            setImagePreview(null);
+          }
+          
+        } catch (err: any) {
+          // ✅ If 404, the draft doesn't exist - create a new one
+          if (err?.status === 404 || err?.data?.message === 'Event not found') {
+            console.log('🔍 Draft not found (404), creating new draft...');
+            
+            // ✅ Clear stale draft ID
+            localStorage.removeItem(STORAGE_KEY);
+            setDraftId(null);
+            
+            // ✅ Create new draft
+            const formDataToSend = new FormData();
+            formDataToSend.append('name', currentFormData.name?.trim() || 'Untitled Event');
+            formDataToSend.append('description', currentFormData.description || '');
+            formDataToSend.append('event_type_id', currentFormData.event_type_id || '');
+            formDataToSend.append('date', currentFormData.date || '');
+            formDataToSend.append('time', currentFormData.time || '');
+            formDataToSend.append('duration', currentFormData.duration?.toString() || '60');
+            formDataToSend.append('price', (currentFormData.price || 0).toString());
+            formDataToSend.append('certificate_price', (currentFormData.certificate_price || 0).toString());
+            formDataToSend.append('location', currentFormData.location || '');
+            formDataToSend.append('is_virtual', currentFormData.is_virtual.toString());
+            formDataToSend.append('is_featured', currentFormData.is_featured.toString());
+            formDataToSend.append('is_private', currentFormData.is_private.toString());
+            formDataToSend.append('zoom_link', currentFormData.zoom_link || '');
+            formDataToSend.append('meet_link', currentFormData.meet_link || '');
+            formDataToSend.append('max_attendees', (currentFormData.max_attendees || 0).toString());
+
+            if (imageFile) {
+              formDataToSend.append('image', imageFile);
+            }
+
+            response = await createDraft({
+              accountId,
+              data: formDataToSend,
+            }).unwrap();
+            
+            const newDraftId = response.id;
+            console.log(`✅ New draft created with ID: ${newDraftId}`);
+            
+            setDraftId(newDraftId);
+            localStorage.setItem(STORAGE_KEY, newDraftId);
+            setCreatedEventId(newDraftId);
+            setImageFile(null);
+            setImagePreview(null);
+          } else {
+            // ✅ Other error - rethrow
+            throw err;
+          }
         }
         
       } else {
-        // ✅ CREATE new draft - POST request (only if no draftId exists)
+        // ✅ CREATE new draft
         console.log('📤 Calling createDraft (POST)...');
         const formDataToSend = new FormData();
         formDataToSend.append('name', currentFormData.name?.trim() || 'Untitled Event');
@@ -643,18 +688,14 @@ export default function CreateEventPage() {
           data: formDataToSend,
         }).unwrap();
         
-        // ✅ Store the draftId in BOTH state AND localStorage
-        const newDraftId = response.id || response.id;
+        const newDraftId = response.id;
         console.log(`✅ New draft created with ID: ${newDraftId}`);
         
-        // ✅ CRITICAL: Update both immediately
         setDraftId(newDraftId);
         localStorage.setItem(STORAGE_KEY, newDraftId);
         setCreatedEventId(newDraftId);
         setImageFile(null);
         setImagePreview(null);
-        
-        console.log(`✅ Verified draftId in localStorage: ${localStorage.getItem(STORAGE_KEY)}`);
       }
 
       setLastSavedData({ ...currentFormData });
@@ -665,6 +706,12 @@ export default function CreateEventPage() {
       
     } catch (err: any) {
       console.error('❌ Auto-save error:', err);
+      // ✅ Show user-friendly error message
+      if (err?.status === 404) {
+        toast.error('Draft not found. Please refresh the page.');
+      } else {
+        toast.error('Failed to save draft. Please try again.');
+      }
     } finally {
       isAutoSavingRef.current = false;
       setIsAutoSaving(false);
@@ -678,6 +725,7 @@ export default function CreateEventPage() {
     updateEvent,
     uploadEventImage,
     draftId,
+    STORAGE_KEY,
   ]);
 
   // ✅ Single auto-save effect

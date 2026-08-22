@@ -16,16 +16,14 @@ import { api } from './api/baseApi';
 import authReducer from './slices/authSlice';
 import eventsReducer from './slices/eventsSlice';
 
-// ✅ Auth persistence - ONLY user info (token is in httpOnly cookie)
+// ✅ Auth persistence - user info only (tokens are in httpOnly cookies)
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'isAuthenticated'], // No token needed - it's in cookies!
+  whitelist: ['user', 'account', 'isAuthenticated'], // ✅ Include account
 };
 
-// ✅ Events persistence - NONE
-// Events data should always be fresh. Only UI preferences like page and page size
-// are not persisted to ensure users always see the latest events.
+// ✅ Events persistence - NONE (always fresh)
 const eventsPersistConfig = {
   key: 'events',
   storage,

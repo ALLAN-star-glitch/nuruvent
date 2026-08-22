@@ -64,7 +64,6 @@ export interface ResendOTPRequest {
 // RESPONSE TYPES
 // ============================================================
 
-// ✅ Updated AccountResponse to match actual response
 export interface AccountResponse {
   id: string;
   slug: string;
@@ -111,7 +110,6 @@ export interface BaseResponse<T = any> {
   data: T;
 }
 
-// ✅ Login response with token and account
 export interface LoginData {
   token: TokenResponse;
   account: AccountResponse;
@@ -208,7 +206,7 @@ export function isTokenResponse(data: LoginData | TwoFactorResponse): data is Lo
 }
 
 // ============================================================
-// ✅ INJECT ENDPOINTS INTO BASE API
+// ✅ NO localStorage - Tokens are handled by HTTP-only cookies
 // ============================================================
 
 export const authApi = api.injectEndpoints({
@@ -245,12 +243,13 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      // ✅ Cookies are set automatically by backend
+      // ✅ No localStorage needed
       invalidatesTags: ['User', 'Auth'],
     }),
 
     // ============================================================
-    // RESEND OTP - UNIFIED (with purpose)
-    // POST /api/v1/auth/resend-otp
+    // RESEND OTP
     // ============================================================
     resendOTP: builder.mutation<ResendOTPResponse, ResendOTPRequest>({
       query: (data) => {
@@ -276,6 +275,7 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      // ✅ Cookies are set automatically by backend
       invalidatesTags: ['Auth'],
     }),
 
@@ -289,6 +289,7 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      // ✅ Cookies are set automatically by backend
       invalidatesTags: ['User', 'Auth'],
     }),
 
@@ -302,6 +303,7 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      // ✅ Cookies are refreshed automatically
     }),
 
     // ============================================================
@@ -313,6 +315,7 @@ export const authApi = api.injectEndpoints({
         url: '/auth/logout',
         method: 'POST',
       }),
+      // ✅ Cookies are cleared by backend
       invalidatesTags: ['User', 'Auth'],
     }),
 

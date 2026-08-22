@@ -1,5 +1,3 @@
-// lib/store/api/baseApi.ts
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { Action } from '@reduxjs/toolkit';
@@ -17,9 +15,14 @@ function isHydrateAction(action: Action): action is Action<typeof REHYDRATE> & {
 
 const baseQuery = fetchBaseQuery({
   baseUrl: API_URL,
-  credentials: 'include',
+  credentials: 'include', // ✅ Cookies are sent automatically
   prepareHeaders: (headers) => {
+    // ✅ Set Content-Type only
     headers.set('Content-Type', 'application/json');
+    
+    // ❌ NO token handling - cookies handle authentication
+    // ❌ NO Authorization header - cookies are sent via credentials: 'include'
+    
     return headers;
   },
 });

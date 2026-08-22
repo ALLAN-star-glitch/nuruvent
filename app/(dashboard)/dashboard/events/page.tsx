@@ -2160,6 +2160,283 @@ export default function EventsDashboardPage() {
         </div>
       )}
 
+            {/* Mobile Events List - Card View */}
+      {isMobile && (
+        <div className="space-y-4 pb-24">
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event) => {
+              const statusConfig = getStatusConfig(event.status);
+              const typeClassName = getTypeConfig(event.type);
+              const isTrashed = event.isDeleted;
+              const addedDate = event.publishedAt || event.createdAt;
+              const addedLabel = event.publishedAt ? 'Published' : 'Created';
+              const addedDateFormatted = formatDate(addedDate);
+              const percentage = event.capacity > 0 
+                ? Math.round((event.registered / event.capacity) * 100) 
+                : 0;
+
+              return (
+                <Card 
+                  key={event.id} 
+                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+                    isTrashed ? 'opacity-60 bg-amber-50/30' : ''
+                  }`}
+                  onClick={() => handleCardClick(event)}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={typeClassName}>
+                          {event.type}
+                        </Badge>
+                        {event.isFeatured && !isTrashed && (
+                          <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                            <Star className="h-3 w-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                        {event.isPrivate && !isTrashed && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Private
+                          </Badge>
+                        )}
+                      </div>
+                      {isTrashed ? (
+                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Trashed
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className={`${statusConfig.color} border`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
+                          {event.status}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-gray-900 line-clamp-2">
+                        {event.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                        <span className="text-primary font-medium">{event.price}</span>
+                        <span className="text-gray-300">•</span>
+                        <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{event.date}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{event.time}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="text-gray-400">Added:</span>
+                      <span>{addedDateFormatted}</span>
+                      <span className="text-gray-400">({addedLabel})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{event.registered} / {event.capacity} registered</span>
+                    </div>
+
+                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <Globe className="h-3.5 w-3.5" />
+                        <span>{event.platform}</span>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
+                            <MoreVertical className="h-4 w-4 text-gray-400" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          
+                          {isTrashed ? (
+                            <>
+                              <DropdownMenuItem 
+                                className="cursor-pointer text-green-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRestoreEvent(event);
+                                }}
+                              >
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                                Restore
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePermanentDelete(event);
+                                }}
+                              >
+                                <Trash className="h-4 w-4 mr-2" />
+                                Delete Permanently
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewEvent(event);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/dashboard/events/${event.id}/edit`);
+                                }}
+                              >
+                                <Edit3 className="h-4 w-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/dashboard/events/new?duplicate=${event.id}`);
+                                }}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              {event.status === 'Draft' && (
+                                <DropdownMenuItem 
+                                  className="cursor-pointer text-green-600"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handlePublishEvent(event);
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Publish
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="text-amber-600 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteEvent(event);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Move to Trash
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                {activeTab === 'trash' ? (
+                  <Trash2 className="h-8 w-8 text-gray-300" />
+                ) : (
+                  <Search className="h-8 w-8 text-gray-300" />
+                )}
+                <p className="font-medium">
+                  {activeTab === 'trash' 
+                    ? 'No events in trash'
+                    : shouldSearch && searchQuery 
+                    ? `No events match "${searchQuery}"`
+                    : activeTab !== 'all'
+                    ? `No ${activeTab} events found`
+                    : 'No events found'
+                  }
+                </p>
+                <p className="text-sm text-gray-400">
+                  {activeTab === 'trash' 
+                    ? 'Deleted events will appear here.'
+                    : 'Create your first event to get started.'
+                  }
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Pagination */}
+          {totalItems > 0 && (
+            <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows:</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => handlePageSizeChange(Number(value))}
+                >
+                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5" className="cursor-pointer">5</SelectItem>
+                    <SelectItem value="10" className="cursor-pointer">10</SelectItem>
+                    <SelectItem value="20" className="cursor-pointer">20</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">
+                  {totalItems > 0 
+                    ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
+                    : '0 of 0'
+                  }
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Mobile Filter Bottom Sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>

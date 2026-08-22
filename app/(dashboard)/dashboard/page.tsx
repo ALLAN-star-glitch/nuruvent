@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Calendar, 
@@ -26,124 +30,163 @@ import {
   Target,
   Lightbulb,
   Star,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useAppSelector } from '@/lib/store/hooks';
+import {
+  useGetEventsByAccountQuery,
+  useGetEventStatusesQuery,
+  useGetEventTypesQuery,
+} from '@/lib/store/api/eventsApi';
 
-const stats = [
-  {
-    label: 'Total Events',
-    value: '24',
-    change: '+12%',
-    trend: 'up',
-    icon: Calendar,
-    color: 'text-primary',
-    bgColor: 'bg-primary/10',
-    description: '4 scheduled this month',
-  },
-  {
-    label: 'Total Attendees',
-    value: '1,847',
-    change: '+8%',
-    trend: 'up',
-    icon: Users,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    description: '156 new this week',
-  },
-  {
-    label: 'Revenue',
-    value: 'KES 284,500',
-    change: '+23%',
-    trend: 'up',
-    icon: CreditCard,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-    description: 'KES 12,400 commission',
-  },
-  {
-    label: 'Certificates Issued',
-    value: '1,203',
-    change: '-2%',
-    trend: 'down',
-    icon: Award,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    description: '24 pending verification',
-  },
-];
-
-const recentEvents = [
-  {
-    id: 1,
-    title: 'Data Science with Python Workshop',
-    date: 'July 28, 2024',
-    attendees: 45,
-    status: 'Completed',
-    statusColor: 'text-green-600 bg-green-50',
-    progress: 100,
-  },
-  {
-    id: 2,
-    title: 'Financial Literacy Webinar',
-    date: 'August 2, 2024',
-    attendees: 78,
-    status: 'Upcoming',
-    statusColor: 'text-blue-600 bg-blue-50',
-    progress: 65,
-  },
-  {
-    id: 3,
-    title: 'UI/UX Design Bootcamp',
-    date: 'August 10, 2024',
-    attendees: 32,
-    status: 'Draft',
-    statusColor: 'text-amber-600 bg-amber-50',
-    progress: 30,
-  },
-  {
-    id: 4,
-    title: 'DevOps Fundamentals Workshop',
-    date: 'August 15, 2024',
-    attendees: 56,
-    status: 'Live',
-    statusColor: 'text-red-600 bg-red-50',
-    progress: 100,
-  },
-  {
-    id: 5,
-    title: 'Cloud Architecture Masterclass',
-    date: 'August 20, 2024',
-    attendees: 43,
-    status: 'Scheduled',
-    statusColor: 'text-indigo-600 bg-indigo-50',
-    progress: 0,
-  },
-];
-
-const quickStats = [
-  { label: 'Active Events', value: '8', icon: Zap, color: 'text-primary' },
-  { label: 'Avg. Attendance', value: '64', icon: Users, color: 'text-green-600' },
-  { label: 'Completion Rate', value: '87%', icon: CheckCircle2, color: 'text-emerald-600' },
-  { label: 'CPD Hours Tracked', value: '4,231', icon: Clock, color: 'text-amber-600' },
-];
-
-const upcomingTasks = [
-  { task: 'Review event registrations', deadline: 'Today, 5:00 PM', priority: 'High' },
-  { task: 'Issue CPD certificates', deadline: 'Tomorrow, 12:00 PM', priority: 'Medium' },
-  { task: 'Prepare webinar slides', deadline: 'Aug 5, 3:00 PM', priority: 'High' },
-  { task: 'Send event reminders', deadline: 'Aug 6, 9:00 AM', priority: 'Low' },
-];
-
-const performanceMetrics = [
-  { label: 'Attendee Satisfaction', value: 92, color: 'bg-green-500' },
-  { label: 'Event Completion', value: 85, color: 'bg-blue-500' },
-  { label: 'Certificate Issuance', value: 78, color: 'bg-purple-500' },
-  { label: 'Revenue Growth', value: 63, color: 'bg-amber-500' },
-];
+// Helper to format price
+const formatPrice = (price: number): string => {
+  if (price === 0) return 'Free';
+  return `KES ${price.toLocaleString()}`;
+};
 
 export default function DashboardPage() {
+  const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const accountId = account?.id || user?.id || '';
+
+  // Fetch events for the dashboard
+  const { data: eventsData, isLoading: eventsLoading } = useGetEventsByAccountQuery({
+    accountId: accountId || '',
+    page: 1,
+    page_size: 20,
+  }, {
+    skip: !accountId || !isAuthenticated,
+  });
+
+  const { data: statusesData } = useGetEventStatusesQuery(undefined, {
+    skip: !accountId || !isAuthenticated,
+  });
+
+  // Create status map
+  const statusesMap = useMemo(() => {
+    if (!statusesData) return {};
+    const statusesArray = Array.isArray(statusesData) ? statusesData : (statusesData as any)?.data || [];
+    return statusesArray.reduce((acc: any, status: any) => ({
+      ...acc,
+      [status.id || status.ID]: status.name || status.Name
+    }), {});
+  }, [statusesData]);
+
+  // Process events data
+  const events = eventsData?.data || [];
+  
+  const totalEvents = events.length;
+  const totalAttendees = events.reduce((acc, e) => acc + (e.current_attendees || 0), 0);
+  const totalRevenue = events.reduce((acc, e) => acc + (e.price || 0), 0);
+  const totalCertificates = events.reduce((acc, e) => acc + (e.certificate_price || 0), 0);
+  const liveEvents = events.filter(e => statusesMap[e.event_status_id] === 'Published').length;
+  const draftEvents = events.filter(e => statusesMap[e.event_status_id] === 'Draft').length;
+  const completedEvents = events.filter(e => statusesMap[e.event_status_id] === 'Completed').length;
+  const totalCpdHours = events.reduce((acc, e) => acc + Math.round((e.duration || 0) / 60), 0);
+
+  // Recent events (last 5)
+  const recentEvents = events.slice(0, 5).map(event => {
+    const status = statusesMap[event.event_status_id] || 'Draft';
+    const statusColorMap: Record<string, string> = {
+      'Draft': 'text-amber-600 bg-amber-50',
+      'Published': 'text-green-600 bg-green-50',
+      'Completed': 'text-blue-600 bg-blue-50',
+      'Cancelled': 'text-red-600 bg-red-50',
+    };
+    return {
+      id: event.id,
+      title: event.name,
+      date: event.date ? new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
+      attendees: event.current_attendees || 0,
+      status: status,
+      statusColor: statusColorMap[status] || 'text-gray-600 bg-gray-50',
+      progress: event.current_attendees && event.max_attendees ? Math.round((event.current_attendees / event.max_attendees) * 100) : 0,
+    };
+  });
+
+  // Stats
+  const stats = [
+    {
+      label: 'Total Events',
+      value: totalEvents.toString(),
+      change: '+12%',
+      trend: 'up',
+      icon: Calendar,
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      description: `${liveEvents} live, ${draftEvents} draft`,
+    },
+    {
+      label: 'Total Attendees',
+      value: totalAttendees.toLocaleString(),
+      change: '+8%',
+      trend: 'up',
+      icon: Users,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      description: `Across ${totalEvents} events`,
+    },
+    {
+      label: 'Revenue',
+      value: formatPrice(totalRevenue),
+      change: '+23%',
+      trend: 'up',
+      icon: CreditCard,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      description: `${completedEvents} completed events`,
+    },
+    {
+      label: 'CPD Hours',
+      value: totalCpdHours.toString(),
+      change: '+5%',
+      trend: 'up',
+      icon: Award,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      description: `${totalEvents} CPD accredited events`,
+    },
+  ];
+
+  const quickStats = [
+    { label: 'Active Events', value: liveEvents.toString(), icon: Zap, color: 'text-primary' },
+    { label: 'Avg. Attendance', value: totalEvents > 0 ? Math.round(totalAttendees / totalEvents).toString() : '0', icon: Users, color: 'text-green-600' },
+    { label: 'Completion Rate', value: totalEvents > 0 ? Math.round((completedEvents / totalEvents) * 100) + '%' : '0%', icon: CheckCircle2, color: 'text-emerald-600' },
+    { label: 'CPD Hours', value: totalCpdHours.toString(), icon: Clock, color: 'text-amber-600' },
+  ];
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-8 pb-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-amber-50 rounded-full">
+                <AlertCircle className="h-10 w-10 text-amber-600" />
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+            <p className="text-sm text-gray-500">Please log in to view your dashboard.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (eventsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Welcome Header with Date/Time */}
@@ -174,7 +217,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-1 sm:gap-2">
             <Badge variant="secondary" className="bg-primary/10 text-primary text-xs sm:text-sm">
               <Activity className="h-3 w-3 mr-1" />
-              <span className="hidden xs:inline">Live:</span> 1
+              <span className="hidden xs:inline">Live:</span> {liveEvents}
             </Badge>
           </div>
         </div>
@@ -248,50 +291,57 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent className="px-2 sm:px-4 lg:px-5 pb-3 sm:pb-5">
-              <div className="space-y-2 sm:space-y-3">
-                {recentEvents.map((event) => (
-                  <div 
-                    key={event.id} 
-                    className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 p-2 sm:p-3 rounded-lg hover:bg-gray-50/80 transition-all border border-transparent hover:border-gray-100 group"
-                  >
-                    <div className="flex items-center gap-3 w-full xs:w-auto">
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <Calendar className="h-4 w-4 sm:h-4.5 sm:w-4.5 lg:h-5 lg:w-5 text-primary" />
+              {recentEvents.length > 0 ? (
+                <div className="space-y-2 sm:space-y-3">
+                  {recentEvents.map((event) => (
+                    <Link 
+                      key={event.id}
+                      href={`/dashboard/events/${event.id}`}
+                      className="flex flex-col xs:flex-row items-start xs:items-center gap-2 xs:gap-3 p-2 sm:p-3 rounded-lg hover:bg-gray-50/80 transition-all border border-transparent hover:border-gray-100 group"
+                    >
+                      <div className="flex items-center gap-3 w-full xs:w-auto">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Calendar className="h-4 w-4 sm:h-4.5 sm:w-4.5 lg:h-5 lg:w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{event.title}</p>
+                            <Badge variant="outline" className={`text-[10px] sm:text-xs ${event.statusColor} border-0 px-1.5 py-0 sm:px-2.5 sm:py-0.5`}>
+                              {event.status}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-500 mt-0.5">
+                            <span>{event.date}</span>
+                            <span className="hidden xs:inline">•</span>
+                            <span className="xs:inline hidden">{event.attendees} attendees</span>
+                            <span className="xs:hidden">{event.attendees}</span>
+                            {event.progress > 0 && event.progress < 100 && (
+                              <>
+                                <span className="hidden xs:inline">•</span>
+                                <span className="text-amber-600 hidden xs:inline">{event.progress}%</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                          <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{event.title}</p>
-                          <Badge variant="outline" className={`text-[10px] sm:text-xs ${event.statusColor} border-0 px-1.5 py-0 sm:px-2.5 sm:py-0.5`}>
-                            {event.status}
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-500 mt-0.5">
-                          <span>{event.date}</span>
-                          <span className="hidden xs:inline">•</span>
-                          <span className="xs:inline hidden">{event.attendees} attendees</span>
-                          <span className="xs:hidden">{event.attendees}</span>
-                          {event.progress > 0 && event.progress < 100 && (
-                            <>
-                              <span className="hidden xs:inline">•</span>
-                              <span className="text-amber-600 hidden xs:inline">{event.progress}%</span>
-                            </>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2 ml-auto xs:ml-0 w-full xs:w-auto">
+                        {event.progress > 0 && event.progress < 100 && (
+                          <div className="flex-1 xs:w-16">
+                            <Progress value={event.progress} className="h-1 sm:h-1.5" />
+                          </div>
+                        )}
+                        {event.progress === 100 && (
+                          <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+                        )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-auto xs:ml-0 w-full xs:w-auto">
-                      {event.progress > 0 && event.progress < 100 && (
-                        <div className="flex-1 xs:w-16">
-                          <Progress value={event.progress} className="h-1 sm:h-1.5" />
-                        </div>
-                      )}
-                      {event.progress === 100 && (
-                        <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-gray-500">
+                  <p className="text-sm">No events found. Create your first event to get started.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -340,7 +390,7 @@ export default function DashboardPage() {
                   Issue Certificates
                 </span>
                 <Badge variant="secondary" className="ml-auto text-[10px] sm:text-xs bg-amber-100 text-amber-700 flex-shrink-0">
-                  6
+                  0
                 </Badge>
               </Link>
 
@@ -379,25 +429,36 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-2 sm:px-4 lg:px-5 pb-3 sm:pb-5 space-y-1.5 sm:space-y-2">
-              {upcomingTasks.slice(0, 3).map((task, index) => (
-                <div key={index} className="flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                  <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${
-                    task.priority === 'High' ? 'bg-red-500' :
-                    task.priority === 'Medium' ? 'bg-amber-500' : 'bg-blue-500'
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium text-gray-700 truncate">{task.task}</p>
-                    <p className="text-[10px] sm:text-xs text-gray-400">{task.deadline}</p>
-                  </div>
-                  <Badge variant="outline" className={`text-[10px] sm:text-xs flex-shrink-0 ${
-                    task.priority === 'High' ? 'text-red-600 border-red-200 bg-red-50' :
-                    task.priority === 'Medium' ? 'text-amber-600 border-amber-200 bg-amber-50' :
-                    'text-blue-600 border-blue-200 bg-blue-50'
-                  }`}>
-                    {task.priority}
-                  </Badge>
+              <div className="flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-700 truncate">Review event registrations</p>
+                  <p className="text-[10px] sm:text-xs text-gray-400">Today, 5:00 PM</p>
                 </div>
-              ))}
+                <Badge variant="outline" className="text-[10px] sm:text-xs text-red-600 border-red-200 bg-red-50 flex-shrink-0">
+                  High
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-700 truncate">Issue CPD certificates</p>
+                  <p className="text-[10px] sm:text-xs text-gray-400">Tomorrow, 12:00 PM</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] sm:text-xs text-amber-600 border-amber-200 bg-amber-50 flex-shrink-0">
+                  Medium
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-700 truncate">Prepare webinar slides</p>
+                  <p className="text-[10px] sm:text-xs text-gray-400">Aug 5, 3:00 PM</p>
+                </div>
+                <Badge variant="outline" className="text-[10px] sm:text-xs text-blue-600 border-blue-200 bg-blue-50 flex-shrink-0">
+                  Low
+                </Badge>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -414,15 +475,34 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-3 sm:px-5 pb-3 sm:pb-5 space-y-2 sm:space-y-3">
-            {performanceMetrics.map((metric) => (
-              <div key={metric.label}>
-                <div className="flex justify-between text-xs sm:text-sm mb-1">
-                  <span className="text-gray-600 truncate">{metric.label}</span>
-                  <span className="font-medium text-gray-900 flex-shrink-0">{metric.value}%</span>
-                </div>
-                <Progress value={metric.value} className={`h-1.5 sm:h-2 ${metric.color}`} />
+            <div>
+              <div className="flex justify-between text-xs sm:text-sm mb-1">
+                <span className="text-gray-600 truncate">Attendee Satisfaction</span>
+                <span className="font-medium text-gray-900 flex-shrink-0">92%</span>
               </div>
-            ))}
+              <Progress value={92} className="h-1.5 sm:h-2 bg-green-500" />
+            </div>
+            <div>
+              <div className="flex justify-between text-xs sm:text-sm mb-1">
+                <span className="text-gray-600 truncate">Event Completion</span>
+                <span className="font-medium text-gray-900 flex-shrink-0">85%</span>
+              </div>
+              <Progress value={85} className="h-1.5 sm:h-2 bg-blue-500" />
+            </div>
+            <div>
+              <div className="flex justify-between text-xs sm:text-sm mb-1">
+                <span className="text-gray-600 truncate">Certificate Issuance</span>
+                <span className="font-medium text-gray-900 flex-shrink-0">78%</span>
+              </div>
+              <Progress value={78} className="h-1.5 sm:h-2 bg-purple-500" />
+            </div>
+            <div>
+              <div className="flex justify-between text-xs sm:text-sm mb-1">
+                <span className="text-gray-600 truncate">Revenue Growth</span>
+                <span className="font-medium text-gray-900 flex-shrink-0">63%</span>
+              </div>
+              <Progress value={63} className="h-1.5 sm:h-2 bg-amber-500" />
+            </div>
           </CardContent>
         </Card>
 
