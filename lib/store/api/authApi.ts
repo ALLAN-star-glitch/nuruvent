@@ -12,7 +12,7 @@ export interface RegisterPersonalRequest {
   password: string;
   name: string;
   phone: string;
-  account_type: 'personal' | 'institution';
+  account_type: 'account_type_personal' | 'account_type_institution';
 }
 
 export interface RegisterInstitutionRequest extends RegisterPersonalRequest {

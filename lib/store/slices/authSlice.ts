@@ -65,11 +65,11 @@ export interface AuthState {
 
 const mapAccountTypeToRole = (accountType: string): UserRole => {
   switch (accountType) {
-    case 'institution':
+    case 'account_type_institution':
     case 'business':
       return 'account_admin';
-    case 'personal':
-      return 'guest';
+    case 'account_type_personal':
+      return 'account_admin';
     case 'admin':
       return 'admin';
     case 'trainer':

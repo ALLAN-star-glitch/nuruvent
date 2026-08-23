@@ -58,7 +58,7 @@ import { OtpInput } from '../ui/OtpInput';
 // TYPES
 // ============================================================
 
-type AccountType = 'personal' | 'institution' | null;
+type AccountType = 'account_type_personal' | 'account_type_institution' | null;
 type Step = 'account-type' | 'details' | 'institution-details' | 'otp' | 'success';
 
 type FormData = {
@@ -188,15 +188,13 @@ export default function SignupForm() {
   const otpRef = useRef('');
 
   // Institution types (matches backend slugs)
-  const institutionTypes = [
-    { value: 'training_institute', label: 'Training Institute' },
-    { value: 'professional_body', label: 'Professional Body' },
-    { value: 'ngo', label: 'NGO / Non-Profit' },
-    { value: 'corporate', label: 'Corporate Company' },
-    { value: 'government', label: 'Government Agency' },
-    { value: 'university', label: 'University / College' },
-    { value: 'other', label: 'Other' },
-  ];
+ const institutionTypes = [
+  { value: 'institution_type_company', label: 'Company' },
+  { value: 'institution_type_institute', label: 'Institute' },
+  { value: 'institution_type_association', label: 'Association' },
+  { value: 'institution_type_school', label: 'School' },
+  { value: 'institution_type_university', label: 'University' },
+];
 
   // OTP timer
   useEffect(() => {
@@ -215,7 +213,7 @@ export default function SignupForm() {
 
   // Get step info
   const getSteps = () => {
-    if (accountType === 'institution') {
+    if (accountType === 'account_type_institution') {
       return { total: 5, labels: ['Type', 'Admin', 'Inst.', 'OTP', 'Done'] };
     }
     return { total: 4, labels: ['Type', 'Details', 'OTP', 'Done'] };
@@ -226,8 +224,8 @@ export default function SignupForm() {
       case 'account-type': return 1;
       case 'details': return 2;
       case 'institution-details': return 3;
-      case 'otp': return accountType === 'institution' ? 4 : 3;
-      case 'success': return accountType === 'institution' ? 5 : 4;
+      case 'otp': return accountType === 'account_type_institution' ? 4 : 3;
+      case 'success': return accountType === 'account_type_institution' ? 5 : 4;
       default: return 1;
     }
   };
@@ -276,7 +274,7 @@ export default function SignupForm() {
         otpRef.current = '';
         setOtpError(null);
         setOtpSuccess(null);
-        if (accountType === 'institution') {
+        if (accountType === 'account_type_institution') {
           setCurrentStep('institution-details');
         } else {
           setCurrentStep('details');
@@ -345,7 +343,7 @@ export default function SignupForm() {
   };
 
   const handleNext = () => {
-    if (accountType === 'personal') {
+    if (accountType === 'account_type_personal') {
       if (!validatePersonal()) return;
       
       // Check if password is valid
@@ -361,7 +359,7 @@ export default function SignupForm() {
         password: formData.password,
         name: formData.name,
         phone: formData.phone,
-        account_type: 'personal',
+        account_type: 'account_type_personal',
       })
         .unwrap()
         .then((response) => {
@@ -400,7 +398,7 @@ export default function SignupForm() {
           password: formData.password,
           name: formData.adminName,
           phone: formData.adminPhone,
-          account_type: 'institution',
+          account_type: 'account_type_institution',
           institution_name: formData.institutionName,
           institution_email: formData.institutionEmail,
           institution_phone: formData.institutionPhone,
@@ -433,7 +431,7 @@ export default function SignupForm() {
       return;
     }
 
-    const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
+    const email = otpEmail || (accountType === 'account_type_institution' ? formData.adminEmail : formData.email);
     if (!email) {
       setOtpError('Email not found. Please try again.');
       return;
@@ -465,7 +463,7 @@ export default function SignupForm() {
     setOtpError(null);
     setOtpSuccess(null);
     
-    const email = otpEmail || (accountType === 'institution' ? formData.adminEmail : formData.email);
+    const email = otpEmail || (accountType === 'account_type_institution' ? formData.adminEmail : formData.email);
     if (!email) {
       setOtpError('Email not found. Please try again.');
       return;
@@ -505,7 +503,7 @@ export default function SignupForm() {
       return { title: 'Choose Your Account Type', description: 'Select how you want to use Nuruvent' };
     }
     if (currentStep === 'details') {
-      if (accountType === 'personal') {
+      if (accountType === 'account_type_personal') {
         return { title: 'Personal Details', description: 'Enter your personal information' };
       }
       return { title: 'Admin Details', description: 'Enter the administrator details' };
@@ -514,7 +512,7 @@ export default function SignupForm() {
       return { title: 'Institution Details', description: 'Enter your organization details' };
     }
     if (currentStep === 'otp') {
-      return { title: 'Verify Your Email', description: `We've sent a code to ${accountType === 'institution' ? formData.adminEmail : formData.email}` };
+      return { title: 'Verify Your Email', description: `We've sent a code to ${accountType === 'account_type_institution' ? formData.adminEmail : formData.email}` };
     }
     if (currentStep === 'success') {
       return { title: 'Account Created!', description: 'Welcome to Nuruvent' };
@@ -529,70 +527,72 @@ export default function SignupForm() {
   // RENDER FUNCTIONS
   // ============================================================
 
-  const renderAccountTypeStep = () => (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col items-center">
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full max-w-md">
-          {[
-            { 
-              type: 'personal' as AccountType, 
-              icon: UserCircle, 
-              label: 'Personal',
-              description: 'Individual user'
-            },
-            { 
-              type: 'institution' as AccountType, 
-              icon: Building, 
-              label: 'Institution',
-              description: 'Organization account'
-            }
-          ].map((option) => {
-            const OptionIcon = option.icon;
-            const isSelected = accountType === option.type;
-            
-            return (
-              <button
-                key={option.type}
-                onClick={() => handleAccountTypeSelect(option.type)}
-                className={cn(
-                  "relative flex flex-col items-center justify-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer",
-                  isSelected
-                    ? "border-[#1A73E8] bg-[#1A73E8]/5 shadow-md"
-                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                )}
-              >
-                <div className={cn(
-                  "w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors",
-                  isSelected ? "bg-[#1A73E8] text-white" : "bg-gray-100 text-gray-500"
-                )}>
-                  <OptionIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+ const renderAccountTypeStep = () => (
+  <div className="space-y-6 sm:space-y-8">
+    <div className="flex flex-col items-center">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 w-full max-w-md">
+        {[
+          { 
+            type: 'account_type_personal' as AccountType,  // ✅ FIXED
+            icon: UserCircle, 
+            label: 'Personal',
+            description: 'Individual user'
+          },
+          { 
+            type: 'account_type_institution' as AccountType,  // ✅ FIXED
+            icon: Building, 
+            label: 'Institution',
+            description: 'Organization account'
+          }
+        ].map((option) => {
+          const OptionIcon = option.icon;
+          const isSelected = accountType === option.type;
+          
+          return (
+            <button
+              key={option.type}
+              onClick={() => handleAccountTypeSelect(option.type)}
+              className={cn(
+                "relative flex flex-col items-center justify-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer",
+                isSelected
+                  ? "border-[#1A73E8] bg-[#1A73E8]/5 shadow-md"
+                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              )}
+            >
+              <div className={cn(
+                "w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors",
+                isSelected ? "bg-[#1A73E8] text-white" : "bg-gray-100 text-gray-500"
+              )}>
+                <OptionIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className={cn(
+                "text-xs sm:text-sm font-medium",
+                isSelected ? "text-gray-900" : "text-gray-700"
+              )}>
+                {option.label}
+              </span>
+              <span className="text-[8px] sm:text-[10px] text-gray-400">{option.description}</span>
+              {isSelected && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-[#1A73E8] flex items-center justify-center shadow-sm">
+                  <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
                 </div>
-                <span className={cn(
-                  "text-xs sm:text-sm font-medium",
-                  isSelected ? "text-gray-900" : "text-gray-700"
-                )}>
-                  {option.label}
-                </span>
-                <span className="text-[8px] sm:text-[10px] text-gray-400">{option.description}</span>
-                {isSelected && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-[#1A73E8] flex items-center justify-center shadow-sm">
-                    <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-white" />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        
-        {accountType && (
-          <div className="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-green-600 font-medium">
-            <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            <span>{accountType === 'personal' ? 'Personal' : 'Institution'} account selected</span>
-          </div>
-        )}
+              )}
+            </button>
+          );
+        })}
       </div>
+      
+      {accountType && (
+        <div className="mt-2 sm:mt-3 flex items-center gap-1.5 text-[10px] sm:text-xs text-green-600 font-medium">
+          <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          <span>
+            {accountType === 'account_type_personal' ? 'Personal' : 'Institution'} account selected
+          </span>
+        </div>
+      )}
     </div>
-  );
+  </div>
+);
 
   const renderPersonalDetails = () => (
     <div className="space-y-4 sm:space-y-6">
@@ -906,7 +906,7 @@ export default function SignupForm() {
           We&apos;ve sent a verification code to:
         </p>
         <p className="text-[#1A73E8] font-medium text-xs sm:text-sm mt-1 break-all">
-          {accountType === 'institution' ? formData.adminEmail : formData.email}
+          {accountType === 'account_type_institution' ? formData.adminEmail : formData.email}
         </p>
       </div>
 
@@ -985,11 +985,11 @@ export default function SignupForm() {
   );
 
   const renderSuccessStep = () => {
-    const displayName = accountType === 'institution' 
+    const displayName = accountType === 'account_type_institution' 
       ? formData.adminName 
       : formData.name;
     
-    const accountLabel = accountType === 'institution' ? 'Institution' : 'Personal';
+    const accountLabel = accountType === 'account_type_institution' ? 'Institution' : 'Personal';
 
     return (
       <div className="space-y-4 sm:space-y-6 text-center">
@@ -1013,7 +1013,7 @@ export default function SignupForm() {
             <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
             <span className="text-gray-500">Email:</span>
             <span className="font-medium text-gray-900 truncate">
-              {accountType === 'institution' ? formData.adminEmail : formData.email}
+              {accountType === 'account_type_institution' ? formData.adminEmail : formData.email}
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs sm:text-sm">
@@ -1021,7 +1021,7 @@ export default function SignupForm() {
             <span className="text-gray-500">Account Type:</span>
             <span className="font-medium text-gray-900">{accountLabel}</span>
           </div>
-          {accountType === 'institution' && (
+          {accountType === 'account_type_institution' && (
             <div className="flex items-center gap-2 text-xs sm:text-sm">
               <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
               <span className="text-gray-500">Institution:</span>
@@ -1137,7 +1137,7 @@ export default function SignupForm() {
               >
                 {currentStep === 'account-type' && renderAccountTypeStep()}
                 {currentStep === 'details' && (
-                  accountType === 'personal' ? renderPersonalDetails() : renderAdminDetails()
+                  accountType === 'account_type_personal' ? renderPersonalDetails() : renderAdminDetails()
                 )}
                 {currentStep === 'institution-details' && renderInstitutionDetails()}
                 {currentStep === 'otp' && renderOtpStep()}
@@ -1153,13 +1153,13 @@ export default function SignupForm() {
                       {isLoadingCombined ? (
                         <span className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                          {accountType === 'institution' && currentStep === 'institution-details' 
+                          {accountType === 'account_type_institution' && currentStep === 'institution-details' 
                             ? 'Creating Account...' 
                             : 'Loading...'}
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          {accountType === 'institution' && currentStep === 'institution-details' 
+                          {accountType === 'account_type_institution' && currentStep === 'institution-details' 
                             ? 'Create Account' 
                             : 'Continue'}
                           <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
