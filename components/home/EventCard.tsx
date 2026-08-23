@@ -20,7 +20,6 @@ import {
   Mic2,
   BookOpen,
   Handshake,
-  Laptop
 } from 'lucide-react';
 import { EventResponse, EventTypeResponse } from '@/lib/store/api/eventsApi';
 import { Card, CardContent } from '@/components/ui/card';
@@ -45,7 +44,6 @@ const getEventTypeIcon = (typeId: string, eventTypes?: EventTypeResponse[]) => {
   
   const found = eventTypes.find((t) => t.id === typeId);
   if (found) {
-    // Map by slug or name
     const slug = found.slug?.toLowerCase() || found.name?.toLowerCase() || '';
     
     if (slug.includes('workshop')) return <Briefcase className="h-3 w-3" />;
@@ -134,7 +132,7 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
         {event.image_url ? (
           <Image
             src={event.image_url}
-            alt={event.display_name || event.name}
+            alt={event.name} // ✅ Changed to event.name
             fill
             className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -203,9 +201,9 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
           )}
         </div>
 
-        {/* Title */}
+        {/* Title - ✅ Now using event.name only */}
         <h3 className="font-bold text-slate-900 text-lg leading-snug line-clamp-2 tracking-tight group-hover:text-primary transition-colors">
-          {event.display_name || event.name}
+          {event.name}
         </h3>
 
         {/* Details List */}
