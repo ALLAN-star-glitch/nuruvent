@@ -49,6 +49,7 @@ export interface CreateEventRequest {
 // ✅ UpdateEventRequest - All fields optional for updates (application/json)
 export interface UpdateEventRequest {
   name?: string;
+  display_name?: string;
   description?: string;
   event_type_id?: string;
   event_status_id?: string;
@@ -195,6 +196,7 @@ export interface EventResponse {
 export interface EventTypeResponse {
   id: string;
   name: string;
+  display_name: string;
   slug: string;
   description?: string;
   icon?: string;
@@ -204,6 +206,7 @@ export interface EventTypeResponse {
 export interface EventStatusResponse {
   id: string;
   name: string;
+  display_name: string;
   slug: string;
   color?: string;
 }
@@ -672,10 +675,13 @@ export const eventsApi = api.injectEndpoints({
         return mapEventResponse(data);
       },
       invalidatesTags: (result, error, id) => [
-        { type: 'Events', id },
-        { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'UPCOMING' },
-      ],
+      { type: 'Events', id },
+      { type: 'Events', id: 'LIST' },
+      { type: 'Events', id: 'UPCOMING' },
+      { type: 'Events', id: 'PAST' },
+      { type: 'Events', id: 'TRASH' },
+      'TrashCount',
+    ],
     }),
 
     // ✅ POST /api/v1/events/{id}/cancel - Cancel event

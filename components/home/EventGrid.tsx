@@ -3,8 +3,9 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { EventCard } from './EventCard';
-import { SearchX, Calendar, Loader2 } from 'lucide-react';
+import { SearchX, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGetUpcomingEventsQuery, useGetEventTypesQuery } from '@/lib/store/api/eventsApi';
 import { motion } from 'framer-motion';
@@ -22,37 +23,62 @@ export function EventGrid({ limit, title, subtitle, showFilters = false }: Event
   const searchQuery = searchParams.get('search')?.toLowerCase() || '';
   const typeFilter = searchParams.get('type') || '';
 
-  // ✅ Fetch real events from API
   const { 
     data: eventsData, 
     isLoading, 
-    error 
-  } = useGetUpcomingEventsQuery({ limit: limit || 10 });
+    error,
+    refetch,
+    isFetching,
+  } = useGetUpcomingEventsQuery(
+    { limit: limit || 10 },
+    {
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    }
+  );
 
-  // ✅ Fetch event types for filtering and mapping
   const { data: eventTypes } = useGetEventTypesQuery();
 
-  // Filter events based on search and type
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetch();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
+  // ✅ Fixed: Filter events with safe null checks
   const filteredEvents = eventsData?.filter((event) => {
     let matches = true;
+    
     if (searchQuery) {
-      matches = matches && (
-        event.name.toLowerCase().includes(searchQuery) ||
-        event.description?.toLowerCase().includes(searchQuery) ||
-        event.location?.toLowerCase().includes(searchQuery) ||
-        event.account_id?.toLowerCase().includes(searchQuery) ||
-        event.creator?.name?.toLowerCase().includes(searchQuery)
+      // ✅ Safe search with nullish coalescing
+      const searchableFields = [
+        event.name,
+        event.display_name,
+        event.description,
+        event.location,
+        event.account_id,
+        event.creator?.name,
+      ].filter((field): field is string => typeof field === 'string' && field.length > 0);
+
+      const hasMatch = searchableFields.some((field) =>
+        field.toLowerCase().includes(searchQuery)
       );
+      matches = matches && hasMatch;
     }
+    
     if (typeFilter) {
       matches = matches && event.event_type_id === typeFilter;
     }
+    
     return matches;
   }) || [];
 
   const displayedEvents = limit ? filteredEvents.slice(0, limit) : filteredEvents;
 
-  // Loading state with skeleton
+  // Loading state
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -91,9 +117,10 @@ export function EventGrid({ limit, title, subtitle, showFilters = false }: Event
         <Button 
           variant="outline" 
           className="mt-4 border-red-200 text-red-700 hover:bg-red-50"
-          onClick={() => window.location.reload()}
+          onClick={() => refetch()}
         >
-          Refresh Page
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
         </Button>
       </div>
     );
@@ -127,54 +154,70 @@ export function EventGrid({ limit, title, subtitle, showFilters = false }: Event
 
   return (
     <div>
-      {/* Header with filters */}
-      {(title || subtitle || searchQuery || showFilters) && (
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
-          <div>
-            {title && (
-              <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-                {title}
-              </h2>
-            )}
-            {subtitle && (
-              <p className="text-gray-600 text-sm mt-1">{subtitle}</p>
-            )}
-            {searchQuery && (
-              <p className="text-sm text-primary mt-1">
-                {displayedEvents.length} results for &quot;{searchQuery}&quot;
-              </p>
-            )}
-          </div>
-
-          {/* Type Filter Dropdown */}
-          {showFilters && eventTypes && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={!typeFilter ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => router.push('/events')}
-                className="rounded-full"
-              >
-                All
-              </Button>
-              {eventTypes.slice(0, 6).map((type) => (
-                <Button
-                  key={type.id}
-                  variant={typeFilter === type.id ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => router.push(`/events?type=${type.id}`)}
-                  className="rounded-full"
-                  style={typeFilter === type.id ? {} : { borderColor: type.color || '#e2e8f0' }}
-                >
-                  {type.name}
-                </Button>
-              ))}
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+          {title && (
+            <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
+              {title}
+            </h2>
+          )}
+          {subtitle && (
+            <p className="text-gray-600 text-sm mt-1">{subtitle}</p>
+          )}
+          {searchQuery && (
+            <p className="text-sm text-primary mt-1">
+              {displayedEvents.length} results for &quot;{searchQuery}&quot;
+            </p>
+          )}
+          {isFetching && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Refreshing...
             </div>
           )}
         </div>
-      )}
 
-      {/* Event Grid - Pass eventTypes to each card */}
+        {/* Refresh Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="text-gray-400 hover:text-gray-600"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+
+        {/* Type Filter - ✅ Updated to use display_name */}
+        {showFilters && eventTypes && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={!typeFilter ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => router.push('/events')}
+              className="rounded-full"
+            >
+              All
+            </Button>
+            {eventTypes.slice(0, 6).map((type) => (
+              <Button
+                key={type.id}
+                variant={typeFilter === type.id ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => router.push(`/events?type=${type.id}`)}
+                className="rounded-full"
+                style={typeFilter === type.id ? {} : { borderColor: type.color || '#e2e8f0' }}
+              >
+                {type.display_name || type.name} {/* ✅ Use display_name, fallback to name */}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Event Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedEvents.map((event, index) => (
           <motion.div
@@ -185,25 +228,12 @@ export function EventGrid({ limit, title, subtitle, showFilters = false }: Event
           >
             <EventCard 
               event={event}
-              eventTypes={eventTypes}  // ✅ Pass event types to card
+              eventTypes={eventTypes}
               onClick={() => router.push(`/events/${event.slug}`)}
             />
           </motion.div>
         ))}
       </div>
-
-      {/* Load More */}
-      {!limit && displayedEvents.length >= 6 && (
-        <div className="text-center mt-10">
-          <Button
-            variant="outline"
-            className="px-8 py-6 border-2 border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all"
-          >
-            Load More Events
-            <Calendar className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

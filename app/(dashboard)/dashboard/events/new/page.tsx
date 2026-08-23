@@ -1343,7 +1343,7 @@ const clearDraftState = useCallback(() => {
                       <SelectContent>
                         {eventTypes.map((type: any) => (
                           <SelectItem key={type.id} value={type.id} className="cursor-pointer">
-                            {type.name}
+                            {type.display_name}
                           </SelectItem>
                         ))}
                       </SelectContent>

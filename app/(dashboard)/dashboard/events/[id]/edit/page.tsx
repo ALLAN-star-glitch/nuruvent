@@ -81,6 +81,7 @@ import React from 'react';
 
 interface EventFormData {
   name: string;
+  display_name: string;
   description: string;
   event_type_id: string;
   date: string;
@@ -103,6 +104,7 @@ interface EventFormData {
 
 interface FormErrors {
   name?: string;
+  display_name?: string; 
   description?: string;
   event_type_id?: string;
   date?: string;
@@ -187,6 +189,7 @@ const SaveStatusIndicator = ({
 
 const defaultFormData: EventFormData = {
   name: '',
+  display_name: '',
   description: '',
   event_type_id: '',
   date: '',
@@ -226,7 +229,6 @@ const formatDateForDisplay = (dateString: string): string => {
   }
 };
 
-// Helper to get status name from status ID using statuses map
 const getStatusNameFromId = (statusId: string, statusesMap: Record<string, string>): string => {
   return statusesMap[statusId] || 'Draft';
 };
@@ -247,6 +249,7 @@ const getTypeConfig = (typeName: string) => {
     'Webinar': 'bg-blue-100 text-blue-700',
     'Meetup': 'bg-amber-100 text-amber-700',
     'Bootcamp': 'bg-red-100 text-red-700',
+    'Uncategorized': 'bg-gray-100 text-gray-700',
   };
   return typeMap[typeName] || 'bg-gray-100 text-gray-700';
 };
@@ -262,7 +265,7 @@ const EventPreviewCard = ({ data, eventType }: { data: EventFormData; eventType?
         <div className="w-full h-48 bg-neutral-light overflow-hidden">
           <img 
             src={data.imagePreview || data.existingImage} 
-            alt={data.name || 'Event preview'} 
+            alt={data.display_name || data.name || 'Event preview'} 
             className="w-full h-full object-cover"
           />
         </div>
@@ -278,7 +281,7 @@ const EventPreviewCard = ({ data, eventType }: { data: EventFormData; eventType?
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-lg font-bold text-neutral-dark line-clamp-2 flex-1">
-            {data.name || 'Untitled Event'}
+            {data.display_name || data.name || 'Untitled Event'}
           </h3>
           <div className="flex items-center gap-1 flex-shrink-0">
             {data.is_featured && (
@@ -430,23 +433,23 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const { data: eventTypes = [] } = useGetEventTypesQuery();
   const { data: eventStatuses = [] } = useGetEventStatusesQuery();
 
-  // ✅ Create statuses map for lookup (supports both cases)
+  // ✅ Create statuses map for lookup using display_name
   const statusesMap = useMemo(() => {
     if (!eventStatuses) return {};
     const array = Array.isArray(eventStatuses) ? eventStatuses : (eventStatuses as any)?.data || [];
     return array.reduce((acc: Record<string, string>, status: any) => ({
       ...acc,
-      [status.id || status.ID]: status.name || status.Name
+      [status.id || status.ID]: status.display_name || status.DisplayName || status.name || status.Name
     }), {});
   }, [eventStatuses]);
 
-  // ✅ Create types map for lookup (supports both cases)
+  // ✅ Create types map for lookup using display_name
   const typesMap = useMemo(() => {
     if (!eventTypes) return {};
     const array = Array.isArray(eventTypes) ? eventTypes : (eventTypes as any)?.data || [];
     return array.reduce((acc: Record<string, string>, type: any) => ({
       ...acc,
-      [type.id || type.ID]: type.name || type.Name
+      [type.id || type.ID]: type.display_name || type.DisplayName || type.name || type.Name
     }), {});
   }, [eventTypes]);
 
@@ -474,11 +477,14 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
   const formDataRef = useRef(formData);
+  const isInitialLoadRef = useRef(true);
+  
+  // ✅ Typing tracking refs to prevent cursor jumps
+  const isTypingRef = useRef(false);
+  const typingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const STEPS = ['Basic Info', 'Details', 'Preview'];
   const isCreating = isUpdating || isPublishing || isUploading;
-
-  
 
   // Check if mobile
   useEffect(() => {
@@ -491,50 +497,52 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
   }, []);
 
   // Update the ref whenever formData changes
-useEffect(() => {
-  formDataRef.current = formData;
-}, [formData]);
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
+  // ✅ Clean up typing timer on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) {
+        clearTimeout(typingTimerRef.current);
+      }
+    };
+  }, []);
 
+  // ============================================================
+  // DETECT CHANGES - FIXED
+  // ============================================================
 
-// ============================================================
-// DETECT CHANGES
-// ============================================================
+  useEffect(() => {
+    if (!lastSavedData || isInitialLoadRef.current) return;
 
-useEffect(() => {
-  if (!lastSavedData) return;
+    const getComparableData = (data: EventFormData) => {
+      const { image, imagePreview, existingImage, ...rest } = data;
+      return rest;
+    };
 
-  const currentData = {
-    ...formData,
-    imagePreview: formData.imagePreview || undefined,
-    image: formData.image || undefined,
-    existingImage: formData.existingImage || undefined,
-  };
-  const savedData = {
-    ...lastSavedData,
-    imagePreview: lastSavedData.imagePreview || undefined,
-    image: lastSavedData.image || undefined,
-    existingImage: lastSavedData.existingImage || undefined,
-  };
-  
-  const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
-  setHasChanges(hasChanged);
+    const current = getComparableData(formData);
+    const saved = getComparableData(lastSavedData);
+    
+    const hasChanged = JSON.stringify(current) !== JSON.stringify(saved);
+    setHasChanges(hasChanged);
 
-  if (hasChanged) {
-    setSaveStatus('saving');
-  } else if (!isAutoSaving) {
-    setSaveStatus('saved');
-  }
-}, [formData, lastSavedData, isAutoSaving]);
+    if (hasChanged && saveStatus !== 'saving') {
+      setSaveStatus('saving');
+    } else if (!hasChanged && !isAutoSaving && saveStatus !== 'saved') {
+      setSaveStatus('saved');
+    }
+  }, [formData, lastSavedData, isAutoSaving, saveStatus]);
 
-
-  // ✅ Load event data when available - USING LOWERCASE FIELDS
+  // ✅ Load event data when available
   useEffect(() => {
     if (eventData) {
       console.log('📋 Loading event data for edit:', eventData);
       
       const mappedData: EventFormData = {
         name: eventData.name || '',
+        display_name: eventData.display_name || eventData.name || '',
         description: eventData.description || '',
         event_type_id: eventData.event_type_id || '',
         date: formatDateForInput(eventData.date),
@@ -557,6 +565,9 @@ useEffect(() => {
       setFormData(mappedData);
       setExistingImage(eventData.image_url || '');
       setLastSavedData(mappedData);
+      setHasChanges(false);
+      setSaveStatus('saved');
+      isInitialLoadRef.current = false;
     }
   }, [eventData]);
 
@@ -571,7 +582,7 @@ useEffect(() => {
   const statusConfig = getStatusConfig(currentStatusName);
   const isPublishedStatus = currentStatusName === 'Published';
 
-  // ✅ Get event type name
+  // ✅ Get event type name with display_name
   const eventTypeName = useMemo(() => {
     if (formData.event_type_id) {
       return typesMap[formData.event_type_id] || formData.event_type_id;
@@ -601,181 +612,146 @@ useEffect(() => {
   }, [formData]);
 
   // ============================================================
-  // DETECT CHANGES
+  // AUTO-SAVE LOGIC - NO CURSOR JUMPS
   // ============================================================
 
-useEffect(() => {
-  if (!lastSavedData) return;
+  const performAutoSave = useCallback(async () => {
+    // ✅ Don't auto-save if user is typing
+    if (isTypingRef.current) {
+      console.log('⏭️ Skipping auto-save: User is typing');
+      return;
+    }
+    
+    if (isAutoSavingRef.current || isSaving || isCreating) {
+      console.log('⏭️ Skipping auto-save: Already saving');
+      return;
+    }
+    
+    if (!accountId) {
+      console.warn('⚠️ Cannot auto-save: No account ID found');
+      return;
+    }
 
-  const currentData = {
-    ...formData,
-    imagePreview: formData.imagePreview || undefined,
-    image: formData.image || undefined,
-    existingImage: formData.existingImage || undefined,
-  };
-  const savedData = {
-    ...lastSavedData,
-    imagePreview: lastSavedData.imagePreview || undefined,
-    image: lastSavedData.image || undefined,
-    existingImage: lastSavedData.existingImage || undefined,
-  };
-  
-  const hasChanged = JSON.stringify(currentData) !== JSON.stringify(savedData);
-  setHasChanges(hasChanged);
-  
+    const currentFormData = formDataRef.current;
 
-  if (hasChanged) {
-    setSaveStatus('saving');
-  } else if (!isAutoSaving) {
-    setSaveStatus('saved');
-  }
-}, [formData, lastSavedData, isAutoSaving]); 
+    const hasName = !!currentFormData.name?.trim();
+    const hasEventType = !!currentFormData.event_type_id;
+    const hasDate = !!currentFormData.date;
 
+    if (!hasName && !hasEventType && !hasDate) {
+      console.log('⏭️ Skipping auto-save: No data yet');
+      return;
+    }
 
-  // ============================================================
-// AUTO-SAVE LOGIC - UPDATED TO USE REF
-// ============================================================
+    // Check if there are actual changes
+    if (lastSavedData) {
+      const { image, imagePreview, existingImage, ...currentRest } = currentFormData;
+      const { image: savedImage, imagePreview: savedPreview, existingImage: savedExisting, ...savedRest } = lastSavedData;
+      if (JSON.stringify(currentRest) === JSON.stringify(savedRest)) {
+        console.log('⏭️ Skipping auto-save: No changes detected');
+        return;
+      }
+    }
 
-const performAutoSave = useCallback(async () => {
-  if (isAutoSavingRef.current || isSaving || isCreating) return;
-  
-  if (!accountId) {
-    console.warn('⚠️ Cannot auto-save: No account ID found');
-    return;
-  }
+    isAutoSavingRef.current = true;
+    setIsAutoSaving(true);
 
-  // ✅ Get the latest form data from the ref
-  const currentFormData = formDataRef.current;
+    try {
+      // ✅ Upload image if new
+      if (imageFile) {
+        console.log('📤 Uploading image for event:', eventId);
+        await uploadEventImage({
+          accountId,
+          eventId: eventId,
+          image: imageFile,
+        }).unwrap();
+        setImageFile(null);
+        setImagePreview(null);
+        setIsImageRemoved(false);
+      }
 
-  const hasName = !!currentFormData.name?.trim();
-  const hasEventType = !!currentFormData.event_type_id;
-  const hasDate = !!currentFormData.date;
+      // ✅ Build update data with the latest values
+      const updateData = {
+        name: currentFormData.name?.trim() || 'Untitled Event',
+        display_name: currentFormData.display_name?.trim() || currentFormData.name?.trim() || 'Untitled Event',
+        description: currentFormData.description || '',
+        event_type_id: currentFormData.event_type_id || '',
+        date: currentFormData.date || '',
+        time: currentFormData.time || '',
+        duration: currentFormData.duration || 60,
+        price: currentFormData.price || 0,
+        certificate_price: currentFormData.certificate_price || 0,
+        location: currentFormData.location || '',
+        is_virtual: currentFormData.is_virtual,
+        is_featured: currentFormData.is_featured,
+        is_private: currentFormData.is_private,
+        zoom_link: currentFormData.zoom_link || '',
+        meet_link: currentFormData.meet_link || '',
+        max_attendees: currentFormData.max_attendees || 0,
+      };
 
-  if (!hasName && !hasEventType && !hasDate) {
-    console.log('⏭️ Skipping auto-save: No data yet');
-    return;
-  }
+      console.log('📤 AUTO-SAVE DATA BEING SENT:', updateData);
 
-  isAutoSavingRef.current = true;
-  setIsAutoSaving(true);
-
-  try {
-    // ✅ Upload image if new
-    if (imageFile) {
-      console.log('📤 Uploading image for event:', eventId);
-      await uploadEventImage({
-        accountId,
-        eventId: eventId,
-        image: imageFile,
+      // ✅ Update event - DO NOT refetch to avoid cursor jump
+      await updateEvent({
+        id: eventId,
+        data: updateData,
       }).unwrap();
-      setImageFile(null);
-      setImagePreview(null);
-      setIsImageRemoved(false);
+
+      // ✅ DO NOT refetch - this causes cursor jumps!
+      // await refetch();
+
+      // ✅ Only update the saved state
+      setLastSavedData({ ...currentFormData });
+      setHasChanges(false);
+      setSaveStatus('saved');
+      
+      console.log('✅ Auto-save successful');
+      
+    } catch (err: any) {
+      console.error('❌ Auto-save error:', err);
+      // Don't show toast for auto-save errors to avoid distraction
+    } finally {
+      isAutoSavingRef.current = false;
+      setIsAutoSaving(false);
     }
+  }, [
+    accountId,
+    eventId,
+    imageFile,
+    isSaving,
+    isCreating,
+    lastSavedData,
+    updateEvent,
+    uploadEventImage,
+    // ✅ Remove refetch from dependencies
+  ]);
 
-    // ✅ Build update data with the latest values
-    const updateData = {
-      name: currentFormData.name?.trim() || 'Untitled Event',
-      description: currentFormData.description || '',
-      event_type_id: currentFormData.event_type_id || '',
-      date: currentFormData.date || '',
-      time: currentFormData.time || '',
-      duration: currentFormData.duration || 60,
-      price: currentFormData.price || 0,
-      certificate_price: currentFormData.certificate_price || 0,
-      location: currentFormData.location || '',
-      is_virtual: currentFormData.is_virtual,
-      is_featured: currentFormData.is_featured,
-      is_private: currentFormData.is_private,
-      zoom_link: currentFormData.zoom_link || '',
-      meet_link: currentFormData.meet_link || '',
-      max_attendees: currentFormData.max_attendees || 0,
-    };
-
-    console.log('📤 AUTO-SAVE DATA BEING SENT:', updateData);
-
-    // ✅ Update event
-    await updateEvent({
-      id: eventId,
-      data: updateData,
-    }).unwrap();
-
-    setLastSavedData({ ...currentFormData });
-    setHasChanges(false);
-    setSaveStatus('saved');
-    
-    console.log('✅ Auto-save successful');
-    
-  } catch (err: any) {
-    console.error('❌ Auto-save error:', err);
-    setError(err?.data?.message || 'Failed to auto-save changes');
-  } finally {
-    isAutoSavingRef.current = false;
-    setIsAutoSaving(false);
-  }
-}, [
-  accountId,
-  eventId,
-  imageFile,
-  isSaving,
-  isCreating,
-  updateEvent,
-  uploadEventImage,
-  // ✅ No formData dependency - we use the ref
-]);
-
-// ✅ Auto-save after 1.5 seconds of inactivity - UPDATED
-useEffect(() => {
-  if (!accountId || !eventData) return;
-  
-  const currentFormData = formDataRef.current;
-  const hasData = !!currentFormData.name?.trim() || !!currentFormData.event_type_id || !!currentFormData.date;
-  if (!hasData) return;
-  if (isSaving || isCreating || isAutoSaving) return;
-
-  if (autoSaveTimerRef.current) {
-    clearTimeout(autoSaveTimerRef.current);
-  }
-
-  autoSaveTimerRef.current = setTimeout(() => {
-    if (hasChanges) {
-      performAutoSave();
-    }
-  }, 1500);
-
-  return () => {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-  };
-}, [
-  accountId,
-  eventData,
-  hasChanges,
-  isSaving,
-  isCreating,
-  isAutoSaving,
-  performAutoSave,
-  // ✅ No formData fields - we use the ref
-]);
-
-  // ✅ Auto-save after 1.5 seconds of inactivity
+  // ✅ Auto-save after 4 seconds of inactivity (increased for better UX)
   useEffect(() => {
-    if (!accountId || !eventData) return;
+    if (!accountId || !eventData || isInitialLoadRef.current) return;
     
-    const hasData = !!formData.name?.trim() || !!formData.event_type_id || !!formData.date;
+    const currentFormData = formDataRef.current;
+    const hasData = !!currentFormData.name?.trim() || !!currentFormData.event_type_id || !!currentFormData.date;
     if (!hasData) return;
     if (isSaving || isCreating || isAutoSaving) return;
+    if (!hasChanges) return;
+    
+    // ✅ Skip if user is typing
+    if (isTypingRef.current) {
+      console.log('⏭️ Skipping auto-save timer: User is typing');
+      return;
+    }
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
 
+    // ✅ 4 second delay for better UX
     autoSaveTimerRef.current = setTimeout(() => {
-      if (hasChanges) {
-        performAutoSave();
-      }
-    }, 1500);
+      console.log('⏰ Auto-save timer triggered');
+      performAutoSave();
+    }, 4000);
 
     return () => {
       if (autoSaveTimerRef.current) {
@@ -785,9 +761,6 @@ useEffect(() => {
   }, [
     accountId,
     eventData,
-    formData.name,
-    formData.event_type_id,
-    formData.date,
     hasChanges,
     isSaving,
     isCreating,
@@ -850,11 +823,11 @@ useEffect(() => {
     const newErrors: FormErrors = {};
     let isValid = true;
 
-    if (!formData.name || formData.name.trim() === '') {
-      newErrors.name = 'Event name is required';
+    if (!formData.display_name || formData.display_name.trim() === '') {
+      newErrors.display_name = 'Event name is required';
       isValid = false;
-    } else if (formData.name.length > 100) {
-      newErrors.name = 'Event name must be less than 100 characters';
+    } else if (formData.display_name.length > 100) {
+      newErrors.display_name = 'Event name must be less than 100 characters';
       isValid = false;
     }
 
@@ -968,18 +941,24 @@ useEffect(() => {
     }
   };
 
-  const handleFieldBlurWithSave = useCallback((field: keyof EventFormData) => {
-    handleFieldBlur(field);
-    if (hasChanges && !isAutoSaving && !isSaving && !isCreating) {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = null;
-      }
-      performAutoSave();
-    }
-  }, [hasChanges, isAutoSaving, isSaving, isCreating, performAutoSave]);
+  // ============================================================
+  // HANDLE CHANGE - Track typing state
+  // ============================================================
 
   const handleChange = (field: keyof EventFormData, value: any) => {
+    // ✅ Mark that user is typing
+    isTypingRef.current = true;
+    
+    // ✅ Clear any pending typing timer
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+    
+    // ✅ Reset typing flag after 600ms of inactivity
+    typingTimerRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+    }, 600);
+    
     setFormData(prev => ({ ...prev, [field]: value }));
     setError(null);
     setSaveStatus('saving');
@@ -995,16 +974,12 @@ useEffect(() => {
 
   const handleSelectChange = (field: keyof EventFormData, value: any) => {
     handleChange(field, value);
-    if (!isAutoSaving && !isSaving && !isCreating) {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = null;
-      }
-      setTimeout(() => {
-        performAutoSave();
-      }, 100);
-    }
   };
+
+  const handleFieldBlurWithSave = useCallback((field: keyof EventFormData) => {
+    handleFieldBlur(field);
+    // Auto-save will be triggered by the useEffect after 4 seconds
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1028,6 +1003,13 @@ useEffect(() => {
           const { image, ...rest } = prev;
           return rest;
         });
+        // Trigger auto-save for image upload
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        setTimeout(() => {
+          performAutoSave();
+        }, 500);
       };
       reader.readAsDataURL(file);
     }
@@ -1049,112 +1031,114 @@ useEffect(() => {
   // SUBMIT
   // ============================================================
 
-  // ============================================================
-// SUBMIT
-// ============================================================
+  const handleSubmit = async (statusSlug: 'draft' | 'published') => {
+    setError(null);
 
-const handleSubmit = async (statusSlug: 'draft' | 'published') => {
-  setError(null);
-
-  if (!accountId) {
-    setError('Please log in to update events.');
-    toast.error('Please log in to update events');
-    return;
-  }
-
-  let isValid = false;
-  if (statusSlug === 'published') {
-    isValid = validateForPublish();
-  } else {
-    isValid = validateForDraft();
-  }
-
-  if (!isValid) {
-    const firstErrorField = Object.keys(errors)[0];
-    if (firstErrorField) {
-      const element = document.getElementById(`field-${firstErrorField}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        element.focus();
-      }
-    }
-    setError(statusSlug === 'published' 
-      ? 'Please fix all errors before publishing.' 
-      : 'Please fix validation errors before saving.');
-    return;
-  }
-
-  setIsSaving(true);
-  setSaveStatus('saving');
-
-  try {
-    // ✅ Upload image if new
-    if (imageFile) {
-      console.log('📤 Uploading image for event:', eventId);
-      await uploadEventImage({
-        accountId,
-        eventId: eventId,
-        image: imageFile,
-      }).unwrap();
-      setImageFile(null);
-      setImagePreview(null);
-      setIsImageRemoved(false);
+    if (!accountId) {
+      setError('Please log in to update events.');
+      toast.error('Please log in to update events');
+      return;
     }
 
-    // ✅ Update event with lowercase fields
-    console.log('📤 Updating event:', eventId);
-    await updateEvent({
-      id: eventId,
-      data: {
-        name: formData.name?.trim() || 'Untitled Event',
-        description: formData.description || '',
-        event_type_id: formData.event_type_id || '',
-        date: formData.date || '',
-        time: formData.time || '',
-        duration: formData.duration || 60,
-        price: formData.price || 0,
-        certificate_price: formData.certificate_price || 0,
-        location: formData.location || '',
-        is_virtual: formData.is_virtual,
-        is_featured: formData.is_featured,
-        is_private: formData.is_private,
-        zoom_link: formData.zoom_link || '',
-        meet_link: formData.meet_link || '',
-        max_attendees: formData.max_attendees || 0,
-      }
-    }).unwrap();
-
-    // ✅ If publishing, publish the event - PASS THE STRING ID ONLY
+    let isValid = false;
     if (statusSlug === 'published') {
-      console.log('📤 Publishing event:', eventId);
-      await publishEvent(eventId).unwrap();  // ✅ Fixed - just pass the ID
-      setIsPublished(true);
+      isValid = validateForPublish();
+    } else {
+      isValid = validateForDraft();
     }
 
-    setLastSavedData({ ...formData });
-    setHasChanges(false);
-    setSaveStatus('saved');
-    
-    setIsSaveDialogOpen(true);
-    
-    if (statusSlug === 'draft') {
-      toast.success('Draft saved successfully!');
-    } else {
-      toast.success('Event published successfully!');
+    if (!isValid) {
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        const element = document.getElementById(`field-${firstErrorField}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }
+      setError(statusSlug === 'published' 
+        ? 'Please fix all errors before publishing.' 
+        : 'Please fix validation errors before saving.');
+      return;
     }
-    
-  } catch (err: any) {
-    console.error('Update event error:', err);
-    setError(err?.data?.message || 'Failed to update event. Please try again.');
-    toast.error(err?.data?.message || 'Failed to update event');
-  } finally {
-    setIsSaving(false);
-  }
-};
+
+    setIsSaving(true);
+    setSaveStatus('saving');
+
+    try {
+      // ✅ Upload image if new
+      if (imageFile) {
+        console.log('📤 Uploading image for event:', eventId);
+        await uploadEventImage({
+          accountId,
+          eventId: eventId,
+          image: imageFile,
+        }).unwrap();
+        setImageFile(null);
+        setImagePreview(null);
+        setIsImageRemoved(false);
+      }
+
+      // ✅ Update event with lowercase fields
+      console.log('📤 Updating event:', eventId);
+      await updateEvent({
+        id: eventId,
+        data: {
+          name: formData.name?.trim() || 'Untitled Event',
+          display_name: formData.display_name?.trim() || formData.name?.trim() || 'Untitled Event',
+          description: formData.description || '',
+          event_type_id: formData.event_type_id || '',
+          date: formData.date || '',
+          time: formData.time || '',
+          duration: formData.duration || 60,
+          price: formData.price || 0,
+          certificate_price: formData.certificate_price || 0,
+          location: formData.location || '',
+          is_virtual: formData.is_virtual,
+          is_featured: formData.is_featured,
+          is_private: formData.is_private,
+          zoom_link: formData.zoom_link || '',
+          meet_link: formData.meet_link || '',
+          max_attendees: formData.max_attendees || 0,
+        }
+      }).unwrap();
+
+      // ✅ If publishing, publish the event
+      if (statusSlug === 'published') {
+        console.log('📤 Publishing event:', eventId);
+        await publishEvent(eventId).unwrap();
+        setIsPublished(true);
+      }
+
+      // ✅ REFETCH the event data AFTER publish to update the UI
+      await refetch();
+
+      setLastSavedData({ ...formData });
+      setHasChanges(false);
+      setSaveStatus('saved');
+      
+      setIsSaveDialogOpen(true);
+      
+      if (statusSlug === 'draft') {
+        toast.success('Draft saved successfully!');
+      } else {
+        toast.success('Event published successfully!');
+      }
+      
+    } catch (err: any) {
+      console.error('Update event error:', err);
+      setError(err?.data?.message || 'Failed to update event. Please try again.');
+      toast.error(err?.data?.message || 'Failed to update event');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleManualSave = () => {
     if (hasChanges) {
       performAutoSave();
+    } else {
+      toast.info('No changes to save');
     }
   };
 
@@ -1196,25 +1180,29 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
             <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 gap-4">
-                  <div id="field-name" className="space-y-2">
+                  <div id="field-display_name" className="space-y-2">
                     <Label className="text-sm font-medium text-neutral-dark">
                       Event Name
                       <span className="text-error-500 ml-1">*</span>
                     </Label>
                     <Input
                       placeholder="e.g., Advanced Data Science Workshop"
-                      value={formData.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                      onBlur={() => handleFieldBlurWithSave('name')}
+                      value={formData.display_name} 
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleChange('display_name', value);
+                        handleChange('name', value);
+                      }}
+                      onBlur={() => handleFieldBlurWithSave('display_name')}
                       className={cn(
                         "cursor-text focus:ring-primary-500 focus:border-primary-500",
-                        touched.name && errors.name && "border-error-500 focus:ring-error-500 focus:border-error-500"
+                        touched.display_name && errors.display_name && "border-error-500 focus:ring-error-500 focus:border-error-500"
                       )}
                     />
-                    {touched.name && errors.name && (
+                    {touched.display_name && errors.display_name && (
                       <p className="text-sm text-error-500 flex items-center gap-1">
                         <AlertCircle className="h-3.5 w-3.5" />
-                        {errors.name}
+                        {errors.display_name}
                       </p>
                     )}
                   </div>
@@ -1239,11 +1227,14 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
                           <SelectValue placeholder="Select event type" />
                         </SelectTrigger>
                         <SelectContent>
-                          {eventTypes.map((type: any) => (
-                            <SelectItem key={type.id || type.ID} value={type.id || type.ID} className="cursor-pointer">
-                              {type.name || type.Name}
-                            </SelectItem>
-                          ))}
+                          {eventTypes.map((type: any) => {
+                            const displayName = type.display_name || type.DisplayName || type.name || type.Name;
+                            return (
+                              <SelectItem key={type.id || type.ID} value={type.id || type.ID} className="cursor-pointer">
+                                {displayName}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       {touched.event_type_id && errors.event_type_id && (
@@ -1528,96 +1519,50 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
               </CardContent>
             </Card>
 
-          {/* ✅ NEW: Featured & Private Toggles */}
-          <Card className="border border-neutral-light">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-neutral-dark">Event Visibility</CardTitle>
-              <CardDescription className="text-xs text-neutral-gray">
-                Control how your event appears to users
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Featured Toggle */}
-              <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
-                <div>
-                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-                    <Star className="h-4 w-4 text-secondary-500" />
-                    Featured Event
-                  </Label>
-                  <p className="text-xs text-neutral-gray">Featured events appear prominently on the homepage</p>
+            <Card className="border border-neutral-light">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-neutral-dark">Event Visibility</CardTitle>
+                <CardDescription className="text-xs text-neutral-gray">
+                  Control how your event appears to users
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
+                  <div>
+                    <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                      <Star className="h-4 w-4 text-secondary-500" />
+                      Featured Event
+                    </Label>
+                    <p className="text-xs text-neutral-gray">Featured events appear prominently on the homepage</p>
+                  </div>
+                  <Switch
+                    checked={formData.is_featured}
+                    onCheckedChange={(checked) => {
+                      handleSelectChange('is_featured', checked);
+                    }}
+                    className="cursor-pointer data-[state=checked]:bg-secondary-500"
+                  />
                 </div>
-                <Switch
-                  checked={formData.is_featured}
-                  onCheckedChange={(checked) => {
-                    console.log('🔵 Featured switch clicked, new value:', checked);
-                    console.log('🔵 Current formData.is_featured:', formData.is_featured);
-                    setFormData(prev => {
-                      console.log('🔵 Updating formData, prev.is_featured:', prev.is_featured);
-                      return { ...prev, is_featured: checked };
-                    });
-                    setSaveStatus('saving');
-                    
-                    setErrors(prev => {
-                      const { is_featured, ...rest } = prev as any;
-                      return rest;
-                    });
-                    
-                    if (!isAutoSaving && !isSaving && !isCreating) {
-                      if (autoSaveTimerRef.current) {
-                        clearTimeout(autoSaveTimerRef.current);
-                        autoSaveTimerRef.current = null;
-                      }
-                      setTimeout(() => {
-                        performAutoSave();
-                      }, 300);
-                    }
-                  }}
-                  className="cursor-pointer data-[state=checked]:bg-secondary-500"
-                />
-              </div>
 
-              {/* Private Toggle - ✅ FIXED */}
-              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
-                <div>
-                  <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-                    <Lock className="h-4 w-4 text-amber-500" />
-                    Private Event
-                  </Label>
-                  <p className="text-xs text-neutral-gray">Private events are hidden from public listings</p>
+                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <div>
+                    <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-amber-500" />
+                      Private Event
+                    </Label>
+                    <p className="text-xs text-neutral-gray">Private events are hidden from public listings</p>
+                  </div>
+                  <Switch
+                    checked={formData.is_private}
+                    onCheckedChange={(checked) => {
+                      handleSelectChange('is_private', checked);
+                    }}
+                    className="cursor-pointer data-[state=checked]:bg-amber-500"
+                  />
                 </div>
-                <Switch
-                  checked={formData.is_private}
-                  onCheckedChange={(checked) => {
-                    console.log('🔵 Private switch clicked, new value:', checked);
-                    console.log('🔵 Current formData.is_private:', formData.is_private);
-                    setFormData(prev => {
-                      console.log('🔵 Updating formData, prev.is_private:', prev.is_private);
-                      return { ...prev, is_private: checked };
-                    });
-                    setSaveStatus('saving');
-                    
-                    setErrors(prev => {
-                      const { is_private, ...rest } = prev as any;
-                      return rest;
-                    });
-                    
-                    if (!isAutoSaving && !isSaving && !isCreating) {
-                      if (autoSaveTimerRef.current) {
-                        clearTimeout(autoSaveTimerRef.current);
-                        autoSaveTimerRef.current = null;
-                      }
-                      setTimeout(() => {
-                        performAutoSave();
-                      }, 300);
-                    }
-                  }}
-                  className="cursor-pointer data-[state=checked]:bg-amber-500"
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-            {/* Image Upload */}
             <Card className="border border-neutral-light">
               <CardContent className="pt-6">
                 <div className="space-y-2">
@@ -1632,7 +1577,7 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
                       <button
                         type="button"
                         onClick={(e) => {
-                          e.stopPropagation(); //  Prevent event bubbling
+                          e.stopPropagation();
                           handleRemoveImage();
                         }}
                         className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
@@ -1692,7 +1637,7 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-neutral-gray">Event Name</p>
-                      <p className="font-medium text-neutral-dark">{formData.name || 'Not set'}</p>
+                      <p className="font-medium text-neutral-dark">{formData.display_name || formData.name || 'Not set'}</p>
                     </div>
                     <div>
                       <p className="text-neutral-gray">Type</p>
@@ -2049,12 +1994,11 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-neutral-gray">
                 <p>• Edit your event details carefully</p>
-                <p>• Changes are auto-saved as you type</p>
+                <p>• Changes are auto-saved after 4 seconds of inactivity</p>
                 <p>• Review the preview before publishing</p>
                 <p>• Update your event image if needed</p>
                 <p>• Mark as <strong>Featured</strong> to highlight on homepage</p>
                 <p>• Mark as <strong>Private</strong> to hide from public listings</p>
-                <p>• Auto-save saves your work after 1.5 seconds of inactivity</p>
               </CardContent>
             </Card>
           </div>
@@ -2106,7 +2050,7 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
                   <Calendar className="h-5 w-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{eventData.name}</p>
+                  <p className="font-medium text-gray-900">{eventData.display_name || eventData.name}</p>
                   <p className="text-sm text-gray-500">
                     {formatDateForDisplay(eventData.date)} • {eventData.time || 'TBD'}
                   </p>
@@ -2152,9 +2096,11 @@ const handleSubmit = async (statusSlug: 'draft' | 'published') => {
             <div className="w-full p-4 bg-neutral-light rounded-lg border border-neutral-light">
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <p className="font-medium text-neutral-dark">{formData.name || 'Untitled Event'}</p>
+                  <p className="font-medium text-neutral-dark">
+                    {formData.display_name || formData.name || 'Untitled Event'}
+                  </p>
                   <p className="text-sm text-neutral-gray">
-                    {formData.date || 'TBD'} • {eventTypeName || 'No type'}
+                    {formatDateForDisplay(formData.date) || 'TBD'} • {eventTypeName || 'No type'}
                   </p>
                 </div>
                 <Badge variant="outline" className={cn(

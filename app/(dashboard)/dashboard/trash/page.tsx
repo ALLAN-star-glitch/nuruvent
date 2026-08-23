@@ -132,24 +132,35 @@ const formatTime = (dateString: string): string => {
   }
 };
 
-const getStatusConfig = (statusName: string) => {
+const getStatusConfig = (statusId: string, statusesMap: Record<string, string>) => {
+  const displayName = statusesMap[statusId] || statusId || 'Draft';
+  
   const statusMap: Record<string, { color: string; dot: string }> = {
     'Draft': { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
     'Published': { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
     'Cancelled': { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
     'Completed': { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
   };
-  return statusMap[statusName] || statusMap.Draft;
+  
+  const config = statusMap[displayName] || statusMap['Draft'];
+  return { ...config, displayName };
 };
 
-const getTypeConfig = (typeName: string) => {
-  const typeMap: Record<string, string> = {
-    'Workshop': 'bg-purple-100 text-purple-700',
-    'Webinar': 'bg-blue-100 text-blue-700',
-    'Meetup': 'bg-amber-100 text-amber-700',
-    'Bootcamp': 'bg-red-100 text-red-700',
+const getTypeConfig = (typeId: string, typesMap: Record<string, string>) => {
+  const displayName = typesMap[typeId] || typeId || 'Event';
+  
+  const classNameMap: Record<string, string> = {
+    'Workshop': 'bg-purple-100 text-purple-700 border-purple-200',
+    'Webinar': 'bg-blue-100 text-blue-700 border-blue-200',
+    'Meetup': 'bg-amber-100 text-amber-700 border-amber-200',
+    'Bootcamp': 'bg-red-100 text-red-700 border-red-200',
+    'Uncategorized': 'bg-gray-100 text-gray-700 border-gray-200',
   };
-  return typeMap[typeName] || 'bg-gray-100 text-gray-700';
+  
+  return {
+    displayName: displayName,
+    className: classNameMap[displayName] || 'bg-gray-100 text-gray-700 border-gray-200'
+  };
 };
 
 const formatPrice = (price: number): string => {
@@ -163,7 +174,9 @@ type ViewMode = 'table' | 'grid';
 
 const convertApiEventToUI = (event: any, typesMap: Record<string, string>, statusesMap: Record<string, string>) => ({
   id: event.id || event.ID,
-  title: event.name || event.Name,
+  title: event.display_name || event.DisplayName || event.name || event.Name || 'Untitled Event',
+  eventTypeId: event.event_type_id || event.EventTypeID,
+  eventStatusId: event.event_status_id || event.EventStatusID,
   type: typesMap[event.event_type_id || event.EventTypeID] || event.event_type_id || event.EventTypeID,
   status: statusesMap[event.event_status_id || event.EventStatusID] || event.event_status_id || event.EventStatusID,
   date: event.date || event.Date ? new Date(event.date || event.Date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
@@ -255,11 +268,6 @@ export default function TrashPage() {
     refetchOnFocus: true,
   });
 
-  // ✅ Add this to monitor refetching
-useEffect(() => {
-  console.log('🔄 Trash data updated:', trashData?.data?.length);
-}, [trashData]);
-
   const [restoreEvent] = useRestoreEventMutation();
   const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
@@ -272,13 +280,19 @@ useEffect(() => {
   const statusesMap = useMemo(() => {
     if (!statusesData) return {};
     const array = Array.isArray(statusesData) ? statusesData : (statusesData as any)?.data || [];
-    return array.reduce((acc: any, s: any) => ({ ...acc, [s.id || s.ID]: s.name || s.Name }), {});
+    return array.reduce((acc: any, s: any) => ({ 
+      ...acc, 
+      [s.id || s.ID]: s.display_name || s.name || s.Name 
+    }), {});
   }, [statusesData]);
 
   const typesMap = useMemo(() => {
     if (!typesData) return {};
     const array = Array.isArray(typesData) ? typesData : (typesData as any)?.data || [];
-    return array.reduce((acc: any, t: any) => ({ ...acc, [t.id || t.ID]: t.name || t.Name }), {});
+    return array.reduce((acc: any, t: any) => ({ 
+      ...acc, 
+      [t.id || t.ID]: t.display_name || t.name || t.Name 
+    }), {});
   }, [typesData]);
 
   const uiEvents = useMemo(() => {
@@ -330,6 +344,7 @@ useEffect(() => {
 
   const totalItems = trashData?.total || filteredEvents.length;
   const totalPages = Math.ceil(totalItems / pageSize);
+  
   const draftCount = uiEvents.filter(e => e.status === 'Draft').length;
   const publishedCount = uiEvents.filter(e => e.status === 'Published').length;
 
@@ -342,31 +357,21 @@ useEffect(() => {
     setIsRestoreDialogOpen(true);
   };
 
-
-const handleConfirmRestore = async () => {
-  if (!selectedEvent) return;
-  try {
-    await restoreEvent(selectedEvent.id).unwrap();
-    setIsRestoreDialogOpen(false);
-    setSelectedEvent(null);
-    setSelectedEvents([]);
-    setSelectAll(false);
-    toast.success(`"${selectedEvent.title}" restored successfully`);
-    
-    // ✅ Force refetch with different approach
-    await refetch();
-    
-    // ✅ Also manually update the trash data by calling refetch again after a delay
-    setTimeout(() => {
-      refetch();
-    }, 100);
-  } catch (err: any) {
-    console.error('Failed to restore event:', err);
-    toast.error(err?.data?.message || 'Failed to restore event');
-  }
-};
-
-
+  const handleConfirmRestore = async () => {
+    if (!selectedEvent) return;
+    try {
+      await restoreEvent(selectedEvent.id).unwrap();
+      setIsRestoreDialogOpen(false);
+      setSelectedEvent(null);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      toast.success(`"${selectedEvent.title}" restored successfully`);
+      await refetch();
+    } catch (err: any) {
+      console.error('Failed to restore event:', err);
+      toast.error(err?.data?.message || 'Failed to restore event');
+    }
+  };
 
   const handlePermanentDelete = (event: any) => {
     setSelectedEvent(event);
@@ -421,24 +426,23 @@ const handleConfirmRestore = async () => {
   };
 
   const handleBulkRestore = async () => {
-  try {
-    await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
-    setIsBulkActionDialogOpen(false);
-    const count = selectedEvents.length;
-    setSelectedEvents([]);
-    setSelectAll(false);
-    toast.success(`${count} events restored successfully`);
-    // ✅ Await refetch to ensure cache is updated
-    await refetch();
-  } catch (err: any) {
-    console.error('Failed to restore events:', err);
-    toast.error(err?.data?.message || 'Failed to restore events');
-  }
-};
+    try {
+      await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
+      setIsBulkActionDialogOpen(false);
+      const count = selectedEvents.length;
+      setSelectedEvents([]);
+      setSelectAll(false);
+      toast.success(`${count} events restored successfully`);
+      await refetch();
+    } catch (err: any) {
+      console.error('Failed to restore events:', err);
+      toast.error(err?.data?.message || 'Failed to restore events');
+    }
+  };
 
   const handleBulkPermanentDelete = async () => {
     try {
-      const result = await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
+      await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
       setIsBulkActionDialogOpen(false);
       const count = selectedEvents.length;
       setSelectedEvents([]);
@@ -636,42 +640,44 @@ const handleConfirmRestore = async () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
+      {/* ✅ Stats Cards - Fully Responsive Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total in Trash</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{trashData?.total || 0}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{trashData?.total || 0}</p>
               </div>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
+              <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg flex-shrink-0 ml-2">
                 <Trash2 className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{draftCount}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{draftCount}</p>
               </div>
-              <div className="p-3 bg-gray-50 text-gray-600 rounded-lg">
+              <div className="p-2.5 bg-gray-50 text-gray-600 rounded-lg flex-shrink-0 ml-2">
                 <Clock className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Published</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{publishedCount}</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{publishedCount}</p>
               </div>
-              <div className="p-3 bg-green-50 text-green-600 rounded-lg">
+              <div className="p-2.5 bg-green-50 text-green-600 rounded-lg flex-shrink-0 ml-2">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
             </div>
@@ -796,7 +802,7 @@ const handleConfirmRestore = async () => {
               </div>
             </div>
 
-            {/* Bulk Actions Bar - Optimized */}
+            {/* Bulk Actions Bar */}
             {getSelectedCount() > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -843,7 +849,9 @@ const handleConfirmRestore = async () => {
         </Card>
       )}
 
-      {/* Table View */}
+      {/* ============================================================
+          DESKTOP TABLE VIEW
+          ============================================================ */}
       {!isMobile && viewMode === 'table' && (
         <Card>
           <CardContent className="p-0">
@@ -886,14 +894,13 @@ const handleConfirmRestore = async () => {
                   {filteredEvents.length > 0 ? (
                     filteredEvents.map((event) => {
                       const isSelected = selectedEvents.includes(event.id);
-                      const statusConfig = getStatusConfig(event.status);
-                      const typeClassName = getTypeConfig(event.type);
+                      const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+                      const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
 
                       return (
                         <TableRow
                           key={event.id}
-                          className={`hover:bg-gray-50/60 transition-colors group ${isSelected ? 'bg-primary/5' : ''
-                            }`}
+                          className={`hover:bg-gray-50/60 transition-colors group ${isSelected ? 'bg-primary/5' : ''}`}
                         >
                           <TableCell className="py-4 px-4">
                             <Checkbox
@@ -927,14 +934,14 @@ const handleConfirmRestore = async () => {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={typeClassName}>
-                              {event.type}
+                            <Badge variant="outline" className={typeInfo.className}>
+                              {typeInfo.displayName}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-4 px-4">
                             <Badge variant="outline" className={`${statusConfig.color} border`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                              {event.status}
+                              {statusConfig.displayName}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-gray-600">
@@ -1049,27 +1056,28 @@ const handleConfirmRestore = async () => {
         </Card>
       )}
 
-      {/* Grid View */}
+      {/* ============================================================
+          DESKTOP GRID VIEW
+          ============================================================ */}
       {!isMobile && viewMode === 'grid' && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event) => {
-                const statusConfig = getStatusConfig(event.status);
-                const typeClassName = getTypeConfig(event.type);
+                const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+                const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
                 const isSelected = selectedEvents.includes(event.id);
 
                 return (
                   <Card
                     key={event.id}
-                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${isSelected ? 'border-primary/50 bg-primary/5' : ''
-                      }`}
+                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${isSelected ? 'border-primary/50 bg-primary/5' : ''}`}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={typeClassName}>
-                            {event.type}
+                          <Badge variant="outline" className={typeInfo.className}>
+                            {typeInfo.displayName}
                           </Badge>
                           {event.isFeatured && (
                             <Badge variant="default" className="bg-secondary-500 text-white text-xs">
@@ -1086,7 +1094,7 @@ const handleConfirmRestore = async () => {
                         </div>
                         <Badge variant="outline" className={`${statusConfig.color} border`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                          {event.status}
+                          {statusConfig.displayName}
                         </Badge>
                       </div>
 
@@ -1227,6 +1235,192 @@ const handleConfirmRestore = async () => {
             </div>
           )}
         </>
+      )}
+
+      {/* ============================================================
+          MOBILE CARD VIEW
+          ============================================================ */}
+      {isMobile && (
+        <div className="space-y-4 pb-24">
+          {filteredEvents.length > 0 ? (
+            filteredEvents.map((event) => {
+              const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+              const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
+              const isSelected = selectedEvents.includes(event.id);
+
+              return (
+                <Card 
+                  key={event.id} 
+                  className={`border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200 ${isSelected ? 'border-primary/50 bg-primary/5' : ''}`}
+                >
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={typeInfo.className}>
+                          {typeInfo.displayName}
+                        </Badge>
+                        {event.isFeatured && (
+                          <Badge variant="default" className="bg-secondary-500 text-white text-xs">
+                            <Star className="h-3 w-3 mr-1" />
+                            Featured
+                          </Badge>
+                        )}
+                        {event.isPrivate && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Private
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant="outline" className={`${statusConfig.color} border`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
+                        {statusConfig.displayName}
+                      </Badge>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-gray-900 line-clamp-2">
+                        {event.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                        <span className="text-primary font-medium">{event.price}</span>
+                        <span className="text-gray-300">•</span>
+                        <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{event.date}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{event.time}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="text-gray-400">Deleted:</span>
+                      <span>{formatDate(event.deletedAt)}</span>
+                      <span className="text-gray-400">({formatTime(event.deletedAt)})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{event.registered} / {event.capacity} registered</span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <Globe className="h-3.5 w-3.5" />
+                        <span>{event.platform}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleSelectEvent(event.id)}
+                          className="cursor-pointer"
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
+                              <MoreVertical className="h-4 w-4 text-gray-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="cursor-pointer text-green-600"
+                              onClick={() => handleRestoreEvent(event)}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-2" />
+                              Restore
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="cursor-pointer text-red-600"
+                              onClick={() => handlePermanentDelete(event)}
+                            >
+                              <Trash className="h-4 w-4 mr-2" />
+                              Delete Permanently
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <div className="py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <Trash2 className="h-8 w-8 text-gray-300" />
+                <p className="font-medium">
+                  {searchQuery
+                    ? `No trashed events match "${searchQuery}"`
+                    : 'No events in trash'}
+                </p>
+                <p className="text-sm text-gray-400">
+                  {searchQuery
+                    ? 'Try adjusting your search terms.'
+                    : 'Deleted events will appear here.'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Pagination */}
+          {totalItems > 0 && (
+            <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">Rows:</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => handlePageSizeChange(Number(value))}
+                >
+                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5" className="cursor-pointer">5</SelectItem>
+                    <SelectItem value="10" className="cursor-pointer">10</SelectItem>
+                    <SelectItem value="20" className="cursor-pointer">20</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">
+                  {totalItems > 0 
+                    ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
+                    : '0 of 0'
+                  }
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Mobile Floating Filter Strip */}

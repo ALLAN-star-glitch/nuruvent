@@ -140,34 +140,46 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-// Helper to get status color config based on status name
-const getStatusConfig = (statusName: string) => {
+// ✅ FIXED: Helper to get status config with display name from statusesMap
+const getStatusConfig = (statusId: string, statusesMap: Record<string, string>) => {
+  // Get the display name from the map
+  const displayName = statusesMap[statusId] || statusId || 'Draft';
+  
   const statusMap: Record<string, { color: string; dot: string }> = {
     'Draft': { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
     'Published': { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
     'Cancelled': { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
     'Completed': { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
   };
-  return statusMap[statusName] || statusMap.Draft;
+  
+  const config = statusMap[displayName] || statusMap['Draft'];
+  return { ...config, displayName };
 };
 
-
-// Helper to get type color config based on type name
-const getTypeConfig = (typeName: string) => {
-  const typeMap: Record<string, string> = {
-    'Workshop': 'bg-purple-100 text-purple-700',
-    'Webinar': 'bg-blue-100 text-blue-700',
-    'Meetup': 'bg-amber-100 text-amber-700',
-    'Bootcamp': 'bg-red-100 text-red-700',
+// ✅ FIXED: Helper to get type config with display name from typesMap
+const getTypeConfig = (typeId: string, typesMap: Record<string, string>) => {
+  // Get the display name from the map
+  const displayName = typesMap[typeId] || typeId || 'Event';
+  
+  const classNameMap: Record<string, string> = {
+    'Workshop': 'bg-purple-100 text-purple-700 border-purple-200',
+    'Webinar': 'bg-blue-100 text-blue-700 border-blue-200',
+    'Meetup': 'bg-amber-100 text-amber-700 border-amber-200',
+    'Bootcamp': 'bg-red-100 text-red-700 border-red-200',
+    'Uncategorized': 'bg-gray-100 text-gray-700 border-gray-200',
   };
-  return typeMap[typeName] || 'bg-gray-100 text-gray-700';
+  
+  return {
+    displayName: displayName,
+    className: classNameMap[displayName] || 'bg-gray-100 text-gray-700 border-gray-200'
+  };
 };
 
 type SortField = 'name' | 'eventDate' | 'addedDate' | 'current_attendees' | 'price' | 'status';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
-// Convert API event to UI event with mapping data - SUPPORTS BOTH CASES
+// ✅ FIXED: Convert API event to UI event with proper ID mapping
 const convertApiEventToUI = (
   event: EventResponse,
   typesMap: Record<string, string>,
@@ -179,7 +191,7 @@ const convertApiEventToUI = (
   };
 
   const id = getVal('id', 'ID');
-  const displayName = getVal('display_name', 'DisplayName') || getVal('name', 'Name'); 
+  const displayName = getVal('display_name', 'DisplayName') || getVal('name', 'Name') || 'Untitled Event';
   const eventTypeId = getVal('event_type_id', 'EventTypeID');
   const eventStatusId = getVal('event_status_id', 'EventStatusID');
   const date = getVal('date', 'Date');
@@ -210,6 +222,13 @@ const convertApiEventToUI = (
   return {
     id,
     title: displayName,
+    // ✅ Store the raw IDs for lookup
+    eventTypeId: eventTypeId,
+    eventStatusId: eventStatusId,
+    // ✅ Store display names from maps
+    typeDisplayName: typesMap[eventTypeId] || eventTypeId || 'Event',
+    statusDisplayName: statusesMap[eventStatusId] || eventStatusId || 'Draft',
+    // Legacy fields for compatibility
     type: typesMap[eventTypeId] || eventTypeId,
     status: statusesMap[eventStatusId] || eventStatusId,
     date: date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
@@ -224,8 +243,6 @@ const convertApiEventToUI = (
     location: location,
     image: imageUrl,
     slug,
-    eventTypeId,
-    eventStatusId,
     rawDate: date,
     rawTime: time,
     duration,
@@ -332,7 +349,7 @@ export default function EventsDashboardPage() {
     skip: !accountId || !isAuthenticated,
   });
 
-  // Create maps for quick lookups: ID → Name (supports both cases)
+  // ✅ FIXED: Create maps for quick lookups: ID → Display Name (supports both cases)
   const statusesMap = useMemo(() => {
     if (!statusesData) return {};
     
@@ -342,7 +359,7 @@ export default function EventsDashboardPage() {
     
     return statusesArray.reduce((acc: any, status: any) => ({
       ...acc,
-      [status.id || status.ID]: status.name || status.Name
+      [status.id || status.ID]: status.display_name || status.name || status.Name
     }), {});
   }, [statusesData]);
 
@@ -355,7 +372,7 @@ export default function EventsDashboardPage() {
     
     return typesArray.reduce((acc: any, type: any) => ({
       ...acc,
-      [type.id || type.ID]: type.name || type.Name
+      [type.id || type.ID]: type.display_name || type.name || type.Name
     }), {});
   }, [typesData]);
 
@@ -1042,110 +1059,110 @@ export default function EventsDashboardPage() {
         </div>
       </div>
 
-    {/* // Stats Cards - Improved version with more accurate data */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Events */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
-                </p>
-              </div>
-              <div className="p-3 bg-primary/10 text-primary rounded-lg">
-                <Calendar className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+  {/* Stats Cards - Responsive Grid Layout */}
+  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+    {/* Total Events */}
+    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
+            </p>
+          </div>
+          <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-lg">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
-        {/* Registrations */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Registrations</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Across {activeEvents.filter(e => e.registered > 0).length} events
-                </p>
-              </div>
-              <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    {/* Registrations */}
+    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {activeEvents.filter(e => e.registered > 0).length} events
+            </p>
+          </div>
+          <div className="p-2.5 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
-        {/* Live Sessions */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
-                </p>
-              </div>
-              <div className="p-3 bg-red-50 text-red-600 rounded-lg">
-                <Video className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    {/* Live Sessions */}
+    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
+            </p>
+          </div>
+          <div className="p-2.5 sm:p-3 bg-red-50 text-red-600 rounded-lg">
+            <Video className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
-        {/* CPD Accredited */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total CPD hours
-                </p>
-              </div>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-                <Award className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    {/* CPD Accredited */}
+    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total hours
+            </p>
+          </div>
+          <div className="p-2.5 sm:p-3 bg-amber-50 text-amber-600 rounded-lg">
+            <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
 
-        {/* Trash Card - Clickable */}
-        <Card 
-          className={`${trashedEvents > 0 ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/70 cursor-pointer' : 'cursor-pointer'} transition-colors`}
-          onClick={() => router.push('/dashboard/trash')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trash</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{trashedEvents}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {trashedEvents > 0 ? (
-                    <span className="text-amber-600">Click to restore</span>
-                  ) : (
-                    'Empty'
-                  )}
-                </p>
-              </div>
-              <div className={`p-3 rounded-lg ${trashedEvents > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
-                <Trash2 className="h-5 w-5" />
-              </div>
-            </div>
-            {trashedEvents > 0 && (
-              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                Click to view <ChevronRight className="h-3 w-3" />
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+    {/* Trash Card - Clickable */}
+    <Card 
+      className={`${trashedEvents > 0 ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/70 cursor-pointer' : 'cursor-pointer'} transition-colors border-gray-200/80 shadow-sm hover:shadow-md`}
+      onClick={() => trashedEvents > 0 ? router.push('/dashboard/trash') : undefined}
+    >
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trash</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{trashedEvents}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {trashedEvents > 0 ? (
+                <span className="text-amber-600">Click to restore</span>
+              ) : (
+                'Empty'
+              )}
+            </p>
+          </div>
+          <div className={`p-2.5 sm:p-3 rounded-lg ${trashedEvents > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
+            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+          </div>
+        </div>
+        {trashedEvents > 0 && (
+          <p className="text-[10px] sm:text-xs text-amber-600 mt-1 flex items-center gap-1">
+            Click to view <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  </div>
 
       {/* Desktop Filters */}
       {!isMobile && (
@@ -1495,7 +1512,9 @@ export default function EventsDashboardPage() {
                         {getSortIcon('name')}
                       </div>
                     </TableHead>
-                    <TableHead className="py-3 px-4">Type</TableHead>
+                    <TableHead className="py-3 px-4">
+                      Type
+                    </TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventDate')}>
                       <div className="flex items-center">
                         Event Date
@@ -1529,8 +1548,10 @@ export default function EventsDashboardPage() {
                       const percentage = event.capacity > 0 
                         ? Math.round((event.registered / event.capacity) * 100) 
                         : 0;
-                      const statusConfig = getStatusConfig(event.status);
-                      const typeClassName = getTypeConfig(event.type);
+                      // ✅ FIXED: Use eventStatusId with statusesMap for display name
+                      const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+                      // ✅ FIXED: Use eventTypeId with typesMap for display name
+                      const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
                       const isSelected = selectedEvents.includes(event.id);
                       const isTrashed = event.isDeleted;
                       
@@ -1586,8 +1607,8 @@ export default function EventsDashboardPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={typeClassName}>
-                              {event.type}
+                            <Badge variant="outline" className={typeInfo.className}>
+                              {typeInfo.displayName}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
@@ -1625,7 +1646,7 @@ export default function EventsDashboardPage() {
                             ) : (
                               <Badge variant="outline" className={`${statusConfig.color} border`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                                {event.status}
+                                {statusConfig.displayName}
                               </Badge>
                             )}
                           </TableCell>
@@ -1845,8 +1866,8 @@ export default function EventsDashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event) => {
-                const statusConfig = getStatusConfig(event.status);
-                const typeClassName = getTypeConfig(event.type);
+                const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+                const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
                 const isSelected = selectedEvents.includes(event.id);
                 const isTrashed = event.isDeleted;
                 const addedDate = event.publishedAt || event.createdAt;
@@ -1864,8 +1885,8 @@ export default function EventsDashboardPage() {
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={typeClassName}>
-                            {event.type}
+                          <Badge variant="outline" className={typeInfo.className}>
+                            {typeInfo.displayName}
                           </Badge>
                           {/* ✅ Featured Badge in Grid */}
                           {event.isFeatured && !isTrashed && (
@@ -1890,7 +1911,7 @@ export default function EventsDashboardPage() {
                         ) : (
                           <Badge variant="outline" className={`${statusConfig.color} border`}>
                             <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                            {event.status}
+                            {statusConfig.displayName}
                           </Badge>
                         )}
                       </div>
@@ -2181,8 +2202,8 @@ export default function EventsDashboardPage() {
         <div className="space-y-4 pb-24">
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
-              const statusConfig = getStatusConfig(event.status);
-              const typeClassName = getTypeConfig(event.type);
+              const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
+              const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
               const isTrashed = event.isDeleted;
               const addedDate = event.publishedAt || event.createdAt;
               const addedLabel = event.publishedAt ? 'Published' : 'Created';
@@ -2202,8 +2223,8 @@ export default function EventsDashboardPage() {
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className={typeClassName}>
-                          {event.type}
+                        <Badge variant="outline" className={typeInfo.className}>
+                          {typeInfo.displayName}
                         </Badge>
                         {event.isFeatured && !isTrashed && (
                           <Badge variant="default" className="bg-secondary-500 text-white text-xs">
@@ -2226,7 +2247,7 @@ export default function EventsDashboardPage() {
                       ) : (
                         <Badge variant="outline" className={`${statusConfig.color} border`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                          {event.status}
+                          {statusConfig.displayName}
                         </Badge>
                       )}
                     </div>
@@ -2608,8 +2629,8 @@ export default function EventsDashboardPage() {
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.type)} shrink-0`}>
-                      {selectedEvent.type}
+                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.eventTypeId, typesMap).className} shrink-0`}>
+                      {getTypeConfig(selectedEvent.eventTypeId, typesMap).displayName}
                     </Badge>
                     {selectedEvent.isDeleted ? (
                       <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
@@ -2617,8 +2638,8 @@ export default function EventsDashboardPage() {
                         Trashed
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className={`${getStatusConfig(selectedEvent.status).color} shrink-0`}>
-                        {selectedEvent.status}
+                      <Badge variant="outline" className={`${getStatusConfig(selectedEvent.eventStatusId, statusesMap).color} shrink-0`}>
+                        {getStatusConfig(selectedEvent.eventStatusId, statusesMap).displayName}
                       </Badge>
                     )}
                     {/* ✅ Featured Badge in View Dialog */}
