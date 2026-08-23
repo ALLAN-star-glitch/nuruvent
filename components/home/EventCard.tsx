@@ -20,6 +20,12 @@ import {
   Mic2,
   BookOpen,
   Handshake,
+  CalendarDays,
+  Ticket,
+  Eye,
+  Tag,
+  DollarSign,
+  Award
 } from 'lucide-react';
 import { EventResponse, EventTypeResponse } from '@/lib/store/api/eventsApi';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,67 +45,66 @@ interface EventCardProps {
 // ✅ Map event type ID to icon component
 const getEventTypeIcon = (typeId: string, eventTypes?: EventTypeResponse[]) => {
   if (!eventTypes || !typeId) {
-    return <Briefcase className="h-3 w-3" />;
+    return <Briefcase className="h-3.5 w-3.5" />;
   }
   
   const found = eventTypes.find((t) => t.id === typeId);
   if (found) {
     const slug = found.slug?.toLowerCase() || found.name?.toLowerCase() || '';
     
-    if (slug.includes('workshop')) return <Briefcase className="h-3 w-3" />;
-    if (slug.includes('webinar')) return <Presentation className="h-3 w-3" />;
-    if (slug.includes('bootcamp')) return <GraduationCap className="h-3 w-3" />;
-    if (slug.includes('meetup')) return <Users2 className="h-3 w-3" />;
-    if (slug.includes('conference')) return <Mic2 className="h-3 w-3" />;
-    if (slug.includes('seminar')) return <BookOpen className="h-3 w-3" />;
-    if (slug.includes('networking')) return <Handshake className="h-3 w-3" />;
+    if (slug.includes('workshop')) return <Briefcase className="h-3.5 w-3.5" />;
+    if (slug.includes('webinar')) return <Presentation className="h-3.5 w-3.5" />;
+    if (slug.includes('bootcamp')) return <GraduationCap className="h-3.5 w-3.5" />;
+    if (slug.includes('meetup')) return <Users2 className="h-3.5 w-3.5" />;
+    if (slug.includes('conference')) return <Mic2 className="h-3.5 w-3.5" />;
+    if (slug.includes('seminar')) return <BookOpen className="h-3.5 w-3.5" />;
+    if (slug.includes('networking')) return <Handshake className="h-3.5 w-3.5" />;
     
-    return <Briefcase className="h-3 w-3" />;
+    return <Briefcase className="h-3.5 w-3.5" />;
   }
   
-  return <Briefcase className="h-3 w-3" />;
+  return <Briefcase className="h-3.5 w-3.5" />;
 };
 
 // ✅ Get event type label and color
 const getEventTypeInfo = (typeId: string, eventTypes?: EventTypeResponse[]) => {
   if (!eventTypes || !typeId) {
-    return { label: 'Event', color: '#64748b' };
+    return { label: 'Event', color: 'var(--color-neutral-gray)' };
   }
   
   const found = eventTypes.find((t) => t.id === typeId);
   if (found) {
     return { 
       label: found.name || 'Event', 
-      color: found.color || '#64748b' 
+      color: found.color || 'var(--color-neutral-gray)' 
     };
   }
   
-  return { label: 'Event', color: '#64748b' };
+  return { label: 'Event', color: 'var(--color-neutral-gray)' };
 };
 
 const formatPrice = (price: number) => {
   if (price === 0) return 'Free';
-  if (price >= 1000) return `KSh ${(price / 1000).toFixed(1)}K`;
-  return `KSh ${price}`;
+  return `KSh ${price.toLocaleString()}`;
 };
 
 const getCreatorDisplay = (event: EventResponse): { name: string; icon: JSX.Element; type: string } => {
   const creator = event.creator;
   if (!creator) {
-    return { name: 'Host', icon: <User className="h-3.5 w-3.5 text-slate-400" />, type: 'host' };
+    return { name: 'Host', icon: <User className="h-3.5 w-3.5 text-neutral-400" />, type: 'host' };
   }
   
   if (creator.account_type === 'institution' && creator.institution_name) {
     return { 
       name: creator.institution_name, 
-      icon: <Building2 className="h-3.5 w-3.5 text-slate-400" />, 
+      icon: <Building2 className="h-3.5 w-3.5 text-neutral-400" />, 
       type: 'institution' 
     };
   }
   
   return { 
     name: creator.name || 'Host', 
-    icon: <User className="h-3.5 w-3.5 text-slate-400" />, 
+    icon: <User className="h-3.5 w-3.5 text-neutral-400" />, 
     type: 'individual' 
   };
 };
@@ -107,15 +112,17 @@ const getCreatorDisplay = (event: EventResponse): { name: string; icon: JSX.Elem
 export function EventCard({ event, onClick, featured = false, eventTypes }: EventCardProps) {
   const eventTypeInfo = getEventTypeInfo(event.event_type_id, eventTypes);
   const eventTypeIcon = getEventTypeIcon(event.event_type_id, eventTypes);
-  const { month, day, time } = formatEventDateDetails(event.date, event.time);
+  const { month, day, time, fullDate, weekday } = formatEventDateDetails(event.date, event.time);
   const creator = getCreatorDisplay(event);
+  const isFree = event.price === 0;
+  const isPast = new Date(event.date) < new Date();
 
   return (
     <Card 
       className={cn(
-        "group relative flex flex-col h-full p-0 pt-0 border-0 overflow-hidden rounded-2xl bg-white transition-all duration-300",
-        "shadow-sm hover:shadow-xl hover:-translate-y-1 cursor-pointer ring-1 ring-slate-200/80",
-        featured && "ring-amber-400/50 shadow-md"
+        "group relative flex flex-col h-full p-0 border border-neutral-100/80 overflow-hidden rounded-2xl bg-white transition-all duration-300",
+        "shadow-sm hover:shadow-xl hover:-translate-y-1.5 cursor-pointer",
+        featured && "ring-2 ring-secondary-400/40 shadow-md shadow-secondary-100/50"
       )}
       onClick={onClick}
       role="button"
@@ -128,47 +135,58 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
       }}
     >
       {/* Image Container */}
-      <div className="relative w-full aspect-[16/9] overflow-hidden bg-slate-100 flex-shrink-0 rounded-t-2xl">
+      <div className="relative w-full aspect-[16/9] overflow-hidden bg-neutral-50 flex-shrink-0">
         {event.image_url ? (
           <Image
             src={event.image_url}
-            alt={event.name} // ✅ Changed to event.name
+            alt={event.display_name || event.name}
             fill
             className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={featured}
           />
         ) : (
-          <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900/5 text-slate-300">
-            <Calendar className="h-10 w-10 stroke-1 mb-1" />
+          <div className="flex flex-col items-center justify-center h-full w-full bg-gradient-to-br from-neutral-50 to-neutral-100 text-neutral-300">
+            <CalendarDays className="h-12 w-12 stroke-1" />
+            <span className="text-sm font-medium text-neutral-400 mt-2">No Image Available</span>
           </div>
         )}
         
-        {/* Subtle Overlay Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />
-
-        {/* Floating Date Badge */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col items-center justify-center min-w-[3.25rem] px-2 py-1.5 rounded-xl bg-white/95 backdrop-blur-md shadow-lg border border-white/20">
-          <span className="text-[10px] font-bold tracking-wider text-rose-500 uppercase leading-none">
-            {month}
-          </span>
-          <span className="text-base font-extrabold text-slate-900 leading-none mt-1">
-            {day}
-          </span>
+        {/* Date Badge - Enhanced with better visibility */}
+        <div className="absolute bottom-4 left-4 z-10">
+          <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md rounded-xl px-4 py-2.5 border border-white/20 shadow-lg shadow-black/10">
+            <div className="flex flex-col items-center leading-none">
+              <span className="text-[10px] font-bold tracking-wider text-secondary-500 uppercase">
+                {month}
+              </span>
+              <span className="text-2xl font-extrabold text-neutral-900 leading-none">
+                {day}
+              </span>
+            </div>
+            <div className="w-px h-10 bg-neutral-200" />
+            <div className="flex flex-col leading-none">
+              <span className="text-[10px] text-neutral-500 font-medium uppercase tracking-wider">
+                {weekday}
+              </span>
+              <span className="text-sm font-semibold text-neutral-900">{time}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Top Right Badges */}
-        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
-          {event.is_featured && (
-            <Badge className="bg-amber-500/90 hover:bg-amber-500 backdrop-blur-md text-white border-0 shadow-sm text-xs px-2.5 py-1 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 fill-current" />
-              <span>Featured</span>
+        {/* Featured Badge */}
+        {event.is_featured && (
+          <div className="absolute top-3 left-3 z-10">
+            <Badge className="bg-gradient-to-r from-secondary-400 to-secondary-500 text-white border-0 shadow-lg shadow-secondary-500/30 px-3 py-1 flex items-center gap-1.5 text-[11px] font-semibold rounded-full">
+              <Award className="h-3.5 w-3.5" />
+              Featured
             </Badge>
-          )}
+          </div>
+        )}
 
-          {/* Event Type Badge with icon and color */}
+        {/* Event Type Badge */}
+        <div className="absolute top-3 right-3 z-10">
           <Badge 
-            className="backdrop-blur-md text-white border-0 text-xs px-2.5 py-1 font-medium flex items-center gap-1"
+            className="border-0 shadow-lg shadow-black/10 px-3 py-1 text-white text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-sm rounded-full"
             style={{ backgroundColor: eventTypeInfo.color }}
           >
             {eventTypeIcon}
@@ -176,81 +194,104 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
           </Badge>
         </div>
 
-        {/* Bottom Virtual Badge */}
+        {/* Virtual Badge */}
         {event.is_virtual && (
-          <div className="absolute bottom-3 left-3 z-10">
-            <Badge className="bg-white/90 backdrop-blur-md text-slate-800 border-0 text-xs font-medium shadow-sm flex items-center gap-1 px-2.5 py-0.5">
-              <Video className="h-3 w-3 text-indigo-600" />
-              <span>Virtual Event</span>
+          <div className="absolute bottom-4 right-4 z-10">
+            <Badge className="bg-primary-500/90 backdrop-blur-md text-white border-0 shadow-lg shadow-primary-500/30 text-[11px] font-medium flex items-center gap-1.5 px-3 py-1 rounded-full">
+              <Video className="h-3.5 w-3.5" />
+              Virtual Event
             </Badge>
           </div>
         )}
       </div>
 
-      {/* Card Content Body */}
-      <CardContent className="p-5 flex-1 flex flex-col">
-        {/* Host / Institution Header */}
-        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-2">
-          {creator.icon}
-          <span className="truncate">
-            <span className="text-slate-400">By</span>{' '}
-            <span className="text-slate-700 font-semibold">{creator.name}</span>
+      {/* Card Content */}
+      <CardContent className="p-5 flex-1 flex flex-col gap-2">
+        {/* Host */}
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="truncate flex items-center gap-1.5">
+            <span className="text-neutral-400">Hosted by</span>
+            <span className="font-semibold text-neutral-700 hover:text-primary-500 transition-colors">
+              {creator.name}
+            </span>
           </span>
           {creator.type === 'institution' && (
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-tertiary-500 flex-shrink-0" />
           )}
         </div>
 
-        {/* Title - ✅ Now using event.name only */}
-        <h3 className="font-bold text-slate-900 text-lg leading-snug line-clamp-2 tracking-tight group-hover:text-primary transition-colors">
-          {event.name}
+        {/* Title */}
+        <h3 className="font-semibold text-neutral-900 text-lg leading-snug line-clamp-2 group-hover:text-primary-500 transition-colors">
+          {event.display_name || event.name}
         </h3>
 
-        {/* Details List */}
-        <div className="mt-4 space-y-2 text-xs text-slate-600">
-          <div className="flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="truncate">{time}</span>
+        {/* Location */}
+        {event.location && (
+          <div className="flex items-center gap-1.5 text-sm text-neutral-500">
+            <MapPin className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+            <span className="truncate">{event.location}</span>
           </div>
+        )}
 
-          {event.location && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-              <span className="truncate">{event.location}</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Users className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-            <span className="truncate">
-              {event.current_attendees || 0} / {event.max_attendees || '∞'} attending
+        {/* Quick Details Grid */}
+        <div className="grid grid-cols-2 gap-2 mt-1 text-sm text-neutral-600">
+          <div className="flex items-center gap-2 bg-neutral-50 rounded-lg px-3 py-1.5">
+            <Users className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+            <span className="font-medium">
+              {event.current_attendees || 0} / {event.max_attendees || '∞'}
             </span>
           </div>
-        </div>
-
-        <div className="flex-1 min-h-[1rem]" />
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-100">
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Price
-            </span>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
+          <div className="flex items-center gap-2 bg-neutral-50 rounded-lg px-3 py-1.5">
+            <Ticket className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+            <span className={cn(
+              "font-semibold",
+              isFree ? "text-tertiary-600" : "text-primary-500"
+            )}>
               {formatPrice(event.price)}
             </span>
           </div>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-neutral-100 my-1" />
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
+              {isFree ? 'Complimentary' : 'Registration Fee'}
+            </span>
+            <div className="flex items-center gap-1.5">
+              {!isFree && <DollarSign className="h-4 w-4 text-primary-500" />}
+              <span className={cn(
+                "text-lg font-bold",
+                isFree ? "text-tertiary-600" : "text-primary-500"
+              )}>
+                {formatPrice(event.price)}
+              </span>
+              {!isFree && (
+                <span className="text-[10px] text-neutral-400 font-medium">
+                  per person
+                </span>
+              )}
+            </div>
+          </div>
 
           <Button 
-            size="sm" 
-            className="rounded-xl font-medium transition-all group-hover:shadow-md text-xs px-4 h-9 cursor-pointer flex items-center gap-1.5"
+            size="default"
+            className={cn(
+              "rounded-full font-semibold text-sm px-6 h-10 shadow-md hover:shadow-lg transition-all duration-200",
+              isFree 
+                ? "bg-tertiary-500 hover:bg-tertiary-600 text-white" 
+                : "bg-primary-500 hover:bg-primary-600 text-white"
+            )}
             onClick={(e) => {
               e.stopPropagation();
               onClick?.();
             }}
           >
-            <span>Register</span>
-            <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            <span>{isFree ? 'Register Now' : 'Get Ticket'}</span>
+            <ArrowUpRight className="h-4 w-4 ml-1.5 transition-transform group-hover/button:translate-x-0.5 group-hover/button:-translate-y-0.5" />
           </Button>
         </div>
       </CardContent>
@@ -265,6 +306,8 @@ function formatEventDateDetails(dateStr: string, timeStr: string) {
   return {
     month: isValidDate ? date.toLocaleDateString('en-US', { month: 'short' }) : 'DEC',
     day: isValidDate ? date.getDate() : '--',
-    time: timeStr || 'Time TBD'
+    weekday: isValidDate ? date.toLocaleDateString('en-US', { weekday: 'short' }) : '---',
+    time: timeStr || 'TBD',
+    fullDate: isValidDate ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'
   };
 }

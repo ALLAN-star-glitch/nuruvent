@@ -49,7 +49,6 @@ export interface CreateEventRequest {
 // ✅ UpdateEventRequest - All fields optional for updates (application/json)
 export interface UpdateEventRequest {
   name?: string;
-  display_name?: string;
   description?: string;
   event_type_id?: string;
   event_status_id?: string;

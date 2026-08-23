@@ -179,7 +179,7 @@ const convertApiEventToUI = (
   };
 
   const id = getVal('id', 'ID');
-  const name = getVal('name', 'Name');
+  const displayName = getVal('display_name', 'DisplayName') || getVal('name', 'Name'); 
   const eventTypeId = getVal('event_type_id', 'EventTypeID');
   const eventStatusId = getVal('event_status_id', 'EventStatusID');
   const date = getVal('date', 'Date');
@@ -209,7 +209,7 @@ const convertApiEventToUI = (
 
   return {
     id,
-    title: name,
+    title: displayName,
     type: typesMap[eventTypeId] || eventTypeId,
     status: statusesMap[eventStatusId] || eventStatusId,
     date: date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
@@ -1312,7 +1312,7 @@ export default function EventsDashboardPage() {
               </div>
             </div>
 
-            {/* Bulk Actions Bar - FIXED */}
+           {/* Bulk Actions Bar - UPDATED */}
             {getSelectedCount() > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1351,6 +1351,36 @@ export default function EventsDashboardPage() {
                     </Button>
                   )}
                   
+                  {/* ✅ Publish - Show for 1 or more events if all selected are drafts */}
+                  {selectedEvents.every(id => {
+                    const event = uiEvents.find(e => e.id === id);
+                    return event?.status === 'Draft' && !event?.isDeleted;
+                  }) && selectedEvents.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      variant="default" 
+                      className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => {
+                        if (selectedEvents.length === 1) {
+                          // Single publish
+                          const event = uiEvents.find(e => e.id === selectedEvents[0]);
+                          if (event) handlePublishEvent(event);
+                        } else {
+                          // Bulk publish
+                          handleBulkAction('publish');
+                        }
+                      }}
+                      disabled={publishingEventId !== null}
+                    >
+                      {publishingEventId && selectedEvents.length === 1 ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      Publish {selectedEvents.length > 1 ? `(${selectedEvents.length})` : ''}
+                    </Button>
+                  )}
+                  
                   {/* Bulk actions - only show when 2+ events selected */}
                   {getSelectedCount() > 1 && (
                     <>
@@ -1378,21 +1408,7 @@ export default function EventsDashboardPage() {
                         </>
                       ) : (
                         <>
-                          {/* Publish - only if all selected are drafts */}
-                          {selectedEvents.every(id => {
-                            const event = uiEvents.find(e => e.id === id);
-                            return event?.status === 'Draft' && !event?.isDeleted;
-                          }) && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="cursor-pointer"
-                              onClick={() => handleBulkAction('publish')}
-                            >
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Publish
-                            </Button>
-                          )}
+                          {/* ✅ Publish is now handled above for both single and bulk */}
                           
                           <Button 
                             size="sm" 
@@ -1404,7 +1420,7 @@ export default function EventsDashboardPage() {
                             Duplicate
                           </Button>
                           
-                          {/* ✅ Bulk Delete - only for 2+ events */}
+                          {/* Bulk Delete - only for 2+ events */}
                           <Button 
                             size="sm" 
                             variant="outline" 

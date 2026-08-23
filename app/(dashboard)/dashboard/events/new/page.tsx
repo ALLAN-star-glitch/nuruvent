@@ -77,7 +77,6 @@ import {
 
 interface EventFormData {
   name: string;
-  display_name: string;
   description: string;
   event_type_id: string;
   date: string;
@@ -166,7 +165,6 @@ const SaveStatusIndicator = ({ status }: { status: 'idle' | 'saving' | 'saved' }
 
 const defaultFormData: EventFormData = {
   name: '',
-  display_name: '', 
   description: '',
   event_type_id: '',
   date: '',
@@ -446,16 +444,6 @@ export default function CreateEventPage() {
   const isAutoSavingRef = useRef(false);
   const formDataRef = useRef(formData);
 
-  // Add this useEffect to keep display_name in sync with name
-useEffect(() => {
-  if (formData.name && formData.display_name !== formData.name) {
-    setFormData(prev => ({
-      ...prev,
-      display_name: prev.name || ''
-    }));
-  }
-}, [formData.name]);
-
 
   // ✅ Check on page load if we should reset
 useEffect(() => {
@@ -616,7 +604,6 @@ useEffect(() => {
     const currentFormData = formDataRef.current;
 
     const currentName = currentFormData.name?.trim() || 'Untitled Event';
-    const currentDisplayName = currentName; // ✅ Always use the current name
 
     const hasName = !!currentFormData.name?.trim();
     const hasEventType = !!currentFormData.event_type_id;
@@ -651,7 +638,6 @@ useEffect(() => {
             id: finalDraftId,
             data: {
               name: currentName,
-              display_name: currentDisplayName,
               description: currentFormData.description || '',
               event_type_id: currentFormData.event_type_id || '',
               date: currentFormData.date || '',
@@ -689,7 +675,6 @@ useEffect(() => {
             
             const formDataToSend = new FormData();
             formDataToSend.append('name', currentFormData.name?.trim() || 'Untitled Event');
-            formDataToSend.append('display_name', currentFormData.name?.trim() || 'Untitled Event'); 
             formDataToSend.append('description', currentFormData.description || '');
             formDataToSend.append('event_type_id', currentFormData.event_type_id || '');
             formDataToSend.append('date', currentFormData.date || '');
@@ -924,11 +909,6 @@ const clearDraftState = useCallback(() => {
   setFormData(prev => {
     const newData = { ...prev, [field]: value };
     
-    // ✅ If name changes, auto-update display_name
-    if (field === 'name') {
-      newData.display_name = value || '';
-    }
-    
     return newData;
   });
   setError(null);
@@ -1067,13 +1047,11 @@ const clearDraftState = useCallback(() => {
             setImagePreview(null);
           }
           const currentName = formData.name?.trim() || 'Untitled Event';
-          const currentDisplayName = currentName;
 
           await updateEvent({
             id: currentDraftId,
             data: {
               name: currentName,
-              display_name: currentDisplayName,
               description: formData.description || '',
               event_type_id: formData.event_type_id || '',
               date: formData.date || '',
@@ -1143,7 +1121,6 @@ const clearDraftState = useCallback(() => {
             id: currentDraftId,
             data: {
               name: formData.name?.trim() || 'Untitled Event',
-              display_name: formData.name?.trim() || 'Untitled Event', 
               description: formData.description || '',
               event_type_id: formData.event_type_id || '',
               date: formData.date || '',
@@ -1164,7 +1141,6 @@ const clearDraftState = useCallback(() => {
         } else {
           const formDataToSend = new FormData();
           formDataToSend.append('name', formData.name?.trim() || 'Untitled Event');
-          formDataToSend.append('display_name', formData.name?.trim() || 'Untitled Event'); 
           formDataToSend.append('description', formData.description || '');
           formDataToSend.append('event_type_id', formData.event_type_id || '');
           formDataToSend.append('date', formData.date || '');
