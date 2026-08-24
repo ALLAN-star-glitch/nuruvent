@@ -2,19 +2,40 @@
 
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, Calendar, Award, Users, Globe } from 'lucide-react';
+import { 
+  ArrowRight, 
+  Sparkles, 
+  Calendar, 
+  Award, 
+  Users, 
+  Globe,
+  ChevronRight
+} from 'lucide-react';
 import { HeroSection } from '@/components/home/HeroSection';
-import { EventGrid } from '@/components/home/EventGrid';
+import { HomeEventGrid } from '@/components/home/HomeEventGrid';
 import { Button } from '@/components/ui/button';
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from '@/lib/constants';
 import { InstallPrompt } from '@/components/PWA/InstallPrompt';
 import { PushNotificationManager } from '@/components/PWA/PushNotificationManager';
+import { EventCategories } from '@/components/home/EventsCategories';
+
 
 export const metadata: Metadata = {
-  title: `${SITE_NAME} | Global Training Event Platform`,
-  description: SITE_DESCRIPTION + ' The all-in-one platform for training institutes, coaches, and professional bodies to manage workshops, webinars, bootcamps, and meetups worldwide.',
-  // ... rest of your metadata
+  title: `${SITE_NAME} | Professional Training & Events Platform`,
+  description: SITE_DESCRIPTION + ' Discover professional workshops, bootcamps, webinars, and certified training courses from Kenya\'s top trainers and institutions.',
+  alternates: {
+    canonical: SITE_URL,
+  },
+  openGraph: {
+    title: `${SITE_NAME} | Professional Training & Events Platform`,
+    description: 'Discover professional training events, workshops, bootcamps, and certified courses. Learn from industry experts and grow your career.',
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    type: 'website',
+  },
 };
+
+export const revalidate = 3600;
 
 export default function HomePage() {
   return (
@@ -25,40 +46,141 @@ export default function HomePage() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Featured Events Section */}
-      <section className="bg-gray-50/50 py-16 border-t border-gray-100">
+      {/* Categories Section - Compact Circles */}
+      <section className="bg-white py-8 border-b border-gray-100">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-10 gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full mb-3">
-                <Sparkles className="h-3.5 w-3.5" />
-                Featured Programs
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                Upcoming Training Events
-              </h2>
-              <p className="text-gray-600 text-sm sm:text-base mt-1">
-                Explore handpicked professional development sessions led by industry experts.
-              </p>
+          <div className="text-center mb-6">
+            <h2 className="text-sm font-semibold text-gray-700 tracking-wide uppercase">
+              Browse by Category
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Find the perfect training for your career
+            </p>
+          </div>
+          
+          <EventCategories />
+        </div>
+      </section>
+
+      {/*Training Events  Section */}
+      <section className="bg-gray-50/30 py-16 border-t border-gray-100">
+        <div className="container mx-auto px-4">
+          <HomeEventGrid 
+            limit={8}
+            title="Featured Training Events"
+            subtitle="Discover professional workshops and certified courses from top trainers"
+          />
+        </div>
+      </section>
+
+      {/* Why Choose Nuruvent Section */}
+      <section className="bg-white py-16 border-t border-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold bg-secondary/10 text-secondary rounded-full mb-3">
+              <Sparkles className="h-3.5 w-3.5" />
+              Why Nuruvent
             </div>
-            
-            <Link href="/events" className="cursor-pointer">
-              <Button variant="outline" className="gap-2 group border-gray-300 hover:border-primary cursor-pointer rounded-full">
-                Explore All Events
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Button>
-            </Link>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+              Built for Professional Growth
+            </h2>
+            <p className="text-gray-600 text-sm sm:text-base mt-2">
+              Everything you need to discover, attend, and excel in professional training events.
+            </p>
           </div>
 
-          <EventGrid limit={6} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
+                <Calendar className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900">Curated Events</h3>
+              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions from verified professionals</p>
+            </div>
 
-          <div className="mt-12 text-center">
-            <Link href="/events" className="cursor-pointer">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white font-medium px-8 rounded-full shadow-md hover:shadow-lg transition-all cursor-pointer">
-                View Full Event Catalog
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
+            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-secondary-100 text-secondary-600 mb-4">
+                <Users className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900">Expert Trainers</h3>
+              <p className="text-sm text-gray-600 mt-1">Learn from industry experts with real-world experience</p>
+            </div>
+
+            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-tertiary-100 text-tertiary-600 mb-4">
+                <Award className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900">Certified Learning</h3>
+              <p className="text-sm text-gray-600 mt-1">Earn recognized certificates to boost your career</p>
+            </div>
+
+            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
+                <Globe className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900">Flexible Access</h3>
+              <p className="text-sm text-gray-600 mt-1">In-person, virtual, or hybrid events to suit your schedule</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ✅ Professional CTA Section - No gradient background */}
+      <section className="bg-white py-16 border-t border-gray-100">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full mb-4">
+              <Sparkles className="h-3.5 w-3.5" />
+              Get Started Today
+            </div>
+            
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight mb-4">
+              Ready to Elevate Your Skills?
+            </h2>
+            
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mb-8">
+              Join thousands of professionals who are growing their careers through Nuruvent. 
+              Discover your next learning opportunity today.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link href="/events" className="cursor-pointer">
+                <Button 
+                  size="lg" 
+                  className="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-6 rounded-full shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group"
+                >
+                  Explore Events
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Button>
+              </Link>
+              
+              <Link href="/how-it-works" className="cursor-pointer">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="border-2 border-gray-300 hover:border-primary-400 text-gray-700 hover:text-primary-600 font-semibold px-8 py-6 rounded-full transition-all duration-300 cursor-pointer"
+                >
+                  Learn More
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            
+            {/* Trust indicators */}
+            <div className="mt-8 flex flex-wrap justify-center items-center gap-6 text-xs text-gray-500">
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-400" />
+                No credit card required
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-400" />
+                Free to browse
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-400" />
+                Cancel anytime
+              </span>
+            </div>
           </div>
         </div>
       </section>

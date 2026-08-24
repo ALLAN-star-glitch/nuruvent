@@ -894,12 +894,12 @@ const clearDraftState = useCallback(() => {
     }
   }, [currentStep, validateStep]);
 
-  const handlePrev = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, []);
+ const handlePrev = useCallback(() => {
+  if (currentStep > 1) {
+    setCurrentStep(prev => prev - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}, [currentStep]);
 
   // ============================================================
   // FIELD HANDLERS

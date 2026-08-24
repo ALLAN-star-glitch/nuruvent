@@ -1,4 +1,5 @@
 // app/events/page.tsx
+
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -23,14 +24,13 @@ export const metadata: Metadata = {
   },
 };
 
-export const revalidate = 3600; // 1 hour revalidation
+export const revalidate = 3600;
 
-// Wrapper component to handle Suspense for EventGrid
 function EventGridWrapper() {
   return (
     <Suspense fallback={
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(6)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(8)].map((_, i) => (
           <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
             <div className="h-32 bg-gray-200 rounded-lg mb-4"></div>
             <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -40,7 +40,7 @@ function EventGridWrapper() {
         ))}
       </div>
     }>
-      <EventGrid />
+      <EventGrid limit={12} />
     </Suspense>
   );
 }
@@ -94,9 +94,12 @@ export default function EventsPage() {
       {/* Catalog Grid + Category Filter */}
       <div className="container mx-auto px-4 py-8 pb-16">
         <div className="flex flex-col lg:flex-row gap-8">
+          {/* Category Filter - Sticky Sidebar */}
           <div className="lg:w-64 flex-shrink-0">
             <CategoryFilter />
           </div>
+          
+          {/* Event Grid - 4 columns */}
           <div className="flex-1">
             <EventGridWrapper />
           </div>

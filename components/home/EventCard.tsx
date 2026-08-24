@@ -28,6 +28,8 @@ import {
   DollarSign,
   Award,
   Clock as ClockIcon,
+  ShieldCheck,
+  BadgeCheck,
 } from 'lucide-react';
 import { EventResponse, EventTypeResponse } from '@/lib/store/api/eventsApi';
 import { Card, CardContent } from '@/components/ui/card';
@@ -90,24 +92,41 @@ const formatPrice = (price: number) => {
   return `KSh ${price.toLocaleString()}`;
 };
 
-const getCreatorDisplay = (event: EventResponse): { name: string; icon: JSX.Element; type: string } => {
+// ✅ UPDATED: Get creator display with institution details
+const getCreatorDisplay = (event: EventResponse): { 
+  name: string; 
+  icon: JSX.Element; 
+  type: string;
+  institutionName?: string;
+  isVerified?: boolean;
+} => {
   const creator = event.creator;
   if (!creator) {
-    return { name: 'Host', icon: <User className="h-3.5 w-3.5 text-neutral-400" />, type: 'host' };
-  }
-  
-  if (creator.account_type === 'institution' && creator.institution_name) {
     return { 
-      name: creator.institution_name, 
-      icon: <Building2 className="h-3.5 w-3.5 text-neutral-400" />, 
-      type: 'institution' 
+      name: 'Host', 
+      icon: <User className="h-3.5 w-3.5 text-neutral-400" />, 
+      type: 'host',
+      isVerified: false,
     };
   }
   
+  // ✅ Institution account - show institution name with verification badge
+  if (creator.account_type === 'institution' && creator.institution_name) {
+    return { 
+      name: creator.institution_name, 
+      icon: <Building2 className="h-3.5 w-3.5 text-primary-500" />, 
+      type: 'institution',
+      institutionName: creator.institution_name,
+      isVerified: true, // Institutions are considered verified
+    };
+  }
+  
+  // Individual account
   return { 
     name: creator.display_name || creator.name || 'Host', 
     icon: <User className="h-3.5 w-3.5 text-neutral-400" />, 
-    type: 'individual' 
+    type: 'individual',
+    isVerified: false,
   };
 };
 
@@ -188,7 +207,7 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
           {/* Featured Badge */}
           {event.is_featured && (
             <div className="absolute top-3 left-3 z-10">
-              <Badge className="bg-gradient-to-r from-secondary-400 to-secondary-500 text-white border-0 shadow-lg shadow-secondary-500/30 px-2.5 py-1 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-full">
+              <Badge className="bg-gradient-to-r from-secondary-400 to-secondary-500 text-black border-0 shadow-lg shadow-secondary-500/30 px-2.5 py-1 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-full">
                 <Award className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 Featured
               </Badge>
@@ -248,17 +267,24 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
 
         {/* Card Content */}
         <CardContent className="p-3 sm:p-4 md:p-5 flex-1 flex flex-col gap-1.5 sm:gap-2">
-          {/* Host */}
+          {/* ✅ UPDATED: Host with Institution Details */}
           <div className="flex items-center gap-2 text-[10px] sm:text-xs text-neutral-500">
             <span className="truncate flex items-center gap-1.5">
               <span className="text-neutral-400 hidden xs:inline">Hosted by</span>
-              <span className="font-semibold text-neutral-700 hover:text-primary-500 transition-colors">
+              <span className="font-semibold text-neutral-700 hover:text-primary-500 transition-colors flex items-center gap-1.5">
+                {creator.icon}
                 {creator.name}
               </span>
+              {/* ✅ Institution verification badge */}
+              {creator.type === 'institution' && creator.isVerified && (
+                <span className="inline-flex items-center gap-1">
+                  <BadgeCheck className="h-3.5 w-3.5 text-primary-500" />
+                  <span className="text-[8px] sm:text-[9px] font-medium text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-full border border-primary-100">
+                    Verified
+                  </span>
+                </span>
+              )}
             </span>
-            {creator.type === 'institution' && (
-              <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-tertiary-500 flex-shrink-0" />
-            )}
           </div>
 
           {/* Title */}
