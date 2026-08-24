@@ -46,6 +46,22 @@ interface EventCardProps {
   eventTypes?: EventTypeResponse[];
 }
 
+// ✅ Helper: Check if account is institution (handles ALL formats)
+const isInstitutionAccount = (accountType: string): boolean => {
+  if (!accountType) return false;
+  const normalized = accountType.toLowerCase().trim();
+  
+  // Handle all possible formats:
+  // - "institution"
+  // - "account-type-institution" (with hyphens)
+  // - "account_type_institution" (with underscores)
+  // - "account_type_institution" (full)
+  return normalized === 'institution' || 
+         normalized === 'account-type-institution' ||
+         normalized === 'account_type_institution' ||
+         normalized.includes('institution');
+};
+
 // ✅ Map event type ID to icon component
 const getEventTypeIcon = (typeId: string, eventTypes?: EventTypeResponse[]) => {
   if (!eventTypes || !typeId) {
@@ -92,7 +108,7 @@ const formatPrice = (price: number) => {
   return `KSh ${price.toLocaleString()}`;
 };
 
-// ✅ UPDATED: Get creator display with institution details
+// ✅ UPDATED: Get creator display with institution details - handles ALL formats
 const getCreatorDisplay = (event: EventResponse): { 
   name: string; 
   icon: JSX.Element; 
@@ -110,8 +126,9 @@ const getCreatorDisplay = (event: EventResponse): {
     };
   }
   
-  // ✅ Institution account - show institution name with verification badge
-  if (creator.account_type === 'institution' && creator.institution_name) {
+  // ✅ Check if institution using the helper (handles ALL formats)
+  // This will match: "institution", "account-type-institution", "account_type_institution"
+  if (isInstitutionAccount(creator.account_type) && creator.institution_name) {
     return { 
       name: creator.institution_name, 
       icon: <Building2 className="h-3.5 w-3.5 text-primary-500" />, 
