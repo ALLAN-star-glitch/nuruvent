@@ -67,7 +67,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <HomeEventGrid 
             limit={8}
-            title="Featured Training Events"
+            title="Upcoming Training Events"
             subtitle="Discover professional workshops and certified courses from top trainers"
           />
         </div>
