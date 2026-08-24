@@ -16,16 +16,11 @@ import {
   Video,
   User,
   LucideIcon,
-  FileText,
-  Sparkles,
-  ChevronsLeft,
-  ChevronsRight,
-  GripVertical,
-  Home,
-  BarChart3,
-  Shield,
-  HelpCircle,
   Zap,
+  Trash2,
+  FilePlus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,24 +36,53 @@ interface NavItem {
   icon: LucideIcon;
   badge?: string;
   soon?: boolean;
+  isTrash?: boolean;
 }
 
-const navItems: NavItem[] = [
-  // Main section
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/events', label: 'Events', icon: Calendar },
-  { href: '/dashboard/events/new', label: 'Create Event', icon: PlusCircle },
-  
-  // Middle section
-  { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
-  { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
-  { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-  { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
-  { href: '/dashboard/replays', label: 'Replays', icon: Video },
-  
-  // Settings section
-  { href: '/dashboard/account', label: 'Account', icon: User },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+interface NavGroup {
+  id: string;
+  label: string;
+  icon?: LucideIcon;
+  items: NavItem[];
+}
+
+// Updated navigation layout:
+// 1. Main items with Dashboard at the top
+// 2. Quick Actions moved right above Settings
+// 3. Settings at the bottom
+const navGroups: NavGroup[] = [
+  {
+    id: 'main',
+    label: '',
+    items: [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/dashboard/events', label: 'Events', icon: Calendar },
+      { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
+      { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
+      { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
+      { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
+      { href: '/dashboard/replays', label: 'Replays', icon: Video },
+      { href: '/dashboard/trash', label: 'Trash', icon: Trash2, isTrash: true },
+    ],
+  },
+  {
+    id: 'quick-actions',
+    label: 'Quick Actions',
+    icon: Zap,
+    items: [
+      { href: '/dashboard/events/new', label: 'Create Event', icon: PlusCircle },
+      { href: '/dashboard/certificates/create', label: 'Generate Certificate', icon: FilePlus },
+    ],
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    items: [
+      { href: '/dashboard/account', label: 'Account', icon: User },
+      { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ];
 
 interface DashboardSidebarProps {
@@ -114,32 +138,16 @@ export function DashboardSidebar({
     setShowLogoutDialog(true);
   };
 
-  // ✅ FIXED: Check exact path match for parent items
   const isActiveLink = (href: string) => {
-    // For parent items like /dashboard/events, only match exact path
-    // Not sub-paths like /dashboard/events/new
     if (href === '/dashboard') {
       return pathname === '/dashboard';
     }
-    // For exact matches only
     return pathname === href;
   };
 
-  // Check if a sub-item is active (for highlighting parent)
-  const isParentActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
-    }
-    return pathname.startsWith(href) && pathname !== href + '/new';
+  const isGroupActive = (items: NavItem[]) => {
+    return items.some(item => isActiveLink(item.href));
   };
-
-  // Split items: main items and settings items
-  const mainItems = navItems.filter(
-    item => item.href !== '/dashboard/account' && item.href !== '/dashboard/settings'
-  );
-  const settingsItems = navItems.filter(
-    item => item.href === '/dashboard/account' || item.href === '/dashboard/settings'
-  );
 
   return (
     <>
@@ -155,137 +163,148 @@ export function DashboardSidebar({
           'after:absolute after:inset-0 after:pointer-events-none after:rounded-3xl after:bg-gradient-to-br after:from-white/5 after:via-transparent after:to-white/5'
         )}
       >
-        {/* Logo / Brand - Removed "N" icon */}
+        {/* Sidebar toggle header */}
         <div
           onClick={toggleSidebar}
           className={cn(
             "flex items-center justify-between p-4 flex-shrink-0 cursor-pointer relative",
             "border-b border-gray-200/20",
-            collapsed && "justify-center px-2"
+            collapsed ? "justify-center px-2" : "px-4"
           )}
         >
           {!collapsed ? (
-            <div className="flex items-center gap-2.5">
-              <span className="text-sm font-bold text-gray-800 tracking-tight">NuruVent</span>
-              <span className="text-[8px] font-medium text-[#1A73E8] bg-[#1A73E8]/10 px-2 py-0.5 rounded-full">Pro</span>
-            </div>
+            <>
+              <span className="text-xs font-medium text-gray-400">Close Sidebar</span>
+              <ChevronLeft className="h-5 w-5 text-gray-400 hover:text-[#1A73E8] transition-colors" />
+            </>
           ) : (
-            <span className="text-sm font-bold text-gray-800 tracking-tight">N</span>
+            <ChevronRight className="h-5 w-5 text-gray-400 hover:text-[#1A73E8] transition-colors" />
           )}
-          
-          <div 
-            className={cn(
-              "h-8 w-8 flex items-center justify-center rounded-xl transition-all duration-200",
-              "hover:bg-gray-100/80 active:scale-95",
-              collapsed && "hidden"
-            )}
-            role="button"
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            tabIndex={0}
-          >
-            <ChevronsLeft className="h-4 w-4 text-gray-400 hover:text-[#1A73E8] transition-colors" />
-          </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-          <div className="space-y-1">
-            {mainItems.map((item) => {
-              // ✅ FIXED: Only active for exact match
-              const isActive = isActiveLink(item.href);
-              const Icon = item.icon;
-              const isCreateEvent = item.href === '/dashboard/events/new';
+          <div className="space-y-3">
+            {navGroups.map((group) => {
+              const groupActive = isGroupActive(group.items);
+              const GroupIcon = group.icon;
+
+              if (group.items.length === 0) return null;
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
-                    isActive
-                      ? 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
-                      : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900',
-                    isCreateEvent && !isActive && 'border border-dashed border-gray-200/50 hover:border-[#1A73E8]/30 hover:bg-[#1A73E8]/5'
+                <div key={group.id} className="space-y-1">
+                  {/* Render header label only for groups with a label defined */}
+                  {group.label && (
+                    !collapsed ? (
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 px-2 py-1 text-xs font-medium transition-colors',
+                          groupActive ? 'text-[#1A73E8]' : 'text-gray-400'
+                        )}
+                      >
+                        {GroupIcon && <GroupIcon className="h-3.5 w-3.5" />}
+                        <span>{group.label}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center px-2 py-1">
+                        {GroupIcon && <GroupIcon className="h-4 w-4 text-gray-400" />}
+                      </div>
+                    )
                   )}
-                >
-                  <Icon
-                    className={cn(
-                      'h-5 w-5 flex-shrink-0 transition-colors',
-                      isActive ? 'text-[#1A73E8]' : 'text-gray-400 group-hover:text-gray-600',
-                      isCreateEvent && !isActive && 'text-gray-400'
-                    )}
-                  />
-                  {!collapsed && (
-                    <span className={cn(
-                      "text-sm font-medium whitespace-nowrap",
-                      isCreateEvent && !isActive && "text-gray-600"
-                    )}>
-                      {item.label}
-                    </span>
-                  )}
-                  {collapsed && (
-                    <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-gray-900/90 backdrop-blur-sm text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
-                      {item.label}
+
+                  {/* Group items */}
+                  <div className={cn("space-y-0.5", !collapsed && group.label && "pl-1")}>
+                    {group.items.map((item) => {
+                      const isActive = isActiveLink(item.href);
+                      const Icon = item.icon;
+                      const isTrash = item.isTrash;
+
+                      if (collapsed) {
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              'flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 group relative',
+                              isActive
+                                ? isTrash ? 'bg-red-50 text-red-600' : 'bg-[#1A73E8]/10 text-[#1A73E8]'
+                                : isTrash 
+                                  ? 'text-red-500 hover:bg-red-50/60 hover:text-red-600' 
+                                  : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                'h-5 w-5 flex-shrink-0 transition-colors',
+                                isTrash
+                                  ? 'text-red-500 group-hover:text-red-600'
+                                  : isActive
+                                    ? 'text-[#1A73E8]'
+                                    : 'text-gray-400 group-hover:text-gray-600'
+                              )}
+                            />
+                            <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-gray-900/90 backdrop-blur-sm text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                              {item.label}
+                            </div>
+                          </Link>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group relative',
+                            isActive
+                              ? isTrash ? 'bg-red-50 text-red-600 shadow-sm' : 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
+                              : isTrash 
+                                ? 'text-red-500 hover:bg-red-50/60 hover:text-red-600' 
+                                : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
+                          )}
+                        >
+                          <Icon
+                            className={cn(
+                              'h-5 w-5 flex-shrink-0 transition-colors',
+                              isTrash
+                                ? 'text-red-500 group-hover:text-red-600'
+                                : isActive
+                                  ? 'text-[#1A73E8]'
+                                  : 'text-gray-400 group-hover:text-gray-600'
+                            )}
+                          />
+                          <span
+                            className={cn(
+                              "text-sm font-medium whitespace-nowrap",
+                              isTrash
+                                ? "text-red-500 group-hover:text-red-600"
+                                : isActive 
+                                  ? "text-[#1A73E8]" 
+                                  : "text-gray-700"
+                            )}
+                          >
+                            {item.label}
+                          </span>
+                          {isActive && (
+                            <div 
+                              className={cn(
+                                "ml-auto w-1 h-6 rounded-full shadow-sm",
+                                isTrash ? "bg-red-500 shadow-red-500/30" : "bg-[#1A73E8] shadow-[#1A73E8]/30"
+                              )} 
+                            />
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  {/* Divider between groups */}
+                  {!collapsed && group.id !== navGroups[navGroups.length - 1].id && (
+                    <div className="relative my-2 mx-2">
+                      <div className="w-full border-t border-gray-200/20" />
                     </div>
                   )}
-                  {!collapsed && isCreateEvent && !isActive && (
-                    <Sparkles className="h-3 w-3 text-amber-400 ml-auto flex-shrink-0" />
-                  )}
-                  {!collapsed && isActive && (
-                    <div className="ml-auto w-1 h-6 rounded-full bg-[#1A73E8] shadow-sm shadow-[#1A73E8]/30" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Divider */}
-          <div className={cn("relative my-4", collapsed ? "mx-2" : "mx-3")}>
-            <div className="absolute inset-0 flex items-center">
-              <div className={cn(
-                "w-full border-t",
-                collapsed ? "border-gray-200/20" : "border-gray-200/30"
-              )} />
-            </div>
-          </div>
-
-          {/* Settings items */}
-          <div className="space-y-1">
-            {settingsItems.map((item) => {
-              const isActive = isActiveLink(item.href);
-              const Icon = item.icon;
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
-                    isActive
-                      ? 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
-                      : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
-                  )}
-                >
-                  <Icon
-                    className={cn(
-                      'h-5 w-5 flex-shrink-0 transition-colors',
-                      isActive ? 'text-[#1A73E8]' : 'text-gray-400 group-hover:text-gray-600'
-                    )}
-                  />
-                  {!collapsed && (
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {item.label}
-                    </span>
-                  )}
-                  {collapsed && (
-                    <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-gray-900/90 backdrop-blur-sm text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
-                      {item.label}
-                    </div>
-                  )}
-                  {!collapsed && isActive && (
-                    <div className="ml-auto w-1 h-6 rounded-full bg-[#1A73E8] shadow-sm shadow-[#1A73E8]/30" />
-                  )}
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -297,22 +316,6 @@ export function DashboardSidebar({
           "border-t border-gray-200/20",
           collapsed ? "px-2 py-3" : "px-3 py-3"
         )}>
-          {/* User Avatar */}
-          <div className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200",
-            collapsed && "justify-center px-0"
-          )}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1A73E8]/20 to-[#1A73E8]/5 flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm">
-              <User className="h-4 w-4 text-[#1A73E8]" />
-            </div>
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">User</p>
-                <p className="text-[10px] text-gray-400 truncate">Host Account</p>
-              </div>
-            )}
-          </div>
-
           <button
             type="button"
             onClick={openLogoutDialog}
@@ -331,22 +334,6 @@ export function DashboardSidebar({
             )}
           </button>
         </div>
-
-        {/* Toggle Button - Floating */}
-        <button
-          onClick={toggleSidebar}
-          className={cn(
-            "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-gray-200/50 shadow-md flex items-center justify-center transition-all duration-200 hover:shadow-lg hover:border-[#1A73E8]/30 group",
-            "hidden md:flex"
-          )}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? (
-            <ChevronsRight className="h-3 w-3 text-gray-400 group-hover:text-[#1A73E8] transition-colors" />
-          ) : (
-            <ChevronsLeft className="h-3 w-3 text-gray-400 group-hover:text-[#1A73E8] transition-colors" />
-          )}
-        </button>
       </aside>
 
       {/* Logout Confirmation Dialog */}

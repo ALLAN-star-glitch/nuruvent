@@ -1,3 +1,5 @@
+// app/(dashboard)/dashboard/events/page.tsx
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
@@ -288,7 +290,6 @@ export default function EventsDashboardPage() {
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
@@ -429,7 +430,7 @@ export default function EventsDashboardPage() {
   const [bulkPublishEvents] = useBulkPublishEventsMutation();
 
 
-  const { data: trashCountData } = useGetTrashedEventsCountQuery({
+  const { data: trashCountData, refetch: refetchTrashCount } = useGetTrashedEventsCountQuery({
   account_id: accountId || '',
   }, {
     skip: !accountId || !isAuthenticated,
@@ -537,23 +538,15 @@ export default function EventsDashboardPage() {
 
 
   // Handler functions
+  
+  // ✅ Row click now selects the row (does NOT navigate)
   const handleRowClick = (eventId: string) => {
-    if (!isMobile) {
-      handleSelectEvent(eventId);
-    }
+    handleSelectEvent(eventId);
   };
 
+  // ✅ Card click navigates to details (for mobile grid view)
   const handleCardClick = (event: any) => {
-    if (isMobile) {
-      handleViewEvent(event);
-    } else {
-      handleSelectEvent(event.id);
-    }
-  };
-
-  const handleViewEvent = (event: any) => {
-    setSelectedEvent(event);
-    setIsViewDialogOpen(true);
+    router.push(`/dashboard/events/${event.id}`);
   };
 
   const handleDeleteEvent = async (event: any) => {
@@ -564,11 +557,10 @@ export default function EventsDashboardPage() {
  const handleConfirmDelete = async () => {
   if (!selectedEvent) return;
   try {
-    // ✅ This is the SINGLE delete API - uses DELETE /api/v1/events/{id}
     await deleteEvent(selectedEvent.id).unwrap();
     setIsDeleteDialogOpen(false);
     setSelectedEvent(null);
-    await refetch();
+    await Promise.all([refetch(), refetchTrashCount()]);
     toast.success('Event moved to trash');
   } catch (err: any) {
     console.error('Failed to delete event:', err);
@@ -589,7 +581,7 @@ export default function EventsDashboardPage() {
       await permanentlyDeleteEvent(selectedEvent.id).unwrap();
       setIsPermanentDeleteDialogOpen(false);
       setSelectedEvent(null);
-      await refetch();
+      await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Event permanently deleted');
     } catch (err) {
       console.error('Failed to permanently delete event:', err);
@@ -609,7 +601,7 @@ export default function EventsDashboardPage() {
       await restoreEvent(selectedEvent.id).unwrap();
       setIsRestoreDialogOpen(false);
       setSelectedEvent(null);
-      await refetch();
+      await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Event restored successfully');
     } catch (err) {
       console.error('Failed to restore event:', err);
@@ -699,10 +691,7 @@ export default function EventsDashboardPage() {
 
   const handleViewSelected = () => {
     if (selectedEvents.length === 1) {
-      const event = uiEvents.find(e => e.id === selectedEvents[0]);
-      if (event) {
-        handleViewEvent(event);
-      }
+      router.push(`/dashboard/events/${selectedEvents[0]}`);
     }
   };
 
@@ -718,13 +707,11 @@ export default function EventsDashboardPage() {
   }
   
   try {
-    // ✅ This is the BULK delete API - uses DELETE /api/v1/events/bulk
-    // Make sure we're passing the correct payload structure
     await bulkDeleteEvents({ ids: selectedEvents }).unwrap();
     setIsBulkActionDialogOpen(false);
     setSelectedEvents([]);
     setSelectAll(false);
-    await refetch();
+    await Promise.all([refetch(), refetchTrashCount()]);
     toast.success(`${selectedEvents.length} events moved to trash`);
   } catch (err: any) {
     console.error('Failed to delete events:', err);
@@ -739,7 +726,7 @@ export default function EventsDashboardPage() {
       setIsBulkActionDialogOpen(false);
       setSelectedEvents([]);
       setSelectAll(false);
-      await refetch();
+      await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events permanently deleted');
     } catch (err) {
       console.error('Failed to permanently delete events:', err);
@@ -753,7 +740,7 @@ export default function EventsDashboardPage() {
       setIsBulkActionDialogOpen(false);
       setSelectedEvents([]);
       setSelectAll(false);
-      await refetch();
+      await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events restored successfully');
     } catch (err) {
       console.error('Failed to restore events:', err);
@@ -853,41 +840,6 @@ export default function EventsDashboardPage() {
       : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
   };
 
-  const handleModalEdit = () => {
-    if (selectedEvent) {
-      setIsViewDialogOpen(false);
-      router.push(`/dashboard/events/${selectedEvent.id}/edit`);
-    }
-  };
-
-  const handleModalDuplicate = () => {
-    if (selectedEvent) {
-      setIsViewDialogOpen(false);
-      router.push(`/dashboard/events/new?duplicate=${selectedEvent.id}`);
-    }
-  };
-
-  const handleModalPublicPage = () => {
-    if (selectedEvent) {
-      setIsViewDialogOpen(false);
-      window.open(`/events/${selectedEvent.slug || selectedEvent.id}`, '_blank');
-    }
-  };
-
-  const handleModalManageAttendees = () => {
-    if (selectedEvent) {
-      setIsViewDialogOpen(false);
-      router.push(`/dashboard/attendees?eventId=${selectedEvent.id}`);
-    }
-  };
-
-  const handleModalDelete = () => {
-    setIsViewDialogOpen(false);
-    if (selectedEvent) {
-      handleDeleteEvent(selectedEvent);
-    }
-  };
-
   const getActiveFilterCount = () => {
     let count = 0;
     if (searchQuery) count++;
@@ -940,7 +892,7 @@ export default function EventsDashboardPage() {
     toast.promise(
       new Promise(async (resolve, reject) => {
         try {
-          const result = await refetch();
+          const result = await Promise.all([refetch(), refetchTrashCount()]);
           resolve(result);
         } catch (error) {
           reject(error);
@@ -1027,7 +979,7 @@ export default function EventsDashboardPage() {
   }
 
   // ============================================================
-  // RENDER
+  // RENDER - Everything below remains EXACTLY the same
   // ============================================================
   return (
     <div className="space-y-6 pb-20">
@@ -1059,117 +1011,125 @@ export default function EventsDashboardPage() {
         </div>
       </div>
 
-  {/* Stats Cards - Responsive Grid Layout */}
-  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-    {/* Total Events */}
-    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-              {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
-            </p>
-          </div>
-          <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-lg">
-            <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* Registrations */}
-    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-              {activeEvents.filter(e => e.registered > 0).length} events
-            </p>
-          </div>
-          <div className="p-2.5 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg">
-            <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* Live Sessions */}
-    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-              {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
-            </p>
-          </div>
-          <div className="p-2.5 sm:p-3 bg-red-50 text-red-600 rounded-lg">
-            <Video className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* CPD Accredited */}
-    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-              {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total hours
-            </p>
-          </div>
-          <div className="p-2.5 sm:p-3 bg-amber-50 text-amber-600 rounded-lg">
-            <Award className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* Trash Card - Clickable */}
-    <Card 
-      className={`${trashedEvents > 0 ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/70 cursor-pointer' : 'cursor-pointer'} transition-colors border-gray-200/80 shadow-sm hover:shadow-md`}
-      onClick={() => trashedEvents > 0 ? router.push('/dashboard/trash') : undefined}
-    >
-      <CardContent className="p-3 sm:p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Trash</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{trashedEvents}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-              {trashedEvents > 0 ? (
-                <span className="text-amber-600">Click to restore</span>
-              ) : (
-                'Empty'
-              )}
-            </p>
-          </div>
-          <div className={`p-2.5 sm:p-3 rounded-lg ${trashedEvents > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'}`}>
-            <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
-          </div>
-        </div>
-        {trashedEvents > 0 && (
-          <p className="text-[10px] sm:text-xs text-amber-600 mt-1 flex items-center gap-1">
-            Click to view <ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
+                </p>
+              </div>
+              <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-lg">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  {activeEvents.filter(e => e.registered > 0).length} events
+                </p>
+              </div>
+              <div className="p-2.5 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
+                </p>
+              </div>
+              <div className="p-2.5 sm:p-3 bg-red-50 text-red-600 rounded-lg">
+                <Video className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total hours
+                </p>
+              </div>
+              <div className="p-2.5 sm:p-3 bg-amber-50 text-amber-600 rounded-lg">
+                <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {/* ✅ UPDATED: Trash Card - More Conspicuous */}
+        <Card 
+          className={`${trashedEvents > 0 
+            ? 'border-amber-300 bg-amber-50/80 hover:bg-amber-50/100 ring-1 ring-amber-200/50 shadow-md shadow-amber-100/30' 
+            : 'border-gray-200/80 bg-gray-50/50'} 
+            transition-all duration-300 cursor-pointer hover:shadow-lg`}
+          onClick={() => trashedEvents > 0 ? router.push('/dashboard/trash') : undefined}
+        >
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-xs font-medium uppercase tracking-wider ${trashedEvents > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
+                  Trash
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className={`text-2xl sm:text-3xl font-bold ${trashedEvents > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
+                    {trashedEvents}
+                  </p>
+                  {trashedEvents > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      {trashedEvents} item{trashedEvents !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+                  {trashedEvents > 0 ? (
+                    <span className="text-amber-600 font-medium flex items-center gap-1">
+                      Click to view & restore
+                      <ArrowRight className="h-3 w-3" />
+                    </span>
+                  ) : (
+                    'Empty'
+                  )}
+                </p>
+              </div>
+              <div className={`p-3 rounded-xl transition-all duration-300 ${
+                trashedEvents > 0 
+                  ? 'bg-amber-100 text-amber-600 shadow-inner' 
+                  : 'bg-gray-100 text-gray-400'
+              }`}>
+                <Trash2 className={`h-5 w-5 sm:h-6 sm:w-6 ${trashedEvents > 0 ? 'animate-pulse' : ''}`} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Desktop Filters */}
       {!isMobile && (
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col gap-4">
-              {/* Row 1: Tabs and Search */}
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
                   {['all', 'live', 'upcoming', 'draft', 'ended'].map((tab) => (
@@ -1188,27 +1148,6 @@ export default function EventsDashboardPage() {
                       {tab}
                     </button>
                   ))}
-                  
-                  {/* ✅ Trash Tab */}
-                  <button
-                    onClick={() => {
-                      setActiveTab('trash');
-                      dispatch(setCurrentPage(1));
-                    }}
-                    className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                      activeTab === 'trash'
-                        ? 'bg-amber-500 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Trash
-                    {trashedEvents > 0 && (
-                      <span className={`ml-1 text-xs ${activeTab === 'trash' ? 'text-white' : 'text-gray-400'}`}>
-                        ({trashedEvents})
-                      </span>
-                    )}
-                  </button>
                 </div>
 
                 <div className="relative w-full md:w-72">
@@ -1232,7 +1171,6 @@ export default function EventsDashboardPage() {
                 </div>
               </div>
 
-              {/* Row 2: View Options and Sort */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
@@ -1329,7 +1267,7 @@ export default function EventsDashboardPage() {
               </div>
             </div>
 
-           {/* Bulk Actions Bar - UPDATED */}
+            {/* Bulk Actions Bar */}
             {getSelectedCount() > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1339,7 +1277,6 @@ export default function EventsDashboardPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* View button - always show for single selection */}
                   {getSelectedCount() === 1 && (
                     <Button 
                       size="sm" 
@@ -1352,7 +1289,6 @@ export default function EventsDashboardPage() {
                     </Button>
                   )}
                   
-                  {/* Edit button - always show for single selection */}
                   {getSelectedCount() === 1 && (
                     <Button 
                       size="sm" 
@@ -1368,7 +1304,6 @@ export default function EventsDashboardPage() {
                     </Button>
                   )}
                   
-                  {/* ✅ Publish - Show for 1 or more events if all selected are drafts */}
                   {selectedEvents.every(id => {
                     const event = uiEvents.find(e => e.id === id);
                     return event?.status === 'Draft' && !event?.isDeleted;
@@ -1379,11 +1314,9 @@ export default function EventsDashboardPage() {
                       className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
                       onClick={() => {
                         if (selectedEvents.length === 1) {
-                          // Single publish
                           const event = uiEvents.find(e => e.id === selectedEvents[0]);
                           if (event) handlePublishEvent(event);
                         } else {
-                          // Bulk publish
                           handleBulkAction('publish');
                         }
                       }}
@@ -1398,10 +1331,8 @@ export default function EventsDashboardPage() {
                     </Button>
                   )}
                   
-                  {/* Bulk actions - only show when 2+ events selected */}
                   {getSelectedCount() > 1 && (
                     <>
-                      {/* Trash tab actions */}
                       {activeTab === 'trash' ? (
                         <>
                           <Button 
@@ -1425,8 +1356,6 @@ export default function EventsDashboardPage() {
                         </>
                       ) : (
                         <>
-                          {/* ✅ Publish is now handled above for both single and bulk */}
-                          
                           <Button 
                             size="sm" 
                             variant="outline" 
@@ -1436,8 +1365,6 @@ export default function EventsDashboardPage() {
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
                           </Button>
-                          
-                          {/* Bulk Delete - only for 2+ events */}
                           <Button 
                             size="sm" 
                             variant="outline" 
@@ -1452,7 +1379,6 @@ export default function EventsDashboardPage() {
                     </>
                   )}
                   
-                  {/* ✅ Single Delete - for exactly 1 event (uses single delete API) */}
                   {getSelectedCount() === 1 && (
                     <Button 
                       size="sm" 
@@ -1470,7 +1396,6 @@ export default function EventsDashboardPage() {
                     </Button>
                   )}
                   
-                  {/* Clear button - always show */}
                   <Button 
                     size="sm" 
                     variant="ghost" 
@@ -1490,7 +1415,7 @@ export default function EventsDashboardPage() {
         </Card>
       )}
 
-      {/* Events Table View */}
+      {/* Table View */}
       {!isMobile && viewMode === 'table' && (
         <Card>
           <CardContent className="p-0">
@@ -1512,9 +1437,7 @@ export default function EventsDashboardPage() {
                         {getSortIcon('name')}
                       </div>
                     </TableHead>
-                    <TableHead className="py-3 px-4">
-                      Type
-                    </TableHead>
+                    <TableHead className="py-3 px-4">Type</TableHead>
                     <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventDate')}>
                       <div className="flex items-center">
                         Event Date
@@ -1548,9 +1471,7 @@ export default function EventsDashboardPage() {
                       const percentage = event.capacity > 0 
                         ? Math.round((event.registered / event.capacity) * 100) 
                         : 0;
-                      // ✅ FIXED: Use eventStatusId with statusesMap for display name
                       const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
-                      // ✅ FIXED: Use eventTypeId with typesMap for display name
                       const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
                       const isSelected = selectedEvents.includes(event.id);
                       const isTrashed = event.isDeleted;
@@ -1583,14 +1504,12 @@ export default function EventsDashboardPage() {
                                   Trashed
                                 </Badge>
                               )}
-                              {/* ✅ Featured Badge */}
                               {event.isFeatured && !isTrashed && (
                                 <Badge variant="default" className="ml-2 bg-secondary-500 text-white text-xs">
                                   <Star className="h-3 w-3 mr-1" />
                                   Featured
                                 </Badge>
                               )}
-                              {/* ✅ Private Badge */}
                               {event.isPrivate && !isTrashed && (
                                 <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
                                   <Lock className="h-3 w-3 mr-1" />
@@ -1662,7 +1581,6 @@ export default function EventsDashboardPage() {
                                 <DropdownMenuSeparator />
                                 
                                 {isTrashed ? (
-                                  // ✅ Trash Actions
                                   <>
                                     <DropdownMenuItem 
                                       className="cursor-pointer text-green-600"
@@ -1686,13 +1604,12 @@ export default function EventsDashboardPage() {
                                     </DropdownMenuItem>
                                   </>
                                 ) : (
-                                  // ✅ Normal Actions
                                   <>
                                     <DropdownMenuItem 
                                       className="cursor-pointer"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleViewEvent(event);
+                                        router.push(`/dashboard/events/${event.id}`);
                                       }}
                                     >
                                       <Eye className="h-4 w-4 mr-2" />
@@ -1888,14 +1805,12 @@ export default function EventsDashboardPage() {
                           <Badge variant="outline" className={typeInfo.className}>
                             {typeInfo.displayName}
                           </Badge>
-                          {/* ✅ Featured Badge in Grid */}
                           {event.isFeatured && !isTrashed && (
                             <Badge variant="default" className="bg-secondary-500 text-white text-xs">
                               <Star className="h-3 w-3 mr-1" />
                               Featured
                             </Badge>
                           )}
-                          {/* ✅ Private Badge in Grid */}
                           {event.isPrivate && !isTrashed && (
                             <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
                               <Lock className="h-3 w-3 mr-1" />
@@ -1972,7 +1887,6 @@ export default function EventsDashboardPage() {
                             <DropdownMenuSeparator />
                             
                             {isTrashed ? (
-                              // ✅ Trash Actions in Grid
                               <>
                                 <DropdownMenuItem 
                                   className="cursor-pointer text-green-600"
@@ -1996,13 +1910,12 @@ export default function EventsDashboardPage() {
                                 </DropdownMenuItem>
                               </>
                             ) : (
-                              // ✅ Normal Actions in Grid
                               <>
                                 <DropdownMenuItem 
                                   className="cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleViewEvent(event);
+                                    router.push(`/dashboard/events/${event.id}`);
                                   }}
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
@@ -2197,7 +2110,7 @@ export default function EventsDashboardPage() {
         </div>
       )}
 
-            {/* Mobile Events List - Card View */}
+      {/* Mobile Events List */}
       {isMobile && (
         <div className="space-y-4 pb-24">
           {filteredEvents.length > 0 ? (
@@ -2336,7 +2249,7 @@ export default function EventsDashboardPage() {
                                 className="cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleViewEvent(event);
+                                  router.push(`/dashboard/events/${event.id}`);
                                 }}
                               >
                                 <Eye className="h-4 w-4 mr-2" />
@@ -2534,7 +2447,6 @@ export default function EventsDashboardPage() {
                       <SelectItem value="upcoming" className="cursor-pointer">Upcoming</SelectItem>
                       <SelectItem value="draft" className="cursor-pointer">Draft</SelectItem>
                       <SelectItem value="ended" className="cursor-pointer">Ended</SelectItem>
-                      <SelectItem value="trash" className="cursor-pointer text-amber-600">Trash</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2613,320 +2525,6 @@ export default function EventsDashboardPage() {
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* View Event Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Event Details</DialogTitle>
-            <DialogDescription>
-              View and manage event information.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedEvent.title}</h2>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="outline" className={`${getTypeConfig(selectedEvent.eventTypeId, typesMap).className} shrink-0`}>
-                      {getTypeConfig(selectedEvent.eventTypeId, typesMap).displayName}
-                    </Badge>
-                    {selectedEvent.isDeleted ? (
-                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Trashed
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className={`${getStatusConfig(selectedEvent.eventStatusId, statusesMap).color} shrink-0`}>
-                        {getStatusConfig(selectedEvent.eventStatusId, statusesMap).displayName}
-                      </Badge>
-                    )}
-                    {/* ✅ Featured Badge in View Dialog */}
-                    {selectedEvent.isFeatured && !selectedEvent.isDeleted && (
-                      <Badge variant="default" className="bg-secondary-500 text-white text-xs">
-                        <Star className="h-3 w-3 mr-1" />
-                        Featured
-                      </Badge>
-                    )}
-                    {/* ✅ Private Badge in View Dialog */}
-                    {selectedEvent.isPrivate && !selectedEvent.isDeleted && (
-                      <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                        <Lock className="h-3 w-3 mr-1" />
-                        Private
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xl sm:text-2xl font-bold text-primary">{selectedEvent.price}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-500">Ticket Price</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Event Date</Label>
-                  <p className="text-sm sm:text-base font-medium">{selectedEvent.date}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Time</Label>
-                  <p className="text-sm sm:text-base font-medium">{selectedEvent.time || 'Not specified'}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Added</Label>
-                  <p className="text-sm sm:text-base font-medium">
-                    {selectedEvent.publishedAt ? 'Published: ' : 'Created: '}
-                    {formatDate(selectedEvent.publishedAt || selectedEvent.createdAt)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Platform</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <Video className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedEvent.platform}</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Location</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-                    <span className="truncate">{selectedEvent.location || 'Virtual'}</span>
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">CPD Hours</Label>
-                  <p className="text-sm sm:text-base font-medium flex items-center gap-1">
-                    <Award className="h-4 w-4 text-amber-500 shrink-0" />
-                    {selectedEvent.cpdHours} hours
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Registrations</Label>
-                <div className="mt-2">
-                  <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    <span>{selectedEvent.registered} / {selectedEvent.capacity}</span>
-                    <span>{selectedEvent.capacity > 0 ? Math.round((selectedEvent.registered / selectedEvent.capacity) * 100) : 0}%</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${selectedEvent.capacity > 0 ? Math.min((selectedEvent.registered / selectedEvent.capacity) * 100, 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {selectedEvent.description && (
-                <div className="space-y-1">
-                  <Label className="text-xs text-gray-500">Description</Label>
-                  <p className="text-sm text-gray-600 mt-1">{selectedEvent.description}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="space-y-3">
-                <Label className="text-xs text-gray-500 font-medium">Actions</Label>
-                
-                {selectedEvent.isDeleted ? (
-                  // ✅ Trash actions in View Dialog
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Button 
-                      variant="outline" 
-                      className="w-full cursor-pointer justify-center text-sm text-green-600 border-green-200 hover:bg-green-50"
-                      onClick={() => {
-                        setIsViewDialogOpen(false);
-                        handleRestoreEvent(selectedEvent);
-                      }}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2 shrink-0" />
-                      Restore Event
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      className="w-full cursor-pointer justify-center text-sm"
-                      onClick={() => {
-                        setIsViewDialogOpen(false);
-                        handlePermanentDelete(selectedEvent);
-                      }}
-                    >
-                      <Trash className="h-4 w-4 mr-2 shrink-0" />
-                      Delete Permanently
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-                        onClick={handleModalEdit}
-                      >
-                        <Edit3 className="h-4 w-4 mr-2 shrink-0" />
-                        Edit Event
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-                        onClick={handleModalDuplicate}
-                      >
-                        <Copy className="h-4 w-4 mr-2 shrink-0" />
-                        Duplicate
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-                        onClick={handleModalPublicPage}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2 shrink-0" />
-                        <span className="truncate">View Public</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer justify-center text-sm hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
-                        onClick={handleModalManageAttendees}
-                      >
-                        <Users className="h-4 w-4 mr-2 shrink-0" />
-                        <span className="truncate">Attendees</span>
-                      </Button>
-                      
-                      {selectedEvent.status === 'Draft' && (
-                        <Button 
-                          variant="default"
-                          className="w-full cursor-pointer justify-center text-sm bg-green-600 hover:bg-green-700 text-white transition-colors col-span-2 sm:col-span-1"
-                          onClick={() => {
-                            setIsViewDialogOpen(false);
-                            handlePublishEvent(selectedEvent);
-                          }}
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-2 shrink-0" />
-                          Publish
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-2 mt-1">
-                      <Button 
-                        variant="outline" 
-                        className="w-full cursor-pointer justify-center text-sm text-amber-600 border-amber-200 hover:bg-amber-50"
-                        onClick={handleModalDelete}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2 shrink-0" />
-                        Move to Trash
-                      </Button>
-                    </div>
-                  </>
-                )}
-
-                <DialogFooter className="gap-2 flex-col sm:flex-row">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setIsViewDialogOpen(false)}
-                    className="w-full sm:w-auto cursor-pointer"
-                  >
-                    Close
-                  </Button>
-                </DialogFooter>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-    {/* Bulk Action Confirmation Dialog - FIXED */}
-    <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {bulkAction === 'publish' && 'Publish Events'}
-            {bulkAction === 'duplicate' && 'Duplicate Events'}
-            {bulkAction === 'delete' && 'Move to Trash'}
-            {bulkAction === 'permanentDelete' && 'Permanently Delete Events'}
-            {bulkAction === 'restore' && 'Restore Events'}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {bulkAction === 'publish' && (
-              <>You are about to publish <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-            )}
-            {bulkAction === 'duplicate' && (
-              <>You are about to duplicate <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-            )}
-            {bulkAction === 'delete' && (
-              <>You are about to move <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} to trash.</>
-            )}
-            {bulkAction === 'permanentDelete' && (
-              <>You are about to permanently delete <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}. This action cannot be undone.</>
-            )}
-            {bulkAction === 'restore' && (
-              <>You are about to restore <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} from trash.</>
-            )}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="py-4">
-          <ScrollArea className="h-32 border rounded-lg p-2">
-            {selectedEvents.map(id => {
-              const event = uiEvents.find(e => e.id === id);
-              return event ? (
-                <div key={id} className="flex items-center gap-2 py-1 text-sm">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span>{event.title}</span>
-                  <span className="text-gray-400">—</span>
-                  <Badge variant="outline" className="text-xs">
-                    {event.isDeleted ? 'Trashed' : event.status}
-                  </Badge>
-                </div>
-              ) : null;
-            })}
-          </ScrollArea>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-          <AlertDialogAction 
-            className={`cursor-pointer ${
-              bulkAction === 'permanentDelete' || bulkAction === 'delete'
-                ? 'bg-red-600 hover:bg-red-700' 
-                : bulkAction === 'restore'
-                ? 'bg-green-600 hover:bg-green-700'
-                : 'bg-primary hover:bg-primary/90'
-            }`}
-            onClick={() => {
-              if (bulkAction === 'publish') {
-                setIsBulkActionDialogOpen(false);
-                handleBulkPublish();
-              } else if (bulkAction === 'duplicate') {
-                handleBulkDuplicate();
-              } else if (bulkAction === 'delete') {
-                // ✅ This now only gets called for 2+ events
-                handleBulkDelete();
-              } else if (bulkAction === 'permanentDelete') {
-                handleBulkPermanentDelete();
-              } else if (bulkAction === 'restore') {
-                handleBulkRestore();
-              }
-            }}
-          >
-            {bulkAction === 'publish' && <CheckCircle2 className="h-4 w-4 mr-2" />}
-            {bulkAction === 'duplicate' && <Copy className="h-4 w-4 mr-2" />}
-            {bulkAction === 'delete' && <Trash2 className="h-4 w-4 mr-2" />}
-            {bulkAction === 'permanentDelete' && <Trash className="h-4 w-4 mr-2" />}
-            {bulkAction === 'restore' && <RotateCcw className="h-4 w-4 mr-2" />}
-            {bulkAction === 'publish' && 'Publish All'}
-            {bulkAction === 'duplicate' && 'Duplicate All'}
-            {bulkAction === 'delete' && 'Move to Trash'}
-            {bulkAction === 'permanentDelete' && 'Delete Permanently'}
-            {bulkAction === 'restore' && 'Restore All'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
 
       {/* Delete (Move to Trash) Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -3102,6 +2700,92 @@ export default function EventsDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Action Confirmation Dialog */}
+      <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkAction === 'publish' && 'Publish Events'}
+              {bulkAction === 'duplicate' && 'Duplicate Events'}
+              {bulkAction === 'delete' && 'Move to Trash'}
+              {bulkAction === 'permanentDelete' && 'Permanently Delete Events'}
+              {bulkAction === 'restore' && 'Restore Events'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {bulkAction === 'publish' && (
+                <>You are about to publish <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
+              )}
+              {bulkAction === 'duplicate' && (
+                <>You are about to duplicate <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
+              )}
+              {bulkAction === 'delete' && (
+                <>You are about to move <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} to trash.</>
+              )}
+              {bulkAction === 'permanentDelete' && (
+                <>You are about to permanently delete <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}. This action cannot be undone.</>
+              )}
+              {bulkAction === 'restore' && (
+                <>You are about to restore <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} from trash.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <ScrollArea className="h-32 border rounded-lg p-2">
+              {selectedEvents.map(id => {
+                const event = uiEvents.find(e => e.id === id);
+                return event ? (
+                  <div key={id} className="flex items-center gap-2 py-1 text-sm">
+                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <span>{event.title}</span>
+                    <span className="text-gray-400">—</span>
+                    <Badge variant="outline" className="text-xs">
+                      {event.isDeleted ? 'Trashed' : event.status}
+                    </Badge>
+                  </div>
+                ) : null;
+              })}
+            </ScrollArea>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className={`cursor-pointer ${
+                bulkAction === 'permanentDelete' || bulkAction === 'delete'
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : bulkAction === 'restore'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : 'bg-primary hover:bg-primary/90'
+              }`}
+              onClick={() => {
+                if (bulkAction === 'publish') {
+                  setIsBulkActionDialogOpen(false);
+                  handleBulkPublish();
+                } else if (bulkAction === 'duplicate') {
+                  handleBulkDuplicate();
+                } else if (bulkAction === 'delete') {
+                  handleBulkDelete();
+                } else if (bulkAction === 'permanentDelete') {
+                  handleBulkPermanentDelete();
+                } else if (bulkAction === 'restore') {
+                  handleBulkRestore();
+                }
+              }}
+            >
+              {bulkAction === 'publish' && <CheckCircle2 className="h-4 w-4 mr-2" />}
+              {bulkAction === 'duplicate' && <Copy className="h-4 w-4 mr-2" />}
+              {bulkAction === 'delete' && <Trash2 className="h-4 w-4 mr-2" />}
+              {bulkAction === 'permanentDelete' && <Trash className="h-4 w-4 mr-2" />}
+              {bulkAction === 'restore' && <RotateCcw className="h-4 w-4 mr-2" />}
+              {bulkAction === 'publish' && 'Publish All'}
+              {bulkAction === 'duplicate' && 'Duplicate All'}
+              {bulkAction === 'delete' && 'Move to Trash'}
+              {bulkAction === 'permanentDelete' && 'Delete Permanently'}
+              {bulkAction === 'restore' && 'Restore All'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

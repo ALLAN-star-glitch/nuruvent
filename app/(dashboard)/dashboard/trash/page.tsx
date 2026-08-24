@@ -352,6 +352,11 @@ export default function TrashPage() {
   // HANDLERS
   // ============================================================
 
+  // ✅ Row click now selects the row (does NOT navigate)
+  const handleRowClick = (eventId: string) => {
+    handleSelectEvent(eventId);
+  };
+
   const handleRestoreEvent = (event: any) => {
     setSelectedEvent(event);
     setIsRestoreDialogOpen(true);
@@ -640,7 +645,7 @@ export default function TrashPage() {
         </div>
       </div>
 
-      {/* ✅ Stats Cards - Fully Responsive Grid */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
         <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
           <CardContent className="p-4">
@@ -850,7 +855,7 @@ export default function TrashPage() {
       )}
 
       {/* ============================================================
-          DESKTOP TABLE VIEW
+          DESKTOP TABLE VIEW - Row click selects, does NOT navigate
           ============================================================ */}
       {!isMobile && viewMode === 'table' && (
         <Card>
@@ -900,9 +905,10 @@ export default function TrashPage() {
                       return (
                         <TableRow
                           key={event.id}
-                          className={`hover:bg-gray-50/60 transition-colors group ${isSelected ? 'bg-primary/5' : ''}`}
+                          onClick={() => handleRowClick(event.id)}
+                          className={`hover:bg-gray-50/60 transition-colors group cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
                         >
-                          <TableCell className="py-4 px-4">
+                          <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => handleSelectEvent(event.id)}
@@ -952,7 +958,7 @@ export default function TrashPage() {
                           </TableCell>
                           <TableCell className="py-4 px-4 text-right">
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
+                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
@@ -1071,7 +1077,7 @@ export default function TrashPage() {
                 return (
                   <Card
                     key={event.id}
-                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${isSelected ? 'border-primary/50 bg-primary/5' : ''}`}
+                    className={`hover:shadow-lg transition-all duration-200 border-gray-200/80 ${isSelected ? 'border-primary/50 bg-primary/5' : ''}`}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
