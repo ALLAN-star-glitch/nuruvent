@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 
@@ -58,12 +57,20 @@ export function PushNotificationManager() {
   }
 
   async function registerServiceWorker() {
-    const registration = await navigator.serviceWorker.register('/sw.js', {
-      scope: '/',
-      updateViaCache: 'none',
-    })
-    const sub = await registration.pushManager.getSubscription()
-    setSubscription(sub)
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/',
+        updateViaCache: 'none',
+      })
+
+      // Proactively ask Vercel if sw.js has changed on app launch
+      await registration.update()
+
+      const sub = await registration.pushManager.getSubscription()
+      setSubscription(sub)
+    } catch (error) {
+      console.error('Service worker registration failed:', error)
+    }
   }
 
   async function subscribeToPush() {

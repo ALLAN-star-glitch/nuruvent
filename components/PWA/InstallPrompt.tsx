@@ -1,16 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client'
 
 import { useState, useEffect } from 'react'
 import { X, Download } from 'lucide-react'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
+
 export function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
@@ -36,13 +40,13 @@ export function InstallPrompt() {
     }
 
     // Check if iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window)
     setIsIOS(ios)
 
     // Listen for the beforeinstallprompt event (Android/Chrome)
     const handler = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e)
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
       
       // Show prompt after 5 seconds delay
       setTimeout(() => {
@@ -81,7 +85,7 @@ export function InstallPrompt() {
       window.removeEventListener('resize', handleResize)
       clearTimeout(timer)
     }
-  }, [])
+  }, [isDismissed, isStandalone])
 
   const handleDismiss = () => {
     setIsDismissed(true)

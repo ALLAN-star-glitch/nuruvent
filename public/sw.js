@@ -1,5 +1,5 @@
 // public/sw.js
-const CACHE_VERSION = 'nuruvent-v11'
+const CACHE_VERSION = 'nuruvent-v12' // Bumped version to force cache refresh
 
 self.addEventListener('install', function (event) {
   self.skipWaiting()
@@ -18,6 +18,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
   event.waitUntil(
     Promise.all([
+      // Clear out older cache versions automatically
       caches.keys().then(function (cacheNames) {
         return Promise.all(
           cacheNames.map(function (cacheName) {
@@ -63,11 +64,10 @@ self.addEventListener('notificationclick', function (event) {
   )
 })
 
-// ✅ NETWORK ONLY for external scripts - NEVER cache them
 self.addEventListener('fetch', function (event) {
   const url = new URL(event.request.url)
   
-  // Network only for external domains
+  // 1. NETWORK ONLY: External third-party scripts
   const externalDomains = [
     'tawk.to',
     'embed.tawk.to',
@@ -80,17 +80,47 @@ self.addEventListener('fetch', function (event) {
   ]
   
   const isExternal = externalDomains.some(domain => url.hostname.includes(domain))
-  
   if (isExternal) {
-    // ✅ Network only - no caching at all
     event.respondWith(fetch(event.request))
     return
   }
-  
-  // For internal assets, use cache-first strategy
+
+  // 2. NETWORK FIRST: Page navigations (e.g. '/' or any HTML route)
+  // Guarantees users get the newest deployment from Vercel when online.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(function (networkResponse) {
+          // Clone and update the local cache with fresh HTML
+          const responseClone = networkResponse.clone()
+          caches.open(CACHE_VERSION).then(function (cache) {
+            cache.put(event.request, responseClone)
+          })
+          return networkResponse
+        })
+        .catch(function () {
+          // Offline fallback: serve cached HTML if network fails
+          return caches.match(event.request)
+        })
+    )
+    return
+  }
+
+  // 3. CACHE FIRST: Static media and internal static assets
   event.respondWith(
     caches.match(event.request).then(function (response) {
-      return response || fetch(event.request)
+      if (response) {
+        return response
+      }
+      return fetch(event.request).then(function (networkResponse) {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseClone = networkResponse.clone()
+          caches.open(CACHE_VERSION).then(function (cache) {
+            cache.put(event.request, responseClone)
+          })
+        }
+        return networkResponse
+      })
     })
   )
 })
