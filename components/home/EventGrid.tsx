@@ -58,6 +58,13 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
 
     let result = [...eventsData];
 
+    // ✅ FIRST: Filter out past events
+    const now = new Date();
+    result = result.filter((event) => {
+      const eventDate = new Date(event.date);
+      return eventDate >= now;
+    });
+
     // 1. Filter by search query
     if (searchQuery) {
       const searchableFields = [
@@ -108,7 +115,6 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
 
     // 4. Filter by date
     if (dateFilter !== 'all') {
-      const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       
       result = result.filter((event) => {
@@ -184,11 +190,11 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
   const activeFilterCount = getActiveFilterCount();
   const categoryName = getCategoryName();
 
-  // Loading state
+  // Loading state with 3 columns
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(limit || 8)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(limit || 9)].map((_, i) => (
           <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
             <div className="aspect-[16/9] bg-gradient-to-br from-gray-200 to-gray-100" />
             <div className="p-5 space-y-3">
@@ -239,12 +245,12 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 text-primary mb-4">
           <Calendar className="h-7 w-7" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900">No events found</h3>
+        <h3 className="text-xl font-semibold text-gray-900">No upcoming events found</h3>
         <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
           {searchQuery 
-            ? `We couldn't find any events matching "${searchQuery}".`
+            ? `We couldn't find any upcoming events matching "${searchQuery}".`
             : activeFilterCount > 0
-              ? `No events match your current filters. Try adjusting your criteria.`
+              ? `No upcoming events match your current filters. Try adjusting your criteria.`
               : 'There are no upcoming events at the moment. Check back soon!'}
         </p>
         {(searchQuery || activeFilterCount > 0) && (
@@ -307,7 +313,7 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
           </div>
           
           <p className="text-sm text-gray-500 mt-1">
-            Showing {displayedEvents.length} of {filteredEvents.length} events
+            Showing {displayedEvents.length} of {filteredEvents.length} upcoming events
           </p>
         </div>
 
@@ -326,8 +332,8 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
         </div>
       </div>
 
-      {/* Event Grid - 4 columns */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Event Grid - 3 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {displayedEvents.map((event, index) => (
           <motion.div
             key={event.id}
@@ -352,7 +358,7 @@ export function EventGrid({ limit, title, subtitle }: EventGridProps) {
             onClick={() => router.push('/events')}
             className="rounded-full px-8 cursor-pointer group"
           >
-            View All {filteredEvents.length} Events
+            View All {filteredEvents.length} Upcoming Events
           </Button>
         </div>
       )}

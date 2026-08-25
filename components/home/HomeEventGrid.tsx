@@ -3,18 +3,20 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EventCard } from './EventCard';
 import { 
   SearchX, 
   Calendar, 
   Loader2, 
   RefreshCw, 
-  ArrowRight
+  ArrowRight,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGetUpcomingEventsQuery, useGetEventTypesQuery } from '@/lib/store/api/eventsApi';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 interface HomeEventGridProps {
   limit?: number;
@@ -28,6 +30,7 @@ export function HomeEventGrid({
   subtitle = "Discover professional workshops and certified courses from top trainers"
 }: HomeEventGridProps) {
   const router = useRouter();
+  const [showAll, setShowAll] = useState(false);
 
   const { 
     data: eventsData, 
@@ -46,8 +49,33 @@ export function HomeEventGrid({
 
   const { data: eventTypes } = useGetEventTypesQuery();
 
-  // Get first 8 events
-  const displayEvents = (eventsData || []).slice(0, limit);
+  // ✅ Filter out past events
+  const upcomingEvents = useMemo(() => {
+    if (!eventsData) return [];
+    
+    const now = new Date();
+    return eventsData.filter((event) => {
+      const eventDate = new Date(event.date);
+      return eventDate >= now;
+    });
+  }, [eventsData]);
+
+  // ✅ Responsive display limit
+  const displayLimit = useMemo(() => {
+    if (typeof window === 'undefined') return 4;
+    if (window.innerWidth < 640) return 4; // Mobile: 4 events
+    if (window.innerWidth < 1024) return 6; // Tablet: 6 events
+    return limit; // Desktop: 8 events
+  }, [limit]);
+
+  // ✅ Determine which events to show
+  const displayEvents = useMemo(() => {
+    const events = showAll ? upcomingEvents : upcomingEvents.slice(0, displayLimit);
+    return events;
+  }, [upcomingEvents, showAll, displayLimit]);
+
+  // ✅ Get total upcoming events count
+  const totalUpcoming = upcomingEvents.length;
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -57,11 +85,17 @@ export function HomeEventGrid({
     return () => clearInterval(interval);
   }, [refetch]);
 
+  // Reset showAll when events change
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowAll(false);
+  }, [eventsData]);
+
   // Loading state
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {[...Array(limit || 8)].map((_, i) => (
+        {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
             <div className="aspect-[16/9] bg-gradient-to-br from-gray-200 to-gray-100" />
             <div className="p-4 space-y-3">
@@ -102,7 +136,7 @@ export function HomeEventGrid({
   }
 
   // Empty state
-  if (displayEvents.length === 0) {
+  if (upcomingEvents.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 text-primary mb-4">
@@ -131,7 +165,7 @@ export function HomeEventGrid({
             <p className="text-gray-600 text-sm mt-1">{subtitle}</p>
           )}
           <p className="text-xs text-gray-400 mt-1">
-            Showing {displayEvents.length} of {eventsData?.length || 0} events
+            Showing {displayEvents.length} of {totalUpcoming} upcoming events
           </p>
         </div>
 
@@ -146,20 +180,10 @@ export function HomeEventGrid({
             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push('/events')}
-            className="rounded-full cursor-pointer group"
-          >
-            View All
-            <ArrowRight className="h-3.5 w-3.5 ml-1 transition-transform group-hover:translate-x-0.5" />
-          </Button>
         </div>
       </div>
 
-      {/* Events Grid - 4 columns */}
+      {/* Events Grid - Responsive columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {displayEvents.map((event, index) => (
           <motion.div
@@ -177,19 +201,41 @@ export function HomeEventGrid({
         ))}
       </div>
 
-      {/* View All CTA - Only show if there are more events */}
-      {eventsData && eventsData.length > limit && (
-        <div className="text-center pt-4">
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+        {/* Show More / Show Less Button */}
+        {totalUpcoming > displayLimit && (
           <Button
             variant="outline"
-            onClick={() => router.push('/events')}
-            className="rounded-full px-8 cursor-pointer group"
+            onClick={() => setShowAll(!showAll)}
+            className="rounded-full px-6 cursor-pointer group"
           >
-            Browse All {eventsData.length} Events
-            <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-0.5" />
+            {showAll ? (
+              <>
+                Show Less
+                <ChevronDown className="h-4 w-4 ml-2 rotate-180 transition-transform" />
+              </>
+            ) : (
+              <>
+                Show More Events
+                <ChevronDown className="h-4 w-4 ml-2 transition-transform group-hover:translate-y-0.5" />
+              </>
+            )}
           </Button>
-        </div>
-      )}
+        )}
+
+        {/* Find More Events Button - Always visible */}
+        <Button
+          onClick={() => router.push('/events')}
+          className={cn(
+            "rounded-full px-6 cursor-pointer group",
+            totalUpcoming > displayLimit ? "bg-primary-500 hover:bg-primary-600 text-white" : "bg-primary-500 hover:bg-primary-600 text-white"
+          )}
+        >
+          Find More Events
+          <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-0.5" />
+        </Button>
+      </div>
     </div>
   );
 }

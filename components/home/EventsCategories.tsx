@@ -23,52 +23,52 @@ const getCategoryStyle = (slug: string) => {
   
   const styleMap: Record<string, { icon: React.ReactNode; bgColor: string; hoverColor: string }> = {
     'workshop': { 
-      icon: <BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <BookOpen className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-blue-50 text-blue-600',
       hoverColor: 'hover:bg-blue-100'
     },
     'webinar': { 
-      icon: <Monitor className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Monitor className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-purple-50 text-purple-600',
       hoverColor: 'hover:bg-purple-100'
     },
     'bootcamp': { 
-      icon: <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-green-50 text-green-600',
       hoverColor: 'hover:bg-green-100'
     },
     'meetup': { 
-      icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-orange-50 text-orange-600',
       hoverColor: 'hover:bg-orange-100'
     },
     'conference': { 
-      icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-red-50 text-red-600',
       hoverColor: 'hover:bg-red-100'
     },
     'training': { 
-      icon: <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Building2 className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-teal-50 text-teal-600',
       hoverColor: 'hover:bg-teal-100'
     },
     'professional': { 
-      icon: <Briefcase className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Briefcase className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-indigo-50 text-indigo-600',
       hoverColor: 'hover:bg-indigo-100'
     },
     'ngo': { 
-      icon: <Globe className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Globe className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-emerald-50 text-emerald-600',
       hoverColor: 'hover:bg-emerald-100'
     },
     'seminar': { 
-      icon: <BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <BookOpen className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-amber-50 text-amber-600',
       hoverColor: 'hover:bg-amber-100'
     },
     'networking': { 
-      icon: <Users className="h-5 w-5 sm:h-6 sm:w-6" />, 
+      icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
       bgColor: 'bg-rose-50 text-rose-600',
       hoverColor: 'hover:bg-rose-100'
     },
@@ -83,7 +83,7 @@ const getCategoryStyle = (slug: string) => {
 
   // Default
   return { 
-    icon: <LayoutGrid className="h-5 w-5 sm:h-6 sm:w-6" />, 
+    icon: <LayoutGrid className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />, 
     bgColor: 'bg-gray-50 text-gray-600',
     hoverColor: 'hover:bg-gray-100'
   };
@@ -107,11 +107,23 @@ export function EventCategories() {
     return null;
   }
 
-  // Show up to 6 categories to keep it compact
-  const categories = eventTypes.slice(0, 6);
+  // ✅ Filter out "uncategorized" and show up to 6 categories
+  const categories = eventTypes
+    .filter((category) => {
+      const name = category.display_name?.toLowerCase() || category.name?.toLowerCase() || '';
+      const slug = category.slug?.toLowerCase() || '';
+      // Filter out uncategorized
+      return !name.includes('uncategorized') && !slug.includes('uncategorized');
+    })
+    .slice(0, 6);
+
+  // If no categories after filtering, don't show anything
+  if (categories.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 md:gap-8">
+    <div className="flex flex-wrap justify-center items-center gap-6 sm:gap-8 md:gap-10 lg:gap-12">
       {categories.map((category) => {
         const { icon, bgColor, hoverColor } = getCategoryStyle(category.slug);
         
@@ -119,20 +131,20 @@ export function EventCategories() {
           <Link
             key={category.id}
             href={`/events?type=${category.id}`}
-            className="group flex flex-col items-center gap-2 transition-all duration-300 cursor-pointer"
+            className="group flex flex-col items-center gap-2.5 transition-all duration-300 cursor-pointer"
           >
-            {/* Circular Icon */}
+            {/* Circular Icon - Larger on desktop */}
             <div className={cn(
-              "flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14 rounded-full transition-all duration-300",
+              "flex items-center justify-center h-14 w-14 sm:h-16 sm:w-16 lg:h-20 lg:w-20 rounded-full transition-all duration-300",
               bgColor,
               hoverColor,
-              "group-hover:scale-110 group-hover:shadow-md"
+              "group-hover:scale-110 group-hover:shadow-lg"
             )}>
               {icon}
             </div>
             
-            {/* Category Name - Small text below */}
-            <span className="text-[10px] sm:text-xs font-medium text-gray-600 text-center group-hover:text-primary-600 transition-colors max-w-[60px] sm:max-w-[80px] truncate">
+            {/* Category Name - Larger text */}
+            <span className="text-xs sm:text-sm lg:text-base font-medium text-gray-600 text-center group-hover:text-primary-600 transition-colors max-w-[70px] sm:max-w-[90px] lg:max-w-[120px] truncate">
               {category.display_name || category.name}
             </span>
           </Link>

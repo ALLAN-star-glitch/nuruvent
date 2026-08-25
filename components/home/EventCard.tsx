@@ -3,17 +3,16 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar, 
   Clock, 
   MapPin, 
   Users, 
   ArrowUpRight, 
-  Sparkles, 
   User, 
   Building2, 
   Video, 
-  CheckCircle2,
   Briefcase,
   Presentation,
   GraduationCap,
@@ -22,14 +21,10 @@ import {
   BookOpen,
   Handshake,
   CalendarDays,
-  Ticket,
-  Eye,
-  Tag,
-  DollarSign,
   Award,
   Clock as ClockIcon,
-  ShieldCheck,
   BadgeCheck,
+  FileText,
 } from 'lucide-react';
 import { EventResponse, EventTypeResponse } from '@/lib/store/api/eventsApi';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,32 +41,21 @@ interface EventCardProps {
   eventTypes?: EventTypeResponse[];
 }
 
-// ✅ Helper: Check if account is institution (handles ALL formats)
 const isInstitutionAccount = (accountType: string): boolean => {
   if (!accountType) return false;
   const normalized = accountType.toLowerCase().trim();
-  
-  // Handle all possible formats:
-  // - "institution"
-  // - "account-type-institution" (with hyphens)
-  // - "account_type_institution" (with underscores)
-  // - "account_type_institution" (full)
   return normalized === 'institution' || 
          normalized === 'account-type-institution' ||
          normalized === 'account_type_institution' ||
          normalized.includes('institution');
 };
 
-// ✅ Map event type ID to icon component
 const getEventTypeIcon = (typeId: string, eventTypes?: EventTypeResponse[]) => {
-  if (!eventTypes || !typeId) {
-    return <Briefcase className="h-3.5 w-3.5" />;
-  }
+  if (!eventTypes || !typeId) return <Briefcase className="h-3.5 w-3.5" />;
   
   const found = eventTypes.find((t) => t.id === typeId);
   if (found) {
     const slug = found.slug?.toLowerCase() || found.name?.toLowerCase() || '';
-    
     if (slug.includes('workshop')) return <Briefcase className="h-3.5 w-3.5" />;
     if (slug.includes('webinar')) return <Presentation className="h-3.5 w-3.5" />;
     if (slug.includes('bootcamp')) return <GraduationCap className="h-3.5 w-3.5" />;
@@ -79,19 +63,14 @@ const getEventTypeIcon = (typeId: string, eventTypes?: EventTypeResponse[]) => {
     if (slug.includes('conference')) return <Mic2 className="h-3.5 w-3.5" />;
     if (slug.includes('seminar')) return <BookOpen className="h-3.5 w-3.5" />;
     if (slug.includes('networking')) return <Handshake className="h-3.5 w-3.5" />;
-    
-    return <Briefcase className="h-3.5 w-3.5" />;
   }
-  
   return <Briefcase className="h-3.5 w-3.5" />;
 };
 
-// ✅ Get event type label and color
 const getEventTypeInfo = (typeId: string, eventTypes?: EventTypeResponse[]) => {
   if (!eventTypes || !typeId) {
     return { label: 'Event', color: 'var(--color-neutral-gray)' };
   }
-  
   const found = eventTypes.find((t) => t.id === typeId);
   if (found) {
     return { 
@@ -99,7 +78,6 @@ const getEventTypeInfo = (typeId: string, eventTypes?: EventTypeResponse[]) => {
       color: found.color || 'var(--color-neutral-gray)' 
     };
   }
-  
   return { label: 'Event', color: 'var(--color-neutral-gray)' };
 };
 
@@ -108,12 +86,10 @@ const formatPrice = (price: number) => {
   return `KSh ${price.toLocaleString()}`;
 };
 
-// ✅ UPDATED: Get creator display with institution details - handles ALL formats
 const getCreatorDisplay = (event: EventResponse): { 
   name: string; 
   icon: JSX.Element; 
   type: string;
-  institutionName?: string;
   isVerified?: boolean;
 } => {
   const creator = event.creator;
@@ -126,19 +102,15 @@ const getCreatorDisplay = (event: EventResponse): {
     };
   }
   
-  // ✅ Check if institution using the helper (handles ALL formats)
-  // This will match: "institution", "account-type-institution", "account_type_institution"
   if (isInstitutionAccount(creator.account_type) && creator.institution_name) {
     return { 
       name: creator.institution_name, 
       icon: <Building2 className="h-3.5 w-3.5 text-primary-500" />, 
       type: 'institution',
-      institutionName: creator.institution_name,
-      isVerified: true, // Institutions are considered verified
+      isVerified: true,
     };
   }
   
-  // Individual account
   return { 
     name: creator.display_name || creator.name || 'Host', 
     icon: <User className="h-3.5 w-3.5 text-neutral-400" />, 
@@ -147,22 +119,64 @@ const getCreatorDisplay = (event: EventResponse): {
   };
 };
 
+function formatEventDateDetails(dateStr: string, timeStr: string) {
+  const date = new Date(dateStr);
+  const isValidDate = !isNaN(date.getTime());
+  return {
+    month: isValidDate ? date.toLocaleDateString('en-US', { month: 'short' }) : 'DEC',
+    day: isValidDate ? date.getDate() : '--',
+    weekday: isValidDate ? date.toLocaleDateString('en-US', { weekday: 'short' }) : '---',
+    time: timeStr || 'TBD',
+    fullDate: isValidDate ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'
+  };
+}
+
 export function EventCard({ event, onClick, featured = false, eventTypes }: EventCardProps) {
+  const router = useRouter();
   const eventTypeInfo = getEventTypeInfo(event.event_type_id, eventTypes);
   const eventTypeIcon = getEventTypeIcon(event.event_type_id, eventTypes);
-  const { month, day, time, fullDate, weekday } = formatEventDateDetails(event.date, event.time);
+  const { month, day, time, weekday } = formatEventDateDetails(event.date, event.time);
   const creator = getCreatorDisplay(event);
   const isFree = event.price === 0;
   const isPast = new Date(event.date) < new Date();
   const isFullyBooked = event.current_attendees >= event.max_attendees && event.max_attendees > 0;
-  const availableSpots = event.max_attendees > 0 ? event.max_attendees - event.current_attendees : '∞';
   const spotsLeft = event.max_attendees > 0 ? event.max_attendees - event.current_attendees : 0;
   const isLowAvailability = spotsLeft > 0 && spotsLeft <= 5;
+  const hasCertificate = event.certificate_price > 0;
+
+  // ✅ Handle navigation without page reload
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClick) {
+      onClick();
+    } else {
+      router.push(`/events/${event.slug}`);
+    }
+  };
+
+  // ✅ Handle button click
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!isPast && !isFullyBooked) {
+      router.push(`/events/${event.slug}`);
+    }
+  };
 
   return (
-    <Link 
-      href={`/events/${event.slug}`}
+    <div 
       className="block h-full cursor-pointer"
+      onClick={handleNavigate}
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          handleNavigate(e as any);
+        }
+      }}
     >
       <Card 
         className={cn(
@@ -170,14 +184,9 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
           "shadow-sm hover:shadow-xl hover:-translate-y-1.5",
           featured && "ring-2 ring-secondary-400/40 shadow-md shadow-secondary-100/50"
         )}
-        onClick={(e) => {
-          e.preventDefault();
-          if (onClick) onClick();
-        }}
       >
-        {/* Image Container - with overlay */}
+        {/* Image Container */}
         <div className="relative w-full aspect-[16/9] overflow-hidden bg-neutral-50 flex-shrink-0">
-          {/* Image */}
           {event.image_url ? (
             <Image
               src={event.image_url}
@@ -194,17 +203,14 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
             </div>
           )}
           
-          {/* ✅ Partial Overlay - Dark gradient from bottom */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-          
-          {/* ✅ Hover overlay - subtle shine effect */}
           <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
 
-          {/* Date Badge - Enhanced with better visibility */}
+          {/* Date Badge - Darker amber month */}
           <div className="absolute bottom-4 left-4 z-10">
             <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 border border-white/20 shadow-lg shadow-black/10">
               <div className="flex flex-col items-center leading-none">
-                <span className="text-[8px] sm:text-[10px] font-bold tracking-wider text-secondary-500 uppercase">
+                <span className="text-[8px] sm:text-[10px] font-bold tracking-wider text-amber-700 uppercase">
                   {month}
                 </span>
                 <span className="text-xl sm:text-2xl font-extrabold text-neutral-900 leading-none">
@@ -253,7 +259,7 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
             </div>
           )}
 
-          {/* ✅ Availability Badge */}
+          {/* Availability Badge */}
           {isLowAvailability && !isPast && !isFullyBooked && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
               <Badge className="bg-amber-500/95 backdrop-blur-sm text-white border-0 shadow-lg shadow-amber-500/30 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-3 py-1 rounded-full animate-pulse">
@@ -263,7 +269,7 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
             </div>
           )}
 
-          {/* ✅ Fully Booked Badge */}
+          {/* Fully Booked Badge */}
           {isFullyBooked && !isPast && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm">
               <Badge className="bg-red-500 text-white border-0 shadow-lg shadow-red-500/30 text-sm font-semibold px-4 py-2 rounded-full">
@@ -272,7 +278,7 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
             </div>
           )}
 
-          {/* ✅ Past Event Overlay */}
+          {/* Past Event Overlay */}
           {isPast && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
               <Badge className="bg-neutral-700/90 text-white border-0 shadow-lg text-sm font-semibold px-4 py-2 rounded-full">
@@ -283,16 +289,15 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
         </div>
 
         {/* Card Content */}
-        <CardContent className="p-3 sm:p-4 md:p-5 flex-1 flex flex-col gap-1.5 sm:gap-2">
-          {/* ✅ UPDATED: Host with Institution Details */}
-          <div className="flex items-center gap-2 text-[10px] sm:text-xs text-neutral-500">
+        <CardContent className="p-3 sm:p-4 md:p-5 flex-1 flex flex-col gap-2 sm:gap-2.5">
+          {/* Host */}
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-500">
             <span className="truncate flex items-center gap-1.5">
               <span className="text-neutral-400 hidden xs:inline">Hosted by</span>
               <span className="font-semibold text-neutral-700 hover:text-primary-500 transition-colors flex items-center gap-1.5">
                 {creator.icon}
                 {creator.name}
               </span>
-              {/* ✅ Institution verification badge */}
               {creator.type === 'institution' && creator.isVerified && (
                 <span className="inline-flex items-center gap-1">
                   <BadgeCheck className="h-3.5 w-3.5 text-primary-500" />
@@ -317,82 +322,66 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
             </div>
           )}
 
-          {/* Quick Details Grid - Responsive */}
-          <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mt-1 text-xs sm:text-sm text-neutral-600">
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-1.5">
-              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-400 flex-shrink-0" />
-              <span className="font-medium text-[10px] sm:text-xs">
-                {event.current_attendees || 0} / {event.max_attendees || '∞'}
+          {/* Divider */}
+          <div className="h-px bg-neutral-100 my-0.5" />
+
+          {/* Pricing Section */}
+          <div className="flex flex-col gap-1.5 pt-0.5">
+            {/* Registration Fee Label */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-medium text-neutral-500">
+                Registration Fee
               </span>
+              <Button 
+                size="default"
+                className={cn(
+                  "rounded-full font-semibold text-xs sm:text-sm px-4 sm:px-6 h-8 sm:h-10 shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer",
+                  isFree 
+                    ? "bg-tertiary-500 hover:bg-tertiary-600 text-white" 
+                    : "bg-primary-500 hover:bg-primary-600 text-white",
+                  (isPast || isFullyBooked) && "opacity-50 cursor-not-allowed hover:shadow-md"
+                )}
+                onClick={handleButtonClick}
+                disabled={isPast || isFullyBooked}
+                type="button"
+              >
+                <span>
+                  {isPast ? 'Ended' : isFullyBooked ? 'Full' : isFree ? 'Register' : 'Get Ticket'}
+                </span>
+                {!isPast && !isFullyBooked && (
+                  <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                )}
+              </Button>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-50 rounded-lg px-2 py-1.5 sm:px-3 sm:py-1.5">
-              <Ticket className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-400 flex-shrink-0" />
+
+            {/* Price Display */}
+            <div className="flex items-center gap-2">
               <span className={cn(
-                "font-semibold text-[10px] sm:text-xs",
-                isFree ? "text-tertiary-600" : "text-primary-500"
+                "text-2xl sm:text-3xl font-bold",
+                isFree ? "text-tertiary-600" : "text-primary-600"
               )}>
                 {formatPrice(event.price)}
               </span>
             </div>
-          </div>
 
-          {/* Divider */}
-          <div className="h-px bg-neutral-100 my-0.5 sm:my-1" />
-
-          {/* Footer - Responsive */}
-          <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between pt-1 gap-2 xs:gap-0">
-            <div className="flex flex-col">
-              <span className="text-[8px] sm:text-[10px] font-medium text-neutral-400 uppercase tracking-wider">
-                {isFree ? 'Complimentary' : 'Registration Fee'}
-              </span>
-              <div className="flex items-center gap-1.5">
-                {!isFree && <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-500" />}
-                <span className={cn(
-                  "text-base sm:text-lg font-bold",
-                  isFree ? "text-tertiary-600" : "text-primary-500"
-                )}>
-                  {formatPrice(event.price)}
+            {/* Certificate Fee */}
+            {hasCertificate && event.certificate_price > 0 && (
+              <div className="flex items-center gap-2 bg-amber-50/80 rounded-lg px-3 py-1.5 sm:py-2 border border-amber-200/60 mt-0.5">
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-amber-700">
+                  Certificate Fee:
                 </span>
-                {!isFree && (
-                  <span className="text-[8px] sm:text-[10px] text-neutral-400 font-medium hidden xs:inline">
-                    per person
-                  </span>
-                )}
+                <span className="text-sm sm:text-base font-bold text-amber-800">
+                  {formatPrice(event.certificate_price)}
+                </span>
               </div>
-            </div>
-
-            <Button 
-              size="default"
-              className={cn(
-                "rounded-full font-semibold text-xs sm:text-sm px-4 sm:px-6 h-8 sm:h-10 w-full xs:w-auto shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer",
-                isFree 
-                  ? "bg-tertiary-500 hover:bg-tertiary-600 text-white cursor-pointer" 
-                  : "bg-primary-500 hover:bg-primary-600 text-white cursor-pointer",
-                (isPast || isFullyBooked) && "opacity-50 cursor-not-allowed hover:shadow-md"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                if (!isPast && !isFullyBooked) {
-                  // Navigate to event detail page
-                  window.location.href = `/events/${event.slug}`;
-                }
-              }}
-              disabled={isPast || isFullyBooked}
-            >
-              <span>
-                {isPast ? 'Ended' : isFullyBooked ? 'Full' : isFree ? 'Register Now' : 'Get Ticket'}
-              </span>
-              {!isPast && !isFullyBooked && (
-                <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              )}
-            </Button>
+            )}
           </div>
 
-          {/* ✅ Spots Left Indicator */}
+          {/* Spots Left Indicator */}
           {!isPast && !isFullyBooked && event.max_attendees > 0 && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="flex-1 h-1 bg-neutral-100 rounded-full overflow-hidden">
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className="flex-1 h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                 <div 
                   className={cn(
                     "h-full rounded-full transition-all duration-500",
@@ -403,26 +392,13 @@ export function EventCard({ event, onClick, featured = false, eventTypes }: Even
                   }}
                 />
               </div>
-              <span className="text-[8px] sm:text-[10px] font-medium text-neutral-500 whitespace-nowrap">
+              <span className="text-xs sm:text-sm font-medium text-neutral-600 whitespace-nowrap">
                 {spotsLeft} left
               </span>
             </div>
           )}
         </CardContent>
       </Card>
-    </Link>
+    </div>
   );
-}
-
-function formatEventDateDetails(dateStr: string, timeStr: string) {
-  const date = new Date(dateStr);
-  const isValidDate = !isNaN(date.getTime());
-  
-  return {
-    month: isValidDate ? date.toLocaleDateString('en-US', { month: 'short' }) : 'DEC',
-    day: isValidDate ? date.getDate() : '--',
-    weekday: isValidDate ? date.toLocaleDateString('en-US', { weekday: 'short' }) : '---',
-    time: timeStr || 'TBD',
-    fullDate: isValidDate ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'
-  };
 }
