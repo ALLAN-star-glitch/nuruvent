@@ -11,7 +11,7 @@ export function TopBar() {
   return (
     <div className="bg-gray-50 border-b border-gray-200">
       <div className="container mx-auto px-4">
-        <nav className="flex items-center gap-1 h-10">
+        <nav className="flex items-center justify-center gap-1 h-10">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;

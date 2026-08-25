@@ -38,7 +38,7 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
         }`} 
       />
 
-      {/* Main Content */}
+      {/* Main Content - Children will now include the welcome banner via the layout */}
       <main className="flex-1 overflow-y-auto p-4 md:p-12 space-y-6">
         {children}
       </main>

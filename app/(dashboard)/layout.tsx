@@ -3,7 +3,9 @@
 import type { Metadata } from 'next';
 import { Header } from '@/components/layout/Header';
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
+import { WelcomeBannerWrapper } from '@/components/dashboard/WelcomeBannerWrapper';
 import { Toaster } from 'sonner';
+import { WelcomeModalWrapper } from '@/components/dashboard/WelcomModalWrapper';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Nuruvent',
@@ -17,17 +19,26 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col">
-      {/* ✅ Header reads auth state from Redux automatically */}
+      {/* Header reads auth state from Redux automatically */}
       <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
         <Header />
       </header>
 
-      {/* Client Component for sidebar interaction */}
+      {/* Client Component for sidebar interaction and welcome content */}
       <DashboardLayoutClient>
-        {children}
+        <div className="p-4 md:p-6 space-y-4">
+          {/* ✅ Welcome Banner - Shows at top of dashboard */}
+          <WelcomeBannerWrapper />
+          
+          {/* Page Content */}
+          {children}
+        </div>
       </DashboardLayoutClient>
 
-      {/* ✅ Toaster - placed at the end so it appears on top of everything */}
+      {/* ✅ Welcome Modal - Pops up on first login/signup */}
+      <WelcomeModalWrapper />
+
+      {/* Toaster */}
       <Toaster 
         position="top-right"
         richColors

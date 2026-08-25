@@ -95,6 +95,13 @@ const initialState: AuthState = {
   isHydrated: false,
 };
 
+// ✅ Helper to set session flag for welcome modal
+const setNewSessionFlag = () => {
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem('new_session', 'true');
+  }
+};
+
 // ============================================================
 // SLICE
 // ============================================================
@@ -195,6 +202,9 @@ const authSlice = createSlice({
           state.otpEmail = null;
           state.registrationData = null;
           state.loginStep = 'authenticated';
+          
+          // ✅ Set session flag for welcome modal
+          setNewSessionFlag();
         }
       })
       
@@ -223,6 +233,9 @@ const authSlice = createSlice({
           };
           state.loginStep = 'authenticated';
           state.twoFactorEmail = null;
+          
+          // ✅ Set session flag for welcome modal
+          setNewSessionFlag();
         } 
         // ✅ Check if 2FA is required
         else if (data?.requires_2fa === true) {
@@ -233,6 +246,9 @@ const authSlice = createSlice({
         else if (data?.access_token) {
           state.isAuthenticated = true;
           state.loginStep = 'authenticated';
+          
+          // ✅ Set session flag for welcome modal
+          setNewSessionFlag();
         } 
         // Neither 2FA nor token - something else
         else {
@@ -263,6 +279,9 @@ const authSlice = createSlice({
           };
           state.twoFactorEmail = null;
           state.loginStep = 'authenticated';
+          
+          // ✅ Set session flag for welcome modal
+          setNewSessionFlag();
         }
       })
       

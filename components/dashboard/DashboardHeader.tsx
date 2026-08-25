@@ -18,6 +18,7 @@ import {
   LogOut,
   Sparkles,
   ChevronDown,
+  ChevronRight,
   Gift,
   Zap,
   Clock,
@@ -56,7 +57,7 @@ interface DashboardHeaderProps {
 // Dashboard menu items - for mobile drawer only
 const dashboardNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/events', label: 'Events', icon: Calendar },
+  { href: '/dashboard/events', label: 'My Events', icon: Calendar },
   { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
   { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
@@ -78,6 +79,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isPublicNavOpen, setIsPublicNavOpen] = useState(false);
   const quickActionsRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
@@ -132,6 +134,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     setShowQuickActions(!showQuickActions);
   };
 
+  const togglePublicNav = () => {
+    setIsPublicNavOpen(!isPublicNavOpen);
+  };
+
   return (
     <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95">
       <div className="container mx-auto px-3 sm:px-4">
@@ -159,39 +165,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetHeader>
 
                 <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                  {/* Main Website Navigation */}
-                  <div>
-                    <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                      Main Menu
-                    </p>
-                    <nav className="space-y-0.5">
-                      {NAV_ITEMS.map((item) => {
-                        const isActive = pathname === item.href;
-                        const Icon = item.icon;
-                        return (
-                          <SheetClose asChild key={item.href}>
-                            <Link
-                              href={item.href}
-                              className={cn(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
-                                isActive
-                                  ? 'bg-primary/10 text-primary'
-                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
-                              )}
-                            >
-                              <Icon className={cn(
-                                'h-5 w-5 shrink-0',
-                                isActive ? 'text-primary' : 'text-gray-400'
-                              )} />
-                              <span>{item.label}</span>
-                            </Link>
-                          </SheetClose>
-                        );
-                      })}
-                    </nav>
-                  </div>
-
-                  {/* Dashboard Menu */}
+                  {/* Dashboard Menu - Always visible first */}
                   <div>
                     <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                       Dashboard
@@ -256,6 +230,49 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       </nav>
                     )}
                   </div>
+
+                  {/* Main Website Navigation - Collapsible, below dashboard */}
+                  <div>
+                    <button
+                      onClick={togglePublicNav}
+                      className="flex items-center justify-between w-full px-3 py-2 rounded-xl text-xs font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <span>Main Menu</span>
+                      {isPublicNavOpen ? (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                    
+                    {isPublicNavOpen && (
+                      <nav className="space-y-0.5 mt-1">
+                        {NAV_ITEMS.map((item) => {
+                          const isActive = pathname === item.href;
+                          const Icon = item.icon;
+                          return (
+                            <SheetClose asChild key={item.href}>
+                              <Link
+                                href={item.href}
+                                className={cn(
+                                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                                  isActive
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
+                                )}
+                              >
+                                <Icon className={cn(
+                                  'h-5 w-5 shrink-0',
+                                  isActive ? 'text-primary' : 'text-gray-400'
+                                )} />
+                                <span>{item.label}</span>
+                              </Link>
+                            </SheetClose>
+                          );
+                        })}
+                      </nav>
+                    )}
+                  </div>
                 </div>
 
                 {/* Drawer Footer - Logout and User */}
@@ -310,16 +327,16 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 shrink-0">
-            {/* ✅ Create Event Button - Desktop */}
+            {/* Create Event Button - Desktop */}
             <Button
               onClick={handleCreateEvent}
-              className="hidden sm:flex items-center gap-1.5 md:gap-2 rounded-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white shadow-sm hover:shadow-md transition-all cursor-pointer px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium"
+              className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all cursor-pointer px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md"
             >
               <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Create Event</span>
             </Button>
 
-            {/* ✅ Create Event Button - Mobile (full width clickable) */}
+            {/* Create Event Button - Mobile */}
             <Button
               onClick={handleCreateEvent}
               variant="ghost"
@@ -375,12 +392,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
             <UserMenu user={user} onLogout={handleLogout} />
 
-            {/* ✅ Create Event Button - Quick create for tablet */}
+            {/* Create Event Button - Quick create for tablet */}
             <Button
               onClick={handleCreateEvent}
               variant="outline"
               size="sm"
-              className="hidden md:flex lg:hidden items-center gap-1 rounded-full border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm cursor-pointer px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95"
+              className="hidden md:flex lg:hidden items-center gap-1 border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm cursor-pointer px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95 rounded-md"
             >
               <PlusCircle className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">New</span>

@@ -5,8 +5,6 @@ import {
   BookOpen,
   Zap,
   CreditCard,
-  Target,
-  HelpCircle,
 } from "lucide-react";
 
 export const SITE_NAME = "Nuruvent";
@@ -18,8 +16,6 @@ export const NAV_ITEMS = [
   { label: "How It Works", href: "/how-it-works", icon: BookOpen },
   { label: "Features", href: "/features", icon: Zap },
   { label: "Pricing", href: "/pricing", icon: CreditCard },
-  { label: "For Hosts", href: "/for-hosts", icon: Target },
-  { label: "Help", href: "/help", icon: HelpCircle },
 ];
 
 export const FOOTER_LINKS = {
