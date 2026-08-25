@@ -222,7 +222,7 @@ export default function CheckoutPage() {
     {
       id: 'card',
       label: 'Card',
-      imageUrl: '/payment-logos/card.jpeg',
+      imageUrl: '/payment-logos/card.png',
       description: 'Visa, Mastercard',
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
