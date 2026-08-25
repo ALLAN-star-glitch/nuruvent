@@ -54,7 +54,7 @@ export function WelcomeModal({ isOpen, onClose, userName }: WelcomeModalProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Link href="/events/create" className="w-full">
+            <Link href="/dashboard/events/new" className="w-full">
               <Button variant="default" className="w-full gap-2 cursor-pointer">
                 <Calendar className="h-4 w-4" />
                 Create Event
@@ -87,7 +87,7 @@ export function WelcomeModal({ isOpen, onClose, userName }: WelcomeModalProps) {
             asChild 
             className="cursor-pointer"
           >
-            <Link href="/events/create">
+            <Link href="/dashboard/create/new">
               Get Started
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
