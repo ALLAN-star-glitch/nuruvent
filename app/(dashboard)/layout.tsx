@@ -5,7 +5,6 @@ import { Header } from '@/components/layout/Header';
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
 import { WelcomeBannerWrapper } from '@/components/dashboard/WelcomeBannerWrapper';
 import { Toaster } from 'sonner';
-import { WelcomeModalWrapper } from '@/components/dashboard/WelcomModalWrapper';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Nuruvent',
@@ -24,7 +23,7 @@ export default function DashboardLayout({
         <Header />
       </header>
 
-      {/* Client Component for sidebar interaction and welcome content */}
+      {/* Client Component for sidebar interaction */}
       <DashboardLayoutClient>
         <div className="p-4 md:p-6 space-y-4">
           {/* ✅ Welcome Banner - Shows at top of dashboard */}
@@ -34,9 +33,6 @@ export default function DashboardLayout({
           {children}
         </div>
       </DashboardLayoutClient>
-
-      {/* ✅ Welcome Modal - Pops up on first login/signup */}
-      <WelcomeModalWrapper />
 
       {/* Toaster */}
       <Toaster 
