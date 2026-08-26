@@ -896,7 +896,7 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                             ) : (
                               <>
                                 <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                                {totalPrice === 0 ? 'Register Now' : 'Proceed to Payment'}
+                                {totalPrice === 0 ? 'Register Now' : 'Proceed to Buy Ticket'}
                               </>
                             )}
                           </Button>

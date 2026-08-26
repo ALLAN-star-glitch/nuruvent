@@ -535,11 +535,13 @@ const renderAccountTypeStep = () => {
       label: 'Personal Account',
       description: 'For individual trainers, coaches, and professionals',
       features: ['Host/Attend training events', 'Sell/Gain certificates', 'Get paid directly'],
-      iconBg: 'bg-blue-500',
+      iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
       bgColor: 'from-blue-50 to-blue-100/50',
-      borderColor: 'border-blue-200',
-      selectedBorder: 'ring-2 ring-blue-500 border-blue-500',
-      hoverBg: 'hover:bg-blue-50',
+      borderColor: 'border-blue-300',
+      selectedBorder: 'ring-4 ring-blue-500 border-blue-500 shadow-xl shadow-blue-500/30',
+      hoverBg: 'hover:bg-blue-50/80 hover:scale-[1.02]',
+      shadowColor: 'shadow-blue-500/20',
+      gradient: 'bg-gradient-to-br from-blue-50 to-white',
     },
     { 
       type: 'account_type_institution' as AccountType,
@@ -547,98 +549,177 @@ const renderAccountTypeStep = () => {
       label: 'Organization Account',
       description: 'For companies, schools, and professional bodies',
       features: ['Multiple trainers', 'Team management', 'Bulk reporting'],
-      iconBg: 'bg-purple-500',
+      iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600',
       bgColor: 'from-purple-50 to-purple-100/50',
-      borderColor: 'border-purple-200',
-      selectedBorder: 'ring-2 ring-purple-500 border-purple-500',
-      hoverBg: 'hover:bg-purple-50',
+      borderColor: 'border-purple-300',
+      selectedBorder: 'ring-4 ring-purple-500 border-purple-500 shadow-xl shadow-purple-500/30',
+      hoverBg: 'hover:bg-purple-50/80 hover:scale-[1.02]',
+      shadowColor: 'shadow-purple-500/20',
+      gradient: 'bg-gradient-to-br from-purple-50 to-white',
     }
   ];
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col items-center">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full max-w-3xl">
-          {accountTypes.map((option) => {
-            const OptionIcon = option.icon;
-            const isSelected = accountType === option.type;
-            
-            return (
-              <button
-                key={option.type}
-                onClick={() => handleAccountTypeSelect(option.type)}
-                className={cn(
-                  "group relative flex flex-col items-start p-6 sm:p-8 rounded-2xl border-2 transition-all duration-300 cursor-pointer text-left",
-                  "bg-white hover:shadow-xl hover:-translate-y-1",
-                  isSelected 
-                    ? option.selectedBorder
-                    : cn("border-gray-200 hover:border-gray-300", option.borderColor),
-                  option.hoverBg
-                )}
-              >
-                {/* Selected badge */}
-                {isSelected && (
-                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1 shadow-lg">
-                    <CheckCircle className="h-5 w-5 text-white" />
-                  </div>
-                )}
-
-                {/* Icon - Using Lucide icon directly */}
-                <div className={cn(
-                  "flex items-center justify-center h-14 w-14 rounded-2xl mb-4 transition-all duration-300",
-                  option.iconBg,
-                  "text-white shadow-lg",
-                  isSelected ? "scale-110" : "group-hover:scale-105"
-                )}>
-                  <OptionIcon className="h-7 w-7" />
-                </div>
-
-                {/* Label */}
-                <h3 className={cn(
-                  "text-lg sm:text-xl font-bold text-gray-900 transition-colors",
-                  isSelected ? "text-primary-600" : ""
-                )}>
-                  {option.label}
-                </h3>
-
-                {/* Description */}
-                <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-                  {option.description}
-                </p>
-
-                {/* Features */}
-                <div className="mt-4 space-y-1.5">
-                  {option.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
-                      <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* CTA - No fading */}
-                <div className={cn(
-                  "mt-5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
-                  isSelected 
-                    ? "bg-primary-500 text-white shadow-md"
-                    : "bg-gray-100 text-gray-700 group-hover:bg-gray-200"
-                )}>
-                  {isSelected ? '✓ Selected' : 'Select Account'}
-                </div>
-              </button>
-            );
-          })}
+      {/* Header with icon */}
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-gray-200">
+          <Users className="h-4 w-4 text-gray-600" />
+          <span className="text-sm font-medium text-gray-700">Choose Your Account Type</span>
         </div>
-        
-        {/* Selected indicator */}
-        {accountType && (
-          <div className="mt-6 flex items-center gap-2 text-sm text-green-600 font-medium bg-green-50 px-4 py-2 rounded-full border border-green-200">
-            <CheckCircle className="h-4 w-4" />
-            <span>
-              {accountType === 'account_type_personal' ? 'Personal' : 'Organization'} account selected
-            </span>
+        <p className="text-sm text-gray-500 mt-2">
+          Select the account that best fits your needs
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 w-full max-w-3xl mx-auto">
+        {accountTypes.map((option) => {
+          const OptionIcon = option.icon;
+          const isSelected = accountType === option.type;
+          
+          return (
+            <motion.button
+              key={option.type}
+              onClick={() => handleAccountTypeSelect(option.type)}
+              whileHover={{ y: -4 }}
+              whileTap={{ scale: 0.98 }}
+              className={cn(
+                "group relative flex flex-col items-start p-6 sm:p-8 rounded-2xl border-2 transition-all duration-300 cursor-pointer text-left",
+                "shadow-lg hover:shadow-2xl",
+                isSelected 
+                  ? option.selectedBorder
+                  : cn(
+                      "border-gray-200 bg-white hover:border-gray-300",
+                      option.shadowColor,
+                      "shadow-md"
+                    ),
+                option.hoverBg
+              )}
+            >
+              {/* Glow effect when selected */}
+              {isSelected && (
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none" />
+              )}
+
+              {/* Selected badge - more prominent */}
+              {isSelected && (
+                <div className="absolute -top-3 -right-3 bg-green-500 rounded-full p-1.5 shadow-lg shadow-green-500/40 animate-pulse">
+                  <CheckCircle className="h-6 w-6 text-white" />
+                </div>
+              )}
+
+              {/* Popular badge for most common choice */}
+              {option.type === 'account_type_personal' && !isSelected && (
+                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg shadow-amber-500/30">
+                  POPULAR
+                </div>
+              )}
+
+              {/* Icon with gradient and glow */}
+              <div className={cn(
+                "flex items-center justify-center h-16 w-16 rounded-2xl mb-4 transition-all duration-300",
+                option.iconBg,
+                "text-white shadow-lg",
+                isSelected ? "scale-110 shadow-2xl" : "group-hover:scale-105 group-hover:shadow-xl"
+              )}>
+                <OptionIcon className="h-8 w-8" />
+              </div>
+
+              {/* Label with emoji or icon */}
+              <h3 className={cn(
+                "text-xl font-bold text-gray-900 transition-colors flex items-center gap-2",
+                isSelected ? "text-primary-600" : ""
+              )}>
+                {option.label}
+                {isSelected && (
+                  <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                    Selected
+                  </span>
+                )}
+              </h3>
+
+              {/* Description */}
+              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                {option.description}
+              </p>
+
+              {/* Features with better visibility */}
+              <div className="mt-4 space-y-2 w-full">
+                {option.features.map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-2.5 text-sm text-gray-700">
+                    <div className={cn(
+                      "flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
+                      isSelected 
+                        ? "bg-green-500 text-white" 
+                        : "bg-gray-200 text-gray-500 group-hover:bg-gray-300"
+                    )}>
+                      <Check className="h-3 w-3" />
+                    </div>
+                    <span>{feature}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA Button - More visible */}
+              <div className="mt-5 w-full">
+                <div className={cn(
+                  "w-full px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-center",
+                  isSelected 
+                    ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30"
+                    : "bg-gray-100 text-gray-700 group-hover:bg-gray-200 group-hover:shadow-md"
+                )}>
+                  {isSelected ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Account Selected
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      Select {option.label}
+                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                  )}
+                </div>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+      
+      {/* Selected indicator - More prominent */}
+      {accountType && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 flex items-center justify-center gap-3 text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-3 rounded-full border-2 border-green-200 shadow-lg shadow-green-500/10"
+        >
+          <div className="p-1 bg-green-500 rounded-full">
+            <CheckCircle className="h-5 w-5 text-white" />
           </div>
-        )}
+          <span className="text-green-700">
+            <span className="font-bold">
+              {accountType === 'account_type_personal' ? 'Personal' : 'Organization'}
+            </span>
+            {' account selected — ready to continue'}
+          </span>
+          <ArrowRight className="h-4 w-4 text-green-500 animate-pulse" />
+        </motion.div>
+      )}
+
+      {/* Quick stats or additional info */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto mt-4">
+        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+          <div className="text-2xl font-bold text-blue-500">500+</div>
+          <div className="text-xs text-gray-500">Active trainers</div>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+          <div className="text-2xl font-bold text-purple-500">1,200+</div>
+          <div className="text-xs text-gray-500">Organizations</div>
+        </div>
+        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+          <div className="text-2xl font-bold text-green-500">4.9★</div>
+          <div className="text-xs text-gray-500">User rating</div>
+        </div>
       </div>
     </div>
   );
