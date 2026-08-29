@@ -21,7 +21,35 @@ import {
   FileCheck,
   Landmark,
   Clock,
+  Zap,
+  Wallet,
+  QrCode,
+  MessageCircle,
+  TrendingUp,
+  CheckCircle,
+  Rocket,
+  LucideIcon,
 } from 'lucide-react';
+
+interface FeatureCardProps {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}
+
+interface StepProps {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  step: number;
+}
+
+interface ComparisonRowProps {
+  feature: string;
+  eventbrite: string;
+  manual: string;
+  nuruvent: string;
+}
 
 export function HowItWorksContent() {
   return (
@@ -54,56 +82,67 @@ export function HowItWorksContent() {
         </div>
       </section>
 
-      {/* Quick Overview — Four Audience Tracks */}
+      {/* Quick Overview — Six Audience Tracks */}
       <section className="py-12 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-3">
-                <Building2 className="w-6 h-6" />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
+            {[
+              {
+                icon: Building2,
+                title: 'Training Institutes',
+                desc: 'Courses, workshops, bootcamps',
+                color: 'primary',
+              },
+              {
+                icon: UserCircle,
+                title: 'Professional Coaches',
+                desc: 'Workshops, seminars, webinars',
+                color: 'secondary',
+              },
+              {
+                icon: Briefcase,
+                title: 'Corporate HR Teams',
+                desc: 'Staff training, team-building',
+                color: 'tertiary',
+              },
+              {
+                icon: GraduationCap,
+                title: 'Professional Bodies',
+                desc: 'CPD events, AGMs, conferences',
+                color: 'error',
+              },
+              {
+                icon: Users,
+                title: 'Individual Trainers',
+                desc: 'Coaching, consulting, training',
+                color: 'primary',
+              },
+              {
+                icon: Globe,
+                title: 'Global Learners',
+                desc: 'Upskill, reskill, advance careers',
+                color: 'secondary',
+              },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center"
+              >
+                <div
+                  className={`w-12 h-12 rounded-full ${item.color === 'primary' ? 'bg-primary/10 text-primary' : ''} ${item.color === 'secondary' ? 'bg-secondary/10 text-secondary-600' : ''} ${item.color === 'tertiary' ? 'bg-tertiary/10 text-tertiary-600' : ''} ${item.color === 'error' ? 'bg-error/10 text-error-500' : ''} mx-auto flex items-center justify-center mb-3`}
+                >
+                  <item.icon className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
+                  {item.title}
+                </h3>
+                <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
+                  {item.desc}
+                </p>
               </div>
-              <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
-                Training Institutes
-              </h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Courses, workshops, bootcamps
-              </p>
-            </div>
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center">
-              <div className="w-12 h-12 rounded-full bg-secondary/10 text-secondary-600 mx-auto flex items-center justify-center mb-3">
-                <UserCircle className="w-6 h-6" />
-              </div>
-              <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
-                Professional Coaches
-              </h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Workshops, seminars, webinars
-              </p>
-            </div>
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center">
-              <div className="w-12 h-12 rounded-full bg-tertiary/10 text-tertiary-600 mx-auto flex items-center justify-center mb-3">
-                <Briefcase className="w-6 h-6" />
-              </div>
-              <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
-                Corporate HR Teams
-              </h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Staff training, team-building
-              </p>
-            </div>
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center">
-              <div className="w-12 h-12 rounded-full bg-error/10 text-error-500 mx-auto flex items-center justify-center mb-3">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
-                Professional Bodies
-              </h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                CPD events, AGMs, conferences
-              </p>
-            </div>
+            ))}
           </div>
-          <p className="text-center text-base text-neutral-gray dark:text-muted-foreground mt-4 max-w-2xl mx-auto">
+          <p className="text-center text-base text-neutral-gray dark:text-muted-foreground mt-4 max-w-3xl mx-auto">
             From universities and NGOs to professional associations and
             independent trainers — Nuruvent serves the entire professional
             development ecosystem.
@@ -167,19 +206,7 @@ export function HowItWorksContent() {
                     desc: 'Fast payouts to mobile money or bank. No 30-day wait. Better cash flow for your training business.',
                   },
                 ].map((step, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-base text-neutral-dark dark:text-white">
-                        {step.title}
-                      </h4>
-                      <p className="text-sm text-neutral-gray dark:text-muted-foreground">
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
+                  <StepCard key={idx} step={idx + 1} {...step} />
                 ))}
               </div>
             </div>
@@ -224,19 +251,7 @@ export function HowItWorksContent() {
                     desc: 'Get your CPD certificate within 1 hour. Instantly verifiable by employers and professional bodies.',
                   },
                 ].map((step, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary/10 text-secondary-700 flex items-center justify-center text-sm font-bold">
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-base text-neutral-dark dark:text-white">
-                        {step.title}
-                      </h4>
-                      <p className="text-sm text-neutral-gray dark:text-muted-foreground">
-                        {step.desc}
-                      </p>
-                    </div>
-                  </div>
+                  <StepCard key={idx} step={idx + 1} {...step} />
                 ))}
               </div>
             </div>
@@ -244,75 +259,8 @@ export function HowItWorksContent() {
         </div>
       </section>
 
-      {/* Feature Highlights */}
-      <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
-              What Makes{' '}
-              <span className="text-primary dark:text-primary-400">
-                Nuruvent Different
-              </span>
-            </h2>
-            <p className="text-xl text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-              Built for the professional development ecosystem.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {[
-              {
-                icon: Smartphone,
-                title: 'Mobile Money & Card Payments',
-                desc: 'M-Pesa, Airtel Money, and card payments. No manual reconciliation.',
-              },
-              {
-                icon: Shield,
-                title: 'QR-Verified Certificates',
-                desc: 'Prevents credential fraud. Instant verification by employers.',
-              },
-              {
-                icon: Video,
-                title: 'Your Zoom or Google Meet',
-                desc: 'No new software. Trainers bring their existing video platform.',
-              },
-              {
-                icon: Clock,
-                title: '7-Day Payouts',
-                desc: 'Fast payouts to mobile money or bank. No 30-day wait.',
-              },
-              {
-                icon: BarChart,
-                title: '10% Commission',
-                desc: 'More revenue stays with trainers. Fair pricing for the market.',
-              },
-              {
-                icon: Users,
-                title: 'Auto Attendance Tracking',
-                desc: 'Zoom Webhooks and Google Meet API. Accurate CPD reporting.',
-              },
-            ].map((feature, idx) => (
-              <div
-                key={idx}
-                className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-all text-center"
-              >
-                <div className="w-14 h-14 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-4">
-                  <feature.icon className="w-7 h-7" />
-                </div>
-                <h3 className="font-semibold text-lg text-neutral-dark dark:text-white mb-1">
-                  {feature.title}
-                </h3>
-                <p className="text-sm text-neutral-gray dark:text-muted-foreground">
-                  {feature.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Payment Options */}
-      <section className="py-16">
+      <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
@@ -362,6 +310,7 @@ export function HowItWorksContent() {
         </div>
       </section>
 
+
       {/* Comparison Table */}
       <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
@@ -403,25 +352,12 @@ export function HowItWorksContent() {
                   { feature: 'Attendance', eventbrite: 'No', manual: 'Manual roll-call', nuruvent: 'Auto via Zoom/Meet API' },
                   { feature: 'CPD Tracking', eventbrite: 'No', manual: 'Manual tracking', nuruvent: 'Auto-tracking' },
                   { feature: 'Discovery', eventbrite: 'Expensive', manual: 'None', nuruvent: 'Marketplace + SEO' },
-                  { feature: 'Fees', eventbrite: '18.5%', manual: '0% (manual work)', nuruvent: '10%' },
+                  { feature: 'Fees', eventbrite: '18.5%', manual: '0% (manual work)', nuruvent: '3.5%' },
                   { feature: 'Payouts', eventbrite: '30 days', manual: 'Instant (manual)', nuruvent: '7 days' },
                   { feature: 'Reminders', eventbrite: 'No', manual: 'Manual', nuruvent: 'Auto WhatsApp + SMS + Email' },
                   { feature: 'Replays', eventbrite: 'No', manual: 'Manual upload', nuruvent: '30-day hosted' },
                 ].map((row, idx) => (
-                  <tr key={idx} className={idx % 2 === 0 ? 'bg-white dark:bg-[#202124]' : 'bg-neutral-light/50 dark:bg-[#2D2E32]/30'}>
-                    <td className="px-4 py-3 text-base font-medium text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
-                      {row.feature}
-                    </td>
-                    <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
-                      {row.eventbrite}
-                    </td>
-                    <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
-                      {row.manual}
-                    </td>
-                    <td className="px-4 py-3 text-base text-center text-primary dark:text-primary-400 font-medium border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10">
-                      {row.nuruvent}
-                    </td>
-                  </tr>
+                  <ComparisonRow key={idx} {...row} />
                 ))}
               </tbody>
             </table>
@@ -492,10 +428,67 @@ export function HowItWorksContent() {
             </Link>
           </div>
           <p className="text-base text-neutral-gray dark:text-muted-foreground mt-6">
-            No setup fees. No hidden costs. 10% commission only.
+            No setup fees. No hidden costs. 3.5% commission only.
           </p>
         </div>
       </section>
     </div>
+  );
+}
+
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+function StepCard({ icon: Icon, title, desc, step }: StepProps) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+        {step}
+      </div>
+      <div>
+        <h4 className="font-medium text-base text-neutral-dark dark:text-white">
+          {title}
+        </h4>
+        <p className="text-sm text-neutral-gray dark:text-muted-foreground">
+          {desc}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FeatureCard({ icon: Icon, title, desc }: FeatureCardProps) {
+  return (
+    <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-all">
+      <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
+        <Icon className="w-6 h-6" />
+      </div>
+      <h3 className="font-semibold text-lg text-neutral-dark dark:text-white mb-1">
+        {title}
+      </h3>
+      <p className="text-sm text-neutral-gray dark:text-muted-foreground">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function ComparisonRow({ feature, eventbrite, manual, nuruvent }: ComparisonRowProps) {
+  return (
+    <tr className="bg-white dark:bg-[#202124] hover:bg-neutral-light/50 dark:hover:bg-[#2D2E32]/30 transition-colors">
+      <td className="px-4 py-3 text-base font-medium text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
+        {feature}
+      </td>
+      <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
+        {eventbrite}
+      </td>
+      <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
+        {manual}
+      </td>
+      <td className="px-4 py-3 text-base text-center text-primary dark:text-primary-400 font-medium border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10">
+        {nuruvent}
+      </td>
+    </tr>
   );
 }

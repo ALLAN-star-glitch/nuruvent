@@ -6,8 +6,71 @@ import { Footer } from '@/components/layout/Footer';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'Nuruvent | Light Your Training Events',
-  description: 'The all-in-one platform for professional training events worldwide.',
+  title: {
+    default: 'Nuruvent — Where Professionals Grow',
+    template: '%s | Nuruvent',
+  },
+  description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+  keywords: [
+    'professional training',
+    'workshops',
+    'webinars',
+    'bootcamps',
+    'certified courses',
+    'CPD',
+    'career development',
+    'professional growth',
+    'training platform',
+    'global training',
+    'Nuruvent',
+    'online learning',
+    'professional development',
+  ],
+  authors: [{ name: 'Nuruvent' }],
+  creator: 'Nuruvent',
+  publisher: 'Nuruvent',
+  openGraph: {
+    title: 'Nuruvent — Where Professionals Grow',
+    description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+    url: 'https://nuruvent.com',
+    siteName: 'Nuruvent',
+    type: 'website',
+    locale: 'en_US',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Nuruvent — Where Professionals Grow',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Nuruvent — Where Professionals Grow',
+    description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+    images: ['/twitter-image.jpg'],
+    site: '@nuruvent',
+    creator: '@nuruvent',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  alternates: {
+    canonical: 'https://nuruvent.com',
+  },
+  verification: {
+    google: 'your-google-verification-code',
+  },
+  category: 'education',
 };
 
 export default function PublicLayout({
@@ -79,6 +142,35 @@ export default function PublicLayout({
               window.addEventListener('popstate', hideTawkOnDashboard);
             }
           `,
+        }}
+      />
+
+      {/* JSON-LD Structured Data */}
+      <Script
+        id="structured-data"
+        type="application/ld+json"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'Nuruvent',
+            description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+            url: 'https://nuruvent.com',
+            logo: 'https://nuruvent.com/logo.png',
+            sameAs: [
+              'https://twitter.com/nuruvent',
+              'https://linkedin.com/company/nuruvent',
+              'https://facebook.com/nuruvent',
+              'https://instagram.com/nuruvent',
+            ],
+            contactPoint: {
+              '@type': 'ContactPoint',
+              email: 'info@nuruvent.com',
+              contactType: 'customer support',
+              availableLanguage: ['English'],
+            },
+          }),
         }}
       />
     </div>

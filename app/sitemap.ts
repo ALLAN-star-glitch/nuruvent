@@ -17,61 +17,43 @@ const staticPages: PageConfig[] = [
     path: '',
     priority: 1.0,
     changeFrequency: 'daily',
-    description: 'Homepage - Events Marketplace'
+    description: 'Homepage - Nuruvent — Where Professionals Grow'
   },
   {
     path: '/events',
     priority: 0.9,
     changeFrequency: 'daily',
-    description: 'All training events'
+    description: 'All training events — workshops, webinars, bootcamps, meetups'
   },
   {
     path: '/how-it-works',
     priority: 0.8,
     changeFrequency: 'monthly',
-    description: 'How Nuruvent works'
-  },
-  {
-    path: '/features',
-    priority: 0.8,
-    changeFrequency: 'monthly',
-    description: 'Platform features'
+    description: 'How Nuruvent works — for training hosts and attendees'
   },
   {
     path: '/pricing',
     priority: 0.8,
     changeFrequency: 'weekly',
-    description: 'Pricing plans'
-  },
-  {
-    path: '/for-hosts',
-    priority: 0.7,
-    changeFrequency: 'monthly',
-    description: 'Information for event hosts'
-  },
-  {
-    path: '/help',
-    priority: 0.6,
-    changeFrequency: 'monthly',
-    description: 'Help and support'
+    description: 'Transparent pricing — free events, paid tickets, certificates, storage'
   },
   {
     path: '/signup',
     priority: 0.7,
     changeFrequency: 'weekly',
-    description: 'Sign up page'
+    description: 'Sign up to Nuruvent — start hosting or attending training events'
   },
   {
     path: '/signin',
     priority: 0.7,
     changeFrequency: 'weekly',
-    description: 'Sign in page'
+    description: 'Sign in to your Nuruvent account'
   },
   {
     path: '/forgot-password',
     priority: 0.5,
     changeFrequency: 'weekly',
-    description: 'Forgot password'
+    description: 'Reset your Nuruvent password'
   },
 ]
 
@@ -79,9 +61,8 @@ const staticPages: PageConfig[] = [
 async function getEventSlugs(): Promise<string[]> {
   // TODO: Replace with actual API call to fetch all event slugs
   try {
-    // Example: fetch from your backend API
     // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/events/slugs`, {
-    //   next: { revalidate: 3600 } // Cache for 1 hour
+    //   next: { revalidate: 3600 }
     // })
     // const data = await response.json()
     // return data.slugs || []
@@ -102,6 +83,20 @@ async function getHostSlugs(): Promise<string[]> {
     return []
   } catch (error) {
     console.error('Error fetching host slugs:', error)
+    return []
+  }
+}
+
+// Dynamic category slugs (fetch from your API)
+async function getCategorySlugs(): Promise<string[]> {
+  // TODO: Replace with actual API call to fetch all category slugs
+  try {
+    // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/categories/slugs`)
+    // const data = await response.json()
+    // return data.slugs || []
+    return []
+  } catch (error) {
+    console.error('Error fetching category slugs:', error)
     return []
   }
 }
@@ -160,24 +155,75 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/events?category=ngos`,
+      url: `${baseUrl}/events?category=corporate-hr`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.6,
     },
     {
-      url: `${baseUrl}/events?category=corporate`,
+      url: `${baseUrl}/events?category=individual-trainers`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=coaches`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=ngos`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.5,
     },
     {
       url: `${baseUrl}/events?category=government`,
       lastModified: new Date(),
       changeFrequency: 'daily',
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/events?category=free`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=paid`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=virtual`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=in-person`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.6,
+    },
+    {
+      url: `${baseUrl}/events?category=hybrid`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
       priority: 0.6,
     },
   ]
+
+  // Dynamic category routes (for category pages)
+  const categorySlugs = await getCategorySlugs()
+  const categoryPageRoutes: MetadataRoute.Sitemap = categorySlugs.map((slug) => ({
+    url: `${baseUrl}/categories/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.5,
+  }))
 
   // Dynamic event routes
   const eventSlugs = await getEventSlugs()
@@ -201,12 +247,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes = [
     ...staticRoutes,
     ...categoryRoutes,
+    ...categoryPageRoutes,
     ...eventRoutes,
     ...hostRoutes,
   ]
 
-  // Sort by priority (highest first)
-  routes.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+  // Remove duplicates (based on URL)
+  const uniqueRoutes = routes.filter(
+    (route, index, self) => index === self.findIndex((r) => r.url === route.url)
+  )
 
-  return routes
+  // Sort by priority (highest first)
+  uniqueRoutes.sort((a, b) => (b.priority || 0) - (a.priority || 0))
+
+  return uniqueRoutes
 }

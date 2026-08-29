@@ -19,20 +19,48 @@ import { InstallPrompt } from '@/components/PWA/InstallPrompt';
 import { PushNotificationManager } from '@/components/PWA/PushNotificationManager';
 import { EventCategories } from '@/components/home/EventsCategories';
 
-
 export const metadata: Metadata = {
-  title: `${SITE_NAME} | Professional Training & Events Platform`,
-  description: SITE_DESCRIPTION + ' Discover professional workshops, bootcamps, webinars, and certified training courses from Kenya\'s top trainers and institutions.',
+  title: `${SITE_NAME} — Where Professionals Grow`,
+  description: 'Nuruvent is the global platform where training providers and learners connect. Discover professional workshops, bootcamps, webinars, and certified courses from universities, professional bodies, corporate teams, and independent coaches worldwide.',
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: `${SITE_NAME} | Professional Training & Events Platform`,
-    description: 'Discover professional training events, workshops, bootcamps, and certified courses. Learn from industry experts and grow your career.',
+    title: `${SITE_NAME} — Where Professionals Grow`,
+    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and certified courses. Illuminate your training, empower your future.',
     url: SITE_URL,
     siteName: SITE_NAME,
     type: 'website',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Nuruvent — Where Professionals Grow',
+      },
+    ],
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: `${SITE_NAME} — Where Professionals Grow`,
+    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and certified courses.',
+    images: ['/twitter-image.jpg'],
+  },
+  keywords: [
+    'professional training',
+    'workshops',
+    'webinars',
+    'bootcamps',
+    'certified courses',
+    'CPD',
+    'career development',
+    'professional growth',
+    'training platform',
+    'global training',
+    'Nuruvent',
+    'online learning',
+    'professional development',
+  ],
 };
 
 export const revalidate = 3600;
@@ -62,13 +90,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/*Training Events  Section */}
+      {/* Training Events Section */}
       <section className="bg-gray-50/30 py-16 border-t border-gray-100">
         <div className="container mx-auto px-4">
           <HomeEventGrid 
             limit={8}
             title="Upcoming Training Events"
-            subtitle="Discover professional workshops and certified courses from top trainers"
+            subtitle="Discover professional workshops and certified courses from training providers worldwide"
           />
         </div>
       </section>
@@ -85,7 +113,7 @@ export default function HomePage() {
               Built for Professional Growth
             </h2>
             <p className="text-gray-600 text-sm sm:text-base mt-2">
-              Everything you need to discover, attend, and excel in professional training events.
+              Everything you need to discover, attend, and excel in professional training events worldwide.
             </p>
           </div>
 
@@ -95,7 +123,7 @@ export default function HomePage() {
                 <Calendar className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-gray-900">Curated Events</h3>
-              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions from verified professionals</p>
+              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions from verified professionals worldwide</p>
             </div>
 
             <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
@@ -103,7 +131,7 @@ export default function HomePage() {
                 <Users className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-gray-900">Expert Trainers</h3>
-              <p className="text-sm text-gray-600 mt-1">Learn from industry experts with real-world experience</p>
+              <p className="text-sm text-gray-600 mt-1">Learn from industry experts with real-world experience across the globe</p>
             </div>
 
             <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
@@ -111,7 +139,7 @@ export default function HomePage() {
                 <Award className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-gray-900">Certified Learning</h3>
-              <p className="text-sm text-gray-600 mt-1">Earn recognized certificates to boost your career</p>
+              <p className="text-sm text-gray-600 mt-1">Earn recognized QR-verified certificates to boost your career</p>
             </div>
 
             <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
@@ -119,13 +147,13 @@ export default function HomePage() {
                 <Globe className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-gray-900">Flexible Access</h3>
-              <p className="text-sm text-gray-600 mt-1">In-person, virtual, or hybrid events to suit your schedule</p>
+              <p className="text-sm text-gray-600 mt-1">In-person, virtual, or hybrid events to suit your schedule anywhere</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ✅ Professional CTA Section - No gradient background */}
+      {/* Professional CTA Section */}
       <section className="bg-white py-16 border-t border-gray-100">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
@@ -135,12 +163,12 @@ export default function HomePage() {
             </div>
             
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight mb-4">
-              Ready to Elevate Your Skills?
+              Ready to Grow Your Career?
             </h2>
             
             <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mb-8">
-              Join thousands of professionals who are growing their careers through Nuruvent. 
-              Discover your next learning opportunity today.
+              Join thousands of professionals and training providers who are advancing their careers 
+              and growing their businesses through Nuruvent. Discover your next opportunity today.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -178,7 +206,7 @@ export default function HomePage() {
               </span>
               <span className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-400" />
-                Cancel anytime
+                Global reach
               </span>
             </div>
           </div>
