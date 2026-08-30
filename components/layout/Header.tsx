@@ -26,7 +26,7 @@ export function Header() {
   if (isAuthenticated && user) {
     return (
       <>
-        <div className="hidden md:block">
+        <div className="md:block">
           <TopBar />
         </div>
         <DashboardHeader user={user} />
@@ -37,7 +37,7 @@ export function Header() {
   // Show MainHeader when not authenticated
   return (
     <>
-      <div className="hidden md:block">
+      <div className="md:block">
         <TopBar />
       </div>
       <MainHeader />

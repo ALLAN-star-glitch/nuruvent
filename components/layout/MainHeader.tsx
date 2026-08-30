@@ -8,7 +8,8 @@ import {
   Menu, 
   LogIn,
   UserPlus,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 import { Logo } from '../shared/Logo';
 import { SearchBar } from './SearchBar';
@@ -37,10 +38,10 @@ export function MainHeader() {
   }
 
   return (
-    <div className="bg-white border-b shadow-xs">
+    <div className="bg-white border-b shadow-xs relative z-10">
       <div className="container mx-auto px-3 sm:px-4">
         <div className="flex flex-col">
-          {/* Top Row: Logo + Navigation + Search + Actions */}
+          {/* Top Row: Logo + Search + Actions */}
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2">
             {/* Left: Mobile Menu + Logo */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -49,7 +50,7 @@ export function MainHeader() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="lg:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
+                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
                     aria-label="Open navigation menu"
                   >
                     <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -126,58 +127,62 @@ export function MainHeader() {
               </Link>
             </div>
 
-            {/* Desktop Navigation - hidden on tablet and mobile, visible on large screens */}
-            <nav className="hidden xl:flex items-center gap-1 shrink-0 mx-2">
-              {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap',
-                      isActive
-                        ? 'text-primary bg-primary/10'
-                        : 'text-gray-600 hover:text-primary hover:bg-gray-50'
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            {/* Search - Desktop: full bar, Tablet/Mobile: hidden (shown below) */}
-            <div className="hidden xl:flex items-center flex-1 max-w-xl mx-2 sm:mx-3">
-              <SearchBar />
+            {/* Search - Desktop: full bar, Tablet/Mobile: hidden (toggle via icon) */}
+            <div className="hidden xl:flex items-center flex-1 max-w-2xl mx-4 justify-center">
+              <div className="w-full max-w-xl relative">
+                <SearchBar />
+              </div>
             </div>
 
-            {/* Right: Actions - Only show if not authenticated */}
-            {!isAuthenticated && (
-              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <Link href="/signin" className="cursor-pointer">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="font-medium text-gray-600 hover:text-primary cursor-pointer hidden sm:flex"
-                  >
-                    Sign In
-                  </Button>
-                </Link>
-                <Link href="/signup" className="cursor-pointer">
-                  <Button 
-                    size="sm" 
-                    className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer px-3 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9 text-xs sm:text-sm"
-                  >
-                    Get Started
-                  </Button>
-                </Link>
-              </div>
-            )}
+            {/* Right: Actions + Search Toggle (tablet/mobile) */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {/* Search Toggle Button - visible on xl and below (tablets, iPads, Nest Hub, mobile) */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                aria-label={isSearchOpen ? "Close search" : "Open search"}
+              >
+                {isSearchOpen ? (
+                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                ) : (
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
+              </Button>
+
+              {/* Actions - Only show if not authenticated */}
+              {!isAuthenticated && (
+                <>
+                  <Link href="/signin" className="cursor-pointer hidden sm:flex">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="font-medium text-gray-600 hover:text-primary cursor-pointer hidden sm:flex"
+                    >
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link href="/signup" className="cursor-pointer">
+                    <Button 
+                      size="sm" 
+                      className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer px-2.5 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9 text-xs sm:text-sm"
+                    >
+                      <span className="hidden xs:inline">Get Started</span>
+                      <span className="xs:hidden">Sign Up</span>
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Mobile/Tablet Search - shown below header on small screens (xl and below) */}
-          <div className="xl:hidden pb-2">
+          {/* Mobile/Tablet Search - shown when toggled on xl and below */}
+          {/* Removed overflow-hidden to allow dropdown to show */}
+          <div className={cn(
+            "xl:hidden transition-all duration-300 ease-in-out relative z-20",
+            isSearchOpen ? "max-h-16 pb-2 opacity-100" : "max-h-0 opacity-0 overflow-hidden"
+          )}>
             <SearchBar />
           </div>
         </div>
