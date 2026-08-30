@@ -529,34 +529,36 @@ export default function SignupForm() {
 
 const renderAccountTypeStep = () => {
   const accountTypes = [
-    { 
+    {
       type: 'account_type_personal' as AccountType,
-      icon: User, 
-      label: 'Personal Account',
-      description: 'For individual trainers, coaches, and professionals',
-      features: ['Host/Attend training events', 'Sell/Gain certificates', 'Get paid directly'],
+      icon: User,
+      label: 'Personal',
+      description: 'For trainers, coaches, consultants, freelancers, and attendees',
+      features: [
+        'Create & host training events',
+        'Discover & attend training events',
+        'Earn from certificates & tickets',
+        'Build your professional brand',
+        'Get paid in 7 days',
+      ],
       iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
-      bgColor: 'from-blue-50 to-blue-100/50',
-      borderColor: 'border-blue-300',
       selectedBorder: 'ring-4 ring-blue-500 border-blue-500 shadow-xl shadow-blue-500/30',
-      hoverBg: 'hover:bg-blue-50/80 hover:scale-[1.02]',
-      shadowColor: 'shadow-blue-500/20',
-      gradient: 'bg-gradient-to-br from-blue-50 to-white',
     },
-    { 
+    {
       type: 'account_type_institution' as AccountType,
-      icon: Building2, 
-      label: 'Organization Account',
-      description: 'For companies, schools, and professional bodies',
-      features: ['Multiple trainers', 'Team management', 'Bulk reporting'],
+      icon: Building2,
+      label: 'Organization',
+      description: 'For universities, companies, professional bodies, and NGOs',
+      features: [
+        'Multiple trainers & staff',
+        'Team management & roles',
+        'Bulk reporting & analytics',
+        'Branded certificates & events',
+        'Bulk attendee registration',
+      ],
       iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600',
-      bgColor: 'from-purple-50 to-purple-100/50',
-      borderColor: 'border-purple-300',
       selectedBorder: 'ring-4 ring-purple-500 border-purple-500 shadow-xl shadow-purple-500/30',
-      hoverBg: 'hover:bg-purple-50/80 hover:scale-[1.02]',
-      shadowColor: 'shadow-purple-500/20',
-      gradient: 'bg-gradient-to-br from-purple-50 to-white',
-    }
+    },
   ];
 
   return (
@@ -568,89 +570,111 @@ const renderAccountTypeStep = () => {
           <span className="text-sm font-medium text-gray-700">Choose Your Account Type</span>
         </div>
         <p className="text-sm text-gray-500 mt-2">
-          Select the account that best fits your needs
+          Select how you want to use Nuruvent
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 w-full max-w-3xl mx-auto">
+      {/* Mobile: Clean Circles | Desktop: Cards */}
+      <div className="grid grid-cols-2 gap-4 sm:gap-5 md:gap-6 w-full max-w-3xl mx-auto">
         {accountTypes.map((option) => {
           const OptionIcon = option.icon;
           const isSelected = accountType === option.type;
-          
+
           return (
             <motion.button
               key={option.type}
               onClick={() => handleAccountTypeSelect(option.type)}
-              whileHover={{ y: -4 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               className={cn(
-                "group relative flex flex-col items-start p-6 sm:p-8 rounded-2xl border-2 transition-all duration-300 cursor-pointer text-left",
-                "shadow-lg hover:shadow-2xl",
-                isSelected 
-                  ? option.selectedBorder
-                  : cn(
-                      "border-gray-200 bg-white hover:border-gray-300",
-                      option.shadowColor,
-                      "shadow-md"
-                    ),
-                option.hoverBg
+                "group relative flex transition-all duration-300 cursor-pointer",
+                // Mobile: Clean circle with text below - NO CARD
+                "flex-col items-center justify-center gap-1 p-2",
+                // Desktop: Full card
+                "md:flex-col md:items-start md:p-6 md:rounded-2xl md:gap-0 md:border-2",
+                "md:shadow-lg hover:md:shadow-2xl",
+                isSelected && "md:ring-4 md:ring-blue-500 md:border-blue-500 md:shadow-xl md:shadow-blue-500/30",
+                !isSelected && "md:border-gray-200 md:bg-white md:hover:border-gray-300 md:shadow-md"
               )}
             >
-              {/* Glow effect when selected */}
+              {/* Glow effect when selected (desktop only) */}
               {isSelected && (
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none" />
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none hidden md:block" />
               )}
 
-              {/* Selected badge - more prominent */}
+              {/* Selected badge - Mobile: smaller */}
               {isSelected && (
-                <div className="absolute -top-3 -right-3 bg-green-500 rounded-full p-1.5 shadow-lg shadow-green-500/40 animate-pulse">
-                  <CheckCircle className="h-6 w-6 text-white" />
+                <div className={cn(
+                  "absolute -top-2 -right-2 bg-green-500 rounded-full shadow-lg shadow-green-500/40 animate-pulse",
+                  "p-1 md:p-1.5",
+                  "h-5 w-5 md:h-6 md:w-6",
+                  "flex items-center justify-center"
+                )}>
+                  <CheckCircle className={cn(
+                    "text-white",
+                    "h-3.5 w-3.5 md:h-5 md:w-5"
+                  )} />
                 </div>
               )}
 
-              {/* Popular badge for most common choice */}
+              {/* Popular badge - Desktop only */}
               {option.type === 'account_type_personal' && !isSelected && (
-                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg shadow-amber-500/30">
+                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg shadow-amber-500/30 hidden md:block">
                   POPULAR
                 </div>
               )}
 
-              {/* Icon with gradient and glow */}
+              {/* Icon - Clean circle with gradient - Mobile: No outer circle */}
               <div className={cn(
-                "flex items-center justify-center h-16 w-16 rounded-2xl mb-4 transition-all duration-300",
+                "flex items-center justify-center transition-all duration-300",
+                // Mobile: Clean circle
+                "h-16 w-16 rounded-full",
+                // Desktop: Slightly larger
+                "md:h-20 md:w-20 md:rounded-2xl",
                 option.iconBg,
                 "text-white shadow-lg",
                 isSelected ? "scale-110 shadow-2xl" : "group-hover:scale-105 group-hover:shadow-xl"
               )}>
-                <OptionIcon className="h-8 w-8" />
+                <OptionIcon className={cn(
+                  "transition-all duration-300",
+                  "h-8 w-8",
+                  "md:h-10 md:w-10"
+                )} />
               </div>
 
-              {/* Label with emoji or icon */}
-              <h3 className={cn(
-                "text-xl font-bold text-gray-900 transition-colors flex items-center gap-2",
-                isSelected ? "text-primary-600" : ""
+              {/* Label - Always visible */}
+              <span className={cn(
+                "font-semibold text-gray-900 transition-colors",
+                isSelected ? "text-primary-600" : "",
+                // Mobile: Small text below circle
+                "text-sm mt-1.5",
+                // Desktop: Larger text
+                "md:text-xl md:mt-3 md:font-bold"
               )}>
                 {option.label}
                 {isSelected && (
-                  <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  <span className="hidden md:inline text-sm font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full ml-2">
                     Selected
                   </span>
                 )}
-              </h3>
+              </span>
 
-              {/* Description */}
-              <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+              {/* Description - Desktop only */}
+              <p className={cn(
+                "text-sm text-gray-500 mt-1 leading-relaxed",
+                "hidden md:block"
+              )}>
                 {option.description}
               </p>
 
-              {/* Features with better visibility */}
-              <div className="mt-4 space-y-2 w-full">
+              {/* Features - Desktop only */}
+              <div className="hidden md:block mt-4 space-y-2 w-full">
                 {option.features.map((feature, idx) => (
                   <div key={idx} className="flex items-center gap-2.5 text-sm text-gray-700">
                     <div className={cn(
                       "flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
-                      isSelected 
-                        ? "bg-green-500 text-white" 
+                      isSelected
+                        ? "bg-green-500 text-white"
                         : "bg-gray-200 text-gray-500 group-hover:bg-gray-300"
                     )}>
                       <Check className="h-3 w-3" />
@@ -660,11 +684,11 @@ const renderAccountTypeStep = () => {
                 ))}
               </div>
 
-              {/* CTA Button - More visible */}
-              <div className="mt-5 w-full">
+              {/* CTA Button - Desktop only */}
+              <div className="hidden md:block mt-5 w-full">
                 <div className={cn(
                   "w-full px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-center",
-                  isSelected 
+                  isSelected
                     ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30"
                     : "bg-gray-100 text-gray-700 group-hover:bg-gray-200 group-hover:shadow-md"
                 )}>
@@ -685,41 +709,41 @@ const renderAccountTypeStep = () => {
           );
         })}
       </div>
-      
-      {/* Selected indicator - More prominent */}
+
+      {/* Selected indicator - Mobile friendly */}
       {accountType && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-4 flex items-center justify-center gap-3 text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-3 rounded-full border-2 border-green-200 shadow-lg shadow-green-500/10"
+          className="flex items-center justify-center gap-2 text-xs sm:text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2.5 rounded-full border-2 border-green-200 shadow-lg shadow-green-500/10 md:px-6 md:py-3"
         >
-          <div className="p-1 bg-green-500 rounded-full">
-            <CheckCircle className="h-5 w-5 text-white" />
+          <div className="p-0.5 md:p-1 bg-green-500 rounded-full">
+            <CheckCircle className="h-4 w-4 md:h-5 md:w-5 text-white" />
           </div>
           <span className="text-green-700">
             <span className="font-bold">
-              {accountType === 'account_type_personal' ? 'Personal' : 'Organization'}
+              {accountType === 'account_type_personal' ? 'Individual' : 'Organization'}
             </span>
-            {' account selected — ready to continue'}
+            {' account selected'}
           </span>
-          <ArrowRight className="h-4 w-4 text-green-500 animate-pulse" />
+          <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-green-500 animate-pulse" />
         </motion.div>
       )}
 
-      {/* Quick stats or additional info */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto mt-4">
-        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-          <div className="text-2xl font-bold text-blue-500">500+</div>
-          <div className="text-xs text-gray-500">Active trainers</div>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-          <div className="text-2xl font-bold text-purple-500">1,200+</div>
-          <div className="text-xs text-gray-500">Organizations</div>
-        </div>
-        <div className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-          <div className="text-2xl font-bold text-green-500">4.9★</div>
-          <div className="text-xs text-gray-500">User rating</div>
-        </div>
+      {/* "Already have an account?" - More conspicuous */}
+      <div className="pt-4 border-t-2 border-gray-200 text-center">
+        <p className="text-sm sm:text-base text-gray-700">
+          Already have an account?{' '}
+          <Link
+            href="/signin"
+            className="text-[#1A73E8] font-bold hover:underline hover:text-[#1557B0] transition-colors cursor-pointer text-base sm:text-lg"
+          >
+            Sign In →
+          </Link>
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          Access your dashboard, manage events, and track your growth
+        </p>
       </div>
     </div>
   );
@@ -1355,17 +1379,6 @@ const renderAccountTypeStep = () => {
             </AnimatePresence>
           </CardContent>
         </Card>
-
-        {currentStep !== 'success' && (
-          <div className="text-center mt-4 sm:mt-6">
-            <p className="text-xs sm:text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link href="/signin" className="text-[#1A73E8] font-medium hover:underline cursor-pointer">
-                Sign In
-              </Link>
-            </p>
-          </div>
-        )}
 
         <div className="text-center mt-4 sm:mt-6">
           <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-400">

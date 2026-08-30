@@ -7,7 +7,8 @@ import { usePathname } from 'next/navigation';
 import { 
   Menu, 
   LogIn,
-  UserPlus
+  UserPlus,
+  Search
 } from 'lucide-react';
 import { Logo } from '../shared/Logo';
 import { SearchBar } from './SearchBar';
@@ -23,10 +24,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 import { useAppSelector } from '@/lib/store/hooks';
+import { useState } from 'react';
 
 export function MainHeader() {
   const pathname = usePathname();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // If authenticated, don't show this header
   if (isAuthenticated) {
@@ -37,7 +40,7 @@ export function MainHeader() {
     <div className="bg-white border-b shadow-xs">
       <div className="container mx-auto px-3 sm:px-4">
         <div className="flex flex-col">
-          {/* Top Row: Logo + Actions */}
+          {/* Top Row: Logo + Navigation + Search + Actions */}
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2">
             {/* Left: Mobile Menu + Logo */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -123,8 +126,29 @@ export function MainHeader() {
               </Link>
             </div>
 
-            {/* Search Bar - hidden on small screens (shown below) */}
-            <div className="flex-1 max-w-xl mx-2 sm:mx-3 hidden md:block">
+            {/* Desktop Navigation - hidden on tablet and mobile, visible on large screens */}
+            <nav className="hidden xl:flex items-center gap-1 shrink-0 mx-2">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'px-3 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer whitespace-nowrap',
+                      isActive
+                        ? 'text-primary bg-primary/10'
+                        : 'text-gray-600 hover:text-primary hover:bg-gray-50'
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Search - Desktop: full bar, Tablet/Mobile: hidden (shown below) */}
+            <div className="hidden xl:flex items-center flex-1 max-w-xl mx-2 sm:mx-3">
               <SearchBar />
             </div>
 
@@ -152,8 +176,8 @@ export function MainHeader() {
             )}
           </div>
 
-          {/* Mobile Search - shown below header on small screens */}
-          <div className="md:hidden pb-2">
+          {/* Mobile/Tablet Search - shown below header on small screens (xl and below) */}
+          <div className="xl:hidden pb-2">
             <SearchBar />
           </div>
         </div>
