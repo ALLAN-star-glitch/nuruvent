@@ -455,48 +455,41 @@ export function SignInForm() {
             </motion.div>
           )}
 
-          {/* ✅ Google Button with 3D effect and Coming Soon Overlay */}
+          {/* ✅ Google Button with Coming Soon Overlay */}
           <div className="relative w-full mb-4">
-            <motion.div
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
-              className="relative"
+            <Button
+              type="button"
+              variant="outline"
+              disabled={true}
+              className="w-full h-10 sm:h-12 border-gray-200 bg-gray-50 text-gray-800 cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base font-medium relative z-10"
             >
-              <Button
-                type="button"
-                variant="outline"
-                disabled={true}
-                className="w-full h-10 sm:h-12 border-gray-200 bg-white text-gray-800 cursor-not-allowed flex items-center justify-center gap-2 sm:gap-3 text-sm sm:text-base font-medium relative z-10 shadow-[0_4px_8px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition-all duration-200"
-              >
-                <svg className="h-4 w-4 sm:h-5 sm:w-5" viewBox="0 0 24 24">
-                  <path
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    fill="#EA4335"
-                  />
-                </svg>
-                Continue with Google
-              </Button>
+              <svg className="h-4 w-4 sm:h-5 sm:w-5 opacity-50" viewBox="0 0 24 24">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
+              </svg>
+              Continue with Google
+            </Button>
 
-              {/* Coming Soon badge on the right side */}
-              <div className="absolute inset-0 rounded-xl flex items-center justify-end pr-3 sm:pr-4 pointer-events-none z-20">
-                <span className="text-[10px] sm:text-xs font-medium text-gray-500 bg-white/95 px-2.5 py-1 rounded-full border border-gray-300 shadow-sm">
-                  Coming Soon
-                </span>
-              </div>
-            </motion.div>
+            {/* Coming Soon badge on the right side */}
+            <div className="absolute inset-0 rounded-xl flex items-center justify-end pr-3 sm:pr-4 pointer-events-none z-20">
+              <span className="text-[10px] sm:text-xs font-medium text-gray-500 bg-white/90 px-2.5 py-1 rounded-full border border-gray-300 shadow-sm">
+                Coming Soon
+              </span>
+            </div>
           </div>
 
           <div className="relative mb-4">
@@ -596,138 +589,17 @@ export function SignInForm() {
             </Button>
           </form>
 
-          {/* ✅ Account selection circles with 3D effect */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
             className="mt-6 text-center"
           >
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-gray-600">
               Don&apos;t have an account?{' '}
               <Link href="/signup" className="text-[#1A73E8] font-medium hover:underline cursor-pointer">
                 Get Started
               </Link>
             </p>
-            
-            {/* Account selection circles */}
-            <div className="flex items-center justify-center gap-4 mt-4">
-              {/* Circle 1 - Admin */}
-              <motion.button
-                whileHover={{ 
-                  scale: 1.12, 
-                  y: -3,
-                  boxShadow: "0 12px 28px rgba(26,115,232,0.25), 0 6px 12px rgba(0,0,0,0.08)" 
-                }}
-                whileTap={{ 
-                  scale: 0.92,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)" 
-                }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 15 
-                }}
-                className="relative group cursor-pointer"
-                onClick={() => setFormData({ ...formData, email: 'admin@example.com' })}
-              >
-                {/* Outer glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#1A73E8]/20 to-[#1A73E8]/10 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Circle with 3D effect */}
-                <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-[#1A73E8] to-[#0d47a1] shadow-[0_6px_16px_rgba(26,115,232,0.3), inset_0_-3px_8px_rgba(0,0,0,0.3), inset_0_3px_8px_rgba(255,255,255,0.3)] flex items-center justify-center transition-all duration-200">
-                  <span className="text-white font-bold text-lg md:text-xl">A</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5 font-medium">Admin</p>
-              </motion.button>
-
-              {/* Circle 2 - User */}
-              <motion.button
-                whileHover={{ 
-                  scale: 1.12, 
-                  y: -3,
-                  boxShadow: "0 12px 28px rgba(52,168,83,0.25), 0 6px 12px rgba(0,0,0,0.08)" 
-                }}
-                whileTap={{ 
-                  scale: 0.92,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)" 
-                }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 15 
-                }}
-                className="relative group cursor-pointer"
-                onClick={() => setFormData({ ...formData, email: 'user@example.com' })}
-              >
-                {/* Outer glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#34A853]/20 to-[#34A853]/10 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Circle with 3D effect */}
-                <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-[#34A853] to-[#1b5e20] shadow-[0_6px_16px_rgba(52,168,83,0.3), inset_0_-3px_8px_rgba(0,0,0,0.3), inset_0_3px_8px_rgba(255,255,255,0.3)] flex items-center justify-center transition-all duration-200">
-                  <span className="text-white font-bold text-lg md:text-xl">U</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5 font-medium">User</p>
-              </motion.button>
-
-              {/* Circle 3 - Host */}
-              <motion.button
-                whileHover={{ 
-                  scale: 1.12, 
-                  y: -3,
-                  boxShadow: "0 12px 28px rgba(251,188,4,0.3), 0 6px 12px rgba(0,0,0,0.08)" 
-                }}
-                whileTap={{ 
-                  scale: 0.92,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)" 
-                }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 15 
-                }}
-                className="relative group cursor-pointer"
-                onClick={() => setFormData({ ...formData, email: 'host@example.com' })}
-              >
-                {/* Outer glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#FBBC04]/20 to-[#FBBC04]/10 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Circle with 3D effect */}
-                <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-[#FBBC04] to-[#f57f17] shadow-[0_6px_16px_rgba(251,188,4,0.35), inset_0_-3px_8px_rgba(0,0,0,0.3), inset_0_3px_8px_rgba(255,255,255,0.3)] flex items-center justify-center transition-all duration-200">
-                  <span className="text-white font-bold text-lg md:text-xl">H</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5 font-medium">Host</p>
-              </motion.button>
-
-              {/* Circle 4 - Guest */}
-              <motion.button
-                whileHover={{ 
-                  scale: 1.12, 
-                  y: -3,
-                  boxShadow: "0 12px 28px rgba(234,67,53,0.25), 0 6px 12px rgba(0,0,0,0.08)" 
-                }}
-                whileTap={{ 
-                  scale: 0.92,
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)" 
-                }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 400, 
-                  damping: 15 
-                }}
-                className="relative group cursor-pointer"
-                onClick={() => setFormData({ ...formData, email: 'guest@example.com' })}
-              >
-                {/* Outer glow */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-[#EA4335]/20 to-[#EA4335]/10 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                {/* Circle with 3D effect */}
-                <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-[#EA4335] to-[#b71c1c] shadow-[0_6px_16px_rgba(234,67,53,0.3), inset_0_-3px_8px_rgba(0,0,0,0.3), inset_0_3px_8px_rgba(255,255,255,0.3)] flex items-center justify-center transition-all duration-200">
-                  <span className="text-white font-bold text-lg md:text-xl">G</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1.5 font-medium">Guest</p>
-              </motion.button>
-            </div>
           </motion.div>
         </motion.div>
 

@@ -535,14 +535,16 @@ const renderAccountTypeStep = () => {
       label: 'Personal',
       description: 'For trainers, coaches, consultants, freelancers, and attendees',
       features: [
-        'Create & host training events',
-        'Discover & attend training events',
-        'Earn from certificates & tickets',
-        'Build your professional brand',
-        'Get paid in 7 days',
+        'Create & host training events/courses',
+        'Team management & roles',
+        'Attend events & courses as a learner',
+        
       ],
-      iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
-      selectedBorder: 'ring-4 ring-blue-500 border-blue-500 shadow-xl shadow-blue-500/30',
+      iconBg: 'from-blue-500 to-blue-600',
+      shadowColor: 'rgba(59, 130, 246, 0.4)',
+      borderColor: 'border-blue-500',
+      ringColor: 'ring-blue-500',
+      selectedBg: 'bg-blue-50',
     },
     {
       type: 'account_type_institution' as AccountType,
@@ -556,8 +558,11 @@ const renderAccountTypeStep = () => {
         'Branded certificates & events',
         'Bulk attendee registration',
       ],
-      iconBg: 'bg-gradient-to-br from-purple-500 to-purple-600',
-      selectedBorder: 'ring-4 ring-purple-500 border-purple-500 shadow-xl shadow-purple-500/30',
+      iconBg: 'from-purple-500 to-purple-600',
+      shadowColor: 'rgba(168, 85, 247, 0.4)',
+      borderColor: 'border-purple-500',
+      ringColor: 'ring-purple-500',
+      selectedBg: 'bg-purple-50',
     },
   ];
 
@@ -574,8 +579,8 @@ const renderAccountTypeStep = () => {
         </p>
       </div>
 
-      {/* Mobile: Clean Circles | Desktop: Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:gap-5 md:gap-6 w-full max-w-3xl mx-auto">
+      {/* Account Selection - Mobile: Side by side 3D Circles | Desktop: Full cards */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-6 w-full max-w-3xl mx-auto">
         {accountTypes.map((option) => {
           const OptionIcon = option.icon;
           const isSelected = accountType === option.type;
@@ -584,100 +589,166 @@ const renderAccountTypeStep = () => {
             <motion.button
               key={option.type}
               onClick={() => handleAccountTypeSelect(option.type)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
               className={cn(
                 "group relative flex transition-all duration-300 cursor-pointer",
-                // Mobile: Clean circle with text below - NO CARD
-                "flex-col items-center justify-center gap-1 p-2",
-                // Desktop: Full card
-                "md:flex-col md:items-start md:p-6 md:rounded-2xl md:gap-0 md:border-2",
-                "md:shadow-lg hover:md:shadow-2xl",
-                isSelected && "md:ring-4 md:ring-blue-500 md:border-blue-500 md:shadow-xl md:shadow-blue-500/30",
-                !isSelected && "md:border-gray-200 md:bg-white md:hover:border-gray-300 md:shadow-md"
+                // Mobile: Clean circle with label below - SIDE BY SIDE
+                "flex-col items-center justify-center gap-2 p-3 rounded-2xl",
+                // Desktop: Full card with features
+                "sm:flex-col sm:items-start sm:p-6 sm:rounded-2xl sm:gap-0 sm:border-2",
+                "sm:shadow-lg hover:sm:shadow-2xl",
+                isSelected && "sm:ring-4 sm:ring-blue-500 sm:border-blue-500 sm:shadow-xl sm:shadow-blue-500/30",
+                !isSelected && "sm:border-gray-200 sm:bg-white sm:hover:border-gray-300 sm:shadow-md",
+                // Mobile selected state - subtle background
+                isSelected && "bg-gradient-to-b from-blue-50/50 to-transparent"
               )}
             >
               {/* Glow effect when selected (desktop only) */}
               {isSelected && (
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none hidden md:block" />
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none hidden sm:block" />
               )}
 
               {/* Selected badge - Mobile: smaller */}
               {isSelected && (
                 <div className={cn(
-                  "absolute -top-2 -right-2 bg-green-500 rounded-full shadow-lg shadow-green-500/40 animate-pulse",
-                  "p-1 md:p-1.5",
-                  "h-5 w-5 md:h-6 md:w-6",
-                  "flex items-center justify-center"
+                  "absolute -top-1.5 -right-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/40 animate-pulse",
+                  "p-0.5 sm:p-1.5",
+                  "h-5 w-5 sm:h-6 sm:w-6",
+                  "flex items-center justify-center z-10"
                 )}>
                   <CheckCircle className={cn(
                     "text-white",
-                    "h-3.5 w-3.5 md:h-5 md:w-5"
+                    "h-3.5 w-3.5 sm:h-5 sm:w-5"
                   )} />
                 </div>
               )}
 
               {/* Popular badge - Desktop only */}
               {option.type === 'account_type_personal' && !isSelected && (
-                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg shadow-amber-500/30 hidden md:block">
+                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-lg shadow-amber-500/30 hidden sm:block">
                   POPULAR
                 </div>
               )}
 
-              {/* Icon - Clean circle with gradient - Mobile: No outer circle */}
-              <div className={cn(
-                "flex items-center justify-center transition-all duration-300",
-                // Mobile: Clean circle
-                "h-16 w-16 rounded-full",
-                // Desktop: Slightly larger
-                "md:h-20 md:w-20 md:rounded-2xl",
-                option.iconBg,
-                "text-white shadow-lg",
-                isSelected ? "scale-110 shadow-2xl" : "group-hover:scale-105 group-hover:shadow-xl"
-              )}>
-                <OptionIcon className={cn(
-                  "transition-all duration-300",
-                  "h-8 w-8",
-                  "md:h-10 md:w-10"
-                )} />
+              {/* 3D Circle - Mobile optimized */}
+              <motion.div
+                whileHover={{ 
+                  scale: 1.06,
+                  y: -2,
+                }}
+                whileTap={{ 
+                  scale: 0.92,
+                  y: 0,
+                }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 15 
+                }}
+                className="relative"
+              >
+                {/* Outer glow ring - mobile: more subtle */}
+                <div 
+                  className={cn(
+                    "absolute -inset-1.5 sm:-inset-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm sm:blur-md",
+                    isSelected && "opacity-100"
+                  )}
+                  style={{
+                    background: isSelected 
+                      ? `radial-gradient(circle, ${option.shadowColor} 0%, transparent 70%)`
+                      : `radial-gradient(circle, ${option.shadowColor} 0%, transparent 70%)`
+                  }}
+                />
+
+                {/* Selected indicator ring - mobile: thinner */}
+                {isSelected && (
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={cn(
+                      "absolute -inset-1 sm:-inset-1.5 rounded-full border-2 sm:border-4",
+                      option.borderColor,
+                      "shadow-lg sm:shadow-2xl"
+                    )}
+                    style={{
+                      boxShadow: `0 0 20px ${option.shadowColor}, 0 0 40px ${option.shadowColor}`
+                    }}
+                  />
+                )}
+
+                {/* Main Circle with 3D effect - Mobile: smaller */}
+                <div 
+                  className={cn(
+                    "relative w-16 h-16 sm:w-20 sm:h-20 md:w-28 md:h-28 rounded-full",
+                    "bg-gradient-to-br",
+                    option.iconBg,
+                    "flex items-center justify-center",
+                    "shadow-[0_4px_12px_rgba(0,0,0,0.15), inset_0_-3px_8px_rgba(0,0,0,0.2), inset_0_3px_8px_rgba(255,255,255,0.3)]",
+                    "transition-all duration-300",
+                    isSelected && "shadow-[0_8px_24px_rgba(0,0,0,0.25), inset_0_-3px_8px_rgba(0,0,0,0.2), inset_0_3px_8px_rgba(255,255,255,0.3)]",
+                    !isSelected && "hover:shadow-[0_8px_24px_rgba(0,0,0,0.2), inset_0_-3px_8px_rgba(0,0,0,0.15), inset_0_3px_8px_rgba(255,255,255,0.3)]"
+                  )}
+                >
+                  {/* Shine effect overlay */}
+                  <div className="absolute inset-0 rounded-full overflow-hidden">
+                    <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-white/40 to-transparent rotate-45 transform translate-y-1/4" />
+                  </div>
+                  
+                  <OptionIcon className={cn(
+                    "relative z-10 text-white transition-all duration-300",
+                    "h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10",
+                    isSelected && "scale-110",
+                    !isSelected && "group-hover:scale-110"
+                  )} />
+                </div>
+              </motion.div>
+
+              {/* Label - Mobile: small and clean */}
+              <div className="text-center w-full">
+                <span className={cn(
+                  "font-semibold transition-colors block",
+                  "text-sm sm:text-base md:text-xl",
+                  isSelected 
+                    ? option.type === 'account_type_personal' 
+                      ? "text-blue-600" 
+                      : "text-purple-600"
+                    : "text-gray-800 group-hover:text-gray-900"
+                )}>
+                  {option.label}
+                </span>
+                
+                {/* Description - Hidden on mobile, shown on desktop */}
+                <p className="text-xs text-gray-500 hidden sm:block mt-0.5">
+                  {option.description.split(',')[0]}
+                </p>
               </div>
 
-              {/* Label - Always visible */}
-              <span className={cn(
-                "font-semibold text-gray-900 transition-colors",
-                isSelected ? "text-primary-600" : "",
-                // Mobile: Small text below circle
-                "text-sm mt-1.5",
-                // Desktop: Larger text
-                "md:text-xl md:mt-3 md:font-bold"
-              )}>
-                {option.label}
-                {isSelected && (
-                  <span className="hidden md:inline text-sm font-normal text-green-600 bg-green-50 px-2 py-0.5 rounded-full ml-2">
-                    Selected
-                  </span>
-                )}
-              </span>
-
-              {/* Description - Desktop only */}
-              <p className={cn(
-                "text-sm text-gray-500 mt-1 leading-relaxed",
-                "hidden md:block"
-              )}>
-                {option.description}
-              </p>
+              {/* Mobile: Selected indicator text */}
+              {isSelected && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-medium sm:hidden",
+                    option.type === 'account_type_personal' 
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-purple-100 text-purple-600"
+                  )}
+                >
+                  ✓ Selected
+                </motion.div>
+              )}
 
               {/* Features - Desktop only */}
-              <div className="hidden md:block mt-4 space-y-2 w-full">
-                {option.features.map((feature, idx) => (
-                  <div key={idx} className="flex items-center gap-2.5 text-sm text-gray-700">
+              <div className="hidden sm:block mt-4 space-y-2 w-full">
+                {option.features.slice(0, 3).map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-2.5 text-xs text-gray-700">
                     <div className={cn(
-                      "flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
+                      "flex-shrink-0 h-4 w-4 rounded-full flex items-center justify-center",
                       isSelected
                         ? "bg-green-500 text-white"
                         : "bg-gray-200 text-gray-500 group-hover:bg-gray-300"
                     )}>
-                      <Check className="h-3 w-3" />
+                      <Check className="h-2.5 w-2.5" />
                     </div>
                     <span>{feature}</span>
                   </div>
@@ -685,9 +756,9 @@ const renderAccountTypeStep = () => {
               </div>
 
               {/* CTA Button - Desktop only */}
-              <div className="hidden md:block mt-5 w-full">
+              <div className="hidden sm:block mt-4 w-full">
                 <div className={cn(
-                  "w-full px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 text-center",
+                  "w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-center",
                   isSelected
                     ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30"
                     : "bg-gray-100 text-gray-700 group-hover:bg-gray-200 group-hover:shadow-md"
@@ -709,26 +780,6 @@ const renderAccountTypeStep = () => {
           );
         })}
       </div>
-
-      {/* Selected indicator - Mobile friendly */}
-      {accountType && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-center gap-2 text-xs sm:text-sm font-medium bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2.5 rounded-full border-2 border-green-200 shadow-lg shadow-green-500/10 md:px-6 md:py-3"
-        >
-          <div className="p-0.5 md:p-1 bg-green-500 rounded-full">
-            <CheckCircle className="h-4 w-4 md:h-5 md:w-5 text-white" />
-          </div>
-          <span className="text-green-700">
-            <span className="font-bold">
-              {accountType === 'account_type_personal' ? 'Individual' : 'Organization'}
-            </span>
-            {' account selected'}
-          </span>
-          <ArrowRight className="h-3 w-3 md:h-4 md:w-4 text-green-500 animate-pulse" />
-        </motion.div>
-      )}
 
       {/* "Already have an account?" - More conspicuous */}
       <div className="pt-4 border-t-2 border-gray-200 text-center">
