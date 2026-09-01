@@ -8,8 +8,34 @@ import { ArrowRight, Users, Award, CheckCircle, Globe, Sparkles, School, Briefca
 export function HeroSection() {
   return (
     <section className="relative min-h-[65vh] lg:min-h-[70vh] flex items-center overflow-hidden bg-white dark:bg-[#202124]">
-      {/* Background Image Container */}
-      <div className="absolute inset-0 z-0">
+      {/* Background Video Container - visible on md and above */}
+      <div className="absolute inset-0 z-0 hidden md:block">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover object-right"
+        >
+          <source
+            src="https://www.pexels.com/download/video/5486220/"
+            type="video/mp4"
+          />
+        </video>
+        
+        {/* Desktop: Smooth left-to-right gradient overlay - image visible on right */}
+        <div className="hidden lg:block absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/60 to-transparent dark:from-[#202124] dark:via-[#202124]/80" />
+        </div>
+
+        {/* Tablet (md) Fallback Overlay */}
+        <div className="hidden md:block lg:hidden absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/50 dark:from-[#202124] dark:via-[#202124]/85 dark:to-[#202124]/50" />
+        </div>
+      </div>
+
+      {/* Background Image Container - visible only on small devices (below md) */}
+      <div className="absolute inset-0 z-0 md:hidden">
         <Image
           src="/hero-image.png"
           alt="Training Events and Online Courses"
@@ -18,13 +44,8 @@ export function HeroSection() {
           priority
         />
         
-        {/* Desktop: Smooth left-to-right gradient overlay - image visible on right */}
-        <div className="hidden lg:block absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent dark:from-[#202124] dark:via-[#202124]/80" />
-        </div>
-
-        {/* Mobile & Tablet Fallback Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/60 lg:hidden dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/60" />
+        {/* Mobile Fallback Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/60 dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/60" />
       </div>
 
       {/* Pattern Overlay on Left Side */}
