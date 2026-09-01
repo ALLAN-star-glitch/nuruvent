@@ -70,7 +70,7 @@ export function HeroSection() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-[1.15] mb-3">
               <span className="text-primary dark:text-primary-400 bg-clip-text">Nuruvent</span> - Where
               <br className="hidden sm:block" />
-              <span className="text-secondary dark:text-secondary-300">Professionals</span> Grow
+              <span className="text-secondary dark:text-secondary-300"> Professionals</span> Grow
             </h1>
 
             {/* Subheading */}
