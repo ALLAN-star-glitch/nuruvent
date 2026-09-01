@@ -5,6 +5,7 @@ import {
   BookOpen,
   Zap,
   CreditCard,
+  Home,
 } from "lucide-react";
 
 export const SITE_NAME = "Nuruvent";
@@ -12,6 +13,7 @@ export const SITE_DESCRIPTION = "Light Your Training Events. Illuminate Your Gro
 export const SITE_URL = "https://nuruvent.com";
 
 export const NAV_ITEMS = [
+  { label: "Home", href: "/", icon: Home},
   { label: "Events", href: "/events", icon: Calendar },
   { label: "How It Works", href: "/how-it-works", icon: BookOpen },
   { label: "Features", href: "/features", icon: Zap },

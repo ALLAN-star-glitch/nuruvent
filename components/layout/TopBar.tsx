@@ -212,24 +212,49 @@ export function TopBar() {
         )}>
           {/* Left: Contact Info - visible on md+ */}
           <div className="hidden md:flex items-center gap-4 text-xs flex-1 min-w-0">
-            {/* Desktop Navigation - visible on xl+ only (moved to left) */}
+            {/* Desktop Navigation - Button Style with Active Bars */}
             <nav className="hidden xl:flex items-center gap-1">
               {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all cursor-pointer",
-                      isActive
-                        ? "bg-current/10 text-current"
-                        : "text-current/70 hover:text-current hover:bg-current/5"
+                      "group relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 cursor-pointer",
+                      // Inactive state - button style
+                      !isActive && "bg-white/60 dark:bg-[#2D2E32]/60 backdrop-blur-sm border border-current/20 hover:border-current/40 hover:bg-white/80 dark:hover:bg-[#2D2E32]/80 hover:shadow-md hover:scale-[1.02] text-current/80",
+                      // Active state - clean with bars
+                      isActive && "text-current"
                     )}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                    {/* Top Bar - Active indicator */}
+                    {isActive && (
+                      <span className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-current opacity-80" />
+                    )}
+                    
+                    <Icon className={cn(
+                      "h-4 w-4 transition-transform duration-300",
+                      "group-hover:scale-110",
+                      isActive && "scale-110"
+                    )} />
+                    <span className={cn(
+                      "relative",
+                      isActive && "font-semibold"
+                    )}>
+                      {item.label}
+                    </span>
+                    
+                    {/* Bottom Bar - Active indicator */}
+                    {isActive && (
+                      <span className="absolute -bottom-[2px] left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-current opacity-80" />
+                    )}
+                    
+                    {/* Hover underline effect for inactive items */}
+                    {!isActive && (
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-0 h-[2px] rounded-full bg-current transition-all duration-300 group-hover:w-6" />
+                    )}
                   </Link>
                 );
               })}
