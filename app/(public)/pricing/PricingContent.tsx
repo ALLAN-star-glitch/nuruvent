@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   Check,
   Zap,
@@ -42,34 +43,78 @@ export function PricingContent() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#202124] text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white">
-      {/* Dynamic Background Elements */}
-      <div className="relative overflow-hidden pt-16 pb-20 md:pt-24 md:pb-32">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-blue-500/10 via-blue-200/20 to-transparent blur-3xl pointer-events-none" />
+      {/* ===== HERO SECTION WITH FADE OUT & BACKGROUND IMAGE ===== */}
+      <section className="relative overflow-hidden bg-white dark:bg-[#202124] py-14 md:py-20">
+        {/* Background Image Container */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/pricing.png"
+            alt="Pricing & Monetization Workflow"
+            fill
+            className="object-cover object-right"
+            priority
+          />
 
-        {/* Header & Value Proposition */}
+          {/* Smooth left-to-right & bottom fade out gradient overlay */}
+          <div className="hidden lg:block absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent dark:from-[#202124] dark:via-[#202124]/85" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent dark:from-[#202124]" />
+          </div>
+
+          {/* Mobile & Tablet Fallback Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/70 lg:hidden dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/70" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent lg:hidden dark:from-[#202124]" />
+        </div>
+
+        {/* Pattern Overlay on Left Side */}
+        <div className="absolute inset-0 pointer-events-none z-0 hidden lg:block">
+          <svg
+            className="absolute left-8 top-6 h-56 w-56"
+            viewBox="0 0 200 200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <pattern
+              id="dotPatternPricing"
+              x="0"
+              y="0"
+              width="20"
+              height="20"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="10" cy="10" r="2" fill="#2563eb" opacity="0.15" />
+            </pattern>
+            <rect x="0" y="0" width="200" height="200" fill="url(#dotPatternPricing)" />
+          </svg>
+        </div>
+
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <div className="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-xs">
-              <Sparkles className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="max-w-2xl text-center lg:text-left">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-400 px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 dark:border-primary/20 shadow-sm cursor-default">
+              <Sparkles className="h-4 w-4" />
               <span>Zero Risk • Pay Only When You Sell</span>
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              Transparent Pricing for <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-800 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-500 bg-clip-text text-transparent">
+            {/* Heading */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight mb-3">
+              Transparent Pricing for{' '}
+              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-800 bg-clip-text text-transparent">
                 Global Event Hosts
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-600 dark:text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            {/* Subheading */}
+            <p className="text-base md:text-lg text-gray-700 dark:text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
               No setup fees, no monthly commitments, and {formatPrice(0)} for free events. Automate attendance tracking, reminders, and certificates out of the box.
             </p>
 
             {/* Currency Toggle */}
-            <div className="pt-4 flex justify-center">
+            <div className="flex justify-center lg:justify-start">
               <div className="bg-white dark:bg-[#2D2E32] border border-slate-200 dark:border-[#3C4043] p-1 rounded-2xl flex items-center gap-1 shadow-sm">
                 <button
                   type="button"
+                  aria-pressed={currency === 'USD'}
                   onClick={() => setCurrency('USD')}
                   className={`px-5 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                     currency === 'USD'
@@ -82,6 +127,7 @@ export function PricingContent() {
                 </button>
                 <button
                   type="button"
+                  aria-pressed={currency === 'KES'}
                   onClick={() => setCurrency('KES')}
                   className={`px-5 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
                     currency === 'KES'
@@ -96,10 +142,10 @@ export function PricingContent() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Main Pricing Section */}
-      <section className="container mx-auto px-4 -mt-12 relative z-20 pb-20">
+      {/* Main Pricing Cards Section */}
+      <section className="container mx-auto px-4 py-12 relative z-20 pb-20">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
           
           {/* Card 1: Free Events */}

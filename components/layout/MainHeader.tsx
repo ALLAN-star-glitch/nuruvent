@@ -25,17 +25,30 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 import { useAppSelector } from '@/lib/store/hooks';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export function MainHeader() {
   const pathname = usePathname();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [shouldAutoFocus, setShouldAutoFocus] = useState(false);
+  const searchBarRef = useRef<HTMLDivElement>(null);
 
   // If authenticated, don't show this header
   if (isAuthenticated) {
     return null;
   }
+
+  // Handle search toggle
+  const handleSearchToggle = () => {
+    const newState = !isSearchOpen;
+    setIsSearchOpen(newState);
+    if (newState) {
+      setShouldAutoFocus(true);
+      // Reset autoFocus after a short delay to allow the input to mount
+      setTimeout(() => setShouldAutoFocus(false), 100);
+    }
+  };
 
   return (
     <div className="bg-white border-b shadow-xs relative z-10">
@@ -141,7 +154,7 @@ export function MainHeader() {
                 variant="ghost"
                 size="icon"
                 className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
-                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                onClick={handleSearchToggle}
                 aria-label={isSearchOpen ? "Close search" : "Open search"}
               >
                 {isSearchOpen ? (
@@ -169,7 +182,7 @@ export function MainHeader() {
                       className="bg-primary hover:bg-primary/90 text-white font-medium cursor-pointer px-2.5 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9 text-xs sm:text-sm"
                     >
                       <span className="hidden xs:inline">Get Started</span>
-                      <span className="xs:hidden">Sign Up</span>
+                      <span className="xs:hidden">Get Started</span>
                     </Button>
                   </Link>
                 </>
@@ -178,12 +191,11 @@ export function MainHeader() {
           </div>
 
           {/* Mobile/Tablet Search - shown when toggled on xl and below */}
-          {/* Removed overflow-hidden to allow dropdown to show */}
           <div className={cn(
             "xl:hidden transition-all duration-300 ease-in-out relative z-20",
             isSearchOpen ? "max-h-16 pb-2 opacity-100" : "max-h-0 opacity-0 overflow-hidden"
           )}>
-            <SearchBar />
+            <SearchBar autoFocus={shouldAutoFocus} />
           </div>
         </div>
       </div>

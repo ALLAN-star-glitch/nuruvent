@@ -168,14 +168,14 @@ export function SearchBar({ placeholder, autoFocus, onSearch }: SearchBarProps) 
 
   return (
     <div ref={searchRef} className="relative w-full">
-      {/* Search Bar Wrapper */}
+      {/* Search Bar Wrapper - removed padding */}
       <div
         className={cn(
-          "flex flex-col md:flex-row items-stretch bg-slate-100/90 hover:bg-slate-100 rounded-xl md:rounded-2xl border border-slate-200/70 transition-all duration-200 p-1 md:p-1.5 gap-1 md:gap-0",
+          "flex flex-col md:flex-row items-stretch bg-slate-100/90 hover:bg-slate-100 rounded-xl md:rounded-2xl border border-slate-200/70 transition-all duration-200 gap-1 md:gap-0",
           isFocused && "bg-white border-primary/40 ring-2 md:ring-4 ring-primary/10 shadow-sm"
         )}
       >
-        {/* Main Input Field */}
+        {/* Main Input Field - adjusted padding */}
         <div className="relative flex-1 flex items-center min-w-0">
           <Search className="absolute left-3 md:left-3.5 h-3.5 w-3.5 md:h-4 md:w-4 text-slate-400 pointer-events-none shrink-0" />
           <input
@@ -203,57 +203,58 @@ export function SearchBar({ placeholder, autoFocus, onSearch }: SearchBarProps) 
             </button>
           )}
         </div>
-      {/* Filter Dropdowns & Execute Button */}
-      <div
-        className={cn(
-          "items-center gap-1.5 pt-1 md:pt-0 pl-1 md:pl-2 justify-between md:justify-start border-t md:border-t-0 md:border-l border-slate-200/60",
-          isFocused ? "flex" : "hidden md:flex"
-        )}
-      >
-        {/* Category Dropdown */}
-        <div className="relative flex-1 md:flex-none flex items-center cursor-pointer group">
-          <Tag className="absolute left-2 md:left-2.5 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 group-hover:text-primary transition-colors pointer-events-none" />
-          <select
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-            className="w-full md:w-auto h-8 md:h-10 pl-7 md:pl-8 pr-6 md:pr-7 text-[11px] md:text-xs font-medium text-slate-700 hover:text-slate-900 bg-transparent border-0 focus:ring-0 focus:outline-none cursor-pointer appearance-none transition-colors"
-          >
-            {categories.map((cat) => (
-              <option key={cat.value} value={cat.value} className="text-slate-800 bg-white">
-                {cat.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-1.5 md:right-2 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 pointer-events-none transition-transform group-hover:translate-y-0.5" />
-        </div>
 
-        {/* Format Dropdown */}
-        <div className="relative flex-1 md:flex-none flex items-center cursor-pointer group">
-          <Monitor className="absolute left-2 md:left-2.5 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 group-hover:text-primary transition-colors pointer-events-none" />
-          <select
-            value={filters.format}
-            onChange={(e) => handleFilterChange('format', e.target.value)}
-            className="w-full md:w-auto h-8 md:h-10 pl-7 md:pl-8 pr-6 md:pr-7 text-[11px] md:text-xs font-medium text-slate-700 hover:text-slate-900 bg-transparent border-0 focus:ring-0 focus:outline-none cursor-pointer appearance-none transition-colors"
-          >
-            {formats.map((fmt) => (
-              <option key={fmt.value} value={fmt.value} className="text-slate-800 bg-white">
-                {fmt.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-1.5 md:right-2 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 pointer-events-none transition-transform group-hover:translate-y-0.5" />
-        </div>
-
-        {/* Search Button */}
-        <button
-          type="button"
-          onClick={executeSearch}
-          aria-label="Execute Search"
-          className="h-8 md:h-10 px-3.5 md:px-4 bg-primary hover:bg-primary/90 text-white text-[11px] md:text-xs font-medium rounded-lg md:rounded-xl flex items-center justify-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs active:scale-95"
+        {/* Filter Dropdowns & Execute Button - removed padding */}
+        <div
+          className={cn(
+            "items-center gap-1.5 pl-1 md:pl-2 justify-between md:justify-start border-t md:border-t-0 md:border-l border-slate-200/60",
+            isFocused ? "flex" : "hidden md:flex"
+          )}
         >
-          <Search className="h-3 w-3 md:h-3.5 md:w-3.5" />
-        </button>
-      </div>
+          {/* Category Dropdown */}
+          <div className="relative flex-1 md:flex-none flex items-center cursor-pointer group">
+            <Tag className="absolute left-2 md:left-2.5 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 group-hover:text-primary transition-colors pointer-events-none" />
+            <select
+              value={filters.category}
+              onChange={(e) => handleFilterChange('category', e.target.value)}
+              className="w-full md:w-auto h-8 md:h-10 pl-7 md:pl-8 pr-6 md:pr-7 text-[11px] md:text-xs font-medium text-slate-700 hover:text-slate-900 bg-transparent border-0 focus:ring-0 focus:outline-none cursor-pointer appearance-none transition-colors"
+            >
+              {categories.map((cat) => (
+                <option key={cat.value} value={cat.value} className="text-slate-800 bg-white">
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-1.5 md:right-2 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 pointer-events-none transition-transform group-hover:translate-y-0.5" />
+          </div>
+
+          {/* Format Dropdown */}
+          <div className="relative flex-1 md:flex-none flex items-center cursor-pointer group">
+            <Monitor className="absolute left-2 md:left-2.5 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 group-hover:text-primary transition-colors pointer-events-none" />
+            <select
+              value={filters.format}
+              onChange={(e) => handleFilterChange('format', e.target.value)}
+              className="w-full md:w-auto h-8 md:h-10 pl-7 md:pl-8 pr-6 md:pr-7 text-[11px] md:text-xs font-medium text-slate-700 hover:text-slate-900 bg-transparent border-0 focus:ring-0 focus:outline-none cursor-pointer appearance-none transition-colors"
+            >
+              {formats.map((fmt) => (
+                <option key={fmt.value} value={fmt.value} className="text-slate-800 bg-white">
+                  {fmt.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-1.5 md:right-2 h-3 w-3 md:h-3.5 md:w-3.5 text-slate-400 pointer-events-none transition-transform group-hover:translate-y-0.5" />
+          </div>
+
+          {/* Search Button */}
+          <button
+            type="button"
+            onClick={executeSearch}
+            aria-label="Execute Search"
+            className="h-8 md:h-10 px-3.5 md:px-4 bg-primary-400 hover:bg-primary/90 text-white text-[11px] md:text-xs font-medium rounded-lg md:rounded-xl flex items-center justify-center gap-1.5 shrink-0 transition-all cursor-pointer shadow-xs active:scale-95"
+          >
+            <Search className="h-3 w-3 md:h-3.5 md:w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Live Search Suggestions Dropdown */}

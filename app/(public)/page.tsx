@@ -20,46 +20,46 @@ import { PushNotificationManager } from '@/components/PWA/PushNotificationManage
 import { EventCategories } from '@/components/home/EventsCategories';
 
 export const metadata: Metadata = {
-  title: `${SITE_NAME} — Where Professionals Grow`,
-  description: 'Nuruvent is the global platform where training providers and learners connect. Discover professional workshops, bootcamps, webinars, and certified courses from universities, professional bodies, corporate teams, and independent coaches worldwide.',
+  title: `${SITE_NAME} — Professional Events & Online Courses Platform`,
+  description: 'Nuruvent is the global platform connecting training providers and learners. Discover professional workshops, live bootcamps, self-paced online courses, and certified programs worldwide.',
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: `${SITE_NAME} — Where Professionals Grow`,
-    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and certified courses. Illuminate your training, empower your future.',
+    title: `${SITE_NAME} — Professional Events & Online Courses Platform`,
+    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and online courses. Illuminate your training, empower your future.',
     url: SITE_URL,
     siteName: SITE_NAME,
     type: 'website',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/hero-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nuruvent — Where Professionals Grow',
+        alt: 'Nuruvent — Training Events & Online Courses Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${SITE_NAME} — Where Professionals Grow`,
-    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and certified courses.',
-    images: ['/twitter-image.jpg'],
+    title: `${SITE_NAME} — Professional Events & Online Courses Platform`,
+    description: 'Connect with training providers and learners worldwide. Discover professional workshops, bootcamps, webinars, and online courses.',
+    images: ['/hero-image.png'],
   },
   keywords: [
+    'training events and courses',
+    'online courses platform',
     'professional training',
     'workshops',
     'webinars',
     'bootcamps',
     'certified courses',
-    'CPD',
+    'CPD certificates',
     'career development',
     'professional growth',
     'training platform',
-    'global training',
     'Nuruvent',
     'online learning',
-    'professional development',
   ],
 };
 
@@ -82,7 +82,7 @@ export default function HomePage() {
               Browse by Category
             </h2>
             <p className="text-xs text-gray-500 mt-1">
-              Find the perfect training for your career
+              Find the perfect event or course for your career
             </p>
           </div>
           
@@ -90,13 +90,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Training Events Section */}
+      {/* Training Events & Courses Section */}
       <section className="bg-gray-50/30 py-16 border-t border-gray-100">
         <div className="container mx-auto px-4">
           <HomeEventGrid 
             limit={8}
-            title="Upcoming Training Events"
-            subtitle="Discover professional workshops and certified courses from training providers worldwide"
+            title="Explore Training Events & Courses"
+            subtitle="Discover professional workshops, live bootcamps, and certified online courses from training providers worldwide"
           />
         </div>
       </section>
@@ -113,7 +113,7 @@ export default function HomePage() {
               Built for Professional Growth
             </h2>
             <p className="text-gray-600 text-sm sm:text-base mt-2">
-              Everything you need to discover, attend, and excel in professional training events worldwide.
+              Everything you need to discover, enroll in, and excel across professional training events and online courses.
             </p>
           </div>
 
@@ -122,15 +122,15 @@ export default function HomePage() {
               <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
                 <Calendar className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Curated Events</h3>
-              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions from verified professionals worldwide</p>
+              <h3 className="text-base font-semibold text-gray-900">Events & Courses</h3>
+              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions and self-paced courses from verified professionals worldwide</p>
             </div>
 
             <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
               <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-secondary-100 text-secondary-600 mb-4">
                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Expert Trainers</h3>
+              <h3 className="text-base font-semibold text-gray-900">Expert Instructors</h3>
               <p className="text-sm text-gray-600 mt-1">Learn from industry experts with real-world experience across the globe</p>
             </div>
 
@@ -139,15 +139,15 @@ export default function HomePage() {
                 <Award className="h-6 w-6" />
               </div>
               <h3 className="text-base font-semibold text-gray-900">Certified Learning</h3>
-              <p className="text-sm text-gray-600 mt-1">Earn recognized QR-verified certificates to boost your career</p>
+              <p className="text-sm text-gray-600 mt-1">Earn recognized QR-verified CPD certificates to boost your career</p>
             </div>
 
             <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
               <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
                 <Globe className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Flexible Access</h3>
-              <p className="text-sm text-gray-600 mt-1">In-person, virtual, or hybrid events to suit your schedule anywhere</p>
+              <h3 className="text-base font-semibold text-gray-900">Flexible Formats</h3>
+              <p className="text-sm text-gray-600 mt-1">In-person workshops, virtual webinars, and self-paced online courses to fit your schedule</p>
             </div>
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function HomePage() {
             
             <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mb-8">
               Join thousands of professionals and training providers who are advancing their careers 
-              and growing their businesses through Nuruvent. Discover your next opportunity today.
+              and growing their businesses through Nuruvent. Discover your next event or course today.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -177,7 +177,7 @@ export default function HomePage() {
                   size="lg" 
                   className="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-6 rounded-full shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group"
                 >
-                  Explore Events
+                  Explore Events & Courses
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>

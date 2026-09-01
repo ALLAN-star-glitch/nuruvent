@@ -212,7 +212,30 @@ export function TopBar() {
         )}>
           {/* Left: Contact Info - visible on md+ */}
           <div className="hidden md:flex items-center gap-4 text-xs flex-1 min-w-0">
-            {/* Contact Info with subtle hover */}
+            {/* Desktop Navigation - visible on xl+ only (moved to left) */}
+            <nav className="hidden xl:flex items-center gap-1">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all cursor-pointer",
+                      isActive
+                        ? "bg-current/10 text-current"
+                        : "text-current/70 hover:text-current hover:bg-current/5"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Contact Info */}
             <div className="flex items-center gap-3">
               <a 
                 href="mailto:info@nuruvent.com" 
@@ -277,31 +300,8 @@ export function TopBar() {
             </div>
           </div>
 
-          {/* Right: Desktop Navigation + Social Links */}
+          {/* Right: Desktop Navigation (removed - now on left) + Social Links */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Desktop Navigation - visible on xl+ only */}
-            <nav className="hidden xl:flex items-center gap-1 mr-2">
-              {NAV_ITEMS.map((item) => {
-                const isActive = pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all cursor-pointer",
-                      isActive
-                        ? "bg-current/10 text-current"
-                        : "text-current/70 hover:text-current hover:bg-current/5"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-
             {/* Social Links - visible on lg+ */}
             <div className="hidden lg:flex items-center gap-0.5">
               {SOCIAL_LINKS.map((social) => {

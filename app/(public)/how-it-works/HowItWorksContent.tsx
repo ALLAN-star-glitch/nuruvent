@@ -1,5 +1,7 @@
+
 /* eslint-disable react/no-unescaped-entities */
 // app/(public)/how-it-works/HowItWorksContent.tsx
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   Users,
@@ -7,10 +9,8 @@ import {
   Video,
   Award,
   Bell,
-  BarChart,
   Smartphone,
   Globe,
-  Shield,
   ArrowRight,
   Sparkles,
   GraduationCap,
@@ -21,15 +21,21 @@ import {
   FileCheck,
   Landmark,
   Clock,
-  Zap,
   Wallet,
   QrCode,
-  MessageCircle,
-  TrendingUp,
-  CheckCircle,
+  BarChart3,
+  Megaphone,
+  ShieldCheck,
+  Coffee,
   Rocket,
   LucideIcon,
+  UserCheck,
+  TrendingUp,
+  Search,
+  UserPlus,
+  BookOpen,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -37,325 +43,505 @@ interface FeatureCardProps {
   desc: string;
 }
 
-interface StepProps {
-  icon: LucideIcon;
-  title: string;
-  desc: string;
-  step: number;
-}
-
-interface ComparisonRowProps {
-  feature: string;
-  eventbrite: string;
-  manual: string;
-  nuruvent: string;
-}
-
 export function HowItWorksContent() {
   return (
     <div className="min-h-screen bg-white dark:bg-[#202124]">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 to-white dark:from-[#202124] dark:to-[#2D2E32] py-20">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-primary/20 blur-3xl" />
-          <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-secondary/20 blur-3xl" />
+      {/* ===== HERO SECTION WITH FADE OUT ===== */}
+      <section className="relative overflow-hidden bg-white dark:bg-[#202124] py-14 md:py-20">
+        {/* Background Image Container */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/how-it-works.png"
+            alt="Events & Courses Training Workflow"
+            fill
+            className="object-cover object-right"
+            priority
+          />
+
+          {/* Smooth left-to-right & bottom fade out gradient overlay */}
+          <div className="hidden lg:block absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent dark:from-[#202124] dark:via-[#202124]/85" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent dark:from-[#202124]" />
+          </div>
+
+          {/* Mobile & Tablet Fallback Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/70 lg:hidden dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/70" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent lg:hidden dark:from-[#202124]" />
         </div>
-        <div className="container mx-auto px-4 relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-base font-medium mb-6">
-              <Sparkles className="w-5 h-5" />
-              Simple. Seamless. Illuminating.
+
+        {/* Pattern Overlay on Left Side */}
+        <div className="absolute inset-0 pointer-events-none z-0 hidden lg:block">
+          <svg
+            className="absolute left-8 top-6 h-56 w-56"
+            viewBox="0 0 200 200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <pattern
+              id="dotPattern"
+              x="0"
+              y="0"
+              width="20"
+              height="20"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="10" cy="10" r="2" fill="#2563eb" opacity="0.15" />
+            </pattern>
+            <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern)" />
+          </svg>
+        </div>
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-2xl text-center lg:text-left">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-400 px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 dark:border-primary/20 shadow-sm cursor-default">
+              <Sparkles className="h-4 w-4" />
+              <span>Simple. Seamless. Illuminating.</span>
             </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-neutral-dark dark:text-white mb-6 leading-tight">
-              How{' '}
-              <span className="text-primary dark:text-primary-400">
-                Nuruvent
-              </span>{' '}
-              Works
+
+            {/* Heading */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight mb-3">
+              How It Works
             </h1>
-            <p className="text-xl md:text-2xl text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-              From event creation to certificate delivery — we handle the
-              complexity so you can focus on training and professional
-              development.
+
+            {/* Subheading */}
+            <p className="text-base md:text-lg text-gray-700 dark:text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
+              Create live events & structured courses, build your training team (personal or organizational), 
+              and get paid directly in 7 days.
             </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Quick Overview — Six Audience Tracks */}
-      <section className="py-12 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
-        <div className="container mx-auto px-4">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
-            {[
-              {
-                icon: Building2,
-                title: 'Training Institutes',
-                desc: 'Courses, workshops, bootcamps',
-                color: 'primary',
-              },
-              {
-                icon: UserCircle,
-                title: 'Professional Coaches',
-                desc: 'Workshops, seminars, webinars',
-                color: 'secondary',
-              },
-              {
-                icon: Briefcase,
-                title: 'Corporate HR Teams',
-                desc: 'Staff training, team-building',
-                color: 'tertiary',
-              },
-              {
-                icon: GraduationCap,
-                title: 'Professional Bodies',
-                desc: 'CPD events, AGMs, conferences',
-                color: 'error',
-              },
-              {
-                icon: Users,
-                title: 'Individual Trainers',
-                desc: 'Coaching, consulting, training',
-                color: 'primary',
-              },
-              {
-                icon: Globe,
-                title: 'Global Learners',
-                desc: 'Upskill, reskill, advance careers',
-                color: 'secondary',
-              },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-white dark:bg-[#2D2E32] rounded-2xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-shadow text-center"
-              >
-                <div
-                  className={`w-12 h-12 rounded-full ${item.color === 'primary' ? 'bg-primary/10 text-primary' : ''} ${item.color === 'secondary' ? 'bg-secondary/10 text-secondary-600' : ''} ${item.color === 'tertiary' ? 'bg-tertiary/10 text-tertiary-600' : ''} ${item.color === 'error' ? 'bg-error/10 text-error-500' : ''} mx-auto flex items-center justify-center mb-3`}
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start">
+              <Link href="/signup" className="cursor-pointer">
+                <Button
+                  size="lg"
+                  className="cursor-pointer bg-primary hover:bg-primary/90 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-semibold px-6 py-3 text-sm md:text-base rounded-xl shadow-md shadow-primary/25 transition-all duration-300"
                 >
-                  <item.icon className="w-6 h-6" />
-                </div>
-                <h3 className="font-semibold text-base text-neutral-dark dark:text-white">
-                  {item.title}
-                </h3>
-                <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
+                  Start Creating
+                  <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+                </Button>
+              </Link>
+
+              <Link href="/events" className="cursor-pointer">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="cursor-pointer border-gray-200 dark:border-[#3C4043] bg-white dark:bg-[#2D2E32] hover:bg-gray-50 dark:hover:bg-[#202124] px-6 py-3 text-sm md:text-base rounded-xl font-medium shadow-sm transition-all text-gray-900 dark:text-white"
+                >
+                  Discover Events & Courses
+                </Button>
+              </Link>
+            </div>
           </div>
-          <p className="text-center text-base text-neutral-gray dark:text-muted-foreground mt-4 max-w-3xl mx-auto">
-            From universities and NGOs to professional associations and
-            independent trainers — Nuruvent serves the entire professional
-            development ecosystem.
-          </p>
         </div>
       </section>
 
-      {/* Two-Track Flow: Hosts & Attendees */}
-      <section className="py-16">
+      {/* ===== STEP-BY-STEP PROCESS FOR HOST & ATTENDEE ===== */}
+      <section className="py-14 md:py-20">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-neutral-dark dark:text-white mb-3">
               Two Journeys,{' '}
               <span className="text-primary dark:text-primary-400">
                 One Platform
               </span>
             </h2>
-            <p className="text-xl text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-              Whether you're creating events or advancing your career.
+
+            <p className="text-base text-neutral-gray dark:text-muted-foreground">
+              Clear, structured workflows designed for hosting live events and courses or joining as a learner.
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {/* Host Track */}
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl border border-[#E8EAED] dark:border-[#3C4043] shadow-sm overflow-hidden">
-              <div className="bg-primary/5 dark:bg-primary/10 px-6 py-4 border-b border-[#E8EAED] dark:border-[#3C4043]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-semibold text-lg text-neutral-dark dark:text-white">
-                    For Training Hosts
+          <div className="space-y-20 max-w-6xl mx-auto">
+
+            {/* =========================================================
+                HOST WORKFLOW
+            ========================================================= */}
+            <div className="space-y-10">
+              <div className="flex items-center gap-3 border-b border-[#E8EAED] dark:border-[#3C4043] pb-4">
+                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold shadow-sm">
+                  <Users className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-bold text-neutral-dark dark:text-white">
+                    The Host Pathway
                   </h3>
+
+                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">
+                    Everything required to set up teams, publish events & courses, monetize, and execute training.
+                  </p>
                 </div>
               </div>
-              <div className="p-6 space-y-6">
-                {[
-                  {
-                    icon: Calendar,
-                    title: 'Create Your Event',
-                    desc: 'Set event details, training type, ticket price, and certificate fee. Add your existing Zoom or Google Meet link.',
-                  },
-                  {
-                    icon: CreditCard,
-                    title: 'Get Paid Automatically',
-                    desc: 'Attendees pay with M-Pesa, Airtel Money, or card. No manual reconciliation — saves 60 minutes per event.',
-                  },
-                  {
-                    icon: Video,
-                    title: 'Run Your Training',
-                    desc: 'Use your own Zoom or Google Meet. No new software. Attendance is auto-tracked via webhooks and APIs.',
-                  },
-                  {
-                    icon: Award,
-                    title: 'Issue Verified Certificates',
-                    desc: 'QR-verified CPD certificates sent automatically. Prevents forgery and protects credential integrity.',
-                  },
-                  {
-                    icon: Clock,
-                    title: 'Get Paid in 7 Days',
-                    desc: 'Fast payouts to mobile money or bank. No 30-day wait. Better cash flow for your training business.',
-                  },
-                ].map((step, idx) => (
-                  <StepCard key={idx} step={idx + 1} {...step} />
-                ))}
+
+              {/* ===== PREMIUM HOST JOURNEY ===== */}
+              <div className="relative">
+
+                {/* Desktop Connecting Line */}
+                <div className="hidden lg:block absolute top-[42px] left-[8%] right-[8%] h-px bg-gradient-to-r from-primary/10 via-primary/40 to-primary/10 dark:from-primary/10 dark:via-primary/30 dark:to-primary/10" />
+
+                {/* Mobile Connecting Line */}
+                <div className="lg:hidden absolute left-[27px] top-8 bottom-8 w-px bg-gradient-to-b from-primary/10 via-primary/40 to-primary/10 dark:from-primary/10 dark:via-primary/30 dark:to-primary/10" />
+
+                <div className="grid grid-cols-1 lg:grid-cols-6 gap-7 lg:gap-3">
+                  {[
+                    {
+                      step: '01',
+                      icon: Calendar,
+                      title: 'Create Event / Course',
+                      desc: 'Define schedule, modules, set prices & video links.',
+                    },
+                    {
+                      step: '02',
+                      icon: UserPlus,
+                      title: 'Build Team',
+                      desc: 'Invite trainers under Personal or Organizational account.',
+                    },
+                    {
+                      step: '03',
+                      icon: CreditCard,
+                      title: 'Accept Payments',
+                      desc: 'Collect tuition & registration via M-Pesa, Airtel, or cards.',
+                    },
+                    {
+                      step: '04',
+                      icon: Video,
+                      title: 'Deliver Training',
+                      desc: 'Host live sessions or manage self-paced course access.',
+                    },
+                    {
+                      step: '05',
+                      icon: Award,
+                      title: 'Issue Certificates',
+                      desc: 'Automatically generate QR-verified CPD certificates.',
+                    },
+                    {
+                      step: '06',
+                      icon: TrendingUp,
+                      title: '7-Day Payouts',
+                      desc: 'Direct payouts every 7 days to bank or mobile money.',
+                    },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="relative flex lg:flex-col items-start lg:items-center group"
+                    >
+                      {/* Step Marker */}
+                      <div className="relative z-10 shrink-0 flex items-center justify-center">
+                        <div className="w-[56px] h-[56px] rounded-2xl bg-white dark:bg-[#202124] border border-primary/20 dark:border-primary/30 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:border-primary group-hover:shadow-lg group-hover:shadow-primary/10 group-hover:-translate-y-1">
+                          <div className="w-[42px] h-[42px] rounded-xl bg-primary/10 dark:bg-primary/15 text-primary flex items-center justify-center transition-all duration-300 group-hover:bg-primary group-hover:text-white">
+                            <item.icon className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="ml-5 lg:ml-0 lg:mt-6 w-full lg:text-center">
+                        <div className="mb-2">
+                          <span className="inline-flex items-center rounded-full bg-primary/5 dark:bg-primary/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.12em] text-primary dark:text-primary-400 uppercase">
+                            Step {item.step}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-sm sm:text-base text-neutral-dark dark:text-white leading-snug mb-2 transition-colors group-hover:text-primary dark:group-hover:text-primary-400">
+                          {item.title}
+                        </h4>
+
+                        <p className="text-xs sm:text-sm text-neutral-gray dark:text-muted-foreground leading-relaxed max-w-[180px] lg:mx-auto">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Attendee Track */}
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl border border-[#E8EAED] dark:border-[#3C4043] shadow-sm overflow-hidden">
-              <div className="bg-secondary/5 dark:bg-secondary/10 px-6 py-4 border-b border-[#E8EAED] dark:border-[#3C4043]">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary text-neutral-dark flex items-center justify-center">
-                    <Smartphone className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-semibold text-lg text-neutral-dark dark:text-white">
-                    For Training Attendees
+            {/* =========================================================
+                LEARNER WORKFLOW
+            ========================================================= */}
+            <div className="space-y-10">
+              <div className="flex items-center gap-3 border-b border-[#E8EAED] dark:border-[#3C4043] pb-4">
+                <div className="w-10 h-10 rounded-xl bg-secondary text-neutral-dark flex items-center justify-center font-bold shadow-sm">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-bold text-neutral-dark dark:text-white">
+                    The Learner Pathway
                   </h3>
+
+                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">
+                    Simple discovery, effortless registration, and instant credential verification.
+                  </p>
                 </div>
               </div>
-              <div className="p-6 space-y-6">
-                {[
-                  {
-                    icon: Globe,
-                    title: 'Discover Events',
-                    desc: 'Find workshops, webinars, bootcamps, and meetups via the marketplace, WhatsApp, or partner networks.',
-                  },
-                  {
-                    icon: Smartphone,
-                    title: 'Register & Pay in Seconds',
-                    desc: 'Click register and pay with M-Pesa, Airtel Money, or card. Instant confirmation via email and WhatsApp.',
-                  },
-                  {
-                    icon: Bell,
-                    title: 'Get Automated Reminders',
-                    desc: 'Receive WhatsApp, SMS, and email reminders at 24 hours, 1 hour, and 10 minutes before your event.',
-                  },
-                  {
-                    icon: Video,
-                    title: 'Attend via Zoom or Google Meet',
-                    desc: 'Click the join link and participate. No new apps. Attendance tracked automatically for CPD credit.',
-                  },
-                  {
-                    icon: FileCheck,
-                    title: 'Receive QR-Verified Certificates',
-                    desc: 'Get your CPD certificate within 1 hour. Instantly verifiable by employers and professional bodies.',
-                  },
-                ].map((step, idx) => (
-                  <StepCard key={idx} step={idx + 1} {...step} />
-                ))}
+
+              {/* ===== PREMIUM LEARNER JOURNEY ===== */}
+              <div className="relative">
+
+                {/* Desktop Connecting Line */}
+                <div className="hidden lg:block absolute top-[42px] left-[10%] right-[10%] h-px bg-gradient-to-r from-secondary/10 via-secondary/50 to-secondary/10 dark:from-secondary/10 dark:via-secondary/30 dark:to-secondary/10" />
+
+                {/* Mobile Connecting Line */}
+                <div className="lg:hidden absolute left-[27px] top-8 bottom-8 w-px bg-gradient-to-b from-secondary/10 via-secondary/50 to-secondary/10 dark:from-secondary/10 dark:via-secondary/30 dark:to-secondary/10" />
+
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-7 lg:gap-6 max-w-5xl mx-auto">
+                  {[
+                    {
+                      step: '01',
+                      icon: Search,
+                      title: 'Discover Training',
+                      desc: 'Browse verified live events, workshops, and certified courses.',
+                    },
+                    {
+                      step: '02',
+                      icon: Smartphone,
+                      title: 'Register & Enroll',
+                      desc: 'Secure your entry using M-Pesa, Airtel, or card payments.',
+                    },
+                    {
+                      step: '03',
+                      icon: Bell,
+                      title: 'Get Reminders',
+                      desc: 'Receive automated WhatsApp, SMS, and calendar alerts.',
+                    },
+                    {
+                      step: '04',
+                      icon: UserCheck,
+                      title: 'Join & Learn',
+                      desc: 'Attend live events or access interactive course modules.',
+                    },
+                    {
+                      step: '05',
+                      icon: FileCheck,
+                      title: 'Claim Credential',
+                      desc: 'Download your QR-verifiable certificate upon completion.',
+                    },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="relative flex lg:flex-col items-start lg:items-center group"
+                    >
+                      {/* Step Marker */}
+                      <div className="relative z-10 shrink-0 flex items-center justify-center">
+                        <div className="w-[56px] h-[56px] rounded-2xl bg-white dark:bg-[#202124] border border-secondary/25 dark:border-secondary/30 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:border-secondary group-hover:shadow-lg group-hover:shadow-secondary/10 group-hover:-translate-y-1">
+                          <div className="w-[42px] h-[42px] rounded-xl bg-secondary/15 dark:bg-secondary/10 text-neutral-dark dark:text-secondary-400 flex items-center justify-center transition-all duration-300 group-hover:bg-secondary group-hover:text-neutral-dark">
+                            <item.icon className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="ml-5 lg:ml-0 lg:mt-6 w-full lg:text-center">
+                        <div className="mb-2">
+                          <span className="inline-flex items-center rounded-full bg-secondary/10 dark:bg-secondary/10 px-2.5 py-1 text-[10px] font-bold tracking-[0.12em] text-neutral-dark dark:text-secondary-400 uppercase">
+                            Step {item.step}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-sm sm:text-base text-neutral-dark dark:text-white leading-snug mb-2 transition-colors group-hover:text-primary dark:group-hover:text-primary-400">
+                          {item.title}
+                        </h4>
+
+                        <p className="text-xs sm:text-sm text-neutral-gray dark:text-muted-foreground leading-relaxed max-w-[190px] lg:mx-auto">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
 
-      {/* Payment Options */}
-      <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
+      {/* ===== KEY FEATURES ===== */}
+      <section className="py-14 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
-              Flexible{' '}
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-dark dark:text-white">
+              Everything You Need
+            </h2>
+
+            <p className="text-sm sm:text-base text-neutral-gray dark:text-muted-foreground mt-1.5">
+              All the tools to create, manage, and scale your events & courses.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {[
+              { icon: Wallet, title: 'Mobile Money', desc: 'M-Pesa, Airtel, Cards' },
+              { icon: QrCode, title: 'QR Certificates', desc: 'Scan to verify completion' },
+              { icon: BarChart3, title: 'CPD Tracking', desc: 'Auto-track professional credits' },
+              { icon: Clock, title: '7-Day Payouts', desc: 'Direct revenue payouts' },
+              { icon: Megaphone, title: 'Discovery Engine', desc: 'Listed in search directory' },
+              { icon: ShieldCheck, title: 'Fraud Protection', desc: 'Secure credential verification' },
+            ].map((feature, idx) => (
+              <FeatureCard key={idx} {...feature} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== EVENT & COURSE TYPES ===== */}
+      <section className="py-14">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-dark dark:text-white">
+              Types of{' '}
               <span className="text-primary dark:text-primary-400">
-                Payment Options
+                Events & Courses
               </span>
             </h2>
-            <p className="text-xl text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-              Choose what works for you.
+
+            <p className="text-sm sm:text-base text-neutral-gray dark:text-muted-foreground mt-1.5">
+              From one-day workshops to structured certification courses.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-3">
-                <Smartphone className="w-8 h-8" />
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 max-w-4xl mx-auto">
+            {[
+              { icon: Coffee, title: 'Workshops' },
+              { icon: Video, title: 'Webinars' },
+              { icon: Rocket, title: 'Bootcamps' },
+              { icon: BookOpen, title: 'Online Courses' },
+              { icon: Users, title: 'Conferences' },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-[#2D2E32] rounded-xl p-5 border border-[#E8EAED] dark:border-[#3C4043] text-center shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="w-11 h-11 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2 group-hover:bg-primary group-hover:text-white transition-colors">
+                  <item.icon className="w-5 h-5" />
+                </div>
+
+                <h3 className="font-semibold text-sm text-neutral-dark dark:text-white">
+                  {item.title}
+                </h3>
               </div>
-              <h3 className="font-semibold text-lg text-neutral-dark dark:text-white">M-Pesa</h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Pay in seconds with STK push.
-              </p>
-            </div>
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm text-center">
-              <div className="w-16 h-16 rounded-full bg-secondary/10 text-secondary-700 mx-auto flex items-center justify-center mb-3">
-                <Smartphone className="w-8 h-8" />
-              </div>
-              <h3 className="font-semibold text-lg text-neutral-dark dark:text-white">Airtel Money</h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Mobile money for Airtel users.
-              </p>
-            </div>
-            <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm text-center">
-              <div className="w-16 h-16 rounded-full bg-tertiary/10 text-tertiary-600 mx-auto flex items-center justify-center mb-3">
-                <Landmark className="w-8 h-8" />
-              </div>
-              <h3 className="font-semibold text-lg text-neutral-dark dark:text-white">Card Payments</h3>
-              <p className="text-sm text-neutral-gray dark:text-muted-foreground mt-1">
-                Visa, Mastercard, and more.
-              </p>
-            </div>
+            ))}
           </div>
-          <p className="text-center text-base text-neutral-gray dark:text-muted-foreground mt-6 max-w-2xl mx-auto">
-            No bank account required for mobile money users. Financial inclusion
-            for professional development.
-          </p>
         </div>
       </section>
 
-
-      {/* Comparison Table */}
-      <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
+      {/* ===== PAYMENTS ===== */}
+      <section className="py-14 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-dark dark:text-white">
+              Flexible{' '}
+              <span className="text-primary dark:text-primary-400">
+                Payments
+              </span>
+            </h2>
+
+            <p className="text-sm sm:text-base text-neutral-gray dark:text-muted-foreground mt-1.5">
+              Accept payments for tickets or course enrollments effortlessly.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
+            {[
+              { icon: Smartphone, title: 'M-Pesa' },
+              { icon: Smartphone, title: 'Airtel' },
+              { icon: Landmark, title: 'Cards' },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-[#2D2E32] rounded-xl p-5 border border-[#E8EAED] dark:border-[#3C4043] text-center shadow-sm cursor-pointer hover:border-primary/50 transition-all"
+              >
+                <div className="w-11 h-11 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2">
+                  <item.icon className="w-5 h-5" />
+                </div>
+
+                <h3 className="font-semibold text-sm text-neutral-dark dark:text-white">
+                  {item.title}
+                </h3>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== COMPARISON ===== */}
+      <section className="py-14">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-dark dark:text-white">
               How We{' '}
               <span className="text-primary dark:text-primary-400">
                 Compare
               </span>
             </h2>
-            <p className="text-xl text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-              Nuruvent vs. the alternatives.
+
+            <p className="text-sm sm:text-base text-neutral-gray dark:text-muted-foreground mt-1.5">
+              See why organizers choose Nuruvent for events & courses.
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto overflow-x-auto">
-            <table className="w-full border-collapse text-base">
+          <div className="max-w-3xl mx-auto overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-primary/5 dark:bg-primary/10">
-                  <th className="text-left px-4 py-4 text-base font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
+                  <th className="text-left px-4 py-3 font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
                     Feature
                   </th>
-                  <th className="text-center px-4 py-4 text-base font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
+
+                  <th className="text-center px-4 py-3 font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
                     Eventbrite
                   </th>
-                  <th className="text-center px-4 py-4 text-base font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
+
+                  <th className="text-center px-4 py-3 font-semibold text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
                     Manual
                   </th>
-                  <th className="text-center px-4 py-4 text-base font-semibold text-primary dark:text-primary-400 border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10">
+
+                  <th className="text-center px-4 py-3 font-semibold text-primary dark:text-primary-400 border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10">
                     Nuruvent
                   </th>
                 </tr>
               </thead>
+
               <tbody>
                 {[
-                  { feature: 'Payment', eventbrite: 'Cards only', manual: 'Manual reconciliation', nuruvent: 'M-Pesa, Airtel, Cards' },
-                  { feature: 'Video', eventbrite: 'None', manual: 'Manual link sharing', nuruvent: "Host's Zoom/Meet" },
-                  { feature: 'Certificates', eventbrite: 'No', manual: 'Manual PDF', nuruvent: 'Auto + QR verification' },
-                  { feature: 'Attendance', eventbrite: 'No', manual: 'Manual roll-call', nuruvent: 'Auto via Zoom/Meet API' },
-                  { feature: 'CPD Tracking', eventbrite: 'No', manual: 'Manual tracking', nuruvent: 'Auto-tracking' },
-                  { feature: 'Discovery', eventbrite: 'Expensive', manual: 'None', nuruvent: 'Marketplace + SEO' },
-                  { feature: 'Fees', eventbrite: '18.5%', manual: '0% (manual work)', nuruvent: '3.5%' },
-                  { feature: 'Payouts', eventbrite: '30 days', manual: 'Instant (manual)', nuruvent: '7 days' },
-                  { feature: 'Reminders', eventbrite: 'No', manual: 'Manual', nuruvent: 'Auto WhatsApp + SMS + Email' },
-                  { feature: 'Replays', eventbrite: 'No', manual: 'Manual upload', nuruvent: '30-day hosted' },
+                  {
+                    feature: 'Events & Courses',
+                    eventbrite: 'Events Only',
+                    manual: 'Separate',
+                    nuruvent: 'Both Integrated',
+                  },
+                  {
+                    feature: 'Payments',
+                    eventbrite: 'Cards',
+                    manual: 'Manual',
+                    nuruvent: 'M-Pesa + Cards',
+                  },
+                  {
+                    feature: 'Certificates',
+                    eventbrite: 'No',
+                    manual: 'PDF',
+                    nuruvent: 'Auto + QR',
+                  },
+                  {
+                    feature: 'CPD Credit Tracking',
+                    eventbrite: 'No',
+                    manual: 'Manual',
+                    nuruvent: 'Auto-tracked',
+                  },
+                  {
+                    feature: 'Payouts',
+                    eventbrite: '30 days',
+                    manual: 'Instant',
+                    nuruvent: '7 days',
+                  },
+                  {
+                    feature: 'Commission Fee',
+                    eventbrite: '18.5%',
+                    manual: '0%',
+                    nuruvent: '3.5%',
+                  },
                 ].map((row, idx) => (
                   <ComparisonRow key={idx} {...row} />
                 ))}
@@ -365,70 +551,93 @@ export function HowItWorksContent() {
         </div>
       </section>
 
-      {/* The Nuruvent Difference */}
-      <section className="py-16">
+      {/* ===== WHO IT'S FOR ===== */}
+      <section className="py-14 bg-neutral-light/50 dark:bg-[#2D2E32]/30">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-[#202124] dark:to-[#2D2E32] rounded-3xl p-8 md:p-12 border border-[#E8EAED] dark:border-[#3C4043]">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-neutral-dark dark:text-white mb-4">
-                Professional Development Infrastructure
-              </h2>
-              <p className="text-lg text-neutral-gray dark:text-muted-foreground max-w-2xl mx-auto">
-                From training institutes and corporate HR teams to professional
-                bodies and independent coaches — we handle the complexity so you
-                can focus on impact.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                <div>
-                  <div className="text-2xl font-bold text-primary dark:text-primary-400">10,000+</div>
-                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">Annual Training Events</p>
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-neutral-dark dark:text-white">
+              Who Uses{' '}
+              <span className="text-primary dark:text-primary-400">
+                Nuruvent
+              </span>
+            </h2>
+
+            <p className="text-sm sm:text-base text-neutral-gray dark:text-muted-foreground mt-1.5">
+              Trusted by event organizers, course creators, and institutions worldwide.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {[
+              { icon: Building2, title: 'Training Institutes' },
+              { icon: UserCircle, title: 'Professional Coaches' },
+              { icon: Briefcase, title: 'Corporate HR Teams' },
+              { icon: GraduationCap, title: 'Professional Bodies' },
+              { icon: Users, title: 'Independent Instructors' },
+              { icon: Globe, title: 'Global Learners' },
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                className="bg-white dark:bg-[#2D2E32] rounded-xl p-5 border border-[#E8EAED] dark:border-[#3C4043] text-center shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <div className="w-11 h-11 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2">
+                  <item.icon className="w-5 h-5" />
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-secondary-700 dark:text-secondary-300">250,000+</div>
-                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">Professional Body Members</p>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-tertiary-600 dark:text-tertiary-300">80%+</div>
-                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">Mobile Money Penetration</p>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-error-500 dark:text-error-400">Global</div>
-                  <p className="text-sm text-neutral-gray dark:text-muted-foreground">Available Worldwide</p>
-                </div>
+
+                <h3 className="font-semibold text-sm text-neutral-dark dark:text-white">
+                  {item.title}
+                </h3>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* CTA - Light Background */}
-      <section className="py-16 bg-neutral-light/50 dark:bg-[#2D2E32]/30 border-t border-[#E8EAED] dark:border-[#3C4043]">
+      {/* ===== CTA ===== */}
+      <section className="py-16 bg-primary-50 dark:bg-[#2D2E32]/50 border-t border-[#E8EAED] dark:border-[#3C4043]">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold text-neutral-dark dark:text-white mb-4">
-            Ready to Illuminate Your Training Events?
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 cursor-default">
+            <Sparkles className="w-4 h-4" />
+            Join 2,000+ Instructors & Organizers
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl font-bold text-neutral-dark dark:text-white mb-3">
+            Ready to Launch{' '}
+            <span className="text-primary dark:text-primary-400">
+              Events & Courses
+            </span>
+            ?
           </h2>
-          <p className="text-xl text-neutral-gray dark:text-muted-foreground max-w-xl mx-auto mb-8">
-            Join training providers and professionals saving time, reducing
-            fraud, and advancing careers.
+
+          <p className="text-base text-neutral-gray dark:text-muted-foreground max-w-md mx-auto mb-8">
+            Start creating, get paid in 7 days, and issue verified certificates.
           </p>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 bg-primary text-white px-8 py-4 rounded-full font-medium text-lg hover:bg-primary-600 transition-colors shadow-sm"
-            >
-              Get Started
-              <ArrowRight className="w-5 h-5" />
+            <Link href="/signup" className="cursor-pointer">
+              <Button
+                size="lg"
+                className="cursor-pointer bg-primary hover:bg-primary-600 text-white rounded-full px-7 py-3.5 font-semibold text-base"
+              >
+                Start Creating
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
             </Link>
-            <Link
-              href="/events"
-              className="inline-flex items-center gap-2 bg-white dark:bg-[#2D2E32] text-neutral-dark dark:text-white px-8 py-4 rounded-full font-medium text-lg border border-[#E8EAED] dark:border-[#3C4043] hover:border-primary hover:text-primary transition-colors"
-            >
-              Find Training Events
-              <ArrowRight className="w-5 h-5" />
+
+            <Link href="/events" className="cursor-pointer">
+              <Button
+                size="lg"
+                variant="outline"
+                className="cursor-pointer bg-white dark:bg-[#2D2E32] text-neutral-dark dark:text-white border-[#E8EAED] dark:border-[#3C4043] rounded-full px-7 py-3.5 font-semibold text-base"
+              >
+                Discover Training
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
             </Link>
           </div>
-          <p className="text-base text-neutral-gray dark:text-muted-foreground mt-6">
-            No setup fees. No hidden costs. 3.5% commission only.
+
+          <p className="text-xs sm:text-sm text-neutral-gray dark:text-muted-foreground mt-5">
+            3.5% commission. No setup fees. No hidden costs.
           </p>
         </div>
       </section>
@@ -440,55 +649,72 @@ export function HowItWorksContent() {
 // SUB-COMPONENTS
 // ============================================================
 
-function StepCard({ icon: Icon, title, desc, step }: StepProps) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
-        {step}
-      </div>
-      <div>
-        <h4 className="font-medium text-base text-neutral-dark dark:text-white">
-          {title}
-        </h4>
-        <p className="text-sm text-neutral-gray dark:text-muted-foreground">
-          {desc}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function FeatureCard({ icon: Icon, title, desc }: FeatureCardProps) {
   return (
-    <div className="bg-white dark:bg-[#2D2E32] rounded-2xl p-6 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-all">
-      <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-        <Icon className="w-6 h-6" />
+    <div className="bg-white dark:bg-[#2D2E32] rounded-xl p-5 border border-[#E8EAED] dark:border-[#3C4043] shadow-sm hover:shadow-md transition-all text-center cursor-pointer group">
+      <div className="w-11 h-11 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2.5 group-hover:bg-primary group-hover:text-white transition-colors">
+        <Icon className="w-5 h-5" />
       </div>
-      <h3 className="font-semibold text-lg text-neutral-dark dark:text-white mb-1">
+
+      <h3 className="font-semibold text-base text-neutral-dark dark:text-white mb-1">
         {title}
       </h3>
-      <p className="text-sm text-neutral-gray dark:text-muted-foreground">
+
+      <p className="text-xs sm:text-sm text-neutral-gray dark:text-muted-foreground">
         {desc}
       </p>
     </div>
   );
 }
 
-function ComparisonRow({ feature, eventbrite, manual, nuruvent }: ComparisonRowProps) {
+function ComparisonRow({
+  feature,
+  eventbrite,
+  manual,
+  nuruvent,
+}: {
+  feature: string;
+  eventbrite: string;
+  manual: string;
+  nuruvent: string;
+}) {
+  const isNuruventBetter = (val: string) => {
+    const betterValues = [
+      'Both Integrated',
+      'M-Pesa + Cards',
+      'Auto + QR',
+      'Auto-tracked',
+      '7 days',
+      '3.5%',
+    ];
+
+    return betterValues.includes(val);
+  };
+
   return (
-    <tr className="bg-white dark:bg-[#202124] hover:bg-neutral-light/50 dark:hover:bg-[#2D2E32]/30 transition-colors">
-      <td className="px-4 py-3 text-base font-medium text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
+    <tr className="bg-white dark:bg-[#202124] hover:bg-neutral-light/50 dark:hover:bg-[#2D2E32]/30 transition-colors cursor-pointer">
+      <td className="px-4 py-3 text-sm font-medium text-neutral-dark dark:text-white border border-[#E8EAED] dark:border-[#3C4043]">
         {feature}
       </td>
-      <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
+
+      <td className="px-4 py-3 text-sm text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
         {eventbrite}
       </td>
-      <td className="px-4 py-3 text-base text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
+
+      <td className="px-4 py-3 text-sm text-center text-neutral-gray dark:text-muted-foreground border border-[#E8EAED] dark:border-[#3C4043]">
         {manual}
       </td>
-      <td className="px-4 py-3 text-base text-center text-primary dark:text-primary-400 font-medium border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10">
+
+      <td
+        className={`px-4 py-3 text-sm text-center font-semibold border border-[#E8EAED] dark:border-[#3C4043] bg-primary/5 dark:bg-primary/10 ${
+          isNuruventBetter(nuruvent)
+            ? 'text-primary dark:text-primary-400'
+            : 'text-neutral-gray dark:text-muted-foreground'
+        }`}
+      >
         {nuruvent}
       </td>
     </tr>
   );
 }
+

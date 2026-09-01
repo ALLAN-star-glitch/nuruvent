@@ -7,17 +7,19 @@ import Script from 'next/script';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Nuruvent — Where Professionals Grow',
+    default: 'Nuruvent — Training Events & Online Courses Platform',
     template: '%s | Nuruvent',
   },
-  description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+  description: 'The global platform connecting training providers and learners. Discover live training events, workshops, webinars, self-paced online courses, and earn certified qualifications.',
   keywords: [
+    'training events and courses',
+    'online courses platform',
     'professional training',
     'workshops',
     'webinars',
     'bootcamps',
     'certified courses',
-    'CPD',
+    'CPD certificates',
     'career development',
     'professional growth',
     'training platform',
@@ -30,26 +32,26 @@ export const metadata: Metadata = {
   creator: 'Nuruvent',
   publisher: 'Nuruvent',
   openGraph: {
-    title: 'Nuruvent — Where Professionals Grow',
-    description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+    title: 'Nuruvent — Training Events & Online Courses Platform',
+    description: 'The global platform connecting training providers and learners. Discover live training events, workshops, webinars, self-paced online courses, and earn certified qualifications.',
     url: 'https://nuruvent.com',
     siteName: 'Nuruvent',
     type: 'website',
     locale: 'en_US',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/hero-image.png',
         width: 1200,
         height: 630,
-        alt: 'Nuruvent — Where Professionals Grow',
+        alt: 'Nuruvent — Training Events & Online Courses Platform',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nuruvent — Where Professionals Grow',
-    description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
-    images: ['/twitter-image.jpg'],
+    title: 'Nuruvent — Training Events & Online Courses Platform',
+    description: 'The global platform connecting training providers and learners. Discover live training events, workshops, webinars, self-paced online courses, and earn certified qualifications.',
+    images: ['/hero-image.png'],
     site: '@nuruvent',
     creator: '@nuruvent',
   },
@@ -153,9 +155,9 @@ export default function PublicLayout({
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': 'Organization',
+            '@type': 'EducationalOrganization',
             name: 'Nuruvent',
-            description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+            description: 'The global platform connecting training providers and learners for live events, workshops, and self-paced online courses.',
             url: 'https://nuruvent.com',
             logo: 'https://nuruvent.com/logo.png',
             sameAs: [

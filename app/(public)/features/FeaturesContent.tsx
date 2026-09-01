@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Zap, 
   Smartphone, 
@@ -78,28 +79,94 @@ const features = [
 
 export function FeaturesContent() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-500 selection:text-white">
-      {/* Page Header */}
-      <section className="relative overflow-hidden pt-16 pb-16 md:pt-24 md:pb-20">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-96 bg-gradient-to-b from-blue-500/10 via-blue-200/20 to-transparent blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-white dark:bg-[#202124] text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white">
+      {/* ===== HERO SECTION WITH FADE OUT ===== */}
+      <section className="relative overflow-hidden bg-white dark:bg-[#202124] py-14 md:py-20">
+        {/* Background Image Container */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/features.png"
+            alt="Events & Courses Training Workflow"
+            fill
+            className="object-cover object-right"
+            priority
+          />
+
+          {/* Smooth left-to-right & bottom fade out gradient overlay */}
+          <div className="hidden lg:block absolute inset-0 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent dark:from-[#202124] dark:via-[#202124]/85" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent dark:from-[#202124]" />
+          </div>
+
+          {/* Mobile & Tablet Fallback Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/70 lg:hidden dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/70" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent lg:hidden dark:from-[#202124]" />
+        </div>
+
+        {/* Pattern Overlay on Left Side */}
+        <div className="absolute inset-0 pointer-events-none z-0 hidden lg:block">
+          <svg
+            className="absolute left-8 top-6 h-56 w-56"
+            viewBox="0 0 200 200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <pattern
+              id="dotPattern"
+              x="0"
+              y="0"
+              width="20"
+              height="20"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="10" cy="10" r="2" fill="#2563eb" opacity="0.15" />
+            </pattern>
+            <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern)" />
+          </svg>
+        </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-3xl mx-auto text-center space-y-4">
-            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-xs">
-              <Zap className="h-4 w-4 text-blue-600" />
+          <div className="max-w-2xl text-center lg:text-left">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-400 px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 dark:border-primary/20 shadow-sm cursor-default">
+              <Zap className="h-4 w-4" />
               <span>Built for Global Event Hosts</span>
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900">
-              Everything You Need to Run <br className="hidden sm:inline" />
+            {/* Heading */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight mb-3">
+              Everything You Need to Run{' '}
               <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-800 bg-clip-text text-transparent">
-                World-Class Training Events
+                World-Class Events & Courses
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+            {/* Subheading */}
+            <p className="text-base md:text-lg text-gray-700 dark:text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
               Nuruvent automates payments, QR credentials, attendee reminders, session tracking, and payouts — all in one unified platform.
             </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start">
+              <Link href="/signup" className="cursor-pointer">
+                <Button
+                  size="lg"
+                  className="cursor-pointer bg-primary hover:bg-primary/90 dark:bg-primary-500 dark:hover:bg-primary-600 text-white font-semibold px-6 py-3 text-sm md:text-base rounded-xl shadow-md shadow-primary/25 transition-all duration-300"
+                >
+                  Start Creating
+                  <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+                </Button>
+              </Link>
+              <Link href="/events" className="cursor-pointer">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="cursor-pointer border-gray-200 dark:border-[#3C4043] bg-white dark:bg-[#2D2E32] hover:bg-gray-50 dark:hover:bg-[#202124] px-6 py-3 text-sm md:text-base rounded-xl font-medium shadow-sm transition-all text-gray-900 dark:text-white"
+                >
+                  Discover Events & Courses
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -153,15 +220,15 @@ export function FeaturesContent() {
             </div>
 
             <h2 className="text-3xl md:text-4xl font-extrabold text-slate-900">
-              Ready to Automate Your Next Event?
+              Ready to Automate Your Next Event or Course?
             </h2>
             <p className="text-slate-600 text-base">
-              Set up your first event in less than 3 minutes. Free for non-paid sessions with zero setup costs.
+              Set up your first event or course in less than 3 minutes. Free for non-paid sessions with zero setup costs.
             </p>
             <div className="pt-2">
               <Link href="/signup" className="cursor-pointer">
                 <Button className="px-8 py-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base shadow-lg shadow-blue-600/20 transition-all inline-flex items-center gap-2 cursor-pointer">
-                  <span>Create Your First Event</span>
+                  <span>Create Your First Event or Course</span>
                   <ArrowRight className="h-5 w-5" />
                 </Button>
               </Link>
