@@ -12,7 +12,7 @@ export function HeroSection() {
       <div className="absolute inset-0 z-0">
         <Image
           src="/hero-image.png"
-          alt="Training Event"
+          alt="Training Events and Online Courses"
           fill
           className="object-cover object-right"
           priority
@@ -63,19 +63,19 @@ export function HeroSection() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-400 px-3 py-1 rounded-full text-xs md:text-sm font-medium mb-3 cursor-default border border-primary/15 dark:border-primary/20 shadow-sm">
               <Sparkles className="h-3 w-3" />
-              <span>For Everyone Who Creates & Attends Training</span>
+              <span>For Everyone Who Hosts & Attends Events or Courses</span>
             </div>
 
             {/* Heading - More Inclusive */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-[1.15] mb-3">
-              <span className="text-primary dark:text-primary-400 bg-clip-text">Nuruvent</span> - Where,
+              <span className="text-primary dark:text-primary-400 bg-clip-text">Nuruvent</span> - Where
               <br className="hidden sm:block" />
               <span className="text-secondary dark:text-secondary-300">Professionals</span> Grow
             </h1>
 
             {/* Subheading */}
             <p className="text-base md:text-lg text-gray-700 dark:text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-5 leading-relaxed">
-              Whether you&apos;re creating training events or advancing your career — 
+              Whether you&apos;re hosting live events, offering self-paced online courses, or advancing your career — 
               Nuruvent brings together training providers and learners from 
               universities, professional bodies, corporate teams, and independent coaches.
             </p>
@@ -92,7 +92,7 @@ export function HeroSection() {
               </div>
               <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#2D2E32] border border-gray-200/80 dark:border-[#3C4043] px-3.5 py-1.5 rounded-full shadow-sm cursor-default">
                 <CheckCircle className="h-4 w-4 text-tertiary dark:text-tertiary-400" />
-                <span className="text-xs md:text-sm font-medium text-gray-700 dark:text-muted-foreground">3.5% Commission</span>
+                <span className="text-xs md:text-sm font-medium text-gray-700 dark:text-muted-foreground">Events & Courses</span>
               </div>
               <div className="flex items-center gap-2 bg-gray-50 dark:bg-[#2D2E32] border border-gray-200/80 dark:border-[#3C4043] px-3.5 py-1.5 rounded-full shadow-sm cursor-default">
                 <Globe className="h-4 w-4 text-primary dark:text-primary-400" />
@@ -145,7 +145,7 @@ export function HeroSection() {
                   variant="outline" 
                   className="border-gray-200 dark:border-[#3C4043] bg-white dark:bg-[#2D2E32] hover:bg-gray-50 dark:hover:bg-[#202124] px-6 py-5 text-sm md:text-base rounded-xl font-medium shadow-sm transition-all text-gray-900 dark:text-white cursor-pointer"
                 >
-                  Find Training
+                  Find Training & Courses
                 </Button>
               </Link>
             </div>
@@ -192,7 +192,7 @@ export function HeroSection() {
                 </div>
               </div>
               <div className="text-xs text-gray-500 dark:text-muted-foreground text-center sm:text-left">
-                <span className="font-semibold text-gray-700 dark:text-white">2,000+</span> training providers and <span className="font-semibold text-gray-700 dark:text-white">10,000+</span> annual events
+                <span className="font-semibold text-gray-700 dark:text-white">2,000+</span> training providers and <span className="font-semibold text-gray-700 dark:text-white">10,000+</span> annual events & courses
               </div>
             </div>
           </div>
@@ -228,7 +228,7 @@ export function HeroSection() {
               </div>
               <div>
                 <p className="text-xs font-bold text-gray-900 dark:text-white">10,000+</p>
-                <p className="text-[11px] text-gray-600 dark:text-muted-foreground">Annual Training Events</p>
+                <p className="text-[11px] text-gray-600 dark:text-muted-foreground">Annual Events & Courses</p>
               </div>
             </div>
           </div>
