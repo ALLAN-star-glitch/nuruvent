@@ -751,7 +751,7 @@ export default function EditEventPage({ params }: { params: Promise<{ id: string
     autoSaveTimerRef.current = setTimeout(() => {
       console.log('⏰ Auto-save timer triggered');
       performAutoSave();
-    }, 4000);
+    }, 2000);
 
     return () => {
       if (autoSaveTimerRef.current) {
