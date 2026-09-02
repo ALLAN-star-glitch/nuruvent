@@ -14,8 +14,7 @@ import {
   CheckCircle,
   RefreshCw,
   ArrowLeftRight,
-  Sun,
-  Moon
+  Sun
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -46,7 +45,6 @@ interface DashboardHeaderProps {
   };
 }
 
-// Mock team data - replace with actual data from your store/API
 interface Team {
   id: string;
   name: string;
@@ -73,7 +71,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
-  // If not authenticated, don't show this header
   if (!isAuthenticated) {
     return null;
   }
@@ -106,9 +103,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const handleTeamSwitch = (team: Team) => {
     setCurrentTeam(team);
     setShowTeamSwitcher(false);
-    // Here you would dispatch a team switch action or update the store
-    // dispatch(setCurrentTeam(team));
-    // Then refetch data with new team context
   };
 
   const getTeamIcon = (type: Team['type']) => {
@@ -123,7 +117,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     return type === 'personal' ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-indigo-50 dark:bg-indigo-950/30';
   };
 
-  // Close dropdown on click outside
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -139,18 +132,16 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     setShowTeamSwitcher(!showTeamSwitcher);
   };
 
-  // Theme toggle - no functionality yet (placeholder)
   const handleThemeToggle = () => {
-    // TODO: Implement theme functionality
     console.log('Theme toggle - coming soon');
   };
 
   return (
     <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-[#202124] dark:border-[#3C4043]/80 dark:backdrop-blur-sm dark:bg-[#202124]/95">
-      <div className="container mx-auto px-3 sm:px-4">
+      <div className="container mx-auto px-2.5 sm:px-4">
         <div className="flex flex-col">
-          <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2">
-            {/* Left: Mobile Menu + Logo */}
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 md:gap-3">
+            {/* Left: Mobile/Tablet Drawer Menu + Logo */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               <Sheet>
                 <SheetTrigger asChild>
@@ -164,7 +155,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </Button>
                 </SheetTrigger>
 
-                <SheetContent side="left" className="p-0 w-[300px] sm:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]">
+                <SheetContent side="left" className="p-0 w-[280px] sm:w-[320px] md:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]">
                   <SheetHeader className="p-4 border-b border-gray-100 flex-row items-center justify-between space-y-0 text-left shrink-0 dark:border-[#3C4043]">
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="inline-flex items-center">
@@ -229,7 +220,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       )}
                     </button>
 
-                    {/* User Info */}
                     <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-[#3C4043]">
                       <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold flex items-center justify-center text-sm shrink-0 dark:from-primary/30 dark:to-primary/10">
                         {getInitials(user.name)}
@@ -243,13 +233,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-              {/* Logo */}
               <Link href="/dashboard" className="inline-flex items-center shrink-0 hover:opacity-80 transition-opacity cursor-pointer">
                 <Logo />
               </Link>
             </div>
 
-            {/* Search Bar - Desktop: full bar, Tablet/Mobile: hidden (toggle via icon) */}
+            {/* Search Bar - Visible on desktop and large screens */}
             <div className="hidden xl:flex items-center flex-1 max-w-2xl mx-4 justify-center">
               <div className="w-full max-w-xl relative">
                 <SearchBar />
@@ -257,8 +246,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </div>
 
             {/* Right Header Controls */}
-            <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 shrink-0">
-              {/* Search Toggle Button - visible on xl and below */}
+            <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
+              {/* Search Toggle Button - visible on tablet & mobile */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -273,23 +262,28 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              {/* ===== TEAM SWITCHER (Icon only on mobile, text on sm+) ===== */}
+              {/* TEAM SWITCHER - Responsive across mobile, tablet, and desktop */}
               <div className="relative" ref={teamSwitcherRef}>
                 <button
                   type="button"
                   onClick={toggleTeamSwitcher}
-                  className="flex items-center justify-center gap-1 sm:gap-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full sm:rounded-lg h-8 w-8 sm:h-9 sm:w-auto px-0 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#3C4043] border border-transparent hover:border-gray-200 dark:hover:border-[#3C4043] cursor-pointer"
+                  className="flex items-center justify-center gap-1 md:gap-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full md:rounded-lg h-8 w-8 md:h-9 md:w-auto px-0 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#3C4043] border border-transparent hover:border-gray-200 dark:hover:border-[#3C4043] cursor-pointer"
                   aria-label="Switch team"
                 >
-                  <ArrowLeftRight className="h-4 w-4 sm:h-4 sm:w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-                  <span className="hidden sm:inline-block text-gray-700 dark:text-gray-300 font-medium">
+                  <ArrowLeftRight className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+                  
+                  {/* Text hidden on mobile (<768px), visible on tablets/laptops (md+) */}
+                  <span className="hidden md:inline-block text-gray-700 dark:text-gray-300 font-medium">
                     Switch Team
                   </span>
-                  <span className="hidden md:inline-block max-w-[80px] truncate text-gray-500 dark:text-gray-400">
+                  
+                  {/* Current team name shown on larger tablets/desktops (lg+) */}
+                  <span className="hidden lg:inline-block max-w-[90px] xl:max-w-[120px] truncate text-gray-500 dark:text-gray-400">
                     ({currentTeam.name})
                   </span>
+
                   <ChevronDown className={cn(
-                    "hidden sm:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0",
+                    "hidden md:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0",
                     showTeamSwitcher ? "rotate-180" : ""
                   )} />
                 </button>
@@ -352,27 +346,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </div>
 
-              {/* Create Event Button - Desktop */}
+              {/* Create Event Button - Compact text on tablets (sm to lg), Full text on desktops (lg+) */}
               <button
                 type="button"
                 onClick={handleCreateEvent}
-                className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all px-2.5 sm:px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md cursor-pointer shrink-0"
               >
-                <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Create Event or Course</span>
+                <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
+                <span className="inline lg:hidden">Create Event</span>
+                <span className="hidden lg:inline">Create Event or Course</span>
               </button>
 
-              {/* Create Event Button - Mobile */}
-              <button
-                type="button"
-                onClick={handleCreateEvent}
-                className="sm:hidden text-primary hover:bg-primary/10 rounded-full h-8 w-8 transition-colors active:scale-95 touch-manipulation flex items-center justify-center cursor-pointer"
-                aria-label="Create Event"
-              >
-                <PlusCircle className="h-5 w-5" />
-              </button>
-
-              {/* ===== THEME SWITCHER (Icon only) ===== */}
+              {/* Theme Toggle - Icon only */}
               <button
                 type="button"
                 onClick={handleThemeToggle}
@@ -383,20 +368,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               </button>
 
               <UserMenu user={user} onLogout={handleLogout} />
-
-              {/* Create Event Button - Quick create for tablet */}
-              <button
-                type="button"
-                onClick={handleCreateEvent}
-                className="hidden md:flex lg:hidden items-center gap-1 border border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95 rounded-md dark:border-[#3C4043] dark:text-gray-300 dark:hover:border-primary/50 dark:hover:bg-primary/10 cursor-pointer"
-              >
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">New</span>
-              </button>
             </div>
           </div>
 
-          {/* Mobile/Tablet Search - shown when toggled on xl and below */}
+          {/* Mobile/Tablet Search Dropdown */}
           <div className={cn(
             "xl:hidden transition-all duration-300 ease-in-out relative z-20",
             isMobileSearchOpen ? "max-h-16 pb-2 opacity-100" : "max-h-0 opacity-0 overflow-hidden"
@@ -406,7 +381,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
         </div>
       </div>
 
-      {/* Logout Confirmation Dialog */}
       <LogoutDialog
         open={showLogoutDialog}
         onOpenChange={setShowLogoutDialog}
