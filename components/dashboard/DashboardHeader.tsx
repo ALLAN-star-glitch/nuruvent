@@ -1,34 +1,24 @@
-// components/dashboard/DashboardHeader.tsx
-
 'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
   Menu, 
-  CreditCard, 
-  LayoutDashboard, 
-  Calendar, 
-  Users, 
-  Award, 
-  Settings,
   PlusCircle,
-  DollarSign,
-  Video,
   LogOut,
-  Sparkles,
   ChevronDown,
-  ChevronRight,
-  Gift,
-  Zap,
-  Clock,
-  TrendingUp,
   Search,
-  X
+  X,
+  Building2,
+  Home,
+  CheckCircle,
+  RefreshCw,
+  ArrowLeftRight,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
-import { NotificationBell } from '@/components/layout/NotificationBell';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { 
   Sheet, 
@@ -56,20 +46,29 @@ interface DashboardHeaderProps {
   };
 }
 
-// Quick action items for dropdown
-const quickActions = [
-  { href: '/dashboard/events/new', label: 'Create Event', icon: PlusCircle, color: 'text-primary' },
-  { href: '/dashboard/events', label: 'Manage Events', icon: Calendar, color: 'text-blue-500' },
-  { href: '/dashboard/attendees', label: 'View Attendees', icon: Users, color: 'text-emerald-500' },
+// Mock team data - replace with actual data from your store/API
+interface Team {
+  id: string;
+  name: string;
+  type: 'personal' | 'institution';
+  role: string;
+  avatar?: string;
+}
+
+const mockTeams: Team[] = [
+  { id: 'personal-1', name: "John's Personal Team", type: 'personal', role: 'Account Admin' },
+  { id: 'nuruvent', name: 'Nuruvent', type: 'institution', role: 'Event Manager' },
+  { id: 'techcorp', name: 'TechCorp', type: 'institution', role: 'Team Member' },
 ];
 
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showTeamSwitcher, setShowTeamSwitcher] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const quickActionsRef = useRef<HTMLDivElement>(null);
+  const [currentTeam, setCurrentTeam] = useState<Team>(mockTeams[0]);
+  const teamSwitcherRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
@@ -104,24 +103,50 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     router.push('/dashboard/events/new');
   };
 
-  // Close quick actions on click outside
+  const handleTeamSwitch = (team: Team) => {
+    setCurrentTeam(team);
+    setShowTeamSwitcher(false);
+    // Here you would dispatch a team switch action or update the store
+    // dispatch(setCurrentTeam(team));
+    // Then refetch data with new team context
+  };
+
+  const getTeamIcon = (type: Team['type']) => {
+    return type === 'personal' ? Home : Building2;
+  };
+
+  const getTeamColor = (type: Team['type']) => {
+    return type === 'personal' ? 'text-blue-600 dark:text-blue-400' : 'text-indigo-600 dark:text-indigo-400';
+  };
+
+  const getTeamBgColor = (type: Team['type']) => {
+    return type === 'personal' ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-indigo-50 dark:bg-indigo-950/30';
+  };
+
+  // Close dropdown on click outside
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (quickActionsRef.current && !quickActionsRef.current.contains(event.target as Node)) {
-        setShowQuickActions(false);
+      if (teamSwitcherRef.current && !teamSwitcherRef.current.contains(event.target as Node)) {
+        setShowTeamSwitcher(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const toggleQuickActions = () => {
-    setShowQuickActions(!showQuickActions);
+  const toggleTeamSwitcher = () => {
+    setShowTeamSwitcher(!showTeamSwitcher);
+  };
+
+  // Theme toggle - no functionality yet (placeholder)
+  const handleThemeToggle = () => {
+    // TODO: Implement theme functionality
+    console.log('Theme toggle - coming soon');
   };
 
   return (
-    <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95">
+    <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-[#202124] dark:border-[#3C4043]/80 dark:backdrop-blur-sm dark:bg-[#202124]/95">
       <div className="container mx-auto px-3 sm:px-4">
         <div className="flex flex-col">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2">
@@ -132,15 +157,15 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
+                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
                     aria-label="Open navigation menu"
                   >
                     <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </SheetTrigger>
 
-                <SheetContent side="left" className="p-0 w-[300px] sm:w-[340px] flex flex-col h-full bg-white">
-                  <SheetHeader className="p-4 border-b border-gray-100 flex-row items-center justify-between space-y-0 text-left shrink-0">
+                <SheetContent side="left" className="p-0 w-[300px] sm:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]">
+                  <SheetHeader className="p-4 border-b border-gray-100 flex-row items-center justify-between space-y-0 text-left shrink-0 dark:border-[#3C4043]">
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="inline-flex items-center">
                       <Logo />
@@ -148,9 +173,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </SheetHeader>
 
                   <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                    {/* Main Website Navigation - Only this remains */}
                     <div>
-                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 dark:text-gray-500">
                         Menu
                       </p>
                       <nav className="space-y-0.5">
@@ -164,13 +188,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                                 className={cn(
                                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                                   isActive
-                                    ? 'bg-primary/10 text-primary'
-                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900'
+                                    ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white'
                                 )}
                               >
                                 <Icon className={cn(
                                   'h-5 w-5 shrink-0',
-                                  isActive ? 'text-primary' : 'text-gray-400'
+                                  isActive ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
                                 )} />
                                 <span>{item.label}</span>
                               </Link>
@@ -182,13 +206,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </div>
 
                   {/* Drawer Footer - Logout and User */}
-                  <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3">
-                    {/* Logout Button */}
+                  <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3 dark:border-[#3C4043] dark:bg-[#2D2E32]">
                     <button
                       type="button"
                       onClick={() => setShowLogoutDialog(true)}
                       disabled={isLoading}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-red-500 hover:bg-red-50/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-red-500 hover:bg-red-50/50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950/20 cursor-pointer"
                     >
                       {isLoading ? (
                         <div className="flex items-center gap-3">
@@ -207,13 +230,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </button>
 
                     {/* User Info */}
-                    <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
+                    <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-[#3C4043]">
+                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold flex items-center justify-center text-sm shrink-0 dark:from-primary/30 dark:to-primary/10">
                         {getInitials(user.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate capitalize">{user.role}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate dark:text-white">{user.name}</p>
+                        <p className="text-xs text-gray-500 truncate capitalize dark:text-gray-400">{user.role}</p>
                       </div>
                     </div>
                   </div>
@@ -235,11 +258,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
             {/* Right Header Controls */}
             <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2 shrink-0">
-              {/* Search Toggle Button - visible on xl and below (tablets, iPads, Nest Hub, mobile) */}
+              {/* Search Toggle Button - visible on xl and below */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 sm:h-9 sm:w-9 transition-colors"
+                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
                 onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
                 aria-label={isMobileSearchOpen ? "Close search" : "Open search"}
               >
@@ -250,81 +273,126 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              {/* Create Event Button - Desktop */}
-              <Button
-                onClick={handleCreateEvent}
-                className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all cursor-pointer px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md"
-              >
-                <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Create Event</span>
-              </Button>
-
-              {/* Create Event Button - Mobile */}
-              <Button
-                onClick={handleCreateEvent}
-                variant="ghost"
-                size="icon"
-                className="sm:hidden text-primary hover:bg-primary/10 rounded-full cursor-pointer h-8 w-8 transition-colors active:scale-95 touch-manipulation"
-                aria-label="Create Event"
-              >
-                <PlusCircle className="h-5 w-5" />
-              </Button>
-
-              <NotificationBell />
-
-              {/* Quick Actions Dropdown */}
-              <div className="relative" ref={quickActionsRef}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full cursor-pointer h-8 w-8 md:h-9 md:w-9 hidden sm:flex transition-colors active:scale-95 touch-manipulation"
-                  onClick={toggleQuickActions}
-                  aria-label="Quick actions"
+              {/* ===== TEAM SWITCHER (Icon only on mobile, text on sm+) ===== */}
+              <div className="relative" ref={teamSwitcherRef}>
+                <button
+                  type="button"
+                  onClick={toggleTeamSwitcher}
+                  className="flex items-center justify-center gap-1 sm:gap-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full sm:rounded-lg h-8 w-8 sm:h-9 sm:w-auto px-0 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#3C4043] border border-transparent hover:border-gray-200 dark:hover:border-[#3C4043] cursor-pointer"
+                  aria-label="Switch team"
                 >
-                  <Sparkles className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                </Button>
+                  <ArrowLeftRight className="h-4 w-4 sm:h-4 sm:w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+                  <span className="hidden sm:inline-block text-gray-700 dark:text-gray-300 font-medium">
+                    Switch Team
+                  </span>
+                  <span className="hidden md:inline-block max-w-[80px] truncate text-gray-500 dark:text-gray-400">
+                    ({currentTeam.name})
+                  </span>
+                  <ChevronDown className={cn(
+                    "hidden sm:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0",
+                    showTeamSwitcher ? "rotate-180" : ""
+                  )} />
+                </button>
 
-                {showQuickActions && (
-                  <div className="absolute right-0 mt-2 w-56 sm:w-64 bg-white rounded-2xl shadow-xl border border-gray-100/80 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                {showTeamSwitcher && (
+                  <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white dark:bg-[#2D2E32] rounded-2xl shadow-2xl border border-gray-200/80 dark:border-[#3C4043] py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="px-3 sm:px-4 py-1.5 sm:py-2">
-                      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">Quick Actions</p>
+                      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Switch Team</p>
                     </div>
-                    <div className="h-px bg-gradient-to-r from-gray-100 to-transparent mx-3 sm:mx-4" />
-                    {quickActions.map((action) => {
-                      const Icon = action.icon;
-                      return (
-                        <button
-                          key={action.href}
-                          onClick={() => {
-                            router.push(action.href);
-                            setShowQuickActions(false);
-                          }}
-                          className="flex items-center gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer group"
-                        >
-                          <div className={cn("h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors", action.color)}>
-                            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </div>
-                          <span className="font-medium text-xs sm:text-sm">{action.label}</span>
-                          <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-400 ml-auto -rotate-90" />
-                        </button>
-                      );
-                    })}
+                    <div className="h-px bg-gradient-to-r from-gray-100 to-transparent dark:from-[#3C4043] mx-3 sm:mx-4" />
+                    <div className="mt-1">
+                      {mockTeams.map((team) => {
+                        const Icon = getTeamIcon(team.type);
+                        const isActive = currentTeam.id === team.id;
+                        return (
+                          <button
+                            key={team.id}
+                            type="button"
+                            onClick={() => handleTeamSwitch(team)}
+                            className={cn(
+                              "flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-left transition-colors cursor-pointer",
+                              isActive 
+                                ? "bg-blue-50 dark:bg-blue-950/30" 
+                                : "hover:bg-gray-50 dark:hover:bg-[#3C4043]/50"
+                            )}
+                          >
+                            <div className={cn(
+                              "h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                              getTeamBgColor(team.type),
+                              isActive ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#2D2E32]" : ""
+                            )}>
+                              <Icon className={cn("h-4 w-4 sm:h-4.5 sm:w-4.5", getTeamColor(team.type))} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={cn(
+                                "text-sm font-medium truncate",
+                                isActive ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"
+                              )}>
+                                {team.name}
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 truncate">
+                                {team.type === 'personal' ? 'Personal Team' : 'Institution Team'} • {team.role}
+                              </p>
+                            </div>
+                            {isActive && (
+                              <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="h-px bg-gradient-to-r from-gray-100 to-transparent dark:from-[#3C4043] mx-3 sm:mx-4" />
+                    <div className="px-3 sm:px-4 pt-1.5">
+                      <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                        <RefreshCw className="h-3 w-3" />
+                        Switch to view different team events & permissions
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
 
+              {/* Create Event Button - Desktop */}
+              <button
+                type="button"
+                onClick={handleCreateEvent}
+                className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md cursor-pointer"
+              >
+                <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Create Event or Course</span>
+              </button>
+
+              {/* Create Event Button - Mobile */}
+              <button
+                type="button"
+                onClick={handleCreateEvent}
+                className="sm:hidden text-primary hover:bg-primary/10 rounded-full h-8 w-8 transition-colors active:scale-95 touch-manipulation flex items-center justify-center cursor-pointer"
+                aria-label="Create Event"
+              >
+                <PlusCircle className="h-5 w-5" />
+              </button>
+
+              {/* ===== THEME SWITCHER (Icon only) ===== */}
+              <button
+                type="button"
+                onClick={handleThemeToggle}
+                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors flex items-center justify-center dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
+                aria-label="Toggle theme (coming soon)"
+              >
+                <Sun className="h-4 w-4 md:h-4.5 md:w-4.5" />
+              </button>
+
               <UserMenu user={user} onLogout={handleLogout} />
 
               {/* Create Event Button - Quick create for tablet */}
-              <Button
+              <button
+                type="button"
                 onClick={handleCreateEvent}
-                variant="outline"
-                size="sm"
-                className="hidden md:flex lg:hidden items-center gap-1 border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm cursor-pointer px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95 rounded-md"
+                className="hidden md:flex lg:hidden items-center gap-1 border border-gray-200 hover:border-primary hover:bg-primary/5 text-xs sm:text-sm px-2.5 sm:px-3 h-8 sm:h-9 transition-all active:scale-95 rounded-md dark:border-[#3C4043] dark:text-gray-300 dark:hover:border-primary/50 dark:hover:bg-primary/10 cursor-pointer"
               >
                 <PlusCircle className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">New</span>
-              </Button>
+              </button>
             </div>
           </div>
 
