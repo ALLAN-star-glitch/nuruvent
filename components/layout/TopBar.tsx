@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { NAV_ITEMS, SOCIAL_LINKS } from '@/lib/constants';
 import { 
   MdEmail, 
@@ -121,6 +121,7 @@ const advertisements = [
 
 export function TopBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -139,12 +140,20 @@ export function TopBar() {
 
   const currentAd = advertisements[currentAdIndex];
 
+  // Handle navigation with router.push for client-side navigation
+  const handleNavigation = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    router.push(href);
+  };
+
   // Render ad content (only image type now)
   const renderAdContent = (isMobile: boolean = false) => {
     return (
       <Link
         href={currentAd.link}
+        onClick={(e) => handleNavigation(e, currentAd.link)}
         className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity group"
+        prefetch={true}
       >
         <div className="relative h-7 sm:h-8 w-auto flex-shrink-0">
           <Image
@@ -217,10 +226,40 @@ export function TopBar() {
               {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                 const Icon = item.icon;
+                // Check if it's an external link
+                const isExternal = item.href.startsWith('http') || item.href.startsWith('//');
+                
+                // If external, use regular anchor tag
+                if (isExternal) {
+                  return (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "group relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 cursor-pointer",
+                        "bg-white/60 dark:bg-[#2D2E32]/60 backdrop-blur-sm border border-current/20 hover:border-current/40 hover:bg-white/80 dark:hover:bg-[#2D2E32]/80 hover:shadow-md hover:scale-[1.02] text-current/80"
+                      )}
+                    >
+                      <Icon className={cn(
+                        "h-4 w-4 transition-transform duration-300",
+                        "group-hover:scale-110"
+                      )} />
+                      <span className="relative">
+                        {item.label}
+                      </span>
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-0 h-[2px] rounded-full bg-current transition-all duration-300 group-hover:w-6" />
+                    </a>
+                  );
+                }
+
+                // Internal navigation with Link component
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={true}
                     className={cn(
                       "group relative flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 cursor-pointer",
                       // Inactive state - button style
