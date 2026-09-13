@@ -122,7 +122,7 @@ export function ModalSignUpForm({ onSuccess, onSwitchToSignIn, prefillData }: Mo
         name: formData.name,
         phone: formData.phone,
         account_type: 'account_type_personal',
-        professional_type: 'professional_type_other',
+        professional_type: 'professional_type_trainer',
       }).unwrap();
 
       const email = response.data?.email || formData.email;

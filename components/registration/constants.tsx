@@ -176,4 +176,5 @@ export const PROFESSIONAL_TYPES_FALLBACK: ProfessionalTypeOption[] = [
   { value: 'professional_type_coach', label: 'Coach' },
   { value: 'professional_type_consultant', label: 'Consultant' },
   { value: 'professional_type_freelancer', label: 'Freelancer' },
+  
 ];
