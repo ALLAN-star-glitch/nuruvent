@@ -2,75 +2,115 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { 
-  CheckCircle, 
-  Calendar, 
-  ArrowRight, 
-  Ticket, 
-  Mail, 
-  User, 
-  Clock, 
-  Printer, 
-  Download, 
+import {
+  CheckCircle,
+  Calendar,
+  ArrowRight,
+  Ticket,
+  Mail,
+  User,
+  Clock,
+  Printer,
+  Download,
   Share2,
   MapPin,
   Video,
-  Building2,
-  Smartphone,
   CreditCard,
   Copy,
   Check,
   ExternalLink,
   CalendarPlus,
-  Heart,
-  Star,
   Info,
   ChevronRight,
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
-import { useAppSelector } from '@/lib/store/hooks';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
-// Helper to format price
+// ============================================================
+// PLACEHOLDER DATA
+// ============================================================
+//
+// Replace this with whatever hydrates the page once the real
+// booking/event data is fetched.
+
+interface PlaceholderEvent {
+  id: string;
+  slug: string;
+  name: string;
+  display_name: string;
+  description: string;
+  date: string;
+  time: string;
+  duration: number;
+  price: number;
+  certificate_price: number;
+  certificate_enabled: boolean;
+  is_virtual: boolean;
+  is_hybrid: boolean;
+  location: string;
+  image_url?: string;
+}
+
+interface PlaceholderAttendee {
+  name: string;
+  email: string;
+}
+
+const PLACEHOLDER_EVENT: PlaceholderEvent = {
+  id: 'placeholder-event-id',
+  slug: 'demo-event',
+  name: 'Hands-on Kubernetes Workshop',
+  display_name: 'Kubernetes Workshop 2026',
+  description:
+    'A two-day deep-dive into production Kubernetes for backend engineers.',
+  date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  time: '09:00',
+  duration: 480,
+  price: 2500,
+  certificate_price: 500,
+  certificate_enabled: true,
+  is_virtual: false,
+  is_hybrid: true,
+  location: 'Nairobi, Kenya',
+};
+
+const PLACEHOLDER_ATTENDEE: PlaceholderAttendee = {
+  name: 'Jane Doe',
+  email: 'jane@example.com',
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+
 const formatPrice = (price: number) => {
   if (price === 0) return 'Free';
   return `KSh ${price.toLocaleString()}`;
 };
 
-// Helper to format date for calendar
 const formatDateForCalendar = (dateStr: string) => {
   const date = new Date(dateStr);
   return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 };
 
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function BookingConfirmationPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const eventSlug = searchParams.get('event');
-  const { isAuthenticated, user, account } = useAppSelector((state) => state.auth);
   const [countdown, setCountdown] = useState(5);
   const [copied, setCopied] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const { data: event, isLoading } = useGetEventBySlugQuery(eventSlug || '', {
-    skip: !eventSlug,
-  });
-
-  // Redirect to events page if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/events');
-    }
-  }, [isAuthenticated, isLoading, router]);
+  // ---- TODO: hydrate from a real booking endpoint ----
+  const event = PLACEHOLDER_EVENT;
+  const attendee = PLACEHOLDER_ATTENDEE;
 
   // Countdown timer for auto-redirect
   useEffect(() => {
@@ -80,97 +120,68 @@ export default function BookingConfirmationPage() {
     }
   }, [countdown]);
 
-  // Check if event is free
-  const isFree = event ? event.price === 0 && event.certificate_price === 0 : false;
+  const isFree =
+    event.price === 0 && event.certificate_price === 0;
 
-  // Handle print
+  const totalPrice =
+    event.price + (event.certificate_price > 0 ? event.certificate_price : 0);
+
+  // ---- Handlers ----
+
   const handlePrint = () => {
     window.print();
   };
 
-  // Handle copy link
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // Handle share
   const handleShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Booking Confirmation - ${event?.display_name || event?.name}`,
-          text: `I've registered for ${event?.display_name || event?.name}! Join me!`,
+          title: `Booking Confirmation - ${event.display_name || event.name}`,
+          text: `I've registered for ${event.display_name || event.name}! Join me!`,
           url: window.location.href,
         });
-      } catch (error) {
-        console.log('Share cancelled');
+      } catch {
+        // Share cancelled — no-op
       }
     } else {
       handleCopyLink();
     }
   };
 
-  // Handle add to calendar
   const handleAddToCalendar = () => {
-    if (!event) return;
     const startDate = formatDateForCalendar(event.date);
-    // Add 3 hours for duration (default)
     const endDate = new Date(event.date);
     endDate.setHours(endDate.getHours() + 3);
-    const endDateStr = endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    
+    const endDateStr =
+      endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
     const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-      event.display_name || event.name
+      event.display_name || event.name,
     )}&dates=${startDate}/${endDateStr}&details=${encodeURIComponent(
-      event.description || 'Event'
+      event.description || 'Event',
     )}&location=${encodeURIComponent(
-      event.is_virtual ? 'Virtual Event' : event.location || ''
+      event.is_virtual ? 'Virtual Event' : event.location || '',
     )}`;
-    
+
     window.open(calendarUrl, '_blank');
   };
 
-  // Handle download ticket (placeholder)
   const handleDownloadTicket = () => {
     // TODO: Implement actual ticket download
     alert('Ticket download will be available soon!');
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50 flex items-center justify-center">
-        <div className="text-center">
-          <Skeleton className="h-16 w-16 rounded-full mx-auto" />
-          <Skeleton className="h-8 w-48 mx-auto mt-4" />
-          <Skeleton className="h-4 w-64 mx-auto mt-2" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50 flex items-center justify-center">
-        <div className="text-center max-w-md px-4">
-          <h2 className="text-xl font-semibold text-neutral-900 mb-2">Event Not Found</h2>
-          <p className="text-sm text-neutral-500 mb-6">
-            We couldn&apos;t find the event you registered for.
-          </p>
-          <Button onClick={() => router.push('/events')} className="cursor-pointer">
-            Browse Events
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const attendeeName = account?.display_name || account?.name || user?.name || 'Guest';
-  const totalPrice = event.price + (event.certificate_price > 0 ? event.certificate_price : 0);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50 py-8 px-4 sm:px-6" ref={printRef}>
+    <div
+      className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50 py-8 px-4 sm:px-6"
+      ref={printRef}
+    >
       <div className="max-w-4xl mx-auto">
         {/* Top Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -182,7 +193,10 @@ export default function BookingConfirmationPage() {
             Back to Event
           </Link>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+            <Badge
+              variant="outline"
+              className="text-xs bg-green-50 text-green-700 border-green-200"
+            >
               <CheckCircle className="h-3 w-3 mr-1" />
               Confirmed
             </Badge>
@@ -192,26 +206,29 @@ export default function BookingConfirmationPage() {
         {/* Main Card */}
         <Card className="border-neutral-200/60 shadow-xl overflow-hidden">
           {/* Header */}
-          <div className={cn(
-            "px-6 py-8 sm:py-10 text-center relative",
-            isFree 
-              ? "bg-gradient-to-r from-tertiary-500 to-tertiary-600" 
-              : "bg-gradient-to-r from-green-500 to-green-600"
-          )}>
+          <div
+            className={cn(
+              'px-6 py-8 sm:py-10 text-center relative',
+              isFree
+                ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600'
+                : 'bg-gradient-to-r from-green-500 to-green-600',
+            )}
+          >
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-4 animate-in zoom-in duration-500">
               <CheckCircle className="h-10 w-10 text-white" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">
               {isFree ? 'Booking Confirmed!' : 'Payment Successful!'}
             </h1>
-            <p className={cn(
-              "mt-1",
-              isFree ? "text-tertiary-100" : "text-green-100"
-            )}>
-              {isFree 
-                ? 'You\'re all set for the event' 
-                : 'Your ticket has been confirmed'
-              }
+            <p
+              className={cn(
+                'mt-1',
+                isFree ? 'text-tertiary-100' : 'text-green-100',
+              )}
+            >
+              {isFree
+                ? "You're all set for the event"
+                : 'Your ticket has been confirmed'}
             </p>
             <div className="absolute bottom-0 left-0 right-0 h-6 bg-white rounded-t-3xl" />
           </div>
@@ -286,11 +303,15 @@ export default function BookingConfirmationPage() {
                 </span>
               </p>
               <p className="text-sm text-neutral-500 mt-1">
-                A confirmation email has been sent to your registered email address.
+                A confirmation email has been sent to your registered email
+                address.
               </p>
               <div className="flex items-center justify-center gap-1 mt-2 text-xs text-neutral-400">
                 <Info className="h-3 w-3" />
-                <span>Booking Reference: #{event.id?.slice(0, 8).toUpperCase() || 'N/A'}</span>
+                <span>
+                  Booking Reference: #
+                  {event.id?.slice(0, 8).toUpperCase() || 'N/A'}
+                </span>
               </div>
             </div>
 
@@ -306,12 +327,14 @@ export default function BookingConfirmationPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-start gap-2 text-sm text-primary-700">
                     <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{new Date(event.date).toLocaleDateString('en-US', { 
-                      weekday: 'long',
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}</span>
+                    <span>
+                      {new Date(event.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-start gap-2 text-sm text-primary-700">
                     <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -339,11 +362,11 @@ export default function BookingConfirmationPage() {
                 <div className="space-y-1.5">
                   <div className="flex items-start gap-2 text-sm text-amber-700">
                     <User className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{attendeeName}</span>
+                    <span>{attendee.name}</span>
                   </div>
                   <div className="flex items-start gap-2 text-sm text-amber-700">
                     <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{account?.email || user?.email || 'No email provided'}</span>
+                    <span>{attendee.email}</span>
                   </div>
                   {!isFree && (
                     <div className="flex items-start gap-2 text-sm text-amber-700">
@@ -355,7 +378,7 @@ export default function BookingConfirmationPage() {
               </div>
             </div>
 
-            {/* Payment Summary - Only for paid events */}
+            {/* Payment Summary — Only for paid events */}
             {!isFree && (
               <>
                 <Separator />
@@ -367,17 +390,27 @@ export default function BookingConfirmationPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-neutral-600">Registration Fee</span>
-                      <span className="font-medium">{formatPrice(event.price)}</span>
+                      <span className="font-medium">
+                        {formatPrice(event.price)}
+                      </span>
                     </div>
                     {event.certificate_price > 0 && (
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-neutral-600">Certificate Fee</span>
-                        <span className="font-medium">{formatPrice(event.certificate_price)}</span>
+                        <span className="text-neutral-600">
+                          Certificate Fee
+                        </span>
+                        <span className="font-medium">
+                          {formatPrice(event.certificate_price)}
+                        </span>
                       </div>
                     )}
                     <div className="border-t border-neutral-200 pt-2 flex items-center justify-between">
-                      <span className="font-semibold text-neutral-900">Total Paid</span>
-                      <span className="font-bold text-green-600">{formatPrice(totalPrice)}</span>
+                      <span className="font-semibold text-neutral-900">
+                        Total Paid
+                      </span>
+                      <span className="font-bold text-green-600">
+                        {formatPrice(totalPrice)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -390,19 +423,23 @@ export default function BookingConfirmationPage() {
             <div className="space-y-3 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button
-                  onClick={() => router.push(`/events/${event.slug}`)}
+                  asChild
                   className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
                   variant="outline"
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Event Details
+                  <Link href={`/events/${event.slug}`}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Event Details
+                  </Link>
                 </Button>
                 <Button
-                  onClick={() => router.push('/events')}
+                  asChild
                   className="w-full h-12 text-base font-semibold rounded-xl bg-primary-500 hover:bg-primary-600 cursor-pointer"
                 >
-                  Browse More Events
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  <Link href="/events">
+                    Browse More Events
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -410,12 +447,12 @@ export default function BookingConfirmationPage() {
             {/* Auto-redirect */}
             <p className="text-xs text-center text-neutral-400">
               Redirecting to events page in {countdown} seconds...
-              <button
-                onClick={() => router.push('/events')}
+              <Link
+                href="/events"
                 className="ml-1 text-primary-500 hover:underline cursor-pointer"
               >
                 (skip)
-              </button>
+              </Link>
             </p>
 
             {/* Footer */}
@@ -431,7 +468,10 @@ export default function BookingConfirmationPage() {
         <div className="mt-6 text-center">
           <p className="text-xs text-neutral-400">
             Want to discover more events?{' '}
-            <Link href="/events" className="text-primary-500 hover:underline cursor-pointer">
+            <Link
+              href="/events"
+              className="text-primary-500 hover:underline cursor-pointer"
+            >
               Browse all events
             </Link>
           </p>
