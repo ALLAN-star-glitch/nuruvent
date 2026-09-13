@@ -1,345 +1,230 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/store/api/authApi.ts
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { api } from './baseApi';
-
-// ============================================================
-// REQUEST TYPES
-// ============================================================
-
-export interface RegisterPersonalRequest {
-  email: string;
-  password: string;
-  name: string;
-  phone: string;
-  account_type: 'account_type_personal' | 'account_type_institution';
-}
-
-export interface RegisterInstitutionRequest extends RegisterPersonalRequest {
-  institution_name: string;
-  institution_email: string;
-  institution_phone: string;
-  institution_type: string;
-}
-
-export interface VerifyOTPRequest {
-  email: string;
-  otp: string;
-}
-
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface VerifyTwoFactorRequest {
-  email: string;
-  otp: string;
-}
-
-export interface RefreshTokenRequest {
-  refresh_token: string;
-}
-
-export interface LogoutRequest {
-  refresh_token: string;
-}
-
-export interface ForgotPasswordRequest {
-  email: string;
-  new_password: string;
-}
-
-export interface VerifyResetOTPRequest {
-  email: string;
-  otp: string;
-}
-
-export interface ResendOTPRequest {
-  email: string;
-  purpose?: 'registration' | 'two_factor' | 'password_reset' | 'email_change' | 'phone_change';
-}
-
-// ============================================================
-// RESPONSE TYPES
-// ============================================================
-
-export interface AccountResponse {
-  id: string;
-  slug: string;
-  name: string;
-  display_name: string;
-  email: string;
-  phone: string;
-  account_type: string;
-  account_type_id: string;
-  email_verified: boolean;
-  identity_verified: boolean;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
-}
-
-export interface OTPResponse {
-  email: string;
-  expires_at: string;
-  message: string;
-}
-
-export interface TwoFactorResponse {
-  requires_2fa: boolean;
-  email: string;
-  expires_in: number;
-}
-
-export interface PasswordResetResponse {
-  message: string;
-  expires_in: number;
-}
-
-export interface BaseResponse<T = any> {
-  success: boolean;
-  message: string;
-  data: T;
-}
-
-export interface LoginData {
-  token: TokenResponse;
-  account: AccountResponse;
-}
-
-export interface LoginResponse {
-  success: boolean;
-  message: string;
-  data: LoginData | TwoFactorResponse;
-}
-
-export interface VerifyOTPResponse {
-  success: boolean;
-  message: string;
-  data: TokenResponse & {
-    account: AccountResponse;
-    institution?: {
-      id: string;
-      name: string;
-      email: string;
-      phone: string;
-      type: string;
-    };
-  };
-}
-
-export interface VerifyTwoFactorResponse {
-  success: boolean;
-  message: string;
-  data: TokenResponse & {
-    account: AccountResponse;
-  };
-}
-
-export interface RegisterResponse {
-  success: boolean;
-  message: string;
-  data: {
-    email: string;
-    expires_at: string;
-    message: string;
-  };
-}
-
-export interface RefreshTokenResponse {
-  success: boolean;
-  message: string;
-  data: TokenResponse;
-}
-
-export interface ResendOTPResponse {
-  success: boolean;
-  message: string;
-  data: {
-    email: string;
-    expires_at: string;
-    message: string;
-  };
-}
-
-export interface ForgotPasswordResponse {
-  success: boolean;
-  message: string;
-  data: {
-    message: string;
-    expires_in: number;
-  };
-}
-
-export interface VerifyResetOTPResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface LogoutResponse {
-  success: boolean;
-  message: string;
-}
-
-// ============================================================
-// TYPE GUARDS
-// ============================================================
-
-export function isTwoFactorResponse(data: any): data is TwoFactorResponse {
-  return data && typeof data === 'object' && 'requires_2fa' in data && data.requires_2fa === true;
-}
-
-export function isLoginData(data: any): data is LoginData {
-  return data && typeof data === 'object' && 'token' in data && 'account' in data;
-}
-
-export function isTokenResponse(data: LoginData | TwoFactorResponse): data is LoginData {
-  return data && typeof data === 'object' && 'token' in data && 'account' in data;
-}
-
-// ============================================================
-// ✅ NO localStorage - Tokens are handled by HTTP-only cookies
-// ============================================================
+import type {
+  // Requests
+  RegisterPersonalRequest,
+  RegisterInstitutionRequest,
+  RegisterWithInvitationRequest,
+  VerifyOTPRequest,
+  ResendOTPRequest,
+  LoginRequest,
+  VerifyTwoFactorRequest,
+  ForgotPasswordRequest,
+  VerifyResetOTPRequest,
+  // Responses
+  RegisterResponse,
+  RegisterWithInvitationResponse,
+  AuthSuccessResponse,
+  ResendOTPResponse,
+  LoginResponse,
+  RefreshTokenResponse,
+  LogoutResponse,
+  ForgotPasswordResponse,
+  VerifyResetOTPResponse,
+} from '@/lib/types/auth';
 
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     // ============================================================
-    // REGISTER
-    // POST /api/v1/auth/register
+    // SELF-SERVICE REGISTRATION (OTP-based)
     // ============================================================
-    registerPersonal: builder.mutation<RegisterResponse, RegisterPersonalRequest>({
-      query: (data) => ({
+
+    /**
+     * POST /api/v1/auth/register
+     *
+     * Starts a personal signup. The backend stores the pending
+     * registration, sends an OTP, and returns the OTP metadata.
+     * Complete the signup via `verifyOTP`.
+     */
+    registerPersonal: builder.mutation<
+      RegisterResponse,
+      RegisterPersonalRequest
+    >({
+      query: (body) => ({
         url: '/auth/register',
         method: 'POST',
-        body: data,
+        body,
       }),
       invalidatesTags: ['Auth'],
     }),
 
-    registerInstitution: builder.mutation<RegisterResponse, RegisterInstitutionRequest>({
-      query: (data) => ({
+    /**
+     * POST /api/v1/auth/register
+     *
+     * Same endpoint as registerPersonal, different body — the backend
+     * branches on `account_type`.
+     */
+    registerInstitution: builder.mutation<
+      RegisterResponse,
+      RegisterInstitutionRequest
+    >({
+      query: (body) => ({
         url: '/auth/register',
         method: 'POST',
-        body: data,
+        body,
       }),
       invalidatesTags: ['Auth'],
     }),
 
-    // ============================================================
-    // VERIFY OTP
-    // POST /api/v1/auth/verify-otp
-    // ============================================================
-    verifyOTP: builder.mutation<VerifyOTPResponse, VerifyOTPRequest>({
-      query: (data) => ({
+    /**
+     * POST /api/v1/auth/verify-otp
+     *
+     * Completes self-service registration. On success the backend sets
+     * HTTP-only cookies and returns the full auth payload.
+     */
+    verifyOTP: builder.mutation<AuthSuccessResponse, VerifyOTPRequest>({
+      query: (body) => ({
         url: '/auth/verify-otp',
         method: 'POST',
-        body: data,
+        body,
       }),
-      // ✅ Cookies are set automatically by backend
-      // ✅ No localStorage needed
-      invalidatesTags: ['User', 'Auth'],
+      invalidatesTags: ['User', 'Auth', 'Memberships'],
+    }),
+
+    /**
+     * POST /api/v1/auth/resend-otp
+     *
+     * Resends an OTP for any purpose (registration, 2FA, password reset,
+     * email change, phone change). `purpose` defaults to "registration"
+     * on the backend if omitted.
+     */
+    resendOTP: builder.mutation<ResendOTPResponse, ResendOTPRequest>({
+      query: (body) => ({
+        url: '/auth/resend-otp',
+        method: 'POST',
+        body: {
+          email: body.email,
+          purpose: body.purpose ?? 'registration',
+        },
+      }),
     }),
 
     // ============================================================
-    // RESEND OTP
+    // INVITATION REGISTRATION (no OTP)
     // ============================================================
-    resendOTP: builder.mutation<ResendOTPResponse, ResendOTPRequest>({
-      query: (data) => {
-        const payload = {
-          email: data.email,
-          purpose: data.purpose || 'registration',
-        };
-        return {
-          url: '/auth/resend-otp',
-          method: 'POST',
-          body: payload,
-        };
-      },
+
+    /**
+     * POST /api/v1/auth/register-with-invitation
+     *
+     * Creates a user from an invitation token, accepts the invitation,
+     * and issues auth tokens — all in one request. No OTP is sent.
+     *
+     * The invitee's email is read from the invitation record, not sent
+     * by the client.
+     */
+    registerWithInvitation: builder.mutation<
+      RegisterWithInvitationResponse,
+      RegisterWithInvitationRequest
+    >({
+      query: (body) => ({
+        url: '/auth/register-with-invitation',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['User', 'Auth', 'Memberships', 'Teams', 'Invitations'],
     }),
 
     // ============================================================
     // LOGIN
-    // POST /api/v1/auth/login
     // ============================================================
+
+    /**
+     * POST /api/v1/auth/login
+     *
+     * Verifies credentials. Returns either a TwoFactorResponse (when 2FA
+     * is enabled — the current default) or a full AuthResponse (if 2FA is
+     * disabled in the future). Use `isTwoFactorResponse` / `isAuthResponse`
+     * to narrow.
+     *
+     * On success with 2FA, no cookies are set yet — complete login via
+     * `verifyTwoFactor`.
+     */
     login: builder.mutation<LoginResponse, LoginRequest>({
-      query: (data) => ({
+      query: (body) => ({
         url: '/auth/login',
         method: 'POST',
-        body: data,
+        body,
       }),
-      // ✅ Cookies are set automatically by backend
       invalidatesTags: ['Auth'],
     }),
 
-    // ============================================================
-    // VERIFY 2FA
-    // POST /api/v1/auth/verify-2fa
-    // ============================================================
-    verifyTwoFactor: builder.mutation<VerifyTwoFactorResponse, VerifyTwoFactorRequest>({
-      query: (data) => ({
+    /**
+     * POST /api/v1/auth/verify-2fa
+     *
+     * Completes login. On success the backend sets HTTP-only cookies and
+     * returns the full auth payload.
+     */
+    verifyTwoFactor: builder.mutation<AuthSuccessResponse, VerifyTwoFactorRequest>({
+      query: (body) => ({
         url: '/auth/verify-2fa',
         method: 'POST',
-        body: data,
+        body,
       }),
-      // ✅ Cookies are set automatically by backend
-      invalidatesTags: ['User', 'Auth'],
+      invalidatesTags: ['User', 'Auth', 'Memberships'],
     }),
 
     // ============================================================
-    // REFRESH TOKEN
-    // POST /api/v1/auth/refresh
+    // SESSION MANAGEMENT
     // ============================================================
-    refreshToken: builder.mutation<RefreshTokenResponse, RefreshTokenRequest>({
-      query: (data) => ({
+
+    /**
+     * POST /api/v1/auth/refresh
+     *
+     * Refreshes the access token using the refresh token cookie. The
+     * backend reads the refresh token from the HTTP-only cookie; the
+     * request body is empty.
+     */
+    refreshToken: builder.mutation<RefreshTokenResponse, void>({
+      query: () => ({
         url: '/auth/refresh',
         method: 'POST',
-        body: data,
       }),
-      // ✅ Cookies are refreshed automatically
     }),
 
-    // ============================================================
-    // LOGOUT
-    // POST /api/v1/auth/logout
-    // ============================================================
+    /**
+     * POST /api/v1/auth/logout
+     *
+     * Revokes the refresh token and clears auth cookies.
+     */
     logout: builder.mutation<LogoutResponse, void>({
       query: () => ({
         url: '/auth/logout',
         method: 'POST',
       }),
-      // ✅ Cookies are cleared by backend
-      invalidatesTags: ['User', 'Auth'],
+      invalidatesTags: ['User', 'Auth', 'Memberships', 'Teams', 'Invitations'],
     }),
 
     // ============================================================
-    // FORGOT PASSWORD
-    // POST /api/v1/auth/forgot-password
+    // PASSWORD RESET
     // ============================================================
+
+    /**
+     * POST /api/v1/auth/forgot-password
+     *
+     * Initiates a password reset. The new password is validated and
+     * stored server-side; an OTP is sent to the user's email to confirm
+     * the reset via `verifyResetOTP`.
+     */
     forgotPassword: builder.mutation<ForgotPasswordResponse, ForgotPasswordRequest>({
-      query: (data) => ({
+      query: (body) => ({
         url: '/auth/forgot-password',
         method: 'POST',
-        body: data,
+        body,
       }),
     }),
 
-    // ============================================================
-    // VERIFY RESET OTP
-    // POST /api/v1/auth/verify-reset-otp
-    // ============================================================
+    /**
+     * POST /api/v1/auth/verify-reset-otp
+     *
+     * Verifies the reset OTP and applies the new password.
+     */
     verifyResetOTP: builder.mutation<VerifyResetOTPResponse, VerifyResetOTPRequest>({
-      query: (data) => ({
+      query: (body) => ({
         url: '/auth/verify-reset-otp',
         method: 'POST',
-        body: data,
+        body,
       }),
     }),
   }),
@@ -355,6 +240,7 @@ export const {
   useRegisterInstitutionMutation,
   useVerifyOTPMutation,
   useResendOTPMutation,
+  useRegisterWithInvitationMutation,
   useLoginMutation,
   useVerifyTwoFactorMutation,
   useRefreshTokenMutation,

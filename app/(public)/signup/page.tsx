@@ -1,7 +1,7 @@
 // app/(public)/signup/page.tsx
 
 import { Metadata } from 'next';
-import SignUpForm from "@/components/registration/SignupForm";
+import { SignupFlow } from '@/components/registration/SignupFlow';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 
 const PAGE_TITLE = `Sign Up — Create Account to Host or Join Events & Courses | ${SITE_NAME}`;
@@ -87,7 +87,7 @@ export default function SignUpPage() {
           }),
         }}
       />
-      <SignUpForm />
+      <SignupFlow />
     </>
   );
 }

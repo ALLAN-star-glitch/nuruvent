@@ -32,16 +32,19 @@ import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
-import { clearAuth, UserRole } from '@/lib/store/slices/authSlice';
+import { clearAuth } from '@/lib/store/slices/authSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
 import { useState, useRef, useEffect } from 'react';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 interface DashboardHeaderProps {
   user: {
     name: string;
     email: string;
     avatar?: string;
-    role: UserRole;
   };
 }
 
@@ -53,11 +56,19 @@ interface Team {
   avatar?: string;
 }
 
+// ============================================================
+// MOCK DATA
+// ============================================================
+
 const mockTeams: Team[] = [
   { id: 'personal-1', name: "John's Personal Team", type: 'personal', role: 'Account Admin' },
   { id: 'nuruvent', name: 'Nuruvent', type: 'institution', role: 'Event Manager' },
   { id: 'techcorp', name: 'TechCorp', type: 'institution', role: 'Team Member' },
 ];
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
@@ -226,7 +237,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 truncate dark:text-white">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate capitalize dark:text-gray-400">{user.role}</p>
+                        <p className="text-xs text-gray-500 truncate dark:text-gray-400">{user.email}</p>
                       </div>
                     </div>
                   </div>
@@ -354,7 +365,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               >
                 <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
                 <span className="inline lg:hidden">Create Event</span>
-                <span className="hidden lg:inline">Create Event or Course</span>
+                <span className="hidden lg:inline">Create Event</span>
               </button>
 
               {/* Theme Toggle - Icon only */}

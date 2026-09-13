@@ -29,26 +29,38 @@ import {
   PlusCircle,
   Video,
   ChevronDown,
-  Shield,
 } from 'lucide-react';
 
 // Redux imports
 import { useAppDispatch } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
-import { clearAuth, UserRole } from '@/lib/store/slices/authSlice';
+import { clearAuth } from '@/lib/store/slices/authSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
 
 interface UserMenuProps {
   user: {
     name: string;
     email: string;
-    role: UserRole;
     avatar?: string;
   };
   onLogout?: () => void;
 }
 
-export function UserMenu({ user, onLogout }: UserMenuProps) {
+// ============================================================
+// QUICK LINKS — flat list, same for everyone
+// ============================================================
+
+const QUICK_LINKS = [
+  { label: 'Events', href: '/dashboard/events', icon: Calendar },
+  { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
+  { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
+  { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
+  { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
+  { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
+  { label: 'Replays', href: '/dashboard/replays', icon: Video },
+];
+
+export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [logout, { isLoading }] = useLogoutMutation();
@@ -63,92 +75,6 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
       .toUpperCase()
       .slice(0, 2);
   };
-
-  const getRoleBadge = () => {
-    switch (user?.role) {
-      case 'super_admin':
-        return { label: 'Super Admin', className: 'text-purple-600 bg-purple-50' };
-      case 'admin':
-        return { label: 'Admin', className: 'text-purple-600 bg-purple-50' };
-      case 'account_admin':
-        return { label: 'Account Admin', className: 'text-blue-600 bg-blue-50' };
-      case 'event_manager':
-        return { label: 'Event Manager', className: 'text-indigo-600 bg-indigo-50' };
-      case 'trainer':
-        return { label: 'Trainer', className: 'text-green-600 bg-green-50' };
-      case 'team_member':
-        return { label: 'Team Member', className: 'text-gray-600 bg-gray-50' };
-      case 'guest':
-      default:
-        return { label: 'Guest', className: 'text-gray-400 bg-gray-50' };
-    }
-  };
-
-  const roleBadge = getRoleBadge();
-
-  const getQuickLinks = () => {
-    const role = user?.role;
-
-    if (role === 'super_admin' || role === 'admin') {
-      return [
-        { label: 'Users', href: '/dashboard/users', icon: Users },
-        { label: 'Events', href: '/dashboard/events', icon: Calendar },
-        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
-        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-        { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
-        { label: 'Replays', href: '/dashboard/replays', icon: Video },
-      ];
-    }
-
-    if (role === 'account_admin') {
-      return [
-        { label: 'Events', href: '/dashboard/events', icon: Calendar },
-        { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
-        { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
-        { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
-        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
-        { label: 'Replays', href: '/dashboard/replays', icon: Video },
-        { label: 'Team', href: '/dashboard/team', icon: Users },
-      ];
-    }
-
-    if (role === 'event_manager') {
-      return [
-        { label: 'Events', href: '/dashboard/events', icon: Calendar },
-        { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
-        { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
-        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-        { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
-        { label: 'Replays', href: '/dashboard/replays', icon: Video },
-      ];
-    }
-
-    if (role === 'trainer') {
-      return [
-        { label: 'My Events', href: '/dashboard/events', icon: Calendar },
-        { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
-        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-        { label: 'Replays', href: '/dashboard/replays', icon: Video },
-      ];
-    }
-
-    if (role === 'team_member') {
-      return [
-        { label: 'Events', href: '/dashboard/events', icon: Calendar },
-        { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-        { label: 'Replays', href: '/dashboard/replays', icon: Video },
-      ];
-    }
-
-    return [
-      { label: 'My Events', href: '/dashboard/events', icon: Calendar },
-      { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
-      { label: 'Replays', href: '/dashboard/replays', icon: Video },
-    ];
-  };
-
-  const quickLinks = getQuickLinks();
 
   const closeDropdown = () => {
     document.body.click();
@@ -197,16 +123,13 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
                   {getInitials()}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col">
-                <p className="text-sm font-medium leading-none">{user?.name}</p>
-                <p className="text-xs leading-none text-muted-foreground mt-1">
+              <div className="flex flex-col min-w-0">
+                <p className="text-sm font-medium leading-none truncate">
+                  {user?.name}
+                </p>
+                <p className="text-xs leading-none text-muted-foreground mt-1 truncate">
                   {user?.email}
                 </p>
-                <span
-                  className={`text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block w-fit ${roleBadge.className}`}
-                >
-                  {roleBadge.label}
-                </span>
               </div>
             </div>
           </DropdownMenuLabel>
@@ -225,7 +148,9 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-primary">Dashboard</span>
-                <span className="text-xs text-muted-foreground">Full dashboard with all features</span>
+                <span className="text-xs text-muted-foreground">
+                  Full dashboard with all features
+                </span>
               </div>
               <svg
                 className="h-4 w-4 text-primary/60 ml-auto"
@@ -246,30 +171,27 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
           <DropdownMenuSeparator />
 
           {/* Quick Links */}
-          {quickLinks.length > 0 && (
-            <>
-              <div className="px-2 py-1.5">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Quick Actions
-                </span>
-              </div>
-              <DropdownMenuGroup>
-                {quickLinks.map((item) => (
-                  <DropdownMenuItem key={item.href} className="p-0 cursor-pointer">
-                    <Link
-                      href={item.href}
-                      className="flex items-center gap-2 py-2 px-2 w-full"
-                      onClick={closeDropdown}
-                    >
-                      <item.icon className="h-4 w-4 text-muted-foreground" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-            </>
-          )}
+          <div className="px-2 py-1.5">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Quick Actions
+            </span>
+          </div>
+          <DropdownMenuGroup>
+            {QUICK_LINKS.map((item) => (
+              <DropdownMenuItem key={item.href} className="p-0 cursor-pointer">
+                <Link
+                  href={item.href}
+                  className="flex items-center gap-2 py-2 px-2 w-full"
+                  onClick={closeDropdown}
+                >
+                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                  <span>{item.label}</span>
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuGroup>
+
+          <DropdownMenuSeparator />
 
           {/* Account */}
           <div className="px-2 py-1.5">
@@ -316,7 +238,7 @@ export function UserMenu({ user, onLogout }: UserMenuProps) {
                 onClick={closeDropdown}
               >
                 <LifeBuoy className="h-4 w-4 text-muted-foreground" />
-                <span>Help & Support</span>
+                <span>Help &amp; Support</span>
               </Link>
             </DropdownMenuItem>
           </DropdownMenuGroup>

@@ -1,269 +1,57 @@
 // lib/store/api/eventsApi.ts
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { mapEventResponse, mapEventStatus, mapEventType, mapPaginatedEvents } from '@/lib/utils/eventMapper';
 import { api } from './baseApi';
+import type {
+  // Response shapes
+  Event,
+  EventType,
+  EventStatus,
+  Category,
+  EventFormat,
+  TicketType,
+  CertificateTemplate,
+  CertificateType,
+  RecurrencePatternRef,
+  PaginatedEvents,
+  OffsetEvents,
+  MediaInfo,
+  BaseResponse,
+  BulkDeleteResult,
+  BulkRestoreResult,
+  BulkStatusResult,
+  BulkDuplicateResult,
+  // Request shapes
+  CreateDraftRequest,
+  CreateEventRequest,
+  UpdateEventRequest,
+  DuplicateEventRequest,
+  BulkDuplicateRequest,
+  // Query params
+  ListEventsParams,
+  SearchEventsParams,
+  GetEventsByTypeParams,
+  GetUpcomingEventsParams,
+  GetPastEventsParams,
+  BulkIDsRequest,
+  GenerateEventDraftResult,
+  GenerateEventDraftRequest,
+} from '@/lib/types/events';
 
 // ============================================================
-// REQUEST TYPES
+// ADDITIONAL QUERY PARAMS (not in types file — small enough)
 // ============================================================
 
-// ✅ CreateDraftRequest - All fields optional for drafts (multipart/form-data)
-export interface CreateDraftRequest {
-  name?: string;
-  description?: string;
-  event_type_id?: string;
-  date?: string;
-  time?: string;
-  duration?: number;
-  price?: number;
-  certificate_price?: number;
-  location?: string;
-  is_virtual?: boolean;
-  is_featured?: boolean;
-  is_private?: boolean;
-  zoom_link?: string;
-  meet_link?: string;
-  max_attendees?: number;
+/** Params for GET /events/me/search (authenticated, permission-scoped). */
+interface SearchMyEventsParams extends SearchEventsParams {
+  team_id?: string;
+  team_type?: 'personal' | 'institution';
 }
 
-// ✅ CreateEventRequest - All fields required for published events (multipart/form-data)
-export interface CreateEventRequest {
-  name: string;
-  description?: string;
-  event_type_id: string;
-  date: string;
-  time: string;
-  duration: number;
-  price?: number;
-  certificate_price?: number;
-  location?: string;
-  is_virtual?: boolean;
-  is_featured?: boolean;
-  is_private?: boolean;
-  zoom_link?: string;
-  meet_link?: string;
-  max_attendees?: number;
-}
+/** Params for GET /events/categories (public reference data). */
+type GetCategoriesParams = void;
 
-// ✅ UpdateEventRequest - All fields optional for updates (application/json)
-export interface UpdateEventRequest {
-  name?: string;
-  display_name?: string;
-  description?: string;
-  event_type_id?: string;
-  event_status_id?: string;
-  date?: string;
-  time?: string;
-  duration?: number;
-  price?: number;
-  certificate_price?: number;
-  location?: string;
-  is_virtual?: boolean;
-  is_featured?: boolean;
-  is_private?: boolean;
-  zoom_link?: string;
-  meet_link?: string;
-  max_attendees?: number;
-}
-
-// ✅ ListEventsParams - For listing events with filters
-export interface ListEventsParams {
-  account_id?: string;
-  event_type_id?: string;
-  event_status_id?: string;
-  include_deleted?: boolean;
-  only_deleted?: boolean;
-  limit?: number;
-  offset?: number;
-}
-
-// ✅ NEW: GetTrashedEventsParams - dedicated trash query
-export interface GetTrashedEventsParams {
-  account_id?: string;
-  page?: number;
-  page_size?: number;
-}
-
-// ✅ SearchEventsParams - For searching events
-export interface SearchEventsParams {
-  q?: string;
-  account_id?: string;
-  event_type_id?: string;
-  include_deleted?: boolean;
-  only_deleted?: boolean;
-  page?: number;
-  page_size?: number;
-}
-
-// ✅ GetEventsByTypeParams
-export interface GetEventsByTypeParams {
-  type: string;
-  page?: number;
-  page_size?: number;
-}
-
-// ✅ GetEventsByAccountParams
-export interface GetEventsByAccountParams {
-  accountId: string;
-  page?: number;
-  page_size?: number;
-  include_deleted?: boolean;
-}
-
-// ✅ GetUpcomingEventsParams
-export interface GetUpcomingEventsParams {
-  limit?: number;
-}
-
-// ✅ GetPastEventsParams
-export interface GetPastEventsParams {
-  limit?: number;
-}
-
-// ✅ BulkIDsRequest - For bulk operations
-export interface BulkIDsRequest {
-  ids: string[];
-}
-
-// ✅ DuplicateEventRequest
-export interface DuplicateEventRequest {
-  name?: string;
-  date?: string;
-  is_draft?: boolean;
-}
-
-// ✅ BulkDuplicateRequest
-export interface BulkDuplicateRequest {
-  ids: string[];
-  name_prefix?: string;
-  date_offset_days?: number;
-  is_draft?: boolean;
-}
-
-// ============================================================
-// RESPONSE TYPES - ALL LOWERCASE
-// ============================================================
-
-// ✅ NEW: Creator information from accounts
-export interface CreatorInfo {
-  id: string;
-  name: string;
-  display_name?: string;
-  email: string;
-  phone?: string;
-  account_type: string;
-  institution_name?: string;
-}
-
-export interface EventResponse {
-  id: string;
-  slug: string;
-  name: string;
-  display_name?: string;
-  description?: string;
-  event_type_id: string;
-  event_status_id: string;
-  image_url?: string;
-  thumbnail_url?: string;
-  date: string;
-  time: string;
-  duration: number;
-  price: number;
-  certificate_price: number;
-  location?: string;
-  is_virtual: boolean;
-  is_featured?: boolean;
-  is_private?: boolean;
-  zoom_link?: string;
-  meet_link?: string;
-  max_attendees: number;
-  current_attendees: number;
-  account_id: string;
-  created_by: string;
-  is_active: boolean;
-  deleted_at?: string | null;
-  deleted_by?: string;
-  restored_at?: string | null;
-  restored_by?: string;
-  created_at: string;
-  updated_at: string;
-
-   // ✅ NEW: Creator information (replaces raw created_by)
-  creator: CreatorInfo;
-}
-
-export interface EventTypeResponse {
-  id: string;
-  name: string;
-  display_name: string;
-  slug: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-}
-
-export interface EventStatusResponse {
-  id: string;
-  name: string;
-  display_name: string;
-  slug: string;
-  color?: string;
-}
-
-export interface MediaInfoResponse {
-  id: string;
-  url: string;
-  media_type: string;
-  entity_id: string;
-  uploaded_by: string;
-  created_at: string;
-}
-
-export interface PaginatedEventsResponse {
-  data: EventResponse[];
-  page: number;
-  page_size: number;
-  total: number;
-  total_pages: number;
-}
-
-export interface ListEventsResponse {
-  data: EventResponse[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-// ✅ Bulk operation results
-export interface BulkDeleteResult {
-  deleted_count: number;
-  failed_ids?: string[];
-  errors?: string[];
-}
-
-export interface BulkRestoreResult {
-  restored_count: number;
-  failed_ids?: string[];
-  errors?: string[];
-}
-
-export interface BulkStatusResult {
-  processed_count: number;
-  failed_ids?: string[];
-  errors?: string[];
-}
-
-export interface BulkDuplicateResult {
-  duplicated_count: number;
-  created_events: Array<{
-    id: string;
-    name: string;
-    slug: string;
-  }>;
-  failed_ids?: string[];
-  errors?: string[];
-}
+/** Params for GET /events/ticket-types (public reference data). */
+type GetTicketTypesParams = void;
 
 // ============================================================
 // API SLICE
@@ -273,176 +61,135 @@ export const eventsApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
     // ============================================================
-    // PUBLIC ENDPOINTS - QUERIES
+    // PUBLIC QUERIES — reference data
     // ============================================================
 
-    // GET /api/v1/events - List all events with filters
-    listEvents: builder.query<ListEventsResponse, ListEventsParams>({
-      query: (params) => ({
-        url: '/events',
-        method: 'GET',
-        params: {
-          ...params,
-          // ✅ Ensure only_deleted is passed as boolean
-          only_deleted: params.only_deleted || undefined,
-        },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data?.data && Array.isArray(response.data.data)) {
-          return {
-            data: response.data.data.map(mapEventResponse),
-            total: response.data.total || response.data.data.length,
-            limit: response.data.limit || 20,
-            offset: response.data.offset || 0,
-          };
-        }
-        if (response?.data && Array.isArray(response.data)) {
-          return {
-            data: response.data,
-            total: response.total || response.data.length,
-            limit: response.limit || 20,
-            offset: response.offset || 0,
-          };
-        }
-        return {
-          data: [],
-          total: 0,
-          limit: 20,
-          offset: 0,
-        };
-      },
-      providesTags: (result) => {
-        if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-          return [
-            ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: 'LIST' },
-          ];
-        }
-        return [{ type: 'Events', id: 'LIST' }];
-      },
-    }),
-
-    // GET /api/v1/events/{id} - Get event by ID
-   getEventById: builder.query<EventResponse, string>({
-      query: (id) => ({
-        url: `/events/${id}`,
-        method: 'GET',
-      }),
-      transformResponse: (response: any) => {
-        // ✅ Use the mapper
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      providesTags: (result, error, id) => [{ type: 'Events', id }],
-    }),
-
-    // GET /api/v1/events/slug/{slug} - Get event by slug
-   getEventBySlug: builder.query<EventResponse, string>({
-      query: (slug) => ({
-        url: `/events/slug/${slug}`,
-        method: 'GET',
-      }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      providesTags: (result, error, slug) => [{ type: 'Events', id: `slug_${slug}` }],
-    }),
-
-    // GET /api/v1/events/upcoming - Get upcoming events
-     getUpcomingEvents: builder.query<EventResponse[], GetUpcomingEventsParams>({
-      query: ({ limit = 10 }) => ({
-        url: '/events/upcoming',
-        method: 'GET',
-        params: { limit },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data && Array.isArray(response.data)) {
-          return response.data.map(mapEventResponse);
-        }
-        if (Array.isArray(response)) {
-          return response.map(mapEventResponse);
-        }
-        return [];
-      },
-      providesTags: (result) => {
-        if (result && Array.isArray(result) && result.length > 0) {
-          return [
-            ...result.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: 'UPCOMING' },
-          ];
-        }
-        return [{ type: 'Events', id: 'UPCOMING' }];
-      },
-    }),
-
-    // GET /api/v1/events/past - Get past events
-   getPastEvents: builder.query<EventResponse[], GetPastEventsParams>({
-      query: ({ limit = 10 }) => ({
-        url: '/events/past',
-        method: 'GET',
-        params: { limit },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data && Array.isArray(response.data)) {
-          return response.data.map(mapEventResponse);
-        }
-        if (Array.isArray(response)) {
-          return response.map(mapEventResponse);
-        }
-        return [];
-      },
-      providesTags: (result) => {
-        if (result && Array.isArray(result) && result.length > 0) {
-          return [
-            ...result.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: 'PAST' },
-          ];
-        }
-        return [{ type: 'Events', id: 'PAST' }];
-      },
-    }),
-
-    // GET /api/v1/events/types - Get all event types
-   getEventTypes: builder.query<EventTypeResponse[], void>({
+    /** GET /events/types */
+    getEventTypes: builder.query<BaseResponse<EventType[]>, void>({
       query: () => ({
         url: '/events/types',
         method: 'GET',
       }),
-      transformResponse: (response: any) => {
-        if (response?.data && Array.isArray(response.data)) {
-          return response.data.map(mapEventType);
-        }
-        if (Array.isArray(response)) {
-          return response.map(mapEventType);
-        }
-        return [];
-      },
       providesTags: ['EventTypes'],
     }),
 
-    // GET /api/v1/events/statuses - Get all event statuses
-    getEventStatuses: builder.query<EventStatusResponse[], void>({
+    /** GET /events/statuses */
+    getEventStatuses: builder.query<BaseResponse<EventStatus[]>, void>({
       query: () => ({
         url: '/events/statuses',
         method: 'GET',
       }),
-      transformResponse: (response: any) => {
-        if (response?.data && Array.isArray(response.data)) {
-          return response.data.map(mapEventStatus);
-        }
-        if (Array.isArray(response)) {
-          return response.map(mapEventStatus);
-        }
-        return [];
-      },
       providesTags: ['EventStatuses'],
     }),
 
+    /** GET /events/categories */
+    getCategories: builder.query<BaseResponse<Category[]>, GetCategoriesParams>({
+      query: () => ({
+        url: '/events/categories',
+        method: 'GET',
+      }),
+      providesTags: ['EventCategories'],
+    }),
 
-    // GET /api/v1/events/type/{type} - Get events by type
+    /** GET /events/ticket-types */
+    getTicketTypes: builder.query<BaseResponse<TicketType[]>, GetTicketTypesParams>({
+      query: () => ({
+        url: '/events/ticket-types',
+        method: 'GET',
+      }),
+      providesTags: ['TicketTypes'],
+    }),
+
+    // ============================================================
+    // PUBLIC QUERIES — events
+    // ============================================================
+
+    /** GET /events — public list with filters (offset-based). */
+    listEvents: builder.query<BaseResponse<OffsetEvents>, ListEventsParams>({
+      query: (params) => ({
+        url: '/events',
+        method: 'GET',
+        params,
+      }),
+      providesTags: (result) =>
+        result?.data?.data?.length
+          ? [
+              ...result.data.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'LIST' },
+            ]
+          : [{ type: 'Events', id: 'LIST' }],
+    }),
+
+    /** GET /events/{id} */
+    getEventById: builder.query<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, id) => [{ type: 'Events', id }],
+    }),
+
+    /** GET /events/slug/{slug} */
+    getEventBySlug: builder.query<BaseResponse<Event>, string>({
+      query: (slug) => ({
+        url: `/events/slug/${slug}`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, slug) => [
+        { type: 'Events', id: `slug_${slug}` },
+      ],
+    }),
+
+    /** GET /events/upcoming */
+    getUpcomingEvents: builder.query<
+      BaseResponse<Event[]>,
+      GetUpcomingEventsParams | void
+    >({
+      query: (params) => ({
+        url: '/events/upcoming',
+        method: 'GET',
+        params: { limit: params?.limit ?? 10 },
+      }),
+      providesTags: (result) =>
+        result?.data?.length
+          ? [
+              ...result.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'UPCOMING' },
+            ]
+          : [{ type: 'Events', id: 'UPCOMING' }],
+    }),
+
+    /** GET /events/past */
+    getPastEvents: builder.query<
+      BaseResponse<Event[]>,
+      GetPastEventsParams | void
+    >({
+      query: (params) => ({
+        url: '/events/past',
+        method: 'GET',
+        params: { limit: params?.limit ?? 10 },
+      }),
+      providesTags: (result) =>
+        result?.data?.length
+          ? [
+              ...result.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'PAST' },
+            ]
+          : [{ type: 'Events', id: 'PAST' }],
+    }),
+
+    /** GET /events/type/{type} — events filtered by type slug. */
     getEventsByType: builder.query<
-      PaginatedEventsResponse,
+      BaseResponse<PaginatedEvents>,
       GetEventsByTypeParams
     >({
       query: ({ type, page = 1, page_size = 20 }) => ({
@@ -450,629 +197,667 @@ export const eventsApi = api.injectEndpoints({
         method: 'GET',
         params: { page, page_size },
       }),
-      transformResponse: (response: any) => {
-        const mapped = mapPaginatedEvents(response);
-        return {
-          ...mapped,
-          // Ensure the response format matches PaginatedEventsResponse
-        };
-      },
-      providesTags: (result, error, { type }) => {
-        if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-          return [
-            ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: `TYPE_${type}` },
-          ];
-        }
-        return [{ type: 'Events', id: `TYPE_${type}` }];
-      },
+      providesTags: (result, _error, { type }) =>
+        result?.data?.data?.length
+          ? [
+              ...result.data.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: `TYPE_${type}` },
+            ]
+          : [{ type: 'Events', id: `TYPE_${type}` }],
     }),
 
-    // ✅ NEW: GET /api/v1/events?only_deleted=true - Get ONLY trashed events
-   getTrashedEvents: builder.query<PaginatedEventsResponse, GetTrashedEventsParams>({
-  query: ({ account_id, page = 1, page_size = 20 }) => ({
-    url: '/events',
-    method: 'GET',
-    params: {
-      account_id,
-      only_deleted: true,
-      limit: page_size,
-      offset: (page - 1) * page_size,
-    },
-  }),
-  transformResponse: (response: any) => {
-    console.log('🔄 getTrashedEvents response:', response);
-    return mapPaginatedEvents(response);
-  },
-  providesTags: (result) => {
-    console.log('🏷️ getTrashedEvents providesTags:', result);
-    if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-      return [
-        ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-        { type: 'Events', id: 'TRASH' },
-        'TrashCount',
-      ];
-    }
-    return [{ type: 'Events', id: 'TRASH' }, 'TrashCount'];
-  },
-}),
-
-
-    // GET /api/v1/events/search - Search events
+    /** GET /events/search — public search (public events only). */
     searchEvents: builder.query<
-      PaginatedEventsResponse,
+      BaseResponse<PaginatedEvents>,
       SearchEventsParams
     >({
       query: (params) => ({
         url: '/events/search',
         method: 'GET',
-        params: {
-          ...params,
-          only_deleted: params.only_deleted || undefined,
-        },
+        params,
       }),
-      transformResponse: (response: any) => {
-        return mapPaginatedEvents(response);
-      },
-      providesTags: (result) => {
-        if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-          return [
-            ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: 'SEARCH' },
-          ];
-        }
-        return [{ type: 'Events', id: 'SEARCH' }];
-      },
+      providesTags: (result) =>
+        result?.data?.data?.length
+          ? [
+              ...result.data.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'SEARCH' },
+            ]
+          : [{ type: 'Events', id: 'SEARCH' }],
     }),
 
     // ============================================================
-    // PROTECTED ENDPOINTS - QUERIES
+    // PROTECTED QUERIES
     // ============================================================
 
-    // GET /api/v1/accounts/{accountId}/events - Get events by account
-    getEventsByAccount: builder.query<
-      PaginatedEventsResponse,
-      GetEventsByAccountParams
+    /**
+     * GET /events/me — authenticated list, scoped by token.
+     *
+     * Distinct from the public `listEvents` (which uses GET /events).
+     * The backend mounts these at different paths so the public and
+     * protected list flows never overlap.
+     */
+    listMyEvents: builder.query<BaseResponse<PaginatedEvents>, ListEventsParams>(
+      {
+        query: (params) => ({
+          url: '/events/me',
+          method: 'GET',
+          params,
+        }),
+        providesTags: (result) =>
+          result?.data?.data?.length
+            ? [
+                ...result.data.data.map(({ id }) => ({
+                  type: 'Events' as const,
+                  id,
+                })),
+                { type: 'Events', id: 'MINE' },
+              ]
+            : [{ type: 'Events', id: 'MINE' }],
+      },
+    ),
+
+    /** GET /events/me/search — authenticated, permission-scoped search. */
+    searchMyEvents: builder.query<
+      BaseResponse<PaginatedEvents>,
+      SearchMyEventsParams
     >({
-      query: ({ accountId, page = 1, page_size = 20, include_deleted = false}) => ({
-        url: `/accounts/${accountId}/events`,
+      query: (params) => ({
+        url: '/events/me/search',
         method: 'GET',
-        params: { 
-          page, 
+        params,
+      }),
+      providesTags: (result) =>
+        result?.data?.data?.length
+          ? [
+              ...result.data.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'MINE_SEARCH' },
+            ]
+          : [{ type: 'Events', id: 'MINE_SEARCH' }],
+    }),
+
+    /**
+     * GET /events/me?only_deleted=true — trashed events for the
+     * authenticated user. Returns the paginated envelope.
+     */
+    getTrashedEvents: builder.query<
+      BaseResponse<PaginatedEvents>,
+      { page?: number; page_size?: number }
+    >({
+      query: ({ page = 1, page_size = 20 }) => ({
+        url: '/events/me',
+        method: 'GET',
+        params: {
+          only_deleted: true,
+          page,
           page_size,
-          include_deleted,
         },
       }),
-      transformResponse: (response: any) => {
-        return mapPaginatedEvents(response);
-      },
-      providesTags: (result, error, { accountId }) => {
-        if (result?.data && Array.isArray(result.data) && result.data.length > 0) {
-          return [
-            ...result.data.map(({ id }) => ({ type: 'Events' as const, id })),
-            { type: 'Events', id: `ACCOUNT_${accountId}` },
-          ];
-        }
-        return [{ type: 'Events', id: `ACCOUNT_${accountId}` }];
-      },
+      providesTags: (result) =>
+        result?.data?.data?.length
+          ? [
+              ...result.data.data.map(({ id }) => ({
+                type: 'Events' as const,
+                id,
+              })),
+              { type: 'Events', id: 'TRASH' },
+              'TrashCount',
+            ]
+          : [{ type: 'Events', id: 'TRASH' }, 'TrashCount'],
+    }),
+
+    /**
+     * GET /events/me?only_deleted=true&page_size=1 — count of trashed
+     * events. Reads `total` off the paginated envelope.
+     */
+    getTrashedEventsCount: builder.query<{ count: number }, void>({
+      query: () => ({
+        url: '/events/me',
+        method: 'GET',
+        params: {
+          only_deleted: true,
+          page: 1,
+          page_size: 1,
+        },
+      }),
+      transformResponse: (response: BaseResponse<PaginatedEvents>) => ({
+        count: response?.data?.total ?? 0,
+      }),
+      providesTags: ['TrashCount'],
     }),
 
     // ============================================================
-    // PROTECTED ENDPOINTS - MUTATIONS
+    // PROTECTED MUTATIONS — create
     // ============================================================
 
-    // ✅ POST /api/v1/accounts/{accountId}/events/draft - Create draft
-    createDraft: builder.mutation<EventResponse, { accountId: string; data: FormData }>({
-      query: ({ accountId, data }) => ({
-        url: `/accounts/${accountId}/events/draft`,
+    /**
+     * POST /events/draft — create a draft event.
+     *
+     * Scope is resolved by the backend from the JWT. Do NOT send
+     * team_id or account_id in the body.
+     */
+    createDraft: builder.mutation<BaseResponse<Event>, CreateDraftRequest>({
+      query: (data) => ({
+        url: '/events/draft',
         method: 'POST',
         body: data,
       }),
-      transformResponse: (response: any) => {
-    // ✅ Use the mapper to convert uppercase fields to lowercase
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, { accountId }) => [
+      invalidatesTags: [
         { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: `ACCOUNT_${accountId}` },
+        { type: 'Events', id: 'MINE' },
+        'TrashCount',
       ],
     }),
 
-    // ✅ POST /api/v1/accounts/{accountId}/events - Create published event
-    createEvent: builder.mutation<EventResponse, { accountId: string; data: FormData }>({
-      query: ({ accountId, data }) => ({
-        url: `/accounts/${accountId}/events`,
+    /** POST /events — create and publish an event. */
+    createEvent: builder.mutation<BaseResponse<Event>, CreateEventRequest>({
+      query: (data) => ({
+        url: '/events',
         method: 'POST',
         body: data,
       }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, { accountId }) => [
+      invalidatesTags: [
         { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: `ACCOUNT_${accountId}` },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
       ],
     }),
 
-    // ✅ PUT /api/v1/events/{id} - Update event
-    updateEvent: builder.mutation<EventResponse, { id: string; data: UpdateEventRequest }>({
+    // ============================================================
+    // PROTECTED MUTATIONS — update & delete
+    // ============================================================
+
+    /** PUT /events/{id} — update an event. */
+    updateEvent: builder.mutation<
+      BaseResponse<Event>,
+      { id: string; data: UpdateEventRequest }
+    >({
       query: ({ id, data }) => ({
         url: `/events/${id}`,
         method: 'PUT',
         body: data,
       }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, { id }) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
       ],
     }),
 
-    // ✅ DELETE /api/v1/events/{id} - Soft delete event
+    /** DELETE /events/{id} — soft delete (move to trash). */
     deleteEvent: builder.mutation<void, string>({
       query: (id) => ({
         url: `/events/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
         { type: 'Events', id: 'PAST' },
-        'TrashCount', 
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
       ],
     }),
 
-    // ✅ NEW: DELETE /api/v1/events/{id}/permanent - Permanently delete event
+    /** DELETE /events/{id}/permanent — hard delete. */
     permanentlyDeleteEvent: builder.mutation<void, string>({
       query: (id) => ({
         url: `/events/${id}/permanent`,
         method: 'DELETE',
       }),
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
         { type: 'Events', id: 'PAST' },
-        'TrashCount', 
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
       ],
     }),
 
-    // ✅ NEW: POST /api/v1/events/{id}/restore - Restore soft-deleted event
-    restoreEvent: builder.mutation<EventResponse, string>({
+    /** POST /events/{id}/restore — restore a soft-deleted event. */
+    restoreEvent: builder.mutation<BaseResponse<Event>, string>({
       query: (id) => ({
         url: `/events/${id}/restore`,
         method: 'POST',
       }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      // ✅ Important: Invalidate trash cache
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'TRASH' },  // ✅ This is the key!
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'TRASH' },
         'TrashCount',
       ],
     }),
 
-    // ✅ POST /api/v1/events/{id}/publish - Publish event
-    publishEvent: builder.mutation<EventResponse, string>({
+    // ============================================================
+    // PROTECTED MUTATIONS — status
+    // ============================================================
+
+    /** POST /events/{id}/publish */
+    publishEvent: builder.mutation<BaseResponse<Event>, string>({
       query: (id) => ({
         url: `/events/${id}/publish`,
         method: 'POST',
       }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, id) => [
-      { type: 'Events', id },
-      { type: 'Events', id: 'LIST' },
-      { type: 'Events', id: 'UPCOMING' },
-      { type: 'Events', id: 'PAST' },
-      { type: 'Events', id: 'TRASH' },
-      'TrashCount',
-    ],
-    }),
-
-    // ✅ POST /api/v1/events/{id}/cancel - Cancel event
-    cancelEvent: builder.mutation<EventResponse, string>({
-      query: (id) => ({
-        url: `/events/${id}/cancel`,
-        method: 'POST',
-      }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (_result, _error, id) => [
         { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'UPCOMING' },
-      ],
-    }),
-
-    // ✅ POST /api/v1/events/{id}/complete - Complete event
-    completeEvent: builder.mutation<EventResponse, string>({
-      query: (id) => ({
-        url: `/events/${id}/complete`,
-        method: 'POST',
-      }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, id) => [
-        { type: 'Events', id },
-        { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'PAST' },
-      ],
-    }),
-
-    // ✅ NEW: POST /api/v1/events/{id}/duplicate - Duplicate single event
-    duplicateEvent: builder.mutation<EventResponse, { id: string; data?: DuplicateEventRequest }>({
-      query: ({ id, data }) => ({
-        url: `/events/${id}/duplicate`,
-        method: 'POST',
-        body: data || {},
-      }),
-      transformResponse: (response: any) => {
-        const data = response?.data || response;
-        return mapEventResponse(data);
-      },
-      invalidatesTags: (result, error, { id }) => [
-        { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: `ACCOUNT_${result?.account_id}` },
-      ],
-    }),
-
-    // ✅ NEW: POST /api/v1/accounts/{accountId}/events/{eventId}/image - Upload event image
-    uploadEventImage: builder.mutation<
-      MediaInfoResponse,
-      { accountId: string; eventId: string; image: File }
-    >({
-      query: ({ accountId, eventId, image }) => {
-        const formData = new FormData();
-        formData.append('image', image);
-        return {
-          url: `/accounts/${accountId}/events/${eventId}/image`,
-          method: 'POST',
-          body: formData,
-        };
-      },
-      transformResponse: (response: any) => {
-        // ✅ Use the mapper if the response contains event data
-        const data = response?.data || response;
-        // If it's a MediaInfoResponse, it might have different fields
-        // Check if it has ID or id field
-        if (data.ID || data.id) {
-          return {
-            id: data.id || data.ID || '',
-            url: data.url || data.URL || '',
-            media_type: data.media_type || data.MediaType || '',
-            entity_id: data.entity_id || data.EntityID || '',
-            uploaded_by: data.uploaded_by || data.UploadedBy || '',
-            created_at: data.created_at || data.CreatedAt || '',
-          };
-        }
-        return data;
-  },
-      invalidatesTags: (result, error, { eventId }) => [{ type: 'Events', id: eventId }],
-    }),
-
-    // ✅ NEW: POST /api/v1/accounts/{accountId}/events/{eventId}/certificate - Upload certificate
-    uploadCertificateTemplate: builder.mutation<
-      MediaInfoResponse,
-      { accountId: string; eventId: string; certificate: File }
-    >({
-      query: ({ accountId, eventId, certificate }) => {
-        const formData = new FormData();
-        formData.append('certificate', certificate);
-        return {
-          url: `/accounts/${accountId}/events/${eventId}/certificate`,
-          method: 'POST',
-          body: formData,
-        };
-      },
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { eventId }) => [{ type: 'Events', id: eventId }],
-    }),
-
-    // ✅ NEW: DELETE /api/v1/accounts/{accountId}/events/{eventId}/image - Delete event image
-    deleteEventImage: builder.mutation<void, { accountId: string; eventId: string }>({
-      query: ({ accountId, eventId }) => ({
-        url: `/accounts/${accountId}/events/${eventId}/image`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: (result, error, { eventId }) => [{ type: 'Events', id: eventId }],
-    }),
-
-    // ✅ NEW: DELETE /api/v1/accounts/{accountId}/events/{eventId}/certificate - Delete certificate
-    deleteEventCertificate: builder.mutation<void, { accountId: string; eventId: string }>({
-      query: ({ accountId, eventId }) => ({
-        url: `/accounts/${accountId}/events/${eventId}/certificate`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: (result, error, { eventId }) => [{ type: 'Events', id: eventId }],
-    }),
-
-    // ✅ NEW: DELETE /api/v1/accounts/{accountId}/events/{eventId}/media - Delete all media
-    deleteAllEventMedia: builder.mutation<void, { accountId: string; eventId: string }>({
-      query: ({ accountId, eventId }) => ({
-        url: `/accounts/${accountId}/events/${eventId}/media`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: (result, error, { eventId }) => [{ type: 'Events', id: eventId }],
-    }),
-
-    // ✅ NEW: DELETE /api/v1/accounts/{accountId}/events/bulk/media - Bulk delete media
-    bulkDeleteEventMedia: builder.mutation<
-      BulkDeleteResult,
-      { accountId: string; ids: string[] }
-    >({
-      query: ({ accountId, ids }) => ({
-        url: `/accounts/${accountId}/events/bulk/media`,
-        method: 'DELETE',
-        body: { ids },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
-        { type: 'Events', id: 'LIST' }, 'TrashCount', 
-      ],
-    }),
-
-    // ============================================================
-    // BULK OPERATIONS - Events
-    // ============================================================
-
-    // ✅ FIXED: DELETE /api/v1/events/bulk - Bulk soft delete
-    bulkDeleteEvents: builder.mutation<BulkDeleteResult, { ids: string[] }>({
-        query: ({ ids }) => ({
-          url: '/events/bulk',  // ✅ This is correct - should be /events/bulk
-          method: 'DELETE',
-          body: { ids },        // ✅ The body should be { ids: string[] }
-        }),
-        transformResponse: (response: any) => {
-          if (response?.data) {
-            return response.data;
-          }
-          return response;
-        },
-        invalidatesTags: (result, error, { ids }) => [
-          ...ids.map((id) => ({ type: 'Events' as const, id })),
-          { type: 'Events', id: 'LIST' },
-          { type: 'Events', id: 'UPCOMING' },
-          { type: 'Events', id: 'PAST' },
-        ],
-      }),
-
-    // ✅ NEW: DELETE /api/v1/events/bulk/permanent - Bulk permanent delete
-    bulkPermanentlyDeleteEvents: builder.mutation<BulkDeleteResult, { ids: string[] }>({
-      query: ({ ids }) => ({
-        url: '/events/bulk/permanent',
-        method: 'DELETE',
-        body: { ids },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
-        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
         { type: 'Events', id: 'PAST' },
-      ],
-    }),
-
-    // ✅ NEW: POST /api/v1/events/bulk/restore - Bulk restore
-   bulkRestoreEvents: builder.mutation<BulkRestoreResult, { ids: string[] }>({
-    query: ({ ids }) => ({
-      url: '/events/bulk/restore',
-      method: 'POST',
-      body: { ids },
-    }),
-    transformResponse: (response: any) => {
-      // ✅ Fix: Map backend response (capitalized) to frontend types
-      if (response?.data) {
-        return {
-          restored_count: response.data.RestoredCount || 0,
-          failed_ids: response.data.FailedIDs || [],
-          errors: response.data.Errors || [],
-        };
-      }
-      return {
-        restored_count: 0,
-        failed_ids: [],
-        errors: [],
-      };
-    },
-      // ✅ Important: Invalidate trash cache
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
-        { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'TRASH' },  // ✅ This is the key!
+        { type: 'Events', id: 'TRASH' },
         'TrashCount',
       ],
     }),
 
-    // ✅ NEW: POST /api/v1/events/bulk/publish - Bulk publish
-    bulkPublishEvents: builder.mutation<BulkStatusResult, { ids: string[] }>({
-      query: ({ ids }) => ({
-        url: '/events/bulk/publish',
+    /** POST /events/{id}/cancel */
+    cancelEvent: builder.mutation<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}/cancel`,
         method: 'POST',
-        body: { ids },
       }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'UPCOMING' },
       ],
     }),
 
-    // ✅ NEW: POST /api/v1/events/bulk/cancel - Bulk cancel
-    bulkCancelEvents: builder.mutation<BulkStatusResult, { ids: string[] }>({
-      query: ({ ids }) => ({
-        url: '/events/bulk/cancel',
+    /** POST /events/{id}/complete */
+    completeEvent: builder.mutation<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}/complete`,
         method: 'POST',
-        body: { ids },
       }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Events', id },
         { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'UPCOMING' },
-      ],
-    }),
-
-    // ✅ NEW: GET /api/v1/events?only_deleted=true&limit=1 - Get count of trashed events
-      getTrashedEventsCount: builder.query<{ count: number }, { account_id: string }>({
-        query: ({ account_id }) => ({
-          url: '/events',
-          method: 'GET',
-          params: {
-            account_id,
-            only_deleted: true,
-            limit: 1,
-            offset: 0,
-          },
-        }),
-        transformResponse: (response: any) => {
-          console.log('🔍 Trash count response:', response);
-          // The response structure is: { success: true, message: "...", data: { data: [], total: 24, ... } }
-          return { count: response?.data?.total || 0 };
-        },
-        providesTags: ['TrashCount'],
-      }),
-
-    // ✅ NEW: POST /api/v1/events/bulk/complete - Bulk complete
-    bulkCompleteEvents: builder.mutation<BulkStatusResult, { ids: string[] }>({
-      query: ({ ids }) => ({
-        url: '/events/bulk/complete',
-        method: 'POST',
-        body: { ids },
-      }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
-        ...ids.map((id) => ({ type: 'Events' as const, id })),
-        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
         { type: 'Events', id: 'PAST' },
       ],
     }),
 
-    // ✅ NEW: POST /api/v1/events/bulk/duplicate - Bulk duplicate
-    bulkDuplicateEvents: builder.mutation<
-      BulkDuplicateResult,
-      { ids: string[]; name_prefix?: string; date_offset_days?: number; is_draft?: boolean }
+    /** POST /events/{id}/duplicate */
+    duplicateEvent: builder.mutation<
+      BaseResponse<Event>,
+      { id: string; data?: DuplicateEventRequest }
     >({
-      query: ({ ids, name_prefix, date_offset_days, is_draft }) => ({
+      query: ({ id, data }) => ({
+        url: `/events/${id}/duplicate`,
+        method: 'POST',
+        body: data ?? {},
+      }),
+      invalidatesTags: [
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
+    /**
+     * POST /events/ai/generate-draft
+     *
+     * Calls the AI provider to generate a fully-formed event draft
+     * (name, description, schedule, tickets, venue) from a natural-language
+     * prompt. The draft is NOT persisted — the caller reviews it and
+     * submits it to `createDraft` or `createEvent` when ready.
+     *
+     * Scope (team, account) is resolved from the JWT by the backend.
+     * Only the AI-specific fields are sent in the body.
+     */
+    generateEventDraft: builder.mutation<
+      BaseResponse<GenerateEventDraftResult>,
+      GenerateEventDraftRequest
+    >({
+      query: (body) => ({
+        url: '/events/ai/generate-draft',
+        method: 'POST',
+        body,
+      }),
+      // No cache invalidation — pure computation on the backend.
+    }),
+
+    // ============================================================
+    // PROTECTED MUTATIONS — media
+    // ============================================================
+
+    /** POST /events/{id}/image — multipart upload. */
+    uploadEventImage: builder.mutation<
+      BaseResponse<MediaInfo>,
+      { eventId: string; image: File }
+    >({
+      query: ({ eventId, image }) => {
+        const formData = new FormData();
+        formData.append('image', image);
+        return {
+          url: `/events/${eventId}/image`,
+          method: 'POST',
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+      ],
+    }),
+
+    /** POST /events/{id}/certificate — multipart upload. */
+    uploadCertificateTemplate: builder.mutation<
+      BaseResponse<MediaInfo>,
+      { eventId: string; certificate: File }
+    >({
+      query: ({ eventId, certificate }) => {
+        const formData = new FormData();
+        formData.append('certificate', certificate);
+        return {
+          url: `/events/${eventId}/certificate`,
+          method: 'POST',
+          body: formData,
+        };
+      },
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+      ],
+    }),
+
+    /** DELETE /events/{id}/image */
+    deleteEventImage: builder.mutation<void, { eventId: string }>({
+      query: ({ eventId }) => ({
+        url: `/events/${eventId}/image`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+      ],
+    }),
+
+    /** DELETE /events/{id}/certificate */
+    deleteEventCertificate: builder.mutation<void, { eventId: string }>({
+      query: ({ eventId }) => ({
+        url: `/events/${eventId}/certificate`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+      ],
+    }),
+
+    /** DELETE /events/{id}/media — delete image + certificate. */
+    deleteAllEventMedia: builder.mutation<void, { eventId: string }>({
+      query: ({ eventId }) => ({
+        url: `/events/${eventId}/media`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+      ],
+    }),
+
+    // ============================================================
+    // PROTECTED MUTATIONS — bulk
+    // ============================================================
+
+    /** DELETE /events/bulk — soft delete many. */
+    bulkDeleteEvents: builder.mutation<BaseResponse<BulkDeleteResult>, BulkIDsRequest>({
+      query: (body) => ({
+        url: '/events/bulk',
+        method: 'DELETE',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
+      ],
+    }),
+
+    /** DELETE /events/bulk/permanent — hard delete many. */
+    bulkPermanentlyDeleteEvents: builder.mutation<
+      BaseResponse<BulkDeleteResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/permanent',
+        method: 'DELETE',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
+      ],
+    }),
+
+    /** POST /events/bulk/restore */
+    bulkRestoreEvents: builder.mutation<
+      BaseResponse<BulkRestoreResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/restore',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'TRASH' },
+        'TrashCount',
+      ],
+    }),
+
+    /** POST /events/bulk/publish */
+    bulkPublishEvents: builder.mutation<
+      BaseResponse<BulkStatusResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/publish',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'UPCOMING' },
+      ],
+    }),
+
+    /** POST /events/bulk/cancel */
+    bulkCancelEvents: builder.mutation<
+      BaseResponse<BulkStatusResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/cancel',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'UPCOMING' },
+      ],
+    }),
+
+    /** POST /events/bulk/complete */
+    bulkCompleteEvents: builder.mutation<
+      BaseResponse<BulkStatusResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/complete',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+        { type: 'Events', id: 'PAST' },
+      ],
+    }),
+
+    /** POST /events/bulk/duplicate */
+    bulkDuplicateEvents: builder.mutation<
+      BaseResponse<BulkDuplicateResult>,
+      BulkDuplicateRequest
+    >({
+      query: (body) => ({
         url: '/events/bulk/duplicate',
         method: 'POST',
-        body: { ids, name_prefix, date_offset_days, is_draft },
+        body,
       }),
-      transformResponse: (response: any) => {
-        if (response?.data) {
-          return response.data;
-        }
-        return response;
-      },
-      invalidatesTags: (result, error, { ids }) => [
+      invalidatesTags: [
         { type: 'Events', id: 'LIST' },
-        ...(result?.created_events?.map((e: any) => ({ type: 'Events' as const, id: e.id })) || []),
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
+    /** DELETE /events/bulk/media — delete media for many events. */
+    bulkDeleteEventMedia: builder.mutation<
+      BaseResponse<BulkDeleteResult>,
+      BulkIDsRequest
+    >({
+      query: (body) => ({
+        url: '/events/bulk/media',
+        method: 'DELETE',
+        body,
+      }),
+      invalidatesTags: (result, _error, { ids }) => [
+        ...ids.map((id) => ({ type: 'Events' as const, id })),
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
       ],
     }),
   }),
 });
 
 // ============================================================
-// EXPORT HOOKS - Queries
+// EXPORT HOOKS
 // ============================================================
 
-// Public endpoints - Queries
+// ---- Public queries ----
 export const {
+  useGetEventTypesQuery,
+  useGetEventStatusesQuery,
+  useGetCategoriesQuery,
+  useGetTicketTypesQuery,
   useListEventsQuery,
   useGetEventByIdQuery,
   useGetEventBySlugQuery,
   useGetUpcomingEventsQuery,
   useGetPastEventsQuery,
-  useGetEventTypesQuery,
-  useGetEventStatusesQuery,
   useGetEventsByTypeQuery,
   useSearchEventsQuery,
 } = eventsApi;
 
-// Protected endpoints - Queries
+// ---- Protected queries ----
 export const {
-  useGetEventsByAccountQuery,
+  useListMyEventsQuery,
+  useSearchMyEventsQuery,
+  useGetTrashedEventsQuery,
+  useGetTrashedEventsCountQuery,
 } = eventsApi;
 
-// ============================================================
-// EXPORT HOOKS - Mutations
-// ============================================================
-
-// Protected endpoints - Mutations
+// ---- Protected mutations — create ----
 export const {
   useCreateDraftMutation,
   useCreateEventMutation,
+} = eventsApi;
+
+// ---- Protected mutations — update & delete ----
+export const {
   useUpdateEventMutation,
   useDeleteEventMutation,
   usePermanentlyDeleteEventMutation,
   useRestoreEventMutation,
+} = eventsApi;
+
+// ---- Protected mutations — status ----
+export const {
   usePublishEventMutation,
   useCancelEventMutation,
   useCompleteEventMutation,
   useDuplicateEventMutation,
+} = eventsApi;
+
+// ---- Protected mutations — AI ----
+export const {
+  useGenerateEventDraftMutation,
+} = eventsApi;
+
+// ---- Protected mutations — media ----
+export const {
   useUploadEventImageMutation,
   useUploadCertificateTemplateMutation,
   useDeleteEventImageMutation,
   useDeleteEventCertificateMutation,
   useDeleteAllEventMediaMutation,
-  useBulkDeleteEventMediaMutation,
+} = eventsApi;
+
+// ---- Protected mutations — bulk ----
+export const {
   useBulkDeleteEventsMutation,
   useBulkPermanentlyDeleteEventsMutation,
   useBulkRestoreEventsMutation,
   useBulkPublishEventsMutation,
   useBulkCancelEventsMutation,
   useBulkCompleteEventsMutation,
-  useGetTrashedEventsQuery,
-  useGetTrashedEventsCountQuery,
   useBulkDuplicateEventsMutation,
+  useBulkDeleteEventMediaMutation,
 } = eventsApi;
+
+// ============================================================
+// CONVENIENCE RE-EXPORTS
+// ============================================================
+
+export type {
+  Event,
+  EventType,
+  EventStatus,
+  Category,
+  EventFormat,
+  TicketType,
+  CertificateTemplate,
+  CertificateType,
+  RecurrencePatternRef,
+  PaginatedEvents,
+  OffsetEvents,
+  MediaInfo,
+  BaseResponse,
+  BulkDeleteResult,
+  BulkRestoreResult,
+  BulkStatusResult,
+  BulkDuplicateResult,
+  CreateDraftRequest,
+  CreateEventRequest,
+  UpdateEventRequest,
+  DuplicateEventRequest,
+  BulkDuplicateRequest,
+  ListEventsParams,
+  SearchEventsParams,
+  GetEventsByTypeParams,
+  GetUpcomingEventsParams,
+  GetPastEventsParams,
+  BulkIDsRequest,
+} from '@/lib/types/events';

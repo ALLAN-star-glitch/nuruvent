@@ -1,110 +1,79 @@
 // app/(public)/events/[slug]/page.tsx
 
-/* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable react-hooks/immutability */
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import Image from 'next/image';
 import {
-  Calendar,
-  Clock,
-  MapPin,
-  Users,
-  ArrowLeft,
-  Video,
-  User,
-  Building2,
-  Ticket,
-  DollarSign,
-  Award,
-  Share2,
-  CalendarDays,
-  Loader2,
   AlertCircle,
+  ArrowLeft,
+  Award,
+  BadgeCheck,
+  Building2,
+  Calendar as CalendarIcon,
+  CalendarDays,
+  CheckCircle,
+  Clock as ClockIcon,
+  CreditCard,
+  FileText,
+  Globe,
   Heart,
   HeartOff,
-  Globe,
-  Clock as ClockIcon,
-  Calendar as CalendarIcon,
-  MapPin as MapPinIcon,
-  Tag,
-  BadgeCheck,
-  CheckCircle,
-  XCircle,
-  FileText,
-  Mail,
-  Phone,
-  MessageSquare,
-  CreditCard,
+  Loader2,
   LogIn,
-  UserPlus,
+  Mail,
+  MapPin as MapPinIcon,
+  MessageSquare,
+  Phone,
+  Share2,
+  Tag,
+  User,
+  Users,
+  Video,
+  XCircle,
 } from 'lucide-react';
+
+import { AuthModal } from '@/components/auth/AuthModal';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
-import { useAppSelector, useAppDispatch } from '@/lib/store/hooks';
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AuthModal } from '@/components/auth/AuthModal';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
-// ✅ Helper: Check if account is institution
-const isInstitutionAccount = (accountType: string): boolean => {
-  if (!accountType) return false;
-  const normalized = accountType.toLowerCase().trim();
-  return normalized === 'institution' || 
-         normalized === 'account-type-institution' ||
-         normalized === 'account_type_institution' ||
-         normalized.includes('institution');
-};
+import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
+import { useAppSelector } from '@/lib/store/hooks';
+import {
+  selectActiveAccount,
+  selectIsAuthenticated,
+  selectUser,
+} from '@/lib/store/slices/authSlice';
+import type { Event } from '@/lib/types/events';
+import {
+  formatEventDateBadge,
+  formatPrice,
+  getCertificatePrice,
+  getEventDuration,
+  getEventFillRate,
+  getEventHostName,
+  getEventLocation,
+  getEventMinPrice,
+  getEventStartTime,
+  getSpotsLeft,
+  getTimeUntilEvent,
+  isEventFree,
+  isEventFullyBooked,
+  isEventPast,
+  isHostInstitution,
+} from '@/lib/utils/eventDisplay';
 
-// Helper to format price
-const formatPrice = (price: number) => {
-  if (price === 0) return 'Free';
-  return `KSh ${price.toLocaleString()}`;
-};
-
-// Helper to format date
-const formatEventDate = (dateStr: string) => {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  } catch {
-    return dateStr;
-  }
-};
-
-// Helper to get time remaining
-const getTimeRemaining = (dateStr: string) => {
-  try {
-    const eventDate = new Date(dateStr);
-    const now = new Date();
-    const diff = eventDate.getTime() - now.getTime();
-    
-    if (diff < 0) return 'Event has passed';
-    
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (days > 0) return `${days}d ${hours}h remaining`;
-    if (hours > 0) return `${hours}h remaining`;
-    return 'Starting soon!';
-  } catch {
-    return '';
-  }
-};
+// ============================================================
+// TYPES
+// ============================================================
 
 interface BookingFormData {
   fullName: string;
@@ -114,7 +83,10 @@ interface BookingFormData {
   certificate: boolean;
 }
 
-// ✅ Skeleton Loading Component
+// ============================================================
+// SKELETON
+// ============================================================
+
 function EventDetailSkeleton() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50">
@@ -159,19 +131,6 @@ function EventDetailSkeleton() {
                 </Card>
               ))}
             </div>
-            <Card className="border-neutral-200/60 shadow-sm">
-              <CardContent className="p-5 sm:p-6 lg:p-7">
-                <div className="flex items-center gap-2 mb-3">
-                  <Skeleton className="h-5 w-1 rounded-full" />
-                  <Skeleton className="h-5 w-32 rounded" />
-                </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-3/4 rounded" />
-                </div>
-              </CardContent>
-            </Card>
           </div>
           <div className="lg:col-span-1 space-y-4">
             <Card className="border-neutral-200/60 shadow-lg overflow-hidden">
@@ -180,25 +139,11 @@ function EventDetailSkeleton() {
                 <Skeleton className="h-8 w-32 rounded" />
               </div>
               <CardContent className="p-5 space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-5 w-20 rounded" />
-                    <Skeleton className="h-5 w-16 rounded" />
-                  </div>
-                  <Skeleton className="h-2 w-full rounded-full" />
-                  <Skeleton className="h-4 w-24 rounded" />
-                </div>
-                <Separator />
-                <div className="space-y-4">
-                  <Skeleton className="h-11 w-full rounded-lg" />
-                  <Skeleton className="h-11 w-full rounded-lg" />
-                  <Skeleton className="h-11 w-full rounded-lg" />
-                  <Skeleton className="h-20 w-full rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
+                <Skeleton className="h-11 w-full rounded-lg" />
+                <Skeleton className="h-11 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-xl" />
               </CardContent>
             </Card>
-            <Skeleton className="h-12 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -206,17 +151,27 @@ function EventDetailSkeleton() {
   );
 }
 
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
 
-  const { data: event, isLoading, error } = useGetEventBySlugQuery(slug, {
-    skip: !slug,
-  });
+  const {
+    data: response,
+    isLoading,
+    error,
+  } = useGetEventBySlugQuery(slug, { skip: !slug });
 
-  // ✅ Get current user from Redux store
-  const { user, account, isAuthenticated } = useAppSelector((state) => state.auth);
+  const event: Event | undefined = response?.data;
+
+  // ---- Auth state (from selectors) ----
+  const user = useAppSelector(selectUser);
+  const account = useAppSelector(selectActiveAccount);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [isShared, setIsShared] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -234,47 +189,46 @@ export default function EventDetailPage() {
     certificate: true,
   });
 
-  // ✅ Pre-fill form with user data when authenticated (but still editable)
+  // Pre-fill form with authenticated user's details.
   useEffect(() => {
     if (isAuthenticated) {
-      const name = account?.display_name || account?.name || user?.name || '';
-      const email = account?.email || user?.email || '';
-      const phone = account?.phone || user?.phone || '';
-      
+      const name = account?.displayName || account?.name || user?.name || '';
+      const email = user?.email || '';
+      const phone = user?.phone || '';
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => ({
         ...prev,
         fullName: name || prev.fullName,
         email: email || prev.email,
         phone: phone || prev.phone,
-        certificate: true,
       }));
     }
   }, [isAuthenticated, account, user]);
 
-  // ✅ When user becomes authenticated after signup/login, submit pending booking
+  // When the user authenticates mid-booking, complete the pending booking.
   useEffect(() => {
     if (isAuthenticated && pendingBooking && !registrationComplete) {
-      // Update form with user data
-      const name = account?.display_name || account?.name || user?.name || '';
-      const email = account?.email || user?.email || '';
-      const phone = account?.phone || user?.phone || '';
-      
+      const name = account?.displayName || account?.name || user?.name || '';
+      const email = user?.email || '';
+      const phone = user?.phone || '';
+
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData((prev) => ({
         ...prev,
         fullName: name || prev.fullName,
         email: email || prev.email,
         phone: phone || prev.phone,
-        certificate: true,
       }));
-      
-      // Submit the booking - redirect to payment page
+
+      // eslint-disable-next-line react-hooks/immutability
       handleBookingSubmit({
         ...pendingBooking,
         fullName: name || pendingBooking.fullName,
         email: email || pendingBooking.email,
         phone: phone || pendingBooking.phone,
       });
-      
+
       setPendingBooking(null);
       setShowAuthModal(false);
       setRegistrationComplete(true);
@@ -283,82 +237,76 @@ export default function EventDetailPage() {
   }, [isAuthenticated, account, user]);
 
   const handleShare = async () => {
+    if (!event) return;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: event?.display_name || event?.name || 'Event',
-          text: `Check out this event: ${event?.display_name || event?.name}`,
+          title: event.display_name || event.name,
+          text: `Check out this event: ${event.display_name || event.name}`,
           url: window.location.href,
         });
         setIsShared(true);
         setTimeout(() => setIsShared(false), 3000);
-      } catch (error) {
-        console.log('Share cancelled or failed');
+      } catch {
+        // user cancelled or share failed
       }
     } else {
       try {
         await navigator.clipboard.writeText(window.location.href);
         setIsShared(true);
         setTimeout(() => setIsShared(false), 3000);
-      } catch (error) {
-        console.log('Failed to copy link');
+      } catch {
+        // clipboard denied
       }
     }
   };
 
-const handleBookingSubmit = async (data: BookingFormData) => {
-  if (!event) return;
+  const handleBookingSubmit = async (data: BookingFormData) => {
+    if (!event) return;
 
-  setIsBooking(true);
-  setBookingError('');
-  
-  try {
-    // TODO: Replace with actual booking API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setBookingSuccess(true);
-    setIsBooking(false);
-    
-    // ✅ Check if event is free (no registration fee AND no certificate fee)
-    const isFree = event.price === 0 && event.certificate_price === 0;
-    
-    setTimeout(() => {
-      if (isFree) {
-        // ✅ For free events, go directly to booking confirmation
-        router.push(`/booking-confirmation?event=${event.slug}`);
-      } else {
-        // ✅ For paid events, go to checkout
-        router.push(`/checkout/${event.slug}?booking=success`);
-      }
-    }, 500);
-    
-  } catch (error) {
-    setBookingError('Failed to book. Please try again.');
-    setIsBooking(false);
-  }
-};
+    setIsBooking(true);
+    setBookingError('');
+
+    try {
+      // TODO: replace with real booking API call.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setBookingSuccess(true);
+      setIsBooking(false);
+
+      const isFree = isEventFree(event);
+
+      setTimeout(() => {
+        if (isFree) {
+          router.push(`/booking-confirmation?event=${event.slug}`);
+        } else {
+          router.push(`/checkout/${event.slug}?booking=success`);
+        }
+      }, 500);
+    } catch {
+      setBookingError('Failed to book. Please try again.');
+      setIsBooking(false);
+    }
+  };
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!event) {
       setBookingError('Event not found');
       return;
     }
 
-    // ✅ If not authenticated, show auth modal with booking details pre-filled
     if (!isAuthenticated) {
       setPendingBooking({ ...formData });
       setShowAuthModal(true);
       return;
     }
 
-    // ✅ Authenticated - submit booking and go to payment
     await handleBookingSubmit(formData);
   };
 
   const handleAuthSuccess = () => {
-    // Auth success is handled by the useEffect above
-    // The pending booking will be submitted automatically
+    // Handled by the effect above.
   };
 
   const handleAuthModalClose = () => {
@@ -370,10 +318,10 @@ const handleBookingSubmit = async (data: BookingFormData) => {
     setBookingSuccess(false);
     setRegistrationComplete(false);
     if (isAuthenticated) {
-      const name = account?.display_name || account?.name || user?.name || '';
-      const email = account?.email || user?.email || '';
-      const phone = account?.phone || user?.phone || '';
-      
+      const name = account?.displayName || account?.name || user?.name || '';
+      const email = user?.email || '';
+      const phone = user?.phone || '';
+
       setFormData({
         fullName: name,
         email: email,
@@ -389,18 +337,21 @@ const handleBookingSubmit = async (data: BookingFormData) => {
     router.back();
   };
 
-  if (isLoading) {
-    return <EventDetailSkeleton />;
-  }
+  // ---- Loading / error ----
+
+  if (isLoading) return <EventDetailSkeleton />;
 
   if (error || !event) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center max-w-md px-4">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-neutral-900 mb-2">Event Not Found</h2>
+          <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+            Event Not Found
+          </h2>
           <p className="text-sm text-neutral-500 mb-6">
-            The event you&apos;re looking for doesn&apos;t exist or has been removed.
+            The event you&apos;re looking for doesn&apos;t exist or has been
+            removed.
           </p>
           <Button onClick={() => router.push('/')} className="cursor-pointer">
             Go Home
@@ -410,50 +361,46 @@ const handleBookingSubmit = async (data: BookingFormData) => {
     );
   }
 
-  const isPast = new Date(event.date) < new Date();
-  const isFullyBooked = event.current_attendees >= event.max_attendees && event.max_attendees > 0;
-  const timeRemaining = getTimeRemaining(event.date);
-  const attendancePercentage = event.max_attendees > 0 
-    ? Math.min(Math.round((event.current_attendees / event.max_attendees) * 100), 100) 
-    : 0;
+  // ---- Derived display values ----
+
+  const startDate = event.start_date ?? event.schedules?.[0]?.start_date ?? '';
+  const startTime = getEventStartTime(event);
+  const duration = getEventDuration(event);
+  const location = getEventLocation(event);
+  const minPrice = getEventMinPrice(event);
+  const certificatePrice = getCertificatePrice(event);
+  const hostName = getEventHostName(event);
+  const hostIsInstitution = isHostInstitution(event);
+  const isPast = isEventPast(event);
+  const isFullyBooked = isEventFullyBooked(event);
+  const isFree = isEventFree(event);
+  const spotsLeft = getSpotsLeft(event);
+  const fillRate = getEventFillRate(event);
+  const timeRemaining = getTimeUntilEvent(event);
+  const hasCertificate = certificatePrice > 0;
+
+  const fullDate = startDate
+    ? new Date(startDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'TBD';
 
   const canBook = !isPast && !isFullyBooked;
-
-  const getCreatorDisplay = () => {
-    const creator = event.creator;
-    if (!creator) {
-      return { name: 'Host', isInstitution: false, institutionName: '' };
-    }
-    
-    if (isInstitutionAccount(creator.account_type) && creator.institution_name) {
-      return { 
-        name: creator.institution_name, 
-        isInstitution: true,
-        institutionName: creator.institution_name,
-        displayName: creator.display_name || creator.name
-      };
-    }
-    
-    return { 
-      name: creator.display_name || creator.name || 'Host', 
-      isInstitution: false,
-      institutionName: '',
-      displayName: creator.display_name || creator.name
-    };
-  };
-
-  const creatorInfo = getCreatorDisplay();
-  const totalPrice = event.price + (event.certificate_price > 0 ? event.certificate_price : 0);
-
-  // ✅ Show success message for both registration + booking
   const showSuccess = bookingSuccess || registrationComplete;
 
-  // ✅ Determine if form fields should be editable
-  const isFormDisabled = false; // Always editable
+  const totalPrice = isFree
+    ? certificatePrice
+    : minPrice + (hasCertificate ? certificatePrice : 0);
+
+  const capacity = event.capacity ?? 0;
+  const attendees = event.current_attendees ?? 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50">
-      {/* Navigation Bar */}
+      {/* ---- Top bar ---- */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-neutral-200/20">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
@@ -474,9 +421,9 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                 type="button"
               >
                 {isSaved ? (
-                  <Heart className="h-5 w-5 sm:h-5.5 sm:w-5.5 text-red-500 fill-red-500" />
+                  <Heart className="h-5 w-5 text-red-500 fill-red-500" />
                 ) : (
-                  <HeartOff className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
+                  <HeartOff className="h-5 w-5" />
                 )}
               </Button>
               <Button
@@ -486,7 +433,7 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                 onClick={handleShare}
                 type="button"
               >
-                <Share2 className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
+                <Share2 className="h-5 w-5" />
                 <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm hidden sm:inline">
                   {isShared ? 'Copied!' : 'Share'}
                 </span>
@@ -496,12 +443,12 @@ const handleBookingSubmit = async (data: BookingFormData) => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* ---- Main ---- */}
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          {/* Left Column - Event Details */}
+          {/* Left column */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-            {/* Hero Image */}
+            {/* Hero image */}
             <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl overflow-hidden bg-neutral-100 shadow-lg">
               {event.image_url ? (
                 <Image
@@ -516,9 +463,9 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                   <CalendarDays className="h-16 w-16 sm:h-24 sm:w-24 text-neutral-300" />
                 </div>
               )}
-              
+
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-              
+
               <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
                 {event.is_featured && (
                   <Badge className="bg-gradient-to-r from-secondary-400 to-secondary-500 text-white border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
@@ -545,22 +492,22 @@ const handleBookingSubmit = async (data: BookingFormData) => {
               </div>
             </div>
 
-            {/* Event Title & Host */}
+            {/* Title + host */}
             <div className="space-y-3">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-neutral-900 leading-tight">
                 {event.display_name || event.name}
               </h1>
               <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base text-neutral-500">
                 <div className="flex items-center gap-2">
-                  {creatorInfo.isInstitution ? (
+                  {hostIsInstitution ? (
                     <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
                   ) : (
                     <User className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
                   )}
                   <span className="hidden xs:inline">Hosted by</span>
                   <span className="font-medium text-neutral-700 flex items-center gap-1">
-                    {creatorInfo.name}
-                    {creatorInfo.isInstitution && (
+                    {hostName}
+                    {hostIsInstitution && (
                       <BadgeCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
                     )}
                   </span>
@@ -568,7 +515,13 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                 <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300 hidden xs:block" />
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
-                  <span>{event.is_virtual ? 'Virtual Event' : 'In-Person'}</span>
+                  <span>
+                    {event.is_virtual
+                      ? 'Virtual Event'
+                      : event.is_hybrid
+                        ? 'Hybrid Event'
+                        : 'In-Person'}
+                  </span>
                 </div>
                 {!isPast && !isFullyBooked && timeRemaining && (
                   <>
@@ -582,7 +535,7 @@ const handleBookingSubmit = async (data: BookingFormData) => {
               </div>
             </div>
 
-            {/* Event Details Grid */}
+            {/* Details grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
@@ -591,27 +544,35 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                       <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">Date</p>
-                      <p className="text-sm sm:text-base font-semibold text-neutral-900">{formatEventDate(event.date)}</p>
+                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                        Date
+                      </p>
+                      <p className="text-sm sm:text-base font-semibold text-neutral-900">
+                        {fullDate}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className="p-2.5 sm:p-3 bg-primary-50 rounded-xl">
-                      <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
+                      <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">Time</p>
-                      <p className="text-sm sm:text-base font-semibold text-neutral-900">{event.time || 'TBD'}</p>
+                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                        Time
+                      </p>
+                      <p className="text-sm sm:text-base font-semibold text-neutral-900">
+                        {startTime}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              
+
               <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex items-center gap-3 sm:gap-4">
@@ -619,9 +580,11 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                       <MapPinIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">Location</p>
+                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                        Location
+                      </p>
                       <p className="text-sm sm:text-base font-semibold text-neutral-900 truncate">
-                        {event.is_virtual ? 'Virtual' : event.location || 'TBD'}
+                        {location}
                       </p>
                     </div>
                   </div>
@@ -644,60 +607,69 @@ const handleBookingSubmit = async (data: BookingFormData) => {
               </Card>
             )}
 
-            {/* Event Footer Details */}
+            {/* Footer details */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm sm:text-base text-neutral-500 pb-4">
-              <div className="flex items-center gap-2 cursor-default">
-                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
-                <span>{event.duration || 'N/A'} minutes</span>
-              </div>
-              {event.certificate_price > 0 && (
+              {duration && (
+                <div className="flex items-center gap-2 cursor-default">
+                  <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                  <span>{duration}</span>
+                </div>
+              )}
+              {hasCertificate && (
                 <>
                   <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300" />
                   <div className="flex items-center gap-2 cursor-default">
                     <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
-                    <span>Certificate: {formatPrice(event.certificate_price)}</span>
+                    <span>Certificate: {formatPrice(certificatePrice)}</span>
                   </div>
                 </>
               )}
               <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300 hidden sm:block" />
               <div className="flex items-center gap-2 cursor-default">
                 <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
-                <span className="hidden sm:inline">ID: {event.id?.slice(0, 8) || 'N/A'}</span>
-                <span className="sm:hidden">#{event.id?.slice(0, 6)}</span>
+                <span className="hidden sm:inline">ID: {event.id.slice(0, 8)}</span>
+                <span className="sm:hidden">#{event.id.slice(0, 6)}</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column - Booking Form */}
+          {/* Right column — booking */}
           <div className="lg:col-span-1">
             <div className="space-y-4">
-              {/* Price Card */}
               <Card className="border-neutral-200/60 shadow-lg overflow-hidden cursor-default">
                 <div className="bg-gradient-to-r from-primary-500/5 to-primary-500/10 px-5 py-4 sm:py-5 border-b border-neutral-200/30">
                   <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
                     Registration
                   </p>
                   <div className="flex items-end gap-2 mt-1">
-                    <span className={cn(
-                      "text-3xl sm:text-4xl font-bold",
-                      totalPrice === 0 ? "text-tertiary-600" : "text-primary-600"
-                    )}>
+                    <span
+                      className={cn(
+                        'text-3xl sm:text-4xl font-bold',
+                        totalPrice === 0 ? 'text-tertiary-600' : 'text-primary-600',
+                      )}
+                    >
                       {formatPrice(totalPrice)}
                     </span>
-                    <span className="text-sm sm:text-base text-neutral-400">total</span>
+                    <span className="text-sm sm:text-base text-neutral-400">
+                      total
+                    </span>
                   </div>
-                  {event.certificate_price > 0 && (
+                  {hasCertificate && !isFree && (
                     <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-neutral-500">
-                      <span className="line-through">{formatPrice(event.price)}</span>
+                      <span className="line-through">
+                        {formatPrice(minPrice)}
+                      </span>
                       <span className="text-neutral-300">+</span>
-                      <span className="text-amber-600 font-medium">{formatPrice(event.certificate_price)}</span>
+                      <span className="text-amber-600 font-medium">
+                        {formatPrice(certificatePrice)}
+                      </span>
                       <span className="text-neutral-400">certificate</span>
                     </div>
                   )}
                 </div>
-                
+
                 <CardContent className="p-5 space-y-4">
-                  {/* Attendee Info */}
+                  {/* Attendees */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm sm:text-base">
                       <div className="flex items-center gap-2 text-neutral-600 cursor-default">
@@ -705,61 +677,64 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                         <span>Attendees</span>
                       </div>
                       <span className="font-semibold text-neutral-900 cursor-default">
-                        {event.current_attendees || 0} / {event.max_attendees || '∞'}
+                        {attendees} / {capacity > 0 ? capacity : '∞'}
                       </span>
                     </div>
-                    {event.max_attendees > 0 && (
+                    {capacity > 0 && (
                       <div className="w-full h-1.5 sm:h-2 bg-neutral-100 rounded-full overflow-hidden cursor-default">
-                        <div 
+                        <div
                           className={cn(
-                            "h-full rounded-full transition-all duration-500",
-                            attendancePercentage >= 90 ? "bg-red-500" : 
-                            attendancePercentage >= 70 ? "bg-amber-500" : 
-                            "bg-tertiary-500"
+                            'h-full rounded-full transition-all duration-500',
+                            fillRate >= 90
+                              ? 'bg-red-500'
+                              : fillRate >= 70
+                                ? 'bg-amber-500'
+                                : 'bg-tertiary-500',
                           )}
-                          style={{ width: `${attendancePercentage}%` }}
+                          style={{ width: `${fillRate}%` }}
                         />
                       </div>
                     )}
-                    {event.max_attendees > 0 && !isPast && !isFullyBooked && (
+                    {spotsLeft !== null && !isPast && !isFullyBooked && (
                       <p className="text-xs sm:text-sm text-neutral-500 cursor-default">
-                        {event.max_attendees - event.current_attendees} spots remaining
+                        {spotsLeft} spots remaining
                       </p>
                     )}
                   </div>
 
                   <Separator />
 
-                  {/* Certificate Included Badge */}
-                  {event.certificate_price > 0 && (
+                  {hasCertificate && (
                     <div className="flex items-center justify-between bg-amber-50/70 rounded-lg px-3 py-2.5 sm:py-3 border-2 border-amber-400">
                       <div className="flex items-center gap-2.5">
                         <div className="p-1.5 bg-amber-100 rounded-lg">
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
                         </div>
                         <div>
-                          <span className="text-sm sm:text-base font-semibold text-amber-800">Certificate Included</span>
-                          <p className="text-xs sm:text-sm text-amber-600">Included in total price</p>
+                          <span className="text-sm sm:text-base font-semibold text-amber-800">
+                            Certificate Included
+                          </span>
+                          <p className="text-xs sm:text-sm text-amber-600">
+                            Included in total price
+                          </p>
                         </div>
                       </div>
                       <span className="text-sm sm:text-base font-semibold text-amber-800 ml-auto">
-                        {formatPrice(event.certificate_price)}
+                        {formatPrice(certificatePrice)}
                       </span>
                     </div>
                   )}
 
-                  {/* Booking Section */}
                   {canBook ? (
                     <>
                       {showSuccess ? (
-                        // ✅ Success State - Account created and ticket booked
                         <div className="space-y-4">
                           <div className="flex items-center gap-3 bg-tertiary-50 border border-tertiary-200 rounded-xl p-4 cursor-default">
                             <CheckCircle className="h-7 w-7 text-tertiary-600 flex-shrink-0" />
                             <div>
                               <p className="font-semibold text-tertiary-800 text-sm sm:text-base">
-                                {!isAuthenticated && registrationComplete 
-                                  ? 'Account Created & Ticket Booked!' 
+                                {!isAuthenticated && registrationComplete
+                                  ? 'Account Created & Ticket Booked!'
                                   : 'Booking Confirmed!'}
                               </p>
                               <p className="text-sm text-tertiary-700">
@@ -779,22 +754,22 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                         </div>
                       ) : (
                         <form onSubmit={handleBooking} className="space-y-4">
-                          {/* ✅ Show auth status */}
                           {!isAuthenticated && (
                             <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200 cursor-default">
                               <LogIn className="h-4 w-4 text-amber-600 flex-shrink-0" />
                               <span className="text-xs sm:text-sm text-amber-700">
-                                You&apos;ll be prompted to sign in or create an account to complete booking
+                                You&apos;ll be prompted to sign in or create an
+                                account to complete booking
                               </span>
                             </div>
                           )}
 
-                          {/* ✅ Logged in status indicator */}
                           {isAuthenticated && (
                             <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 border border-green-200 cursor-default">
                               <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
                               <span className="text-xs sm:text-sm text-green-700">
-                                Booking as {account?.display_name || account?.name || user?.name}
+                                Booking as{' '}
+                                {account?.displayName || account?.name || user?.name}
                               </span>
                             </div>
                           )}
@@ -810,9 +785,10 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                                 placeholder="Enter your full name"
                                 className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
                                 value={formData.fullName}
-                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, fullName: e.target.value })
+                                }
                                 required
-                                // ✅ Always editable
                               />
                             </div>
                           </div>
@@ -829,9 +805,10 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                                 placeholder="you@example.com"
                                 className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
                                 value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, email: e.target.value })
+                                }
                                 required
-                                // ✅ Always editable
                               />
                             </div>
                           </div>
@@ -848,8 +825,9 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                                 placeholder="+254 700 000 000"
                                 className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
                                 value={formData.phone}
-                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                // ✅ Always editable
+                                onChange={(e) =>
+                                  setFormData({ ...formData, phone: e.target.value })
+                                }
                               />
                             </div>
                           </div>
@@ -865,7 +843,12 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                                 placeholder="Any special requirements or questions..."
                                 className="pl-9 sm:pl-10 min-h-[80px] sm:min-h-[100px] resize-none text-sm sm:text-base cursor-text"
                                 value={formData.specialRequests}
-                                onChange={(e) => setFormData({ ...formData, specialRequests: e.target.value })}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    specialRequests: e.target.value,
+                                  })
+                                }
                               />
                             </div>
                           </div>
@@ -880,11 +863,11 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                           <Button
                             type="submit"
                             className={cn(
-                              "w-full h-12 sm:h-14 text-base sm:text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 cursor-pointer",
-                              totalPrice === 0 
-                                ? "bg-tertiary-500 hover:bg-tertiary-600 shadow-tertiary-500/30" 
-                                : "bg-primary-500 hover:bg-primary-600 shadow-primary-500/30",
-                              isBooking && "opacity-70 cursor-not-allowed hover:opacity-70"
+                              'w-full h-12 sm:h-14 text-base sm:text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 cursor-pointer',
+                              totalPrice === 0
+                                ? 'bg-tertiary-500 hover:bg-tertiary-600 shadow-tertiary-500/30'
+                                : 'bg-primary-500 hover:bg-primary-600 shadow-primary-500/30',
+                              isBooking && 'opacity-70 cursor-not-allowed hover:opacity-70',
                             )}
                             disabled={isBooking}
                           >
@@ -896,7 +879,9 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                             ) : (
                               <>
                                 <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                                {totalPrice === 0 ? 'Register Now' : 'Proceed to Buy Ticket'}
+                                {totalPrice === 0
+                                  ? 'Register Now'
+                                  : 'Proceed to Buy Ticket'}
                               </>
                             )}
                           </Button>
@@ -910,20 +895,30 @@ const handleBookingSubmit = async (data: BookingFormData) => {
                   ) : (
                     <div className="text-center py-4">
                       <div className="flex items-center justify-center gap-2 text-neutral-500 mb-2 cursor-default">
-                        {isPast ? <XCircle className="h-5 w-5 sm:h-6 sm:w-6" /> : <Users className="h-5 w-5 sm:h-6 sm:w-6" />}
+                        {isPast ? (
+                          <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+                        ) : (
+                          <Users className="h-5 w-5 sm:h-6 sm:w-6" />
+                        )}
                         <span className="font-medium text-sm sm:text-base">
-                          {isPast ? 'Event has ended' : isFullyBooked ? 'Fully Booked' : 'Registration Closed'}
+                          {isPast
+                            ? 'Event has ended'
+                            : isFullyBooked
+                              ? 'Fully Booked'
+                              : 'Registration Closed'}
                         </span>
                       </div>
                       <p className="text-sm sm:text-base text-neutral-400 cursor-default">
-                        {isPast ? 'Check out our upcoming events' : 'No more spots available'}
+                        {isPast
+                          ? 'Check out our upcoming events'
+                          : 'No more spots available'}
                       </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Share Card */}
+              {/* Share card */}
               <Card className="border-neutral-200/60 shadow-sm cursor-default">
                 <CardContent className="p-4">
                   <Button
@@ -942,7 +937,7 @@ const handleBookingSubmit = async (data: BookingFormData) => {
         </div>
       </div>
 
-      {/* ✅ Auth Modal - shows when unauthenticated user tries to book */}
+      {/* Auth modal for unauthenticated booking */}
       <AuthModal
         isOpen={showAuthModal}
         onClose={handleAuthModalClose}

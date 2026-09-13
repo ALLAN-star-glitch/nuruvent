@@ -1,425 +1,341 @@
 // app/(dashboard)/dashboard/events/page.tsx
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Plus,
-  Search,
-  Calendar,
-  Users,
-  Clock,
-  MoreVertical,
-  ExternalLink,
-  Edit3,
-  Copy,
-  Trash2,
-  CheckCircle2,
-  Video,
-  Filter,
-  Check,
-  Eye,
-  MapPin,
-  Award,
-  Globe,
-  XCircle,
-  Grid3x3,
-  List,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  ArrowRight,
-  Loader2,
-  RefreshCw,
-  AlertTriangle,
-  LogIn,
-  AlertCircle,
-  Star,
-  Lock,
-  Trash,
-  RotateCcw,
+  Plus, Search, Calendar, Users, Clock, MoreVertical, ExternalLink, Edit3,
+  Copy, Trash2, CheckCircle2, Video, Filter, Check, Eye, Award, Globe,
+  XCircle, Grid3x3, List, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft,
+  ChevronRight, X, ArrowRight, Loader2, RefreshCw, AlertTriangle, LogIn,
+  AlertCircle, Star, Lock, Trash, RotateCcw,
 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
-import { useAppSelector, useAppDispatch } from '@/lib/store/hooks';
-import {
-  useGetEventsByAccountQuery,
-  useSearchEventsQuery,
-  useDeleteEventMutation,
-  usePermanentlyDeleteEventMutation,
-  useRestoreEventMutation,
-  usePublishEventMutation,
-  useGetEventStatusesQuery,
-  useGetEventTypesQuery,
-  EventResponse,
-  useBulkDeleteEventsMutation,
-  useBulkPermanentlyDeleteEventsMutation,
-  useBulkRestoreEventsMutation,
-  useBulkPublishEventsMutation,
-  useGetTrashedEventsCountQuery,
-} from '@/lib/store/api/eventsApi';
-import {
-  setCurrentPage,
-  setPageSize,
-  setTotalEvents,
-} from '@/lib/store/slices/eventsSlice';
 import { toast } from 'sonner';
 
-// Helper to format price
-const formatPrice = (price: number): string => {
-  if (price === 0) return 'Free';
-  return `KES ${price.toLocaleString()}`;
-};
+import {
+  useBulkDeleteEventsMutation,
+  useBulkPermanentlyDeleteEventsMutation,
+  useBulkPublishEventsMutation,
+  useBulkRestoreEventsMutation,
+  useDeleteEventMutation,
+  useGetTrashedEventsCountQuery,
+  useListMyEventsQuery,
+  usePermanentlyDeleteEventMutation,
+  usePublishEventMutation,
+  useRestoreEventMutation,
+  useSearchMyEventsQuery,
+} from '@/lib/store/api/eventsApi';
+import type { Event } from '@/lib/types/events';
+import {
+  formatPrice,
+  getEventDuration,
+  getEventLocation,
+  getEventMinPrice,
+  getEventStartTime,
+  getEventStatusName,
+  isEventDraft,
+  isEventPublished,
+} from '@/lib/utils/eventDisplay';
 
-// Helper to format date for display
-const formatDate = (dateString: string): string => {
-  if (!dateString) return 'N/A';
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return 'N/A';
-  }
-};
-
-// ✅ FIXED: Helper to get status config with display name from statusesMap
-const getStatusConfig = (statusId: string, statusesMap: Record<string, string>) => {
-  // Get the display name from the map
-  const displayName = statusesMap[statusId] || statusId || 'Draft';
-  
-  const statusMap: Record<string, { color: string; dot: string }> = {
-    'Draft': { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
-    'Published': { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
-    'Cancelled': { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
-    'Completed': { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
-  };
-  
-  const config = statusMap[displayName] || statusMap['Draft'];
-  return { ...config, displayName };
-};
-
-// ✅ FIXED: Helper to get type config with display name from typesMap
-const getTypeConfig = (typeId: string, typesMap: Record<string, string>) => {
-  // Get the display name from the map
-  const displayName = typesMap[typeId] || typeId || 'Event';
-  
-  const classNameMap: Record<string, string> = {
-    'Workshop': 'bg-purple-100 text-purple-700 border-purple-200',
-    'Webinar': 'bg-blue-100 text-blue-700 border-blue-200',
-    'Meetup': 'bg-amber-100 text-amber-700 border-amber-200',
-    'Bootcamp': 'bg-red-100 text-red-700 border-red-200',
-    'Uncategorized': 'bg-gray-100 text-gray-700 border-gray-200',
-  };
-  
-  return {
-    displayName: displayName,
-    className: classNameMap[displayName] || 'bg-gray-100 text-gray-700 border-gray-200'
-  };
-};
+// ============================================================
+// TYPES
+// ============================================================
 
 type SortField = 'name' | 'eventDate' | 'addedDate' | 'current_attendees' | 'price' | 'status';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
-// ✅ FIXED: Convert API event to UI event with proper ID mapping
-const convertApiEventToUI = (
-  event: EventResponse,
-  typesMap: Record<string, string>,
-  statusesMap: Record<string, string>
-): any => {
-  // Helper to get value from either camelCase or snake_case
-  const getVal = (camel: string, snake: string) => {
-    return (event as any)[camel] ?? (event as any)[snake];
-  };
+interface UIEvent {
+  id: string;
+  title: string;
+  eventTypeId: string;
+  eventStatusId: string;
+  typeDisplayName: string;
+  statusDisplayName: string;
+  type: string;
+  status: string;
+  date: string;
+  time: string;
+  registered: number;
+  capacity: number;
+  priceDisplay: string;
+  priceValue: number;
+  platform: string;
+  cpdHours: number;
+  description: string;
+  host: string;
+  location: string;
+  image?: string;
+  slug: string;
+  rawDate: string;
+  duration: string;
+  certificatePrice: number;
+  isVirtual: boolean;
+  isFeatured: boolean;
+  isPrivate: boolean;
+  zoomLink?: string;
+  meetLink?: string;
+  createdAt: string;
+  publishedAt?: string;
+  deletedAt?: string;
+  isDeleted: boolean;
+}
 
-  const id = getVal('id', 'ID');
-  const displayName = getVal('display_name', 'DisplayName') || getVal('name', 'Name') || 'Untitled Event';
-  const eventTypeId = getVal('event_type_id', 'EventTypeID');
-  const eventStatusId = getVal('event_status_id', 'EventStatusID');
-  const date = getVal('date', 'Date');
-  const time = getVal('time', 'Time');
-  const currentAttendees = getVal('current_attendees', 'CurrentAttendees') || 0;
-  const maxAttendees = getVal('max_attendees', 'MaxAttendees') || 0;
-  const price = getVal('price', 'Price') || 0;
-  const isVirtual = getVal('is_virtual', 'IsVirtual') || false;
-  const zoomLink = getVal('zoom_link', 'ZoomLink');
-  const meetLink = getVal('meet_link', 'MeetLink');
-  const duration = getVal('duration', 'Duration') || 0;
-  const description = getVal('description', 'Description');
-  const location = getVal('location', 'Location') || 'Virtual';
-  const imageUrl = getVal('image_url', 'ImageURL');
-  const slug = getVal('slug', 'Slug');
-  const accountId = getVal('account_id', 'AccountID');
-  const isActive = getVal('is_active', 'IsActive');
-  const deletedAt = getVal('deleted_at', 'DeletedAt');
-  const deletedBy = getVal('deleted_by', 'DeletedBy');
-  const restoredAt = getVal('restored_at', 'RestoredAt');
-  const restoredBy = getVal('restored_by', 'RestoredBy');
-  const createdAt = getVal('created_at', 'CreatedAt') || date;
-  const updatedAt = getVal('updated_at', 'UpdatedAt') || date;
-  const isFeatured = getVal('is_featured', 'IsFeatured') || false;
-  const isPrivate = getVal('is_private', 'IsPrivate') || false;
-  const certificatePrice = getVal('certificate_price', 'CertificatePrice') || 0;
+// ============================================================
+// HELPERS
+// ============================================================
+
+function formatDateShort(dateString: string | undefined): string {
+  if (!dateString) return 'N/A';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return 'N/A';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getStatusBadgeConfig(statusName: string) {
+  const map: Record<string, { color: string; dot: string }> = {
+    Draft: { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
+    Published: { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
+    Cancelled: { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
+    Completed: { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
+  };
+  return map[statusName] ?? map.Draft;
+}
+
+function getTypeBadgeClass(typeName: string): string {
+  const map: Record<string, string> = {
+    Workshop: 'bg-purple-100 text-purple-700 border-purple-200',
+    Webinar: 'bg-blue-100 text-blue-700 border-blue-200',
+    Meetup: 'bg-amber-100 text-amber-700 border-amber-200',
+    Bootcamp: 'bg-red-100 text-red-700 border-red-200',
+    Uncategorized: 'bg-gray-100 text-gray-700 border-gray-200',
+  };
+  return map[typeName] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+}
+
+/**
+ * Convert the backend `Event` shape into the flat UI shape this page
+ * renders. All the nested derivations (start date, min ticket price,
+ * duration from schedule, etc.) happen here once.
+ */
+function toUIEvent(event: Event): UIEvent {
+  const startDate = event.start_date ?? event.schedules?.[0]?.start_date ?? '';
+  const startTime = getEventStartTime(event);
+  const duration = getEventDuration(event);
+  const minPrice = getEventMinPrice(event);
+  const location = getEventLocation(event);
+  const statusName = getEventStatusName(event);
+  const typeName = event.event_type?.display_name || event.event_type?.name || 'Event';
+
+  const isDeleted = Boolean(event.deleted_at);
+
+  // CPD hours are derived from duration when the event type supports
+  // certificates. The backend doesn't expose "CPD hours" directly.
+  const cpdHours = event.event_type?.supports_certificate
+    ? Math.round(parseDurationMinutes(duration) / 60)
+    : 0;
+
+  const platform = event.is_virtual
+    ? event.zoom_link
+      ? 'Zoom'
+      : event.meet_link
+        ? 'Google Meet'
+        : 'Virtual'
+    : 'In-Person';
 
   return {
-    id,
-    title: displayName,
-    // ✅ Store the raw IDs for lookup
-    eventTypeId: eventTypeId,
-    eventStatusId: eventStatusId,
-    // ✅ Store display names from maps
-    typeDisplayName: typesMap[eventTypeId] || eventTypeId || 'Event',
-    statusDisplayName: statusesMap[eventStatusId] || eventStatusId || 'Draft',
-    // Legacy fields for compatibility
-    type: typesMap[eventTypeId] || eventTypeId,
-    status: statusesMap[eventStatusId] || eventStatusId,
-    date: date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD',
-    time: time || 'TBD',
-    registered: currentAttendees,
-    capacity: maxAttendees,
-    price: formatPrice(price),
-    platform: isVirtual ? (zoomLink ? 'Zoom' : meetLink ? 'Google Meet' : 'Virtual') : 'In-Person',
-    cpdHours: Math.round(duration / 60) || 0,
-    description,
-    host: accountId,
-    location: location,
-    image: imageUrl,
-    slug,
-    rawDate: date,
-    rawTime: time,
+    id: event.id,
+    title: event.display_name || event.name || 'Untitled Event',
+    eventTypeId: event.event_type?.id ?? '',
+    eventStatusId: event.event_status?.id ?? '',
+    typeDisplayName: typeName,
+    statusDisplayName: statusName,
+    type: typeName,
+    status: statusName,
+    date: startDate ? formatDateShort(startDate) : 'TBD',
+    time: startTime,
+    registered: event.current_attendees ?? 0,
+    capacity: event.capacity ?? 0,
+    priceDisplay: formatPrice(minPrice),
+    priceValue: minPrice,
+    platform,
+    cpdHours,
+    description: event.description || '',
+    host: event.organizer?.id ?? '',
+    location,
+    image: event.image_url,
+    slug: event.slug,
+    rawDate: startDate,
     duration,
-    certificatePrice,
-    isVirtual,
-    isFeatured,
-    isPrivate,
-    zoomLink,
-    meetLink,
-    currentAttendees,
-    maxAttendees,
-    accountId,
-    isActive,
-    deletedAt,
-    deletedBy,
-    restoredAt,
-    restoredBy,
-    createdAt,
-    updatedAt,
-    isDeleted: !!deletedAt,
+    certificatePrice: event.certificate_enabled ? event.certificate_price ?? 0 : 0,
+    isVirtual: event.is_virtual,
+    isFeatured: event.is_featured,
+    isPrivate: event.visibility === 'private',
+    zoomLink: event.zoom_link,
+    meetLink: event.meet_link,
+    createdAt: event.created_at,
+    publishedAt: event.published_at,
+    deletedAt: event.deleted_at,
+    isDeleted,
   };
-};
+}
+
+function parseDurationMinutes(duration: string): number {
+  // Parse "2h 30m" / "45m" / "3h" back into minutes for CPD math.
+  if (!duration) return 0;
+  const hoursMatch = duration.match(/(\d+)h/);
+  const minsMatch = duration.match(/(\d+)m/);
+  const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
+  const mins = minsMatch ? parseInt(minsMatch[1], 10) : 0;
+  return hours * 60 + mins;
+}
+
+// ============================================================
+// PAGE
+// ============================================================
 
 export default function EventsDashboardPage() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
-  
-  // Get auth state
-  const { account, user, isAuthenticated } = useAppSelector((state) => state.auth);
-  
-  // Use account.id for the accountId, fallback to user.id
-  const accountId = account?.id || user?.id || '';
 
-  // Get events state from Redux
-  const { currentPage, pageSize } = useAppSelector((state) => state.events);
-  
-  // Local state
+  // ---- Auth ----
+  // The events list endpoints now scope from the JWT. We don't need
+  // account/user IDs. We only need to know whether the user is
+  // authenticated to decide whether to fetch at all.
+  const isAuthenticated = useAuthenticated();
+
+  // ---- Local state ----
   const [activeTab, setActiveTab] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState<string>('');
-  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<UIEvent | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isPermanentDeleteDialogOpen, setIsPermanentDeleteDialogOpen] = useState(false);
   const [isRestoreDialogOpen, setIsRestoreDialogOpen] = useState(false);
-
   const [publishError, setPublishError] = useState<{ message: string; details: string[] } | null>(null);
   const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] = useState(false);
   const [publishingEventId, setPublishingEventId] = useState<string | null>(null);
-  
-
-  // Sort and view state
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [sortField, setSortField] = useState<SortField>('eventDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-
-  // Check if mobile
   const [isMobile, setIsMobile] = useState(false);
 
+  // ---- Mobile detection ----
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Debounce search query
+  // ---- Debounce search ----
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Reset to page 1 when search query changes
+  // ---- Reset page on search change ----
   useEffect(() => {
-    dispatch(setCurrentPage(1));
-  }, [debouncedSearchQuery, dispatch]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentPage(1);
+  }, [debouncedSearchQuery]);
 
-  // ============================================================
-  // STEP 1: Fetch Statuses and Types (mapping data)
-  // ============================================================
-  const { 
-    data: statusesData, 
-    isLoading: isStatusesLoading,
-    error: statusesError,
-  } = useGetEventStatusesQuery(undefined, {
-    skip: !accountId || !isAuthenticated,
-  });
-  
-  const { 
-    data: typesData, 
-    isLoading: isTypesLoading,
-    error: typesError,
-  } = useGetEventTypesQuery(undefined, {
-    skip: !accountId || !isAuthenticated,
-  });
-
-  // ✅ FIXED: Create maps for quick lookups: ID → Display Name (supports both cases)
-  const statusesMap = useMemo(() => {
-    if (!statusesData) return {};
-    
-    const statusesArray = Array.isArray(statusesData) 
-      ? statusesData 
-      : (statusesData as any)?.data || [];
-    
-    return statusesArray.reduce((acc: any, status: any) => ({
-      ...acc,
-      [status.id || status.ID]: status.display_name || status.name || status.Name
-    }), {});
-  }, [statusesData]);
-
-  const typesMap = useMemo(() => {
-    if (!typesData) return {};
-    
-    const typesArray = Array.isArray(typesData) 
-      ? typesData 
-      : (typesData as any)?.data || [];
-    
-    return typesArray.reduce((acc: any, type: any) => ({
-      ...acc,
-      [type.id || type.ID]: type.display_name || type.name || type.Name
-    }), {});
-  }, [typesData]);
-
-  // Determine if we should search
   const shouldSearch = debouncedSearchQuery.trim().length > 0;
 
-  // ============================================================
-  // STEP 2: Fetch Events with cache invalidation for fresh data
-  // ============================================================
+
+  // `useListMyEventsQuery` hits GET /events with the auth token; the
+  // backend route is dual-mounted and picks the scoped handler.
   const {
-  data: browseData,
-  isLoading: isBrowseLoading,
-  isFetching: isBrowseFetching,
-  error: browseError,
-  refetch: refetchBrowse,
-} = useGetEventsByAccountQuery({
-  accountId: accountId || '',
-  page: currentPage,
-  page_size: pageSize,
- 
-}, {
-  skip: shouldSearch || !accountId || !isAuthenticated,
-  refetchOnMountOrArgChange: true,
-  refetchOnReconnect: true,
-  refetchOnFocus: true,
-});
+    data: listResponse,
+    isLoading: isListLoading,
+    isFetching: isListFetching,
+    error: listError,
+    refetch: refetchList,
+  } = useListMyEventsQuery(
+  {
+    page: currentPage,
+    page_size: pageSize,
+    only_deleted: activeTab === 'trash' ? true : undefined,
+  },
+  { skip: shouldSearch || !isAuthenticated },
+);
 
   const {
-  data: searchData,
-  isLoading: isSearchLoading,
-  isFetching: isSearchFetching,
-  error: searchError,
-  refetch: refetchSearch,
-} = useSearchEventsQuery({
-  q: debouncedSearchQuery,
-  account_id: accountId || '',
-  page: currentPage,
-  page_size: pageSize,
-}, {
-  skip: !shouldSearch || !accountId || !isAuthenticated,
-  refetchOnMountOrArgChange: true,
-  refetchOnReconnect: true,
-  refetchOnFocus: true,
-});
+    data: searchResponse,
+    isLoading: isSearchLoading,
+    isFetching: isSearchFetching,
+    error: searchError,
+    refetch: refetchSearch,
+  } = useSearchMyEventsQuery(
+    {
+      q: debouncedSearchQuery,
+      page: currentPage,
+      page_size: pageSize,
+    },
+    { skip: !shouldSearch || !isAuthenticated },
+  );
 
-  // Mutations
+  const { data: trashCountResponse, refetch: refetchTrashCount } =
+    useGetTrashedEventsCountQuery(undefined, { skip: !isAuthenticated });
+
+  const trashedEvents = trashCountResponse?.count ?? 0;
+
+  // ---- Combine query results ----
+  const activeData = shouldSearch ? searchResponse : listResponse;
+  const isLoading = isListLoading || isSearchLoading;
+  const isFetching = shouldSearch ? isSearchFetching : isListFetching;
+  const error = shouldSearch ? searchError : listError;
+  const refetch = shouldSearch ? refetchSearch : refetchList;
+
+  const rawEvents: Event[] = activeData?.data?.data ?? [];
+  const totalItems = activeData?.data?.total ?? 0;
+
+  // ---- Convert to UI shape ----
+  const uiEvents: UIEvent[] = useMemo(
+    () => rawEvents.map(toUIEvent),
+    [rawEvents],
+  );
+
+  // ============================================================
+  // MUTATIONS
+  // ============================================================
+
   const [deleteEvent] = useDeleteEventMutation();
   const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
   const [restoreEvent] = useRestoreEventMutation();
@@ -429,148 +345,99 @@ export default function EventsDashboardPage() {
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
   const [bulkPublishEvents] = useBulkPublishEventsMutation();
 
-
-  const { data: trashCountData, refetch: refetchTrashCount } = useGetTrashedEventsCountQuery({
-  account_id: accountId || '',
-  }, {
-    skip: !accountId || !isAuthenticated,
-    refetchOnMountOrArgChange: true,
-  });
-
-  // Use this for the trash count
-  const trashedEvents = trashCountData?.count || 0;
-
-  // Use the appropriate data
-  const activeData = shouldSearch ? searchData : browseData;
-  const isLoading = isStatusesLoading || isTypesLoading || (shouldSearch ? isSearchLoading : isBrowseLoading);
-  const isFetching = shouldSearch ? isSearchFetching : isBrowseFetching;
-  const error = shouldSearch ? searchError : browseError;
-  const refetch = shouldSearch ? refetchSearch : refetchBrowse;
-
-  // Update Redux state when data changes
-  useEffect(() => {
-    if (activeData) {
-      dispatch(setTotalEvents(activeData.total || 0));
-    }
-  }, [activeData, dispatch]);
-
   // ============================================================
-  // STEP 3: Convert API events to UI format with mapping
+  // FILTER + SORT
   // ============================================================
-  const uiEvents = useMemo(() => {
-    if (!activeData?.data) return [];
-    return activeData.data.map((event) => 
-      convertApiEventToUI(event, typesMap, statusesMap)
-    );
-  }, [activeData, typesMap, statusesMap]);
 
-  // Filter events based on active tab (including trash)
   const filteredEvents = useMemo(() => {
     let filtered = [...uiEvents];
 
-    // Filter by tab (status or trash)
+    // Tab filter
     if (activeTab === 'trash') {
-      filtered = filtered.filter((event) => event.isDeleted);
+      filtered = filtered.filter((e) => e.isDeleted);
     } else if (activeTab !== 'all') {
-      const statusNameMap: Record<string, string> = {
-        'live': 'Published',
-        'upcoming': 'Published',
-        'draft': 'Draft',
-        'ended': 'Completed',
+      const statusMap: Record<string, string> = {
+        live: 'Published',
+        upcoming: 'Published',
+        draft: 'Draft',
+        ended: 'Completed',
       };
-      const targetStatusName = statusNameMap[activeTab];
-      
-      if (targetStatusName) {
-        filtered = filtered.filter((event) => 
-          !event.isDeleted && event.status === targetStatusName
+      const target = statusMap[activeTab];
+      if (target) {
+        filtered = filtered.filter(
+          (e) => !e.isDeleted && e.status === target,
         );
       }
     } else {
-      // 'all' - show only non-deleted events
-      filtered = filtered.filter((event) => !event.isDeleted);
+      filtered = filtered.filter((e) => !e.isDeleted);
     }
 
-    // Sort logic
+    // Sort
     filtered.sort((a, b) => {
-      let comparison = 0;
+      let cmp = 0;
       switch (sortField) {
         case 'name':
-          comparison = a.title.localeCompare(b.title);
+          cmp = a.title.localeCompare(b.title);
           break;
         case 'eventDate':
-          comparison = new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime();
+          cmp = new Date(a.rawDate).getTime() - new Date(b.rawDate).getTime();
           break;
         case 'addedDate': {
-          const dateA = a.publishedAt || a.createdAt;
-          const dateB = b.publishedAt || b.createdAt;
-          comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
+          const da = a.publishedAt || a.createdAt;
+          const db = b.publishedAt || b.createdAt;
+          cmp = new Date(da).getTime() - new Date(db).getTime();
           break;
         }
         case 'current_attendees':
-          comparison = a.registered - b.registered;
+          cmp = a.registered - b.registered;
           break;
         case 'price':
-          comparison = parseFloat(a.price.replace(/[^0-9.-]+/g, '')) - 
-                       parseFloat(b.price.replace(/[^0-9.-]+/g, ''));
+          cmp = a.priceValue - b.priceValue;
           break;
         case 'status':
-          comparison = a.status.localeCompare(b.status);
+          cmp = a.status.localeCompare(b.status);
           break;
-        default:
-          comparison = 0;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === 'asc' ? cmp : -cmp;
     });
 
     return filtered;
   }, [uiEvents, activeTab, sortField, sortDirection]);
 
-  // Get total from API or filtered length
-  const totalItems = activeData?.total || filteredEvents.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
+  // ---- Stats ----
+  const activeEvents = uiEvents.filter((e) => !e.isDeleted);
+  const totalEvents = totalItems;
+  const totalRegistered = activeEvents.reduce((s, e) => s + e.registered, 0);
+  const liveEvents = activeEvents.filter((e) => e.status === 'Published').length;
+  const cpdEvents = activeEvents.filter((e) => e.cpdHours > 0).length;
 
-  // Stats (excluding deleted events)
-  const activeEvents = uiEvents.filter(e => !e.isDeleted);
-  const totalEvents = activeEvents.length;
-  const totalRegistered = activeEvents.reduce((acc, e) => acc + (e.registered || 0), 0);
-  const liveEvents = activeEvents.filter(e => e.status === 'Published').length;
-  const cpdEvents = activeEvents.filter(e => e.cpdHours > 0).length;
+  // ============================================================
+  // HANDLERS
+  // ============================================================
 
+  const handleRowClick = (id: string) => handleSelectEvent(id);
+  const handleCardClick = (event: UIEvent) => router.push(`/dashboard/events/${event.id}`);
 
-  // Handler functions
-  
-  // ✅ Row click now selects the row (does NOT navigate)
-  const handleRowClick = (eventId: string) => {
-    handleSelectEvent(eventId);
-  };
-
-  // ✅ Card click navigates to details (for mobile grid view)
-  const handleCardClick = (event: any) => {
-    router.push(`/dashboard/events/${event.id}`);
-  };
-
-  const handleDeleteEvent = async (event: any) => {
+  const handleDeleteEvent = (event: UIEvent) => {
     setSelectedEvent(event);
     setIsDeleteDialogOpen(true);
   };
 
- const handleConfirmDelete = async () => {
-  if (!selectedEvent) return;
-  try {
-    await deleteEvent(selectedEvent.id).unwrap();
-    setIsDeleteDialogOpen(false);
-    setSelectedEvent(null);
-    await Promise.all([refetch(), refetchTrashCount()]);
-    toast.success('Event moved to trash');
-  } catch (err: any) {
-    console.error('Failed to delete event:', err);
-    const errorMsg = err?.data?.message || err?.message || 'Failed to delete event';
-    toast.error(errorMsg);
-  }
-};
+  const handleConfirmDelete = async () => {
+    if (!selectedEvent) return;
+    try {
+      await deleteEvent(selectedEvent.id).unwrap();
+      setIsDeleteDialogOpen(false);
+      setSelectedEvent(null);
+      await Promise.all([refetch(), refetchTrashCount()]);
+      toast.success('Event moved to trash');
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Failed to delete event';
+      toast.error(msg);
+    }
+  };
 
-  // Permanent Delete
-  const handlePermanentDelete = async (event: any) => {
+  const handlePermanentDelete = (event: UIEvent) => {
     setSelectedEvent(event);
     setIsPermanentDeleteDialogOpen(true);
   };
@@ -583,14 +450,12 @@ export default function EventsDashboardPage() {
       setSelectedEvent(null);
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Event permanently deleted');
-    } catch (err) {
-      console.error('Failed to permanently delete event:', err);
+    } catch {
       toast.error('Failed to permanently delete event');
     }
   };
 
-  // Restore Event
-  const handleRestoreEvent = async (event: any) => {
+  const handleRestoreEvent = (event: UIEvent) => {
     setSelectedEvent(event);
     setIsRestoreDialogOpen(true);
   };
@@ -603,67 +468,28 @@ export default function EventsDashboardPage() {
       setSelectedEvent(null);
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Event restored successfully');
-    } catch (err) {
-      console.error('Failed to restore event:', err);
+    } catch {
       toast.error('Failed to restore event');
     }
   };
 
-  const handlePublishEvent = async (event: any) => {
+  const handlePublishEvent = async (event: UIEvent) => {
     setPublishingEventId(event.id);
     setPublishError(null);
-    
     const loadingToast = toast.loading(`Publishing "${event.title}"...`);
-    
+
     try {
       await publishEvent(event.id).unwrap();
-      
       toast.dismiss(loadingToast);
       toast.success(`"${event.title}" published successfully!`, {
         duration: 4000,
         position: 'top-right',
       });
-      
       await refetch();
-    } catch (err: any) {
-      console.error('Failed to publish event:', err);
-      
+    } catch (err: unknown) {
       toast.dismiss(loadingToast);
-      
-      const errorData = err?.data;
-      let errorMessage = 'Failed to publish event';
-      let errorDetails: string[] = [];
-      
-      if (errorData) {
-        if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        }
-        
-        if (errorData.errors) {
-          if (typeof errorData.errors === 'string') {
-            errorDetails = [errorData.errors];
-          } else if (Array.isArray(errorData.errors)) {
-            errorDetails = errorData.errors;
-          } else if (typeof errorData.errors === 'object') {
-            errorDetails = Object.values(errorData.errors).map(v => String(v));
-          }
-        }
-        
-        if (errorDetails.length === 0 && errorData.message) {
-          errorDetails = [errorData.message];
-        }
-      }
-      
-      if (errorDetails.length === 0) {
-        errorDetails = [err?.message || 'Failed to publish event'];
-      }
-      
-      setPublishError({
-        message: errorMessage,
-        details: errorDetails
-      });
+      const { message, details } = extractErrorDetails(err, 'Failed to publish event');
+      setPublishError({ message, details });
       setIsPublishErrorDialogOpen(true);
     } finally {
       setPublishingEventId(null);
@@ -674,19 +500,15 @@ export default function EventsDashboardPage() {
     if (selectAll) {
       setSelectedEvents([]);
     } else {
-      setSelectedEvents(filteredEvents.map(e => e.id));
+      setSelectedEvents(filteredEvents.map((e) => e.id));
     }
     setSelectAll(!selectAll);
   };
 
   const handleSelectEvent = (id: string) => {
-    setSelectedEvents(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(e => e !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
+    setSelectedEvents((prev) =>
+      prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id],
+    );
   };
 
   const handleViewSelected = () => {
@@ -700,25 +522,21 @@ export default function EventsDashboardPage() {
     setIsBulkActionDialogOpen(true);
   };
 
- const handleBulkDelete = async () => {
-  if (selectedEvents.length === 0) {
-    toast.error('No events selected');
-    return;
-  }
-  
-  try {
-    await bulkDeleteEvents({ ids: selectedEvents }).unwrap();
-    setIsBulkActionDialogOpen(false);
-    setSelectedEvents([]);
-    setSelectAll(false);
-    await Promise.all([refetch(), refetchTrashCount()]);
-    toast.success(`${selectedEvents.length} events moved to trash`);
-  } catch (err: any) {
-    console.error('Failed to delete events:', err);
-    const errorMsg = err?.data?.message || err?.message || 'Failed to delete events';
-    toast.error(errorMsg);
-  }
-};
+  const handleBulkDelete = async () => {
+    if (selectedEvents.length === 0) return;
+    const count = selectedEvents.length;
+    try {
+      await bulkDeleteEvents({ ids: selectedEvents }).unwrap();
+      setIsBulkActionDialogOpen(false);
+      setSelectedEvents([]);
+      setSelectAll(false);
+      await Promise.all([refetch(), refetchTrashCount()]);
+      toast.success(`${count} events moved to trash`);
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Failed to delete events';
+      toast.error(msg);
+    }
+  };
 
   const handleBulkPermanentDelete = async () => {
     try {
@@ -728,8 +546,7 @@ export default function EventsDashboardPage() {
       setSelectAll(false);
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events permanently deleted');
-    } catch (err) {
-      console.error('Failed to permanently delete events:', err);
+    } catch {
       toast.error('Failed to permanently delete events');
     }
   };
@@ -742,8 +559,7 @@ export default function EventsDashboardPage() {
       setSelectAll(false);
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events restored successfully');
-    } catch (err) {
-      console.error('Failed to restore events:', err);
+    } catch {
       toast.error('Failed to restore events');
     }
   };
@@ -751,58 +567,21 @@ export default function EventsDashboardPage() {
   const handleBulkPublish = async () => {
     const count = selectedEvents.length;
     const loadingToast = toast.loading(`Publishing ${count} events...`);
-    
     try {
       await bulkPublishEvents({ ids: selectedEvents }).unwrap();
-      
       toast.dismiss(loadingToast);
       toast.success(`${count} events published successfully!`, {
         duration: 4000,
         position: 'top-right',
       });
-      
       setIsBulkActionDialogOpen(false);
       setSelectedEvents([]);
       setSelectAll(false);
       await refetch();
-    } catch (err: any) {
-      console.error('Failed to publish events:', err);
+    } catch (err: unknown) {
       toast.dismiss(loadingToast);
-      
-      const errorData = err?.data;
-      let errorMessage = 'Failed to publish events';
-      let errorDetails: string[] = [];
-      
-      if (errorData) {
-        if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        } else if (errorData.message) {
-          errorMessage = errorData.message;
-        }
-        
-        if (errorData.errors) {
-          if (typeof errorData.errors === 'string') {
-            errorDetails = [errorData.errors];
-          } else if (Array.isArray(errorData.errors)) {
-            errorDetails = errorData.errors;
-          } else if (typeof errorData.errors === 'object') {
-            errorDetails = Object.values(errorData.errors).map(v => String(v));
-          }
-        }
-        
-        if (errorDetails.length === 0 && errorData.message) {
-          errorDetails = [errorData.message];
-        }
-      }
-      
-      if (errorDetails.length === 0) {
-        errorDetails = [err?.message || 'Failed to publish events'];
-      }
-      
-      setPublishError({
-        message: errorMessage,
-        details: errorDetails
-      });
+      const { message, details } = extractErrorDetails(err, 'Failed to publish events');
+      setPublishError({ message, details });
       setIsPublishErrorDialogOpen(true);
       setIsBulkActionDialogOpen(false);
     }
@@ -812,19 +591,14 @@ export default function EventsDashboardPage() {
     setIsBulkActionDialogOpen(false);
     setSelectedEvents([]);
     setSelectAll(false);
-    // Navigate to create page with selected events as template
-    if (selectedEvents.length === 1) {
-      router.push(`/dashboard/events/new?duplicate=${selectedEvents[0]}`);
-    } else {
-      router.push(`/dashboard/events/new?duplicate=${selectedEvents.join(',')}`);
-    }
+    router.push(
+      `/dashboard/events/new?duplicate=${selectedEvents.join(',')}`,
+    );
   };
-
-  const getSelectedCount = () => selectedEvents.length;
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
       setSortDirection('asc');
@@ -832,12 +606,12 @@ export default function EventsDashboardPage() {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
-    }
-    return sortDirection === 'asc' 
-      ? <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
-      : <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />;
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />
+    );
   };
 
   const getActiveFilterCount = () => {
@@ -848,13 +622,13 @@ export default function EventsDashboardPage() {
   };
 
   const getSortLabel = () => {
-    const labels = {
+    const labels: Record<SortField, string> = {
       name: 'Title',
       eventDate: 'Event Date',
       addedDate: 'Added Date',
       current_attendees: 'Registrations',
       price: 'Price',
-      status: 'Status'
+      status: 'Status',
     };
     return labels[sortField];
   };
@@ -865,51 +639,39 @@ export default function EventsDashboardPage() {
     setActiveTab('all');
     setSortField('eventDate');
     setSortDirection('desc');
-    dispatch(setCurrentPage(1));
+    setCurrentPage(1);
     setIsFilterSheetOpen(false);
   };
 
-  const handleMobileApply = () => {
-    setIsFilterSheetOpen(false);
-  };
-
-  const handlePageChange = (page: number) => {
-    dispatch(setCurrentPage(page));
-  };
-
+  const handlePageChange = (page: number) => setCurrentPage(page);
   const handlePageSizeChange = (size: number) => {
-    dispatch(setPageSize(size));
-    dispatch(setCurrentPage(1));
+    setPageSize(size);
+    setCurrentPage(1);
   };
 
   const handleClearSearch = () => {
     setSearchQuery('');
     setDebouncedSearchQuery('');
-    dispatch(setCurrentPage(1));
+    setCurrentPage(1);
   };
 
   const handleRefresh = async () => {
     toast.promise(
-      new Promise(async (resolve, reject) => {
-        try {
-          const result = await Promise.all([refetch(), refetchTrashCount()]);
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      }),
+      (async () => {
+        await Promise.all([refetch(), refetchTrashCount()]);
+      })(),
       {
         loading: 'Refreshing events...',
         success: 'Events refreshed successfully!',
         error: 'Failed to refresh events',
-      }
+      },
     );
   };
 
   // ============================================================
-  // AUTHENTICATION CHECK
+  // AUTH GATES
   // ============================================================
-  
+
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -920,11 +682,13 @@ export default function EventsDashboardPage() {
                 <LogIn className="h-10 w-10 text-amber-600" />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Authentication Required
+            </h2>
             <p className="text-sm text-gray-500 mb-6">
               Please log in to view and manage your events.
             </p>
-            <Button 
+            <Button
               className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
               onClick={() => router.push('/signin')}
             >
@@ -937,34 +701,6 @@ export default function EventsDashboardPage() {
     );
   }
 
-  if (!accountId) {
-    return (
-      <div className="flex items-center justify-center min-h-[500px]">
-        <Card className="max-w-md w-full border-neutral-light shadow-sm">
-          <CardContent className="pt-8 pb-6 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-red-50 rounded-full">
-                <AlertTriangle className="h-10 w-10 text-red-600" />
-              </div>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Account Not Found</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              We couldn&apos;t find your account information. Please contact support.
-            </p>
-            <Button 
-              variant="outline" 
-              className="w-full cursor-pointer"
-              onClick={() => router.push('/dashboard')}
-            >
-              Go to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Loading state
   if (isLoading && !activeData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -978,9 +714,38 @@ export default function EventsDashboardPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md w-full border-red-200 shadow-sm">
+          <CardContent className="pt-8 pb-6 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-red-50 rounded-full">
+                <AlertCircle className="h-10 w-10 text-red-600" />
+              </div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Failed to load events
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Something went wrong while fetching your events.
+            </p>
+            <Button variant="outline" className="cursor-pointer" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const totalPages = Math.ceil(totalItems / pageSize);
+
   // ============================================================
-  // RENDER - Everything below remains EXACTLY the same
+  // RENDER
   // ============================================================
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
@@ -992,8 +757,8 @@ export default function EventsDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             className="cursor-pointer"
             onClick={handleRefresh}
@@ -1003,7 +768,7 @@ export default function EventsDashboardPage() {
             Refresh
           </Button>
           <Link href="/dashboard/events/new" className="cursor-pointer">
-            <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all cursor-pointer">
+            <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm cursor-pointer">
               <Plus className="h-4 w-4" />
               Create Event
             </Button>
@@ -1011,121 +776,40 @@ export default function EventsDashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Events</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalEvents}</p>
-                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                  {uiEvents.filter(e => e.status === 'Published' && !e.isDeleted).length} published
-                </p>
-              </div>
-              <div className="p-2.5 sm:p-3 bg-primary/10 text-primary rounded-lg">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Registrations</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalRegistered}</p>
-                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                  {activeEvents.filter(e => e.registered > 0).length} events
-                </p>
-              </div>
-              <div className="p-2.5 sm:p-3 bg-tertiary/10 text-tertiary rounded-lg">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Live Sessions</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{liveEvents}</p>
-                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                  {uiEvents.filter(e => e.status === 'Draft' && !e.isDeleted).length} drafts
-                </p>
-              </div>
-              <div className="p-2.5 sm:p-3 bg-red-50 text-red-600 rounded-lg">
-                <Video className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">CPD Accredited</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{cpdEvents}</p>
-                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                  {uiEvents.reduce((acc, e) => acc + (e.cpdHours || 0), 0)} total hours
-                </p>
-              </div>
-              <div className="p-2.5 sm:p-3 bg-amber-50 text-amber-600 rounded-lg">
-                <Award className="h-4 w-4 sm:h-5 sm:w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        {/* ✅ UPDATED: Trash Card - More Conspicuous */}
-        <Card 
-          className={`${trashedEvents > 0 
-            ? 'border-amber-300 bg-amber-50/80 hover:bg-amber-50/100 ring-1 ring-amber-200/50 shadow-md shadow-amber-100/30' 
-            : 'border-gray-200/80 bg-gray-50/50'} 
-            transition-all duration-300 cursor-pointer hover:shadow-lg`}
-          onClick={() => trashedEvents > 0 ? router.push('/dashboard/trash') : undefined}
-        >
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-xs font-medium uppercase tracking-wider ${trashedEvents > 0 ? 'text-amber-600' : 'text-gray-500'}`}>
-                  Trash
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className={`text-2xl sm:text-3xl font-bold ${trashedEvents > 0 ? 'text-amber-700' : 'text-gray-400'}`}>
-                    {trashedEvents}
-                  </p>
-                  {trashedEvents > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      {trashedEvents} item{trashedEvents !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
-                  {trashedEvents > 0 ? (
-                    <span className="text-amber-600 font-medium flex items-center gap-1">
-                      Click to view & restore
-                      <ArrowRight className="h-3 w-3" />
-                    </span>
-                  ) : (
-                    'Empty'
-                  )}
-                </p>
-              </div>
-              <div className={`p-3 rounded-xl transition-all duration-300 ${
-                trashedEvents > 0 
-                  ? 'bg-amber-100 text-amber-600 shadow-inner' 
-                  : 'bg-gray-100 text-gray-400'
-              }`}>
-                <Trash2 className={`h-5 w-5 sm:h-6 sm:w-6 ${trashedEvents > 0 ? 'animate-pulse' : ''}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          label="Total Events"
+          value={totalEvents}
+          sub={`${activeEvents.filter((e) => e.status === 'Published').length} published`}
+          icon={<Calendar className="h-5 w-5" />}
+          bg="bg-primary/10 text-primary"
+        />
+        <StatCard
+          label="Registrations"
+          value={totalRegistered}
+          sub={`${activeEvents.filter((e) => e.registered > 0).length} events`}
+          icon={<Users className="h-5 w-5" />}
+          bg="bg-tertiary/10 text-tertiary"
+        />
+        <StatCard
+          label="Live Sessions"
+          value={liveEvents}
+          sub={`${activeEvents.filter((e) => e.status === 'Draft').length} drafts`}
+          icon={<Video className="h-5 w-5" />}
+          bg="bg-red-50 text-red-600"
+        />
+        <StatCard
+          label="CPD Accredited"
+          value={cpdEvents}
+          sub={`${activeEvents.reduce((s, e) => s + e.cpdHours, 0)} total hours`}
+          icon={<Award className="h-5 w-5" />}
+          bg="bg-amber-50 text-amber-600"
+        />
+        <TrashCard count={trashedEvents} onClick={() => router.push('/dashboard/trash')} />
       </div>
 
-      {/* Desktop Filters */}
+      {/* Desktop filters */}
       {!isMobile && (
         <Card>
           <CardContent className="p-4">
@@ -1137,7 +821,7 @@ export default function EventsDashboardPage() {
                       key={tab}
                       onClick={() => {
                         setActiveTab(tab);
-                        dispatch(setCurrentPage(1));
+                        setCurrentPage(1);
                       }}
                       className={`px-3.5 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors whitespace-nowrap cursor-pointer ${
                         activeTab === tab
@@ -1176,9 +860,9 @@ export default function EventsDashboardPage() {
                   <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'table' 
-                          ? 'bg-white text-primary shadow-sm' 
+                      className={`p-1.5 rounded-md cursor-pointer ${
+                        viewMode === 'table'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700'
                       }`}
                       title="Table View"
@@ -1187,9 +871,9 @@ export default function EventsDashboardPage() {
                     </button>
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'grid' 
-                          ? 'bg-white text-primary shadow-sm' 
+                      className={`p-1.5 rounded-md cursor-pointer ${
+                        viewMode === 'grid'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700'
                       }`}
                       title="Grid View"
@@ -1221,35 +905,30 @@ export default function EventsDashboardPage() {
                         <SelectItem value="status" className="cursor-pointer text-sm">Status</SelectItem>
                       </SelectContent>
                     </Select>
-
                     <button
-                      onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-                      className="p-1 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-                      title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                      onClick={() => setSortDirection((p) => (p === 'asc' ? 'desc' : 'asc'))}
+                      className="p-1 hover:bg-gray-100 rounded-md cursor-pointer"
                     >
-                      {sortDirection === 'asc' 
-                        ? <ArrowUp className="h-4 w-4 text-primary" />
-                        : <ArrowDown className="h-4 w-4 text-primary" />
-                      }
+                      {sortDirection === 'asc' ? (
+                        <ArrowUp className="h-4 w-4 text-primary" />
+                      ) : (
+                        <ArrowDown className="h-4 w-4 text-primary" />
+                      )}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   <span className="text-xs text-gray-400">
-                    {isFetching && (
-                      <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />
-                    )}
+                    {isFetching && <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />}
                     {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
                     {shouldSearch && searchQuery && (
-                      <span className="text-gray-400 ml-1">
-                        (searching &quot;{searchQuery}&quot;)
-                      </span>
+                      <span className="text-gray-400 ml-1">(searching &quot;{searchQuery}&quot;)</span>
                     )}
                   </span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 text-xs cursor-pointer"
                     onClick={() => {
                       setSearchQuery('');
@@ -1257,7 +936,7 @@ export default function EventsDashboardPage() {
                       setActiveTab('all');
                       setSortField('eventDate');
                       setSortDirection('desc');
-                      dispatch(setCurrentPage(1));
+                      setCurrentPage(1);
                     }}
                   >
                     <Filter className="h-3.5 w-3.5 mr-1" />
@@ -1267,155 +946,29 @@ export default function EventsDashboardPage() {
               </div>
             </div>
 
-            {/* Bulk Actions Bar */}
-            {getSelectedCount() > 0 && (
-              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-gray-700">
-                    {getSelectedCount()} event{getSelectedCount() > 1 ? 's' : ''} selected
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {getSelectedCount() === 1 && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="cursor-pointer"
-                      onClick={handleViewSelected}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View
-                    </Button>
-                  )}
-                  
-                  {getSelectedCount() === 1 && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="cursor-pointer"
-                      onClick={() => {
-                        const eventId = selectedEvents[0];
-                        router.push(`/dashboard/events/${eventId}/edit`);
-                      }}
-                    >
-                      <Edit3 className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  )}
-                  
-                  {selectedEvents.every(id => {
-                    const event = uiEvents.find(e => e.id === id);
-                    return event?.status === 'Draft' && !event?.isDeleted;
-                  }) && selectedEvents.length > 0 && (
-                    <Button 
-                      size="sm" 
-                      variant="default" 
-                      className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => {
-                        if (selectedEvents.length === 1) {
-                          const event = uiEvents.find(e => e.id === selectedEvents[0]);
-                          if (event) handlePublishEvent(event);
-                        } else {
-                          handleBulkAction('publish');
-                        }
-                      }}
-                      disabled={publishingEventId !== null}
-                    >
-                      {publishingEventId && selectedEvents.length === 1 ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                      )}
-                      Publish {selectedEvents.length > 1 ? `(${selectedEvents.length})` : ''}
-                    </Button>
-                  )}
-                  
-                  {getSelectedCount() > 1 && (
-                    <>
-                      {activeTab === 'trash' ? (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
-                            onClick={() => handleBulkAction('restore')}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Restore
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
-                            onClick={() => handleBulkAction('permanentDelete')}
-                          >
-                            <Trash className="h-4 w-4 mr-2" />
-                            Delete Permanently
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="cursor-pointer"
-                            onClick={() => handleBulkAction('duplicate')}
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Duplicate
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
-                            onClick={() => handleBulkAction('delete')}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Move to Trash
-                          </Button>
-                        </>
-                      )}
-                    </>
-                  )}
-                  
-                  {getSelectedCount() === 1 && (
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
-                      onClick={() => {
-                        const event = uiEvents.find(e => e.id === selectedEvents[0]);
-                        if (event) {
-                          handleDeleteEvent(event);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Move to Trash
-                    </Button>
-                  )}
-                  
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setSelectedEvents([]);
-                      setSelectAll(false);
-                    }}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Clear
-                  </Button>
-                </div>
-              </div>
+            {/* Bulk actions */}
+            {selectedEvents.length > 0 && (
+              <BulkActionsBar
+                selectedIds={selectedEvents}
+                uiEvents={uiEvents}
+                activeTab={activeTab}
+                publishingEventId={publishingEventId}
+                onClear={() => {
+                  setSelectedEvents([]);
+                  setSelectAll(false);
+                }}
+                onView={handleViewSelected}
+                onEdit={(id) => router.push(`/dashboard/events/${id}/edit`)}
+                onPublish={(event) => handlePublishEvent(event)}
+                onBulkAction={handleBulkAction}
+                onDeleteEvent={handleDeleteEvent}
+              />
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Table View */}
+      {/* Table view */}
       {!isMobile && viewMode === 'table' && (
         <Card>
           <CardContent className="p-0">
@@ -1431,58 +984,32 @@ export default function EventsDashboardPage() {
                         disabled={filteredEvents.length === 0}
                       />
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
-                      <div className="flex items-center">
-                        Event Title
-                        {getSortIcon('name')}
-                      </div>
-                    </TableHead>
+                    <SortableHead label="Event Title" field="name" sortField={sortField} onSort={toggleSort} icon={getSortIcon('name')} />
                     <TableHead className="py-3 px-4">Type</TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('eventDate')}>
-                      <div className="flex items-center">
-                        Event Date
-                        {getSortIcon('eventDate')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('addedDate')}>
-                      <div className="flex items-center">
-                        Added
-                        {getSortIcon('addedDate')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('current_attendees')}>
-                      <div className="flex items-center">
-                        Registrations
-                        {getSortIcon('current_attendees')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
-                      <div className="flex items-center">
-                        Status
-                        {getSortIcon('status')}
-                      </div>
-                    </TableHead>
+                    <SortableHead label="Event Date" field="eventDate" sortField={sortField} onSort={toggleSort} icon={getSortIcon('eventDate')} />
+                    <SortableHead label="Added" field="addedDate" sortField={sortField} onSort={toggleSort} icon={getSortIcon('addedDate')} />
+                    <SortableHead label="Registrations" field="current_attendees" sortField={sortField} onSort={toggleSort} icon={getSortIcon('current_attendees')} />
+                    <SortableHead label="Status" field="status" sortField={sortField} onSort={toggleSort} icon={getSortIcon('status')} />
                     <TableHead className="py-3 px-4 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredEvents.length > 0 ? (
                     filteredEvents.map((event) => {
-                      const percentage = event.capacity > 0 
-                        ? Math.round((event.registered / event.capacity) * 100) 
-                        : 0;
-                      const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
-                      const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
+                      const percentage =
+                        event.capacity > 0
+                          ? Math.round((event.registered / event.capacity) * 100)
+                          : 0;
+                      const statusConfig = getStatusBadgeConfig(event.statusDisplayName);
+                      const typeClass = getTypeBadgeClass(event.typeDisplayName);
                       const isSelected = selectedEvents.includes(event.id);
                       const isTrashed = event.isDeleted;
-                      
-                      const addedDate = event.createdAt;
-                      const addedLabel = event.status === 'Published' ? 'Published' : 'Created';
-                      const addedDateFormatted = formatDate(addedDate);
+                      const addedDate = event.publishedAt || event.createdAt;
+                      const addedLabel = event.publishedAt ? 'Published' : 'Created';
 
                       return (
-                        <TableRow 
-                          key={event.id} 
+                        <TableRow
+                          key={event.id}
                           onClick={() => handleRowClick(event.id)}
                           className={`hover:bg-gray-50/60 transition-colors group cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
@@ -1500,34 +1027,31 @@ export default function EventsDashboardPage() {
                               {event.title}
                               {isTrashed && (
                                 <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  Trashed
+                                  <Trash2 className="h-3 w-3 mr-1" /> Trashed
                                 </Badge>
                               )}
                               {event.isFeatured && !isTrashed && (
-                                <Badge variant="default" className="ml-2 bg-secondary-500 text-white text-xs">
-                                  <Star className="h-3 w-3 mr-1" />
-                                  Featured
+                                <Badge className="ml-2 bg-secondary-500 text-white text-xs">
+                                  <Star className="h-3 w-3 mr-1" /> Featured
                                 </Badge>
                               )}
                               {event.isPrivate && !isTrashed && (
                                 <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                                  <Lock className="h-3 w-3 mr-1" />
-                                  Private
+                                  <Lock className="h-3 w-3 mr-1" /> Private
                                 </Badge>
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                               <span className="text-gray-400">{event.platform}</span>
                               <span className="text-gray-300">•</span>
-                              <span className="text-primary font-medium">{event.price}</span>
+                              <span className="text-primary font-medium">{event.priceDisplay}</span>
                               <span className="text-gray-300">•</span>
                               <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={typeInfo.className}>
-                              {typeInfo.displayName}
+                            <Badge variant="outline" className={typeClass}>
+                              {event.typeDisplayName}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
@@ -1538,150 +1062,41 @@ export default function EventsDashboardPage() {
                           </TableCell>
                           <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
                             <div className="flex flex-col">
-                              <span className="text-sm">{addedDateFormatted}</span>
+                              <span className="text-sm">{formatDateShort(addedDate)}</span>
                               <span className="text-xs text-gray-400">{addedLabel}</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <div className="w-36">
-                              <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
-                                <span>{event.registered} / {event.capacity}</span>
-                                <span className="text-gray-500">{percentage}%</span>
-                              </div>
-                              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                                <div
-                                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                                  style={{ width: `${Math.min(percentage, 100)}%` }}
-                                />
-                              </div>
-                            </div>
+                            <AttendanceBar
+                              current={event.registered}
+                              capacity={event.capacity}
+                              percent={percentage}
+                            />
                           </TableCell>
                           <TableCell className="py-4 px-4">
                             {isTrashed ? (
                               <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Trashed
+                                <Trash2 className="h-3 w-3 mr-1" /> Trashed
                               </Badge>
                             ) : (
                               <Badge variant="outline" className={`${statusConfig.color} border`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                                {statusConfig.displayName}
+                                {event.statusDisplayName}
                               </Badge>
                             )}
                           </TableCell>
                           <TableCell className="py-4 px-4 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                
-                                {isTrashed ? (
-                                  <>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-green-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRestoreEvent(event);
-                                      }}
-                                    >
-                                      <RotateCcw className="h-4 w-4 mr-2" />
-                                      Restore
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer text-red-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handlePermanentDelete(event);
-                                      }}
-                                    >
-                                      <Trash className="h-4 w-4 mr-2" />
-                                      Delete Permanently
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : (
-                                  <>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.push(`/dashboard/events/${event.id}`);
-                                      }}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />
-                                      View Details
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.push(`/dashboard/events/${event.id}/edit`);
-                                      }}
-                                    >
-                                      <Edit3 className="h-4 w-4 mr-2" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.push(`/dashboard/events/new?duplicate=${event.id}`);
-                                      }}
-                                    >
-                                      <Copy className="h-4 w-4 mr-2" />
-                                      Duplicate
-                                    </DropdownMenuItem>
-                                    {event.status === 'Draft' && (
-                                      <DropdownMenuItem 
-                                        className="cursor-pointer text-green-600"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handlePublishEvent(event);
-                                        }}
-                                      >
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Publish
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(`/events/${event.slug || event.id}`, '_blank');
-                                      }}
-                                    >
-                                      <ExternalLink className="h-4 w-4 mr-2" />
-                                      View Public Page
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem 
-                                      className="cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.push(`/dashboard/attendees?eventId=${event.id}`);
-                                      }}
-                                    >
-                                      <Users className="h-4 w-4 mr-2" />
-                                      Manage Attendees
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem 
-                                      className="text-amber-600 cursor-pointer"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteEvent(event);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Move to Trash
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <EventActionsMenu
+                              event={event}
+                              isTrashed={isTrashed}
+                              onView={() => router.push(`/dashboard/events/${event.id}`)}
+                              onEdit={() => router.push(`/dashboard/events/${event.id}/edit`)}
+                              onDuplicate={() => router.push(`/dashboard/events/new?duplicate=${event.id}`)}
+                              onPublish={() => handlePublishEvent(event)}
+                              onRestore={() => handleRestoreEvent(event)}
+                              onPermanentDelete={() => handlePermanentDelete(event)}
+                              onMoveToTrash={() => handleDeleteEvent(event)}
+                            />
                           </TableCell>
                         </TableRow>
                       );
@@ -1689,33 +1104,7 @@ export default function EventsDashboardPage() {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} className="py-12 text-center text-gray-500">
-                        <div className="flex flex-col items-center gap-2">
-                          {activeTab === 'trash' ? (
-                            <Trash2 className="h-8 w-8 text-gray-300" />
-                          ) : (
-                            <Search className="h-8 w-8 text-gray-300" />
-                          )}
-                          <p className="font-medium">
-                            {activeTab === 'trash' 
-                              ? 'No events in trash'
-                              : shouldSearch && searchQuery 
-                              ? `No events match "${searchQuery}"`
-                              : activeTab !== 'all'
-                              ? `No ${activeTab} events found`
-                              : 'No events found'
-                            }
-                          </p>
-                          <p className="text-sm text-gray-400">
-                            {activeTab === 'trash' 
-                              ? 'Deleted events will appear here. You can restore or permanently delete them.'
-                              : shouldSearch && searchQuery 
-                              ? 'Try adjusting your search terms or filters.'
-                              : activeTab !== 'all'
-                              ? 'Try changing the status filter.'
-                              : 'Create your first event to get started.'
-                            }
-                          </p>
-                        </div>
+                        <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -1723,362 +1112,79 @@ export default function EventsDashboardPage() {
               </Table>
             </div>
 
-            {/* Pagination */}
             {totalItems > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Rows per page:</span>
-                  <Select
-                    value={pageSize.toString()}
-                    onValueChange={(value) => handlePageSizeChange(Number(value))}
-                  >
-                    <SelectTrigger className="h-8 w-[70px] cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5" className="cursor-pointer">5</SelectItem>
-                      <SelectItem value="10" className="cursor-pointer">10</SelectItem>
-                      <SelectItem value="20" className="cursor-pointer">20</SelectItem>
-                      <SelectItem value="50" className="cursor-pointer">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">
-                    {totalItems > 0 
-                      ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
-                      : '0 of 0'
-                    }
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
-                      disabled={currentPage === totalPages || totalPages === 0}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <PaginationBar
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Grid View */}
+      {/* Grid view */}
       {!isMobile && viewMode === 'grid' && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.length > 0 ? (
-              filteredEvents.map((event) => {
-                const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
-                const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
-                const isSelected = selectedEvents.includes(event.id);
-                const isTrashed = event.isDeleted;
-                const addedDate = event.publishedAt || event.createdAt;
-                const addedLabel = event.publishedAt ? 'Published' : 'Created';
-                const addedDateFormatted = formatDate(addedDate);
-
-                return (
-                  <Card 
-                    key={event.id} 
-                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
-                      isSelected ? 'border-primary/50 bg-primary/5' : ''
-                    } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
-                    onClick={() => handleCardClick(event)}
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="outline" className={typeInfo.className}>
-                            {typeInfo.displayName}
-                          </Badge>
-                          {event.isFeatured && !isTrashed && (
-                            <Badge variant="default" className="bg-secondary-500 text-white text-xs">
-                              <Star className="h-3 w-3 mr-1" />
-                              Featured
-                            </Badge>
-                          )}
-                          {event.isPrivate && !isTrashed && (
-                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                              <Lock className="h-3 w-3 mr-1" />
-                              Private
-                            </Badge>
-                          )}
-                        </div>
-                        {isTrashed ? (
-                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Trashed
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className={`${statusConfig.color} border`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                            {statusConfig.displayName}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div>
-                        <h3 className="font-semibold text-gray-900 group-hover:text-primary transition-colors line-clamp-2">
-                          {event.title}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                          <span className="text-primary font-medium">{event.price}</span>
-                          <span className="text-gray-300">•</span>
-                          <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{event.date}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          <span>{event.time}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="text-gray-400">Added:</span>
-                        <span>{addedDateFormatted}</span>
-                        <span className="text-gray-400">({addedLabel})</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>{event.registered} / {event.capacity} registered</span>
-                      </div>
-
-                      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min((event.registered / event.capacity) * 100, 100)}%` }}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                        <div className="flex items-center gap-1 text-xs text-gray-400">
-                          <Globe className="h-3.5 w-3.5" />
-                          <span>{event.platform}</span>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
-                              <MoreVertical className="h-4 w-4 text-gray-400" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            
-                            {isTrashed ? (
-                              <>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer text-green-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRestoreEvent(event);
-                                  }}
-                                >
-                                  <RotateCcw className="h-4 w-4 mr-2" />
-                                  Restore
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer text-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePermanentDelete(event);
-                                  }}
-                                >
-                                  <Trash className="h-4 w-4 mr-2" />
-                                  Delete Permanently
-                                </DropdownMenuItem>
-                              </>
-                            ) : (
-                              <>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/dashboard/events/${event.id}`);
-                                  }}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/dashboard/events/${event.id}/edit`);
-                                  }}
-                                >
-                                  <Edit3 className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  className="cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/dashboard/events/new?duplicate=${event.id}`);
-                                  }}
-                                >
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                {event.status === 'Draft' && (
-                                  <DropdownMenuItem 
-                                    className="cursor-pointer text-green-600"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handlePublishEvent(event);
-                                    }}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Publish
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  className="text-amber-600 cursor-pointer"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteEvent(event);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Move to Trash
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
+              filteredEvents.map((event) => (
+                <EventGridCard
+                  key={event.id}
+                  event={event}
+                  isSelected={selectedEvents.includes(event.id)}
+                  onSelect={handleSelectEvent}
+                  onClick={() => handleCardClick(event)}
+                  onView={() => router.push(`/dashboard/events/${event.id}`)}
+                  onEdit={() => router.push(`/dashboard/events/${event.id}/edit`)}
+                  onDuplicate={() => router.push(`/dashboard/events/new?duplicate=${event.id}`)}
+                  onPublish={() => handlePublishEvent(event)}
+                  onRestore={() => handleRestoreEvent(event)}
+                  onPermanentDelete={() => handlePermanentDelete(event)}
+                  onMoveToTrash={() => handleDeleteEvent(event)}
+                />
+              ))
             ) : (
               <div className="col-span-full py-12 text-center text-gray-500">
-                <div className="flex flex-col items-center gap-2">
-                  {activeTab === 'trash' ? (
-                    <Trash2 className="h-8 w-8 text-gray-300" />
-                  ) : (
-                    <Search className="h-8 w-8 text-gray-300" />
-                  )}
-                  <p className="font-medium">
-                    {activeTab === 'trash' 
-                      ? 'No events in trash'
-                      : shouldSearch && searchQuery 
-                      ? `No events match "${searchQuery}"`
-                      : activeTab !== 'all'
-                      ? `No ${activeTab} events found`
-                      : 'No events found'
-                    }
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    {activeTab === 'trash' 
-                      ? 'Deleted events will appear here. You can restore or permanently delete them.'
-                      : shouldSearch && searchQuery 
-                      ? 'Try adjusting your search terms or filters.'
-                      : activeTab !== 'all'
-                      ? 'Try changing the status filter.'
-                      : 'Create your first event to get started.'
-                    }
-                  </p>
-                </div>
+                <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
               </div>
             )}
           </div>
 
-          {/* Pagination for Grid View */}
           {totalItems > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Rows per page:</span>
-                <Select
-                  value={pageSize.toString()}
-                  onValueChange={(value) => handlePageSizeChange(Number(value))}
-                >
-                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5" className="cursor-pointer">5</SelectItem>
-                    <SelectItem value="10" className="cursor-pointer">10</SelectItem>
-                    <SelectItem value="20" className="cursor-pointer">20</SelectItem>
-                    <SelectItem value="50" className="cursor-pointer">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {totalItems > 0 
-                    ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
-                    : '0 of 0'
-                  }
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+            <div className="bg-white rounded-lg border border-gray-200">
+              <PaginationBar
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
             </div>
           )}
         </>
       )}
 
-      {/* Mobile Floating Filter Strip */}
+      {/* Mobile floating filter strip */}
       {isMobile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
-          <div className="pointer-events-auto mx-auto max-w-md bg-white rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm bg-white/95">
+          <div className="pointer-events-auto mx-auto max-w-md bg-white/95 rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm">
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
               >
                 <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-sm text-gray-600 truncate">
-                  {searchQuery || 'Search'}
-                </span>
+                <span className="text-sm text-gray-600 truncate">{searchQuery || 'Search'}</span>
               </button>
-
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors relative"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 relative"
               >
                 <Filter className="h-4 w-4 text-gray-400" />
                 <span className="text-sm text-gray-600">Filters</span>
@@ -2088,17 +1194,13 @@ export default function EventsDashboardPage() {
                   </span>
                 )}
               </button>
-
               <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
-
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
               >
                 <ArrowUpDown className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600 truncate max-w-[60px]">
-                  {getSortLabel()}
-                </span>
+                <span className="text-sm text-gray-600 truncate max-w-[60px]">{getSortLabel()}</span>
                 {sortDirection === 'asc' ? (
                   <ArrowUp className="h-3 w-3 text-gray-400" />
                 ) : (
@@ -2110,284 +1212,48 @@ export default function EventsDashboardPage() {
         </div>
       )}
 
-      {/* Mobile Events List */}
+      {/* Mobile list */}
       {isMobile && (
         <div className="space-y-4 pb-24">
           {filteredEvents.length > 0 ? (
-            filteredEvents.map((event) => {
-              const statusConfig = getStatusConfig(event.eventStatusId, statusesMap);
-              const typeInfo = getTypeConfig(event.eventTypeId, typesMap);
-              const isTrashed = event.isDeleted;
-              const addedDate = event.publishedAt || event.createdAt;
-              const addedLabel = event.publishedAt ? 'Published' : 'Created';
-              const addedDateFormatted = formatDate(addedDate);
-              const percentage = event.capacity > 0 
-                ? Math.round((event.registered / event.capacity) * 100) 
-                : 0;
-
-              return (
-                <Card 
-                  key={event.id} 
-                  className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
-                    isTrashed ? 'opacity-60 bg-amber-50/30' : ''
-                  }`}
-                  onClick={() => handleCardClick(event)}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className={typeInfo.className}>
-                          {typeInfo.displayName}
-                        </Badge>
-                        {event.isFeatured && !isTrashed && (
-                          <Badge variant="default" className="bg-secondary-500 text-white text-xs">
-                            <Star className="h-3 w-3 mr-1" />
-                            Featured
-                          </Badge>
-                        )}
-                        {event.isPrivate && !isTrashed && (
-                          <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
-                            <Lock className="h-3 w-3 mr-1" />
-                            Private
-                          </Badge>
-                        )}
-                      </div>
-                      {isTrashed ? (
-                        <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Trashed
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className={`${statusConfig.color} border`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
-                          {statusConfig.displayName}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div>
-                      <h3 className="font-semibold text-gray-900 line-clamp-2">
-                        {event.title}
-                      </h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        <span className="text-primary font-medium">{event.price}</span>
-                        <span className="text-gray-300">•</span>
-                        <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>{event.date}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span>{event.time}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="text-gray-400">Added:</span>
-                      <span>{addedDateFormatted}</span>
-                      <span className="text-gray-400">({addedLabel})</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Users className="h-3.5 w-3.5" />
-                      <span>{event.registered} / {event.capacity} registered</span>
-                    </div>
-
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <Globe className="h-3.5 w-3.5" />
-                        <span>{event.platform}</span>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
-                            <MoreVertical className="h-4 w-4 text-gray-400" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          
-                          {isTrashed ? (
-                            <>
-                              <DropdownMenuItem 
-                                className="cursor-pointer text-green-600"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRestoreEvent(event);
-                                }}
-                              >
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Restore
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer text-red-600"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handlePermanentDelete(event);
-                                }}
-                              >
-                                <Trash className="h-4 w-4 mr-2" />
-                                Delete Permanently
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/events/${event.id}`);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/events/${event.id}/edit`);
-                                }}
-                              >
-                                <Edit3 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/dashboard/events/new?duplicate=${event.id}`);
-                                }}
-                              >
-                                <Copy className="h-4 w-4 mr-2" />
-                                Duplicate
-                              </DropdownMenuItem>
-                              {event.status === 'Draft' && (
-                                <DropdownMenuItem 
-                                  className="cursor-pointer text-green-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePublishEvent(event);
-                                  }}
-                                >
-                                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                                  Publish
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-amber-600 cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteEvent(event);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Move to Trash
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })
+            filteredEvents.map((event) => (
+              <EventGridCard
+                key={event.id}
+                event={event}
+                isSelected={selectedEvents.includes(event.id)}
+                onSelect={handleSelectEvent}
+                onClick={() => handleCardClick(event)}
+                onView={() => router.push(`/dashboard/events/${event.id}`)}
+                onEdit={() => router.push(`/dashboard/events/${event.id}/edit`)}
+                onDuplicate={() => router.push(`/dashboard/events/new?duplicate=${event.id}`)}
+                onPublish={() => handlePublishEvent(event)}
+                onRestore={() => handleRestoreEvent(event)}
+                onPermanentDelete={() => handlePermanentDelete(event)}
+                onMoveToTrash={() => handleDeleteEvent(event)}
+              />
+            ))
           ) : (
             <div className="py-12 text-center text-gray-500">
-              <div className="flex flex-col items-center gap-2">
-                {activeTab === 'trash' ? (
-                  <Trash2 className="h-8 w-8 text-gray-300" />
-                ) : (
-                  <Search className="h-8 w-8 text-gray-300" />
-                )}
-                <p className="font-medium">
-                  {activeTab === 'trash' 
-                    ? 'No events in trash'
-                    : shouldSearch && searchQuery 
-                    ? `No events match "${searchQuery}"`
-                    : activeTab !== 'all'
-                    ? `No ${activeTab} events found`
-                    : 'No events found'
-                  }
-                </p>
-                <p className="text-sm text-gray-400">
-                  {activeTab === 'trash' 
-                    ? 'Deleted events will appear here.'
-                    : 'Create your first event to get started.'
-                  }
-                </p>
-              </div>
+              <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
             </div>
           )}
 
-          {/* Mobile Pagination */}
           {totalItems > 0 && (
-            <div className="flex items-center justify-between gap-4 p-4 bg-white rounded-lg border border-gray-200 mt-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Rows:</span>
-                <Select
-                  value={pageSize.toString()}
-                  onValueChange={(value) => handlePageSizeChange(Number(value))}
-                >
-                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5" className="cursor-pointer">5</SelectItem>
-                    <SelectItem value="10" className="cursor-pointer">10</SelectItem>
-                    <SelectItem value="20" className="cursor-pointer">20</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">
-                  {totalItems > 0 
-                    ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
-                    : '0 of 0'
-                  }
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => handlePageChange(Math.min(currentPage + 1, totalPages))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+            <div className="bg-white rounded-lg border border-gray-200">
+              <PaginationBar
+                currentPage={currentPage}
+                pageSize={pageSize}
+                totalItems={totalItems}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
             </div>
           )}
         </div>
       )}
 
-      {/* Mobile Filter Bottom Sheet */}
+      {/* Mobile filter sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
           <div className="px-6 pt-6 pb-8 h-full flex flex-col">
@@ -2396,7 +1262,7 @@ export default function EventsDashboardPage() {
                 <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
                 >
                   <X className="h-5 w-5 text-gray-500" />
                 </button>
@@ -2405,7 +1271,7 @@ export default function EventsDashboardPage() {
                 Refine your event list
               </SheetDescription>
             </SheetHeader>
-            
+
             <div className="flex-1 overflow-y-auto mt-6 pb-6">
               <div className="space-y-1.5 mb-5">
                 <Label className="text-sm font-medium text-gray-700">Search</Label>
@@ -2415,31 +1281,23 @@ export default function EventsDashboardPage() {
                     placeholder="Search events..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-9 h-11 cursor-text border-gray-200 focus:border-primary focus:ring-primary/20 rounded-xl"
+                    className="pl-9 pr-9 h-11 border-gray-200 rounded-xl"
                   />
-                  {searchQuery && (
-                    <button
-                      onClick={handleClearSearch}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                      aria-label="Clear search"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
-                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-sm font-medium text-gray-700 truncate">Status</Label>
-                  <Select value={activeTab} onValueChange={(value) => {
-                    setActiveTab(value);
-                    dispatch(setCurrentPage(1));
-                  }}>
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
-                      <div className="truncate w-full text-left">
-                        <SelectValue placeholder="All" />
-                      </div>
+                  <Select
+                    value={activeTab}
+                    onValueChange={(v) => {
+                      setActiveTab(v);
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                      <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all" className="cursor-pointer">All</SelectItem>
@@ -2451,18 +1309,14 @@ export default function EventsDashboardPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-1.5 min-w-0 overflow-hidden">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-sm font-medium text-gray-700 truncate">Sort By</Label>
                   <Select
                     value={sortField}
-                    onValueChange={(value: SortField) => {
-                      setSortField(value);
-                    }}
+                    onValueChange={(v: SortField) => setSortField(v)}
                   >
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl focus:ring-primary/20 w-full">
-                      <div className="truncate w-full text-left">
-                        <SelectValue />
-                      </div>
+                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="name" className="cursor-pointer">Title</SelectItem>
@@ -2481,27 +1335,25 @@ export default function EventsDashboardPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className={`h-11 rounded-xl cursor-pointer transition-all ${
-                      sortDirection === 'asc' 
-                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                    className={`h-11 rounded-xl cursor-pointer ${
+                      sortDirection === 'asc'
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                     onClick={() => setSortDirection('asc')}
                   >
-                    <ArrowUp className="h-4 w-4 mr-2" />
-                    Ascending
+                    <ArrowUp className="h-4 w-4 mr-2" /> Ascending
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className={`h-11 rounded-xl cursor-pointer transition-all ${
-                      sortDirection === 'desc' 
-                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm' 
+                    className={`h-11 rounded-xl cursor-pointer ${
+                      sortDirection === 'desc'
+                        ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                     onClick={() => setSortDirection('desc')}
                   >
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    Descending
+                    <ArrowDown className="h-4 w-4 mr-2" /> Descending
                   </Button>
                 </div>
               </div>
@@ -2510,14 +1362,14 @@ export default function EventsDashboardPage() {
             <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50"
                 onClick={handleMobileReset}
               >
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm transition-all"
-                onClick={handleMobileApply}
+                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm"
+                onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
               </Button>
@@ -2526,7 +1378,7 @@ export default function EventsDashboardPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Delete (Move to Trash) Confirmation Dialog */}
+      {/* Move to trash dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -2549,26 +1401,21 @@ export default function EventsDashboardPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsDeleteDialogOpen(false)}
-              className="cursor-pointer"
-            >
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} className="cursor-pointer">
               Cancel
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
               onClick={handleConfirmDelete}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Move to Trash
+              <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Permanent Delete Confirmation Dialog */}
+      {/* Permanent delete dialog */}
       <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -2591,26 +1438,21 @@ export default function EventsDashboardPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsPermanentDeleteDialogOpen(false)}
               className="cursor-pointer"
             >
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
-              className="cursor-pointer"
-              onClick={handleConfirmPermanentDelete}
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Delete Permanently
+            <Button variant="destructive" className="cursor-pointer" onClick={handleConfirmPermanentDelete}>
+              <Trash className="h-4 w-4 mr-2" /> Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Restore Confirmation Dialog */}
+      {/* Restore dialog */}
       <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -2633,44 +1475,44 @@ export default function EventsDashboardPage() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsRestoreDialogOpen(false)}
               className="cursor-pointer"
             >
               Cancel
             </Button>
-            <Button 
-              variant="default" 
+            <Button
               className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
               onClick={handleConfirmRestore}
             >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restore Event
+              <RotateCcw className="h-4 w-4 mr-2" /> Restore Event
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Publish Error Dialog */}
+      {/* Publish error dialog */}
       <Dialog open={isPublishErrorDialogOpen} onOpenChange={setIsPublishErrorDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
-              <XCircle className="h-5 w-5" />
-              Cannot Publish Event
+              <XCircle className="h-5 w-5" /> Cannot Publish Event
             </DialogTitle>
             <DialogDescription className="text-red-600">
               {publishError?.message || 'Failed to publish event'}
             </DialogDescription>
           </DialogHeader>
-          
+
           {publishError?.details && publishError.details.length > 0 && (
             <div className="py-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Please fix the following issues:</p>
               <ul className="space-y-2">
                 {publishError.details.map((detail, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg">
+                  <li
+                    key={index}
+                    className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg"
+                  >
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
                     <span>{detail}</span>
                   </li>
@@ -2678,30 +1520,29 @@ export default function EventsDashboardPage() {
               </ul>
             </div>
           )}
-          
+
           <DialogFooter className="gap-2 flex-col sm:flex-row">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsPublishErrorDialogOpen(false)}
               className="w-full sm:w-auto cursor-pointer"
             >
               Close
             </Button>
-            <Button 
+            <Button
               className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white cursor-pointer"
               onClick={() => {
                 setIsPublishErrorDialogOpen(false);
                 router.push(`/dashboard/events/${publishingEventId || selectedEvent?.id}/edit`);
               }}
             >
-              <Edit3 className="h-4 w-4 mr-2" />
-              Edit Event
+              <Edit3 className="h-4 w-4 mr-2" /> Edit Event
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Action Confirmation Dialog */}
+      {/* Bulk action dialog */}
       <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2713,34 +1554,28 @@ export default function EventsDashboardPage() {
               {bulkAction === 'restore' && 'Restore Events'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {bulkAction === 'publish' && (
-                <>You are about to publish <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-              )}
-              {bulkAction === 'duplicate' && (
-                <>You are about to duplicate <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}.</>
-              )}
-              {bulkAction === 'delete' && (
-                <>You are about to move <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} to trash.</>
-              )}
-              {bulkAction === 'permanentDelete' && (
-                <>You are about to permanently delete <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''}. This action cannot be undone.</>
-              )}
-              {bulkAction === 'restore' && (
-                <>You are about to restore <strong>{getSelectedCount()}</strong> event{getSelectedCount() > 1 ? 's' : ''} from trash.</>
-              )}
+              You are about to{' '}
+              {bulkAction === 'publish' && 'publish'}
+              {bulkAction === 'duplicate' && 'duplicate'}
+              {bulkAction === 'delete' && 'move to trash'}
+              {bulkAction === 'permanentDelete' && 'permanently delete'}
+              {bulkAction === 'restore' && 'restore'}{' '}
+              <strong>{selectedEvents.length}</strong> event
+              {selectedEvents.length > 1 ? 's' : ''}
+              {bulkAction === 'permanentDelete' ? '. This action cannot be undone.' : '.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
             <ScrollArea className="h-32 border rounded-lg p-2">
-              {selectedEvents.map(id => {
-                const event = uiEvents.find(e => e.id === id);
+              {selectedEvents.map((id) => {
+                const event = uiEvents.find((e) => e.id === id);
                 return event ? (
                   <div key={id} className="flex items-center gap-2 py-1 text-sm">
                     <Calendar className="h-4 w-4 text-gray-400" />
                     <span>{event.title}</span>
                     <span className="text-gray-400">—</span>
                     <Badge variant="outline" className="text-xs">
-                      {event.isDeleted ? 'Trashed' : event.status}
+                      {event.isDeleted ? 'Trashed' : event.statusDisplayName}
                     </Badge>
                   </div>
                 ) : null;
@@ -2749,13 +1584,13 @@ export default function EventsDashboardPage() {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               className={`cursor-pointer ${
                 bulkAction === 'permanentDelete' || bulkAction === 'delete'
-                  ? 'bg-red-600 hover:bg-red-700' 
+                  ? 'bg-red-600 hover:bg-red-700'
                   : bulkAction === 'restore'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-primary hover:bg-primary/90'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-primary hover:bg-primary/90'
               }`}
               onClick={() => {
                 if (bulkAction === 'publish') {
@@ -2788,4 +1623,685 @@ export default function EventsDashboardPage() {
       </AlertDialog>
     </div>
   );
+}
+
+// ============================================================
+// SUBCOMPONENTS
+// ============================================================
+
+function useAuthenticated() {
+  return useAppSelectorSafe((state) => state.auth.isAuthenticated);
+}
+
+/**
+ * Local wrapper so this file doesn't import the auth slice directly —
+ * keeps the auth module's API surface in one place. Falls back to
+ * direct state access if the selector isn't exported yet.
+ */
+function useAppSelectorSafe<T>(selector: (state: { auth: { isAuthenticated: boolean } }) => T): T {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { useAppSelector } = require('@/lib/store/hooks');
+  return useAppSelector(selector);
+}
+
+interface StatCardProps {
+  label: string;
+  value: number;
+  sub: string;
+  icon: React.ReactNode;
+  bg: string;
+}
+
+function StatCard({ label, value, sub, icon, bg }: StatCardProps) {
+  return (
+    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{value}</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{sub}</p>
+          </div>
+          <div className={`p-2.5 sm:p-3 rounded-lg ${bg}`}>{icon}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TrashCard({ count, onClick }: { count: number; onClick: () => void }) {
+  const isActive = count > 0;
+  return (
+    <Card
+      className={`${
+        isActive
+          ? 'border-amber-300 bg-amber-50/80 ring-1 ring-amber-200/50 shadow-md shadow-amber-100/30'
+          : 'border-gray-200/80 bg-gray-50/50'
+      } transition-all duration-300 cursor-pointer hover:shadow-lg`}
+      onClick={isActive ? onClick : undefined}
+    >
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-xs font-medium uppercase tracking-wider ${isActive ? 'text-amber-600' : 'text-gray-500'}`}>
+              Trash
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className={`text-2xl sm:text-3xl font-bold ${isActive ? 'text-amber-700' : 'text-gray-400'}`}>
+                {count}
+              </p>
+              {isActive && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  {count} item{count !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+              {isActive ? (
+                <span className="text-amber-600 font-medium flex items-center gap-1">
+                  Click to view & restore <ArrowRight className="h-3 w-3" />
+                </span>
+              ) : (
+                'Empty'
+              )}
+            </p>
+          </div>
+          <div
+            className={`p-3 rounded-xl transition-all duration-300 ${
+              isActive ? 'bg-amber-100 text-amber-600 shadow-inner' : 'bg-gray-100 text-gray-400'
+            }`}
+          >
+            <Trash2 className={`h-5 w-5 sm:h-6 sm:w-6 ${isActive ? 'animate-pulse' : ''}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface SortableHeadProps {
+  label: string;
+  field: SortField;
+  sortField: SortField;
+  onSort: (field: SortField) => void;
+  icon: React.ReactNode;
+}
+
+function SortableHead({ label, field, onSort, icon }: SortableHeadProps) {
+  return (
+    <TableHead
+      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+      onClick={() => onSort(field)}
+    >
+      <div className="flex items-center">
+        {label}
+        {icon}
+      </div>
+    </TableHead>
+  );
+}
+
+interface AttendanceBarProps {
+  current: number;
+  capacity: number;
+  percent: number;
+}
+
+function AttendanceBar({ current, capacity, percent }: AttendanceBarProps) {
+  return (
+    <div className="w-36">
+      <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
+        <span>
+          {current} / {capacity || '∞'}
+        </span>
+        <span className="text-gray-500">{percent}%</span>
+      </div>
+      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="bg-primary h-1.5 rounded-full transition-all duration-300"
+          style={{ width: `${Math.min(percent, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface EmptyStateProps {
+  activeTab: string;
+  searchQuery: string;
+}
+
+function EmptyState({ activeTab, searchQuery }: EmptyStateProps) {
+  const title =
+    activeTab === 'trash'
+      ? 'No events in trash'
+      : searchQuery
+        ? `No events match "${searchQuery}"`
+        : activeTab !== 'all'
+          ? `No ${activeTab} events found`
+          : 'No events found';
+
+  const description =
+    activeTab === 'trash'
+      ? 'Deleted events will appear here. You can restore or permanently delete them.'
+      : searchQuery
+        ? 'Try adjusting your search terms or filters.'
+        : activeTab !== 'all'
+          ? 'Try changing the status filter.'
+          : 'Create your first event to get started.';
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {activeTab === 'trash' ? (
+        <Trash2 className="h-8 w-8 text-gray-300" />
+      ) : (
+        <Search className="h-8 w-8 text-gray-300" />
+      )}
+      <p className="font-medium">{title}</p>
+      <p className="text-sm text-gray-400">{description}</p>
+    </div>
+  );
+}
+
+interface PaginationBarProps {
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}
+
+function PaginationBar({
+  currentPage,
+  pageSize,
+  totalItems,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationBarProps) {
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-500">Rows per page:</span>
+        <Select value={pageSize.toString()} onValueChange={(v) => onPageSizeChange(Number(v))}>
+          <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="5" className="cursor-pointer">5</SelectItem>
+            <SelectItem value="10" className="cursor-pointer">10</SelectItem>
+            <SelectItem value="20" className="cursor-pointer">20</SelectItem>
+            <SelectItem value="50" className="cursor-pointer">50</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-500">
+          {totalItems > 0
+            ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
+            : '0 of 0'}
+        </span>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 cursor-pointer"
+            onClick={() => onPageChange(Math.max(currentPage - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 cursor-pointer"
+            onClick={() => onPageChange(Math.min(currentPage + 1, totalPages))}
+            disabled={currentPage === totalPages || totalPages === 0}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface EventGridCardProps {
+  event: UIEvent;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onClick: () => void;
+  onView: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onPublish: () => void;
+  onRestore: () => void;
+  onPermanentDelete: () => void;
+  onMoveToTrash: () => void;
+}
+
+function EventGridCard({
+  event,
+  isSelected,
+  onClick,
+  onView,
+  onEdit,
+  onDuplicate,
+  onPublish,
+  onRestore,
+  onPermanentDelete,
+  onMoveToTrash,
+}: EventGridCardProps) {
+  const statusConfig = getStatusBadgeConfig(event.statusDisplayName);
+  const typeClass = getTypeBadgeClass(event.typeDisplayName);
+  const isTrashed = event.isDeleted;
+  const addedDate = event.publishedAt || event.createdAt;
+  const addedLabel = event.publishedAt ? 'Published' : 'Created';
+  const percent = event.capacity > 0 ? Math.round((event.registered / event.capacity) * 100) : 0;
+
+  return (
+    <Card
+      className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+        isSelected ? 'border-primary/50 bg-primary/5' : ''
+      } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
+      onClick={onClick}
+    >
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="outline" className={typeClass}>
+              {event.typeDisplayName}
+            </Badge>
+            {event.isFeatured && !isTrashed && (
+              <Badge className="bg-secondary-500 text-white text-xs">
+                <Star className="h-3 w-3 mr-1" /> Featured
+              </Badge>
+            )}
+            {event.isPrivate && !isTrashed && (
+              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                <Lock className="h-3 w-3 mr-1" /> Private
+              </Badge>
+            )}
+          </div>
+          {isTrashed ? (
+            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+              <Trash2 className="h-3 w-3 mr-1" /> Trashed
+            </Badge>
+          ) : (
+            <Badge variant="outline" className={`${statusConfig.color} border`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
+              {event.statusDisplayName}
+            </Badge>
+          )}
+        </div>
+
+        <div>
+          <h3 className="font-semibold text-gray-900 line-clamp-2">{event.title}</h3>
+          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+            <span className="text-primary font-medium">{event.priceDisplay}</span>
+            <span className="text-gray-300">•</span>
+            <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{event.date}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            <span>{event.time}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="text-gray-400">Added:</span>
+          <span>{formatDateShort(addedDate)}</span>
+          <span className="text-gray-400">({addedLabel})</span>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Users className="h-3.5 w-3.5" />
+          <span>
+            {event.registered} / {event.capacity || '∞'} registered
+          </span>
+        </div>
+
+        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="bg-primary h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${Math.min(percent, 100)}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center gap-1 text-xs text-gray-400">
+            <Globe className="h-3.5 w-3.5" />
+            <span>{event.platform}</span>
+          </div>
+          <EventActionsMenu
+            event={event}
+            isTrashed={isTrashed}
+            onView={onView}
+            onEdit={onEdit}
+            onDuplicate={onDuplicate}
+            onPublish={onPublish}
+            onRestore={onRestore}
+            onPermanentDelete={onPermanentDelete}
+            onMoveToTrash={onMoveToTrash}
+            small
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface EventActionsMenuProps {
+  event: UIEvent;
+  isTrashed: boolean;
+  onView: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onPublish: () => void;
+  onRestore: () => void;
+  onPermanentDelete: () => void;
+  onMoveToTrash: () => void;
+  small?: boolean;
+}
+
+function EventActionsMenu({
+  isTrashed,
+  onView,
+  onEdit,
+  onDuplicate,
+  onPublish,
+  onRestore,
+  onPermanentDelete,
+  onMoveToTrash,
+  small,
+}: EventActionsMenuProps) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={small ? 'h-7 w-7 p-0 cursor-pointer' : 'h-8 w-8 cursor-pointer'}
+        >
+          <MoreVertical className={small ? 'h-4 w-4 text-gray-400' : 'h-4 w-4'} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {isTrashed ? (
+          <>
+            <DropdownMenuItem
+              className="cursor-pointer text-green-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRestore();
+              }}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" /> Restore
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer text-red-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPermanentDelete();
+              }}
+            >
+              <Trash className="h-4 w-4 mr-2" /> Delete Permanently
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onView();
+              }}
+            >
+              <Eye className="h-4 w-4 mr-2" /> View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Edit3 className="h-4 w-4 mr-2" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate();
+              }}
+            >
+              <Copy className="h-4 w-4 mr-2" /> Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer text-green-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPublish();
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Publish
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onView();
+              }}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" /> View Public Page
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-amber-600 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMoveToTrash();
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+interface BulkActionsBarProps {
+  selectedIds: string[];
+  uiEvents: UIEvent[];
+  activeTab: string;
+  publishingEventId: string | null;
+  onClear: () => void;
+  onView: () => void;
+  onEdit: (id: string) => void;
+  onPublish: (event: UIEvent) => void;
+  onBulkAction: (action: string) => void;
+  onDeleteEvent: (event: UIEvent) => void;
+}
+
+function BulkActionsBar({
+  selectedIds,
+  uiEvents,
+  activeTab,
+  publishingEventId,
+  onClear,
+  onView,
+  onEdit,
+  onPublish,
+  onBulkAction,
+  onDeleteEvent,
+}: BulkActionsBarProps) {
+  const count = selectedIds.length;
+
+  const allDraft = selectedIds.every((id) => {
+    const e = uiEvents.find((x) => x.id === id);
+    return e?.status === 'Draft' && !e?.isDeleted;
+  });
+
+  return (
+    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <Check className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium text-gray-700">
+          {count} event{count > 1 ? 's' : ''} selected
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {count === 1 && (
+          <>
+            <Button size="sm" variant="outline" className="cursor-pointer" onClick={onView}>
+              <Eye className="h-4 w-4 mr-2" /> View
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => onEdit(selectedIds[0])}
+            >
+              <Edit3 className="h-4 w-4 mr-2" /> Edit
+            </Button>
+          </>
+        )}
+
+        {allDraft && count > 0 && (
+          <Button
+            size="sm"
+            className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => {
+              if (count === 1) {
+                const event = uiEvents.find((e) => e.id === selectedIds[0]);
+                if (event) onPublish(event);
+              } else {
+                onBulkAction('publish');
+              }
+            }}
+            disabled={publishingEventId !== null}
+          >
+            {publishingEventId && count === 1 ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+            )}
+            Publish {count > 1 ? `(${count})` : ''}
+          </Button>
+        )}
+
+        {count > 1 && (
+          <>
+            {activeTab === 'trash' ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
+                  onClick={() => onBulkAction('restore')}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" /> Restore
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
+                  onClick={() => onBulkAction('permanentDelete')}
+                >
+                  <Trash className="h-4 w-4 mr-2" /> Delete Permanently
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={() => onBulkAction('duplicate')}
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Duplicate
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+                  onClick={() => onBulkAction('delete')}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
+                </Button>
+              </>
+            )}
+          </>
+        )}
+
+        {count === 1 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+            onClick={() => {
+              const event = uiEvents.find((e) => e.id === selectedIds[0]);
+              if (event) onDeleteEvent(event);
+            }}
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
+          </Button>
+        )}
+
+        <Button size="sm" variant="ghost" className="cursor-pointer" onClick={onClear}>
+          <XCircle className="h-4 w-4 mr-2" /> Clear
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ERROR HELPERS
+// ============================================================
+
+function extractErrorDetails(
+  err: unknown,
+  fallback: string,
+): { message: string; details: string[] } {
+  let message = fallback;
+  let details: string[] = [];
+
+  const data = (err as { data?: unknown })?.data;
+  if (data) {
+    if (typeof data === 'string') {
+      message = data;
+    } else if (typeof data === 'object' && data !== null) {
+      const msg = (data as { message?: unknown }).message;
+      if (typeof msg === 'string') message = msg;
+
+      const errs = (data as { errors?: unknown }).errors;
+      if (typeof errs === 'string') {
+        details = [errs];
+      } else if (Array.isArray(errs)) {
+        details = errs.map(String);
+      } else if (errs && typeof errs === 'object') {
+        details = Object.values(errs).map(String);
+      }
+    }
+  }
+
+  if (details.length === 0) {
+    details = [message];
+  }
+
+  return { message, details };
 }

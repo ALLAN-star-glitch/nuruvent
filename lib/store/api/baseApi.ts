@@ -41,6 +41,6 @@ export const api = createApi({
     }
     return undefined;
   },
-  tagTypes: ['User', 'Auth', 'Events', 'EventTypes', 'EventStatuses', 'TrashCount'],
+  tagTypes: ['User', 'Auth', 'Events', 'EventTypes', 'EventStatuses', 'TrashCount', 'Memberships', 'Teams', 'Invitations', 'EventCategories', 'TicketTypes'],
   endpoints: () => ({}),
 });

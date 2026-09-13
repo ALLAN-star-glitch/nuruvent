@@ -1,22 +1,31 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // components/home/HomeEventGrid.tsx
 
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { EventCard } from './EventCard';
-import { 
-  SearchX, 
-  Calendar, 
-  Loader2, 
-  RefreshCw, 
-  ArrowRight,
-  ChevronDown
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useGetUpcomingEventsQuery, useGetEventTypesQuery } from '@/lib/store/api/eventsApi';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import {
+  ArrowRight,
+  Calendar,
+  ChevronDown,
+  Loader2,
+  RefreshCw,
+  SearchX,
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { EventCard } from './EventCard';
 import { cn } from '@/lib/utils';
+
+import { useGetUpcomingEventsQuery } from '@/lib/store/api/eventsApi';
+import type { Event } from '@/lib/types/events';
+import { isEventUpcoming } from '@/lib/utils/eventDisplay';
+
+// ============================================================
+// PROPS
+// ============================================================
 
 interface HomeEventGridProps {
   limit?: number;
@@ -24,79 +33,78 @@ interface HomeEventGridProps {
   subtitle?: string;
 }
 
-export function HomeEventGrid({ 
-  limit = 8, 
-  title = "Featured Training Events", 
-  subtitle = "Discover professional workshops and certified courses from top trainers"
+// ============================================================
+// COMPONENT
+// ============================================================
+
+export function HomeEventGrid({
+  limit = 8,
+  title = 'Featured Training Events',
+  subtitle = 'Discover professional workshops and certified courses from top trainers',
 }: HomeEventGridProps) {
   const router = useRouter();
   const [showAll, setShowAll] = useState(false);
 
-  const { 
-    data: eventsData, 
-    isLoading, 
+  // The endpoint returns the upcoming feed directly — no need to
+  // fetch the whole catalogue and filter client-side.
+  const {
+    data: response,
+    isLoading,
     error,
     refetch,
     isFetching,
-  } = useGetUpcomingEventsQuery(
-    { limit: 20 },
-    {
-      refetchOnMountOrArgChange: true,
-      refetchOnFocus: true,
-      refetchOnReconnect: true,
-    }
+  } = useGetUpcomingEventsQuery({ limit: 20 });
+
+  const events: Event[] = response?.data ?? [];
+
+  // Belt-and-suspenders: the backend already filters to upcoming, but
+  // a stale cached response could include an event that just started.
+  const upcomingEvents = useMemo(
+    () => events.filter((event) => isEventUpcoming(event)),
+    [events],
   );
 
-  const { data: eventTypes } = useGetEventTypesQuery();
+  // ---- Responsive display limit ----
+  // Recomputed on window resize so the "Show more" behaviour matches
+  // the visible grid at any breakpoint.
+  const [displayLimit, setDisplayLimit] = useState(limit);
 
-  // ✅ Filter out past events
-  const upcomingEvents = useMemo(() => {
-    if (!eventsData) return [];
-    
-    const now = new Date();
-    return eventsData.filter((event) => {
-      const eventDate = new Date(event.date);
-      return eventDate >= now;
-    });
-  }, [eventsData]);
+  useEffect(() => {
+    const compute = () => {
+      if (typeof window === 'undefined') return limit;
+      if (window.innerWidth < 640) return 4; // mobile
+      if (window.innerWidth < 1024) return 6; // tablet
+      return limit; // desktop
+    };
 
-  // ✅ Responsive display limit
-  const displayLimit = useMemo(() => {
-    if (typeof window === 'undefined') return 4;
-    if (window.innerWidth < 640) return 4; // Mobile: 4 events
-    if (window.innerWidth < 1024) return 6; // Tablet: 6 events
-    return limit; // Desktop: 8 events
+    const handleResize = () => setDisplayLimit(compute());
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [limit]);
 
-  // ✅ Determine which events to show
-  const displayEvents = useMemo(() => {
-    const events = showAll ? upcomingEvents : upcomingEvents.slice(0, displayLimit);
-    return events;
-  }, [upcomingEvents, showAll, displayLimit]);
-
-  // ✅ Get total upcoming events count
-  const totalUpcoming = upcomingEvents.length;
-
-  // Auto-refresh every 30 seconds
+  // ---- Reset "show all" whenever the underlying list changes ----
   useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [refetch]);
-
-  // Reset showAll when events change
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowAll(false);
-  }, [eventsData]);
+  }, [response]);
 
-  // Loading state
+  const totalUpcoming = upcomingEvents.length;
+  const displayEvents = showAll
+    ? upcomingEvents
+    : upcomingEvents.slice(0, displayLimit);
+
+  // ----------------------------------------------------------
+  // Loading skeleton
+  // ----------------------------------------------------------
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse">
+          <div
+            key={i}
+            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse"
+          >
             <div className="aspect-[16/9] bg-gradient-to-br from-gray-200 to-gray-100" />
             <div className="p-4 space-y-3">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
@@ -112,19 +120,24 @@ export function HomeEventGrid({
     );
   }
 
+  // ----------------------------------------------------------
   // Error state
+  // ----------------------------------------------------------
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-red-100 text-red-500 mb-4">
           <SearchX className="h-7 w-7" />
         </div>
-        <h3 className="text-lg font-semibold text-red-800">Unable to load events</h3>
+        <h3 className="text-lg font-semibold text-red-800">
+          Unable to load events
+        </h3>
         <p className="text-sm text-red-600 mt-1">
-          We&apos;re having trouble fetching events. Please try refreshing the page.
+          We&apos;re having trouble fetching events. Please try refreshing the
+          page.
         </p>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="mt-4 border-red-200 text-red-700 hover:bg-red-50 cursor-pointer"
           onClick={() => refetch()}
         >
@@ -135,14 +148,18 @@ export function HomeEventGrid({
     );
   }
 
+  // ----------------------------------------------------------
   // Empty state
+  // ----------------------------------------------------------
   if (upcomingEvents.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 text-primary mb-4">
           <Calendar className="h-7 w-7" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900">No upcoming events</h3>
+        <h3 className="text-xl font-semibold text-gray-900">
+          No upcoming events
+        </h3>
         <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
           There are no upcoming events at the moment. Check back soon!
         </p>
@@ -150,6 +167,9 @@ export function HomeEventGrid({
     );
   }
 
+  // ----------------------------------------------------------
+  // Grid
+  // ----------------------------------------------------------
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -177,13 +197,15 @@ export function HomeEventGrid({
             disabled={isFetching}
             className="text-gray-400 hover:text-gray-600 cursor-pointer"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={cn('h-4 w-4 mr-2', isFetching && 'animate-spin')}
+            />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Events Grid - Responsive columns */}
+      {/* Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {displayEvents.map((event, index) => (
           <motion.div
@@ -192,18 +214,16 @@ export function HomeEventGrid({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <EventCard 
+            <EventCard
               event={event}
-              eventTypes={eventTypes}
               onClick={() => router.push(`/events/${event.slug}`)}
             />
           </motion.div>
         ))}
       </div>
 
-      {/* Action Buttons */}
+      {/* Actions */}
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-        {/* Show More / Show Less Button */}
         {totalUpcoming > displayLimit && (
           <Button
             variant="outline"
@@ -224,13 +244,9 @@ export function HomeEventGrid({
           </Button>
         )}
 
-        {/* Find More Events Button - Always visible */}
         <Button
           onClick={() => router.push('/events')}
-          className={cn(
-            "rounded-full px-6 cursor-pointer group",
-            totalUpcoming > displayLimit ? "bg-primary-500 hover:bg-primary-600 text-white" : "bg-primary-500 hover:bg-primary-600 text-white"
-          )}
+          className="rounded-full px-6 cursor-pointer group bg-primary-500 hover:bg-primary-600 text-white"
         >
           Find More Events
           <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-0.5" />
