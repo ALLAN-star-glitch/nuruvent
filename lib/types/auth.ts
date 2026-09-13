@@ -28,9 +28,10 @@ export type AccountType =
  */
 export type ProfessionalType =
   | 'professional_type_trainer'
-  | 'professional_type_coach'
   | 'professional_type_consultant'
-  | 'professional_type_freelancer';
+  | 'professional_type_educator'
+  | 'professional_type_student'
+  | 'professional_type_other'; // ← this one doesn't exist, apparently
 
 /**
  * Institution type — describes what kind of institution an

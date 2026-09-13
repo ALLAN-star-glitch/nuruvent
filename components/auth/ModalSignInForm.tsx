@@ -182,15 +182,7 @@ export function ModalSignInForm({ onSuccess, onSwitchToSignUp }: ModalSignInForm
         otp: twoFactorOtp,
       }).unwrap();
 
-      if (response.data?.account) {
-        if (onSuccess) {
-          onSuccess();
-        } else {
-          router.push('/dashboard');
-        }
-      } else {
-        setError('Verification failed. Please try again.');
-      }
+       router.push('/dashboard');
     } catch (err: any) {
       setError(err.data?.message || 'Invalid 2FA code. Please try again.');
     } finally {

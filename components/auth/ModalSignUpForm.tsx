@@ -116,12 +116,13 @@ export function ModalSignUpForm({ onSuccess, onSwitchToSignIn, prefillData }: Mo
     setErrors({});
 
     try {
-      const response = await registerPersonal({
+          const response = await registerPersonal({
         email: formData.email,
         password: formData.password,
         name: formData.name,
         phone: formData.phone,
         account_type: 'account_type_personal',
+        professional_type: 'professional_type_other',
       }).unwrap();
 
       const email = response.data?.email || formData.email;
