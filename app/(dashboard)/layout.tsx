@@ -3,7 +3,6 @@
 import type { Metadata } from 'next';
 import { Header } from '@/components/layout/Header';
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
-import { WelcomeBannerWrapper } from '@/components/dashboard/WelcomeBannerWrapper';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
@@ -26,8 +25,6 @@ export default function DashboardLayout({
       {/* Client Component for sidebar interaction */}
       <DashboardLayoutClient>
         <div className="p-4 md:p-6 space-y-4">
-          {/* ✅ Welcome Banner - Shows at top of dashboard */}
-          <WelcomeBannerWrapper />
           
           {/* Page Content */}
           {children}
