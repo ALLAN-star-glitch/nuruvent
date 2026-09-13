@@ -217,12 +217,7 @@ export function SignInForm() {
         otp: code,
       }).unwrap();
 
-      // ✅ Check if verification was successful
-      if (response.data?.account) {
-        router.push('/dashboard');
-      } else {
-        setError('Verification failed. Please try again.');
-      }
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.data?.message || 'Invalid 2FA code. Please try again.');
     } finally {
