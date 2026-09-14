@@ -237,7 +237,8 @@ export function mapEventToForm(event: EventModel): EventFormData {
 
   return {
     // ---- Basic ----
-    name: event.name ?? '',
+    name: event.display_name?.trim() || event.name || '',
+    display_name: event.display_name ?? '',
     description: event.description ?? '',
     short_description: event.short_description ?? '',
     event_type_id: event.event_type?.id ?? '',

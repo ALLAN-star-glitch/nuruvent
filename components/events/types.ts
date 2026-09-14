@@ -250,6 +250,7 @@ export function makeEmptySEO(): SEOForm {
 export interface EventFormData {
   // ---- Basic info ----
   name: string;
+  display_name: string;
   description: string;
   short_description: string;
   event_type_id: string;
@@ -339,6 +340,7 @@ export interface FormErrors {
 export const defaultFormData: EventFormData = {
   // Basic
   name: '',
+  display_name: '',
   description: '',
   short_description: '',
   event_type_id: '',
