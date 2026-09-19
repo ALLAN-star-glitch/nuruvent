@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  CalendarClock,
   Check,
   ChevronDown,
   Loader2,
@@ -30,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,11 +40,12 @@ import { useGenerateEventDraftMutation } from '@/lib/store/api/eventsApi';
 import type {
   EventType as EventTypeModel,
   GeneratedEventDraft,
+  RecurrenceInput,
   TicketType as TicketTypeModel,
 } from '@/lib/types/events';
 
 // ============================================================
-// GENERATE WITH AI — MODAL
+// TYPES
 // ============================================================
 
 type ModalStep = 'prompt' | 'generating' | 'preview' | 'error';
@@ -59,10 +62,6 @@ interface GenerateWithAIModalProps {
   ) => Promise<void>;
 }
 
-// ============================================================
-// FORM DEFAULTS
-// ============================================================
-
 interface PromptFormState {
   prompt: string;
   eventTypeId: string;
@@ -72,6 +71,17 @@ interface PromptFormState {
   currency: string;
   minCapacity: number | null;
   maxCapacity: number | null;
+}
+
+interface RecurrenceFormState {
+  enabled: boolean;
+  pattern: 'daily' | 'weekly' | 'monthly' | 'custom';
+  interval: number | null;
+  daysOfWeek: string[];
+  dayOfMonth: number | null;
+  weekOfMonth: string;
+  endsOn: string;
+  occurrences: number | null;
 }
 
 const INITIAL_FORM: PromptFormState = {
@@ -84,6 +94,27 @@ const INITIAL_FORM: PromptFormState = {
   minCapacity: null,
   maxCapacity: null,
 };
+
+const INITIAL_RECURRENCE: RecurrenceFormState = {
+  enabled: false,
+  pattern: 'weekly',
+  interval: 1,
+  daysOfWeek: [],
+  dayOfMonth: null,
+  weekOfMonth: '',
+  endsOn: '',
+  occurrences: null,
+};
+
+const WEEKDAYS: { value: string; label: string }[] = [
+  { value: 'monday', label: 'Mon' },
+  { value: 'tuesday', label: 'Tue' },
+  { value: 'wednesday', label: 'Wed' },
+  { value: 'thursday', label: 'Thu' },
+  { value: 'friday', label: 'Fri' },
+  { value: 'saturday', label: 'Sat' },
+  { value: 'sunday', label: 'Sun' },
+];
 
 const PROMPT_MAX = 500;
 
@@ -101,6 +132,8 @@ export function GenerateWithAIModal({
 }: GenerateWithAIModalProps) {
   const [step, setStep] = useState<ModalStep>('prompt');
   const [form, setForm] = useState<PromptFormState>(INITIAL_FORM);
+  const [recurrence, setRecurrence] =
+    useState<RecurrenceFormState>(INITIAL_RECURRENCE);
   const [draft, setDraft] = useState<GeneratedEventDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -127,6 +160,25 @@ export function GenerateWithAIModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateRec = <K extends keyof RecurrenceFormState>(
+    key: K,
+    value: RecurrenceFormState[K],
+  ) => {
+    setRecurrence((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const toggleWeekday = (day: string) => {
+    setRecurrence((prev) => {
+      const has = prev.daysOfWeek.includes(day);
+      return {
+        ...prev,
+        daysOfWeek: has
+          ? prev.daysOfWeek.filter((d) => d !== day)
+          : [...prev.daysOfWeek, day],
+      };
+    });
+  };
+
   const toggleTicketType = (id: string) => {
     setForm((prev) => {
       const has = prev.ticketTypeIds.includes(id);
@@ -144,14 +196,56 @@ export function GenerateWithAIModal({
     });
   };
 
+  // ---- Recurrence validation (block submit until complete) ----
+
+  const recurrenceValid = useMemo(() => {
+    if (!recurrence.enabled) return true;
+
+    if (recurrence.pattern === 'weekly' || recurrence.pattern === 'custom') {
+      if (recurrence.daysOfWeek.length === 0) return false;
+    }
+    if (recurrence.pattern === 'monthly') {
+      if (recurrence.dayOfMonth == null && !recurrence.weekOfMonth) return false;
+    }
+    if (!recurrence.endsOn && !recurrence.occurrences) return false;
+
+    return true;
+  }, [recurrence]);
+
   const canGenerate = useMemo(() => {
     return (
       form.prompt.trim().length >= 10 &&
       form.prompt.length <= PROMPT_MAX &&
       !!form.eventTypeId &&
-      form.ticketTypeIds.length > 0
+      form.ticketTypeIds.length > 0 &&
+      recurrenceValid
     );
-  }, [form]);
+  }, [form, recurrenceValid]);
+
+  const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
+    if (!recurrence.enabled) return null;
+
+    const base: RecurrenceInput = {
+      pattern: recurrence.pattern,
+      interval: recurrence.interval ?? 1,
+    };
+
+    if (recurrence.pattern === 'weekly' || recurrence.pattern === 'custom') {
+      base.days_of_week = recurrence.daysOfWeek;
+    }
+    if (recurrence.pattern === 'monthly' || recurrence.pattern === 'custom') {
+      if (recurrence.dayOfMonth != null) base.day_of_month = recurrence.dayOfMonth;
+      if (recurrence.weekOfMonth) base.week_of_month = recurrence.weekOfMonth;
+    }
+
+    if (recurrence.endsOn) base.ends_on = recurrence.endsOn;
+    else if (recurrence.occurrences != null)
+      base.occurrences = recurrence.occurrences;
+
+    return base;
+  }, [recurrence]);
+
+  // ---- Generate ----
 
   const handleGenerate = useCallback(async () => {
     if (!canGenerate) return;
@@ -170,6 +264,7 @@ export function GenerateWithAIModal({
         currency: form.currency || undefined,
         min_capacity: form.minCapacity ?? undefined,
         max_capacity: form.maxCapacity ?? undefined,
+        recurrence: buildRecurrenceInput(),
       }).unwrap();
 
       const { draft: generatedDraft, warnings } = response.data;
@@ -210,14 +305,15 @@ export function GenerateWithAIModal({
         message = 'The AI provider returned an error. Try again in a moment.';
       } else {
         message =
-          apiErr?.data?.message ??
-          'Failed to generate a draft. Try again.';
+          apiErr?.data?.message ?? 'Failed to generate a draft. Try again.';
       }
 
       setError(message);
       setStep('error');
     }
-  }, [canGenerate, form, generateDraft]);
+  }, [canGenerate, form, buildRecurrenceInput, generateDraft]);
+
+  // ---- Preview actions ----
 
   const handleEditDraft = useCallback(() => {
     if (!draft) return;
@@ -246,6 +342,8 @@ export function GenerateWithAIModal({
     setError(null);
     setStep('prompt');
   }, []);
+
+  // ---- Render ----
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -280,7 +378,6 @@ export function GenerateWithAIModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* STEP: PROMPT */}
         {step === 'prompt' && (
           <div className="space-y-5 py-2">
             {/* Prompt */}
@@ -296,12 +393,12 @@ export function GenerateWithAIModal({
                 value={form.prompt}
                 onChange={(e) => update('prompt', e.target.value)}
                 placeholder="A two-day Kubernetes workshop in Nairobi for 60 engineers, hybrid, with a virtual stream and both in-person and remote tickets…"
-                className="min-h-[120px] resize-none cursor-text bg-muted/40 placeholder:text-muted-foreground focus-visible:ring-primary/20 transition-all"
+                className="min-h-[110px] resize-none cursor-text bg-muted/40 placeholder:text-muted-foreground focus-visible:ring-primary/20 transition-all"
                 disabled={isGenerating}
               />
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
-                  A sentence or two is plenty.
+                  Describe the content. Use the toggle below for recurrence.
                 </span>
                 <span
                   className={cn(
@@ -330,11 +427,7 @@ export function GenerateWithAIModal({
                 </SelectTrigger>
                 <SelectContent>
                   {eventTypes.map((t) => (
-                    <SelectItem
-                      key={t.id}
-                      value={t.id}
-                      className="cursor-pointer"
-                    >
+                    <SelectItem key={t.id} value={t.id} className="cursor-pointer">
                       {t.display_name || t.name}
                     </SelectItem>
                   ))}
@@ -378,7 +471,241 @@ export function GenerateWithAIModal({
               </p>
             </div>
 
-            {/* Advanced options */}
+            {/* ========================================================= */}
+            {/* Recurrence                                                */}
+            {/* ========================================================= */}
+            <div className="rounded-lg border border-border overflow-hidden">
+              <div className="flex items-center justify-between p-3.5 bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-primary" />
+                  <div>
+                    <Label className="text-sm font-medium text-foreground cursor-pointer">
+                      This event repeats
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Turn on to specify the recurrence pattern explicitly.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={recurrence.enabled}
+                  onCheckedChange={(c) => updateRec('enabled', c)}
+                  disabled={isGenerating}
+                  className="cursor-pointer"
+                />
+              </div>
+
+              {recurrence.enabled && (
+                <div className="p-3.5 pt-3 space-y-3 border-t border-border bg-background">
+                  {/* Pattern + interval */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        Pattern
+                      </Label>
+                      <Select
+                        value={recurrence.pattern}
+                        onValueChange={(v) =>
+                          updateRec(
+                            'pattern',
+                            v as RecurrenceFormState['pattern'],
+                          )
+                        }
+                        disabled={isGenerating}
+                      >
+                        <SelectTrigger className="cursor-pointer">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="daily" className="cursor-pointer">
+                            Daily
+                          </SelectItem>
+                          <SelectItem value="weekly" className="cursor-pointer">
+                            Weekly
+                          </SelectItem>
+                          <SelectItem value="monthly" className="cursor-pointer">
+                            Monthly
+                          </SelectItem>
+                          <SelectItem value="custom" className="cursor-pointer">
+                            Custom
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        Interval
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={recurrence.interval ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateRec(
+                            'interval',
+                            v === '' ? null : parseInt(v, 10) || 1,
+                          );
+                        }}
+                        disabled={isGenerating}
+                        className="cursor-text"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        {recurrence.pattern === 'daily'
+                          ? 'Every N day(s)'
+                          : recurrence.pattern === 'weekly'
+                            ? 'Every N week(s)'
+                            : recurrence.pattern === 'monthly'
+                              ? 'Every N month(s)'
+                              : 'Custom interval'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Weekdays */}
+                  {(recurrence.pattern === 'weekly' ||
+                    recurrence.pattern === 'custom') && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">
+                        On days <span className="text-destructive">*</span>
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {WEEKDAYS.map((d) => {
+                          const selected = recurrence.daysOfWeek.includes(d.value);
+                          return (
+                            <button
+                              key={d.value}
+                              type="button"
+                              onClick={() => toggleWeekday(d.value)}
+                              disabled={isGenerating}
+                              className={cn(
+                                'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer',
+                                selected
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background text-muted-foreground border-border hover:border-primary/40',
+                                isGenerating && 'opacity-60 cursor-not-allowed',
+                              )}
+                            >
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {recurrence.daysOfWeek.length === 0 && (
+                        <p className="text-[11px] text-destructive">
+                          Pick at least one day.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Monthly */}
+                  {(recurrence.pattern === 'monthly' ||
+                    recurrence.pattern === 'custom') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">
+                          Day of month
+                        </Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={31}
+                          placeholder="e.g., 15"
+                          value={recurrence.dayOfMonth ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateRec(
+                              'dayOfMonth',
+                              v === '' ? null : parseInt(v, 10) || null,
+                            );
+                          }}
+                          disabled={isGenerating}
+                          className="cursor-text"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">
+                          Or week of month
+                        </Label>
+                        <Select
+                          value={recurrence.weekOfMonth || '__none__'}
+                          onValueChange={(v) =>
+                            updateRec('weekOfMonth', v === '__none__' ? '' : v)
+                          }
+                          disabled={isGenerating}
+                        >
+                          <SelectTrigger className="cursor-pointer">
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="cursor-pointer">
+                              None
+                            </SelectItem>
+                            <SelectItem value="first" className="cursor-pointer">First</SelectItem>
+                            <SelectItem value="second" className="cursor-pointer">Second</SelectItem>
+                            <SelectItem value="third" className="cursor-pointer">Third</SelectItem>
+                            <SelectItem value="fourth" className="cursor-pointer">Fourth</SelectItem>
+                            <SelectItem value="last" className="cursor-pointer">Last</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ends */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      Ends <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground">
+                          On date
+                        </Label>
+                        <Input
+                          type="date"
+                          value={recurrence.endsOn}
+                          onChange={(e) => {
+                            updateRec('endsOn', e.target.value);
+                            if (e.target.value) updateRec('occurrences', null);
+                          }}
+                          disabled={isGenerating}
+                          className="cursor-text mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-muted-foreground">
+                          After occurrences
+                        </Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          placeholder="e.g., 4"
+                          value={recurrence.occurrences ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateRec(
+                              'occurrences',
+                              v === '' ? null : parseInt(v, 10) || null,
+                            );
+                            if (v) updateRec('endsOn', '');
+                          }}
+                          disabled={isGenerating}
+                          className="cursor-text mt-1"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Set one. Leave the other blank.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Advanced options (unchanged) */}
             <details className="group rounded-lg border border-border overflow-hidden transition-all">
               <summary className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-sm font-medium text-foreground hover:bg-muted/50 select-none transition-colors">
                 <span>Advanced options</span>
@@ -465,7 +792,6 @@ export function GenerateWithAIModal({
           </div>
         )}
 
-        {/* STEP: GENERATING */}
         {step === 'generating' && (
           <div className="py-12 flex flex-col items-center gap-4">
             <div className="relative">
@@ -485,14 +811,12 @@ export function GenerateWithAIModal({
           </div>
         )}
 
-        {/* STEP: PREVIEW */}
         {step === 'preview' && draft && (
           <div className="py-2">
             <DraftPreview draft={draft} currency={form.currency || 'KES'} />
           </div>
         )}
 
-        {/* STEP: ERROR */}
         {step === 'error' && (
           <div className="py-6 flex flex-col items-center gap-3 text-center">
             <div className="p-3 rounded-full bg-destructive/10 border border-destructive/20 animate-pulse">
@@ -509,7 +833,6 @@ export function GenerateWithAIModal({
           </div>
         )}
 
-        {/* FOOTER */}
         <DialogFooter className="gap-2 sm:gap-2">
           {step === 'prompt' && (
             <>
@@ -615,7 +938,7 @@ export function GenerateWithAIModal({
 }
 
 // ============================================================
-// DRAFT PREVIEW
+// DRAFT PREVIEW (unchanged from your version)
 // ============================================================
 
 function DraftPreview({
@@ -629,7 +952,6 @@ function DraftPreview({
 
   return (
     <div className="space-y-4">
-      {/* Name + short description */}
       <div>
         <h3 className="text-lg font-semibold text-foreground leading-snug">
           {draft.name}
@@ -641,13 +963,9 @@ function DraftPreview({
         )}
       </div>
 
-      {/* Meta row */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {schedule?.start_date && (
-          <Badge
-            variant="outline"
-            className="text-muted-foreground font-normal"
-          >
+          <Badge variant="outline" className="text-muted-foreground font-normal">
             {formatDate(schedule.start_date)}
             {schedule.start_time && ` · ${schedule.start_time}`}
             {schedule.end_time && `–${schedule.end_time}`}
@@ -661,10 +979,7 @@ function DraftPreview({
             Virtual
           </Badge>
         ) : (
-          <Badge
-            variant="outline"
-            className="text-muted-foreground font-normal"
-          >
+          <Badge variant="outline" className="text-muted-foreground font-normal">
             In-person
           </Badge>
         )}
@@ -674,6 +989,15 @@ function DraftPreview({
             className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 font-medium"
           >
             Hybrid
+          </Badge>
+        )}
+        {draft.is_recurring && draft.recurrence && (
+          <Badge
+            variant="outline"
+            className="text-primary border-primary/30 bg-primary/5 font-medium"
+          >
+            <CalendarClock className="h-3 w-3 mr-1" />
+            {formatRecurrence(draft.recurrence)}
           </Badge>
         )}
         {draft.tags?.slice(0, 4).map((tag) => (
@@ -687,7 +1011,6 @@ function DraftPreview({
         ))}
       </div>
 
-      {/* Description */}
       {draft.description && (
         <div className="rounded-lg border border-border bg-muted/30 p-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
@@ -699,10 +1022,7 @@ function DraftPreview({
         </div>
       )}
 
-      {/* Venue */}
-      {(draft.venue_name ||
-        draft.venue_city ||
-        draft.in_person_location) && (
+      {(draft.venue_name || draft.venue_city || draft.in_person_location) && (
         <div className="rounded-lg border border-border p-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Venue
@@ -715,7 +1035,6 @@ function DraftPreview({
         </div>
       )}
 
-      {/* Tickets */}
       {draft.tickets && draft.tickets.length > 0 && (
         <div className="rounded-lg border border-border p-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -767,4 +1086,36 @@ function formatDate(iso: string): string {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+function formatRecurrence(r: {
+  pattern: string;
+  interval?: number;
+  days_of_week?: string[];
+  ends_on?: string | null;
+  occurrences?: number | null;
+}): string {
+  const every = r.interval && r.interval > 1 ? `Every ${r.interval} ` : 'Every ';
+  const unit =
+    r.pattern === 'daily'
+      ? r.interval && r.interval > 1 ? 'days' : 'day'
+      : r.pattern === 'weekly'
+        ? r.interval && r.interval > 1 ? 'weeks' : 'week'
+        : r.pattern === 'monthly'
+          ? r.interval && r.interval > 1 ? 'months' : 'month'
+          : 'period';
+
+  let label = `${every}${unit}`;
+
+  if (r.pattern === 'weekly' && r.days_of_week?.length) {
+    label += ` on ${r.days_of_week.map((d) => d.slice(0, 3)).join(', ')}`;
+  }
+
+  if (r.ends_on) {
+    label += ` until ${r.ends_on}`;
+  } else if (r.occurrences) {
+    label += ` · ${r.occurrences} times`;
+  }
+
+  return label;
 }

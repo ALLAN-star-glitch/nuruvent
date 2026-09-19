@@ -22,9 +22,6 @@ import type {
 // ============================================================
 // SCHEDULES
 // ============================================================
-//
-// The form's `schedules` array is the single source of truth.
-// Every entry maps 1:1 to the backend's ScheduleRequest shape.
 
 function schedulesToRequest(schedules: ScheduleForm[]) {
   const usable = schedules.filter(
@@ -82,16 +79,42 @@ function deriveStartEnd(schedules: ScheduleForm[]) {
 // ============================================================
 // RECURRENCE
 // ============================================================
+//
+// The backend publish-readiness check requires:
+//   - pattern weekly  → days_of_week must be non-empty
+//   - pattern monthly → day_of_month OR week_of_month must be set
+//   - pattern custom  → days_of_week must be non-empty
+//
+// If those conditions aren't met, we drop the recurrence entirely
+// rather than send `days_of_week: []` (which the backend rejects).
+// Dropping is preferable to a 400 because the event can still be
+// published as a non-recurring event.
 
 function recurrenceToRequest(recurrence: RecurrenceForm | null) {
   if (!recurrence || !recurrence.pattern) return undefined;
 
+  const days = (recurrence.days_of_week ?? []).filter(Boolean);
+
+  if (
+    (recurrence.pattern === 'weekly' ||
+      recurrence.pattern === 'custom') &&
+    days.length === 0
+  ) {
+    return undefined;
+  }
+
+  if (
+    recurrence.pattern === 'monthly' &&
+    recurrence.day_of_month == null &&
+    !recurrence.week_of_month
+  ) {
+    return undefined;
+  }
+
   return {
     pattern: recurrence.pattern,
     interval: recurrence.interval ?? undefined,
-    days_of_week: recurrence.days_of_week.length
-      ? recurrence.days_of_week
-      : undefined,
+    days_of_week: days.length ? days : undefined,
     day_of_month: recurrence.day_of_month ?? undefined,
     week_of_month: recurrence.week_of_month || undefined,
     ends_on: recurrence.ends_on || undefined,
@@ -102,13 +125,6 @@ function recurrenceToRequest(recurrence: RecurrenceForm | null) {
 // ============================================================
 // TICKETS
 // ============================================================
-//
-// `form.tickets` is the source of truth. A ticket is "usable" only
-// when it has a ticket_type_id and a quantity > 0. Rows that are
-// still empty (the default state) are dropped from the payload.
-//
-// `is_free` is derived: true iff there is at least one usable ticket
-// and every usable ticket has price === 0 (or null, treated as 0).
 
 function ticketsToRequest(tickets: TicketForm[]): TicketInput[] | undefined {
   const usable = tickets.filter(
@@ -130,12 +146,6 @@ function ticketsToRequest(tickets: TicketForm[]): TicketInput[] | undefined {
   }));
 }
 
-/**
- * Derive `is_free` from the usable ticket list.
- *   - No usable tickets → false (payload shouldn't be submitted anyway).
- *   - All usable tickets have price === 0 or null → true.
- *   - Any ticket has a non-zero price → false.
- */
 function deriveIsFree(tickets: TicketForm[]): boolean {
   const usable = tickets.filter(
     (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
@@ -228,7 +238,11 @@ function buildCommonFields(form: EventFormData) {
   const is_multi_day = deriveIsMultiDay(form.schedules);
   const tickets = ticketsToRequest(form.tickets);
   const is_free = deriveIsFree(form.tickets);
+
   const recurrence = recurrenceToRequest(form.recurrence);
+  // If the recurrence was dropped (invalid config), the event is
+  // effectively non-recurring — keep is_recurring in lockstep.
+  const is_recurring = recurrence ? !!form.is_recurring : false;
 
   return {
     schedules,
@@ -238,6 +252,7 @@ function buildCommonFields(form: EventFormData) {
     tickets,
     is_free,
     recurrence,
+    is_recurring,
   };
 }
 
@@ -246,7 +261,13 @@ function buildCommonFields(form: EventFormData) {
 // ============================================================
 
 export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
-  const { schedules, tickets, is_free, recurrence } = buildCommonFields(form);
+  const {
+    schedules,
+    tickets,
+    is_free,
+    recurrence,
+    is_recurring,
+  } = buildCommonFields(form);
 
   return {
     name: form.name?.trim() || 'Untitled Event',
@@ -257,7 +278,7 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
     tags: form.tags.length ? form.tags : undefined,
     language: form.language || undefined,
     schedules,
-    is_recurring: form.is_recurring || undefined,
+    is_recurring: is_recurring || undefined,
     recurrence,
     is_virtual: form.is_virtual,
     is_hybrid: form.is_hybrid || undefined,
@@ -303,7 +324,13 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
 // ============================================================
 
 export function buildPublishPayload(form: EventFormData): CreateEventRequest {
-  const { schedules, tickets, is_free, recurrence } = buildCommonFields(form);
+  const {
+    schedules,
+    tickets,
+    is_free,
+    recurrence,
+    is_recurring,
+  } = buildCommonFields(form);
 
   return {
     name: form.name?.trim() || 'Untitled Event',
@@ -314,7 +341,7 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
     tags: form.tags.length ? form.tags : undefined,
     language: form.language || undefined,
     schedules: schedules ?? [],
-    is_recurring: form.is_recurring || undefined,
+    is_recurring: is_recurring || undefined,
     recurrence,
     tickets: tickets ?? [],
     visibility: (form.is_private ? 'private' : 'public') as EventVisibility,
@@ -359,11 +386,23 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
 // ============================================================
 // UPDATE PAYLOAD
 // ============================================================
+//
+// Update semantics are pointer-based: `undefined` means "leave as-is".
+// We therefore send `is_recurring` as the derived boolean (not
+// `|| undefined`) so clearing a recurrence actually clears it
+// server-side, and `recurrence: undefined` alone means "keep the
+// existing recurrence".
 
 export function buildUpdatePayload(
   form: EventFormData,
 ): UpdateEventRequest {
-  const { schedules, tickets, is_free, recurrence } = buildCommonFields(form);
+  const {
+    schedules,
+    tickets,
+    is_free,
+    recurrence,
+    is_recurring,
+  } = buildCommonFields(form);
 
   return {
     name: form.name?.trim() || undefined,
@@ -374,8 +413,8 @@ export function buildUpdatePayload(
     tags: form.tags.length ? form.tags : undefined,
     language: form.language || undefined,
     schedules,
-    is_recurring: form.is_recurring,
-    recurrence,
+    is_recurring,
+    recurrence: recurrence,
     is_virtual: form.is_virtual,
     is_hybrid: form.is_hybrid,
     zoom_link: form.zoom_link || undefined,
@@ -420,17 +459,9 @@ export function buildUpdatePayload(
 // AI DRAFT → FORM MAPPING
 // ============================================================
 
-/**
- * Flatten the AI's draft into the wizard's form shape.
- *
- * Schedules are mapped from `draft.schedules`. Tickets are mapped from
- * `draft.tickets`. Other nested slices (recurrence, speakers, materials,
- * SEO) are user-driven and not read from the AI.
- */
 export function mapAIDraftToForm(
   draft: GeneratedEventDraft,
 ): Partial<EventFormData> {
-  // ---- Schedules ----
   const schedules: ScheduleForm[] | undefined = draft.schedules?.length
     ? draft.schedules.map((s, i) => ({
         _key:
@@ -452,7 +483,28 @@ export function mapAIDraftToForm(
       }))
     : undefined;
 
-  // ---- Tickets ----
+    // ---- Recurrence ----
+  // The AI returns recurrence in the same shape as GeneratedRecurrence,
+  // which mirrors the wizard's RecurrenceForm. But it may omit `interval`
+  // (default 1) and it uses null for missing fields, while the wizard
+  // form uses '' for missing strings and null for missing numbers.
+  //
+  // We coerce everything into RecurrenceForm's expected types here so the
+  // RecurrenceField renders correctly. Weekdays arrive already normalized
+  // to full lowercase names by the backend correction layer.
+  const recurrence: RecurrenceForm | null =
+    draft.is_recurring && draft.recurrence
+      ? {
+          pattern: draft.recurrence.pattern,
+          interval: draft.recurrence.interval ?? 1,
+          days_of_week: draft.recurrence.days_of_week ?? [],
+          day_of_month: draft.recurrence.day_of_month ?? null,
+          week_of_month: draft.recurrence.week_of_month ?? '',
+          ends_on: draft.recurrence.ends_on ?? '',
+          occurrences: draft.recurrence.occurrences ?? null,
+        }
+      : null;
+
   const tickets: TicketForm[] | undefined = draft.tickets?.length
     ? draft.tickets.map((t, i) => ({
         _key:
@@ -486,21 +538,21 @@ export function mapAIDraftToForm(
   const meetLink = firstSchedule?.meet_link ?? '';
 
   return {
-    // Basic
     name: draft.name ?? undefined,
     description: draft.description ?? undefined,
     short_description: draft.short_description ?? undefined,
     tags: draft.tags ?? undefined,
     language: draft.language ?? undefined,
 
-    // Schedule
     schedules,
 
-    // Tickets
+    // ---- Recurrence ----
+    is_recurring: !!draft.is_recurring,  
+    recurrence,
+
     tickets,
     capacity: draft.capacity ?? undefined,
 
-    // Venue
     is_virtual: isVirtual,
     is_hybrid: draft.is_hybrid ?? undefined,
     location: !isVirtual ? locationCandidate : '',
@@ -513,11 +565,9 @@ export function mapAIDraftToForm(
     venue_city: draft.venue_city ?? undefined,
     venue_country: draft.venue_country ?? undefined,
 
-    // Access & privacy
     invite_only: draft.invite_only ?? undefined,
     is_private: draft.visibility === 'private' ? true : undefined,
 
-    // Monetization
     is_featured: draft.is_featured ?? undefined,
     certificate_enabled: draft.certificate_enabled ?? undefined,
   };

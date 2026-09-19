@@ -120,9 +120,26 @@ export function useEventSubmit({
               image.clearImage();
             }
 
+            // ============ DEBUG START ============
+            const payload = buildUpdatePayload(formData);
+
+            console.log('=== [PUT] useEventSubmit (publish) ===');
+            console.log('formData.is_recurring =', formData.is_recurring);
+            console.log(
+              'formData.recurrence =',
+              JSON.stringify(formData.recurrence, null, 2),
+            );
+            console.log(
+              'formData.recurrence?.days_of_week =',
+              formData.recurrence?.days_of_week,
+            );
+            console.log('transform output =', JSON.stringify(payload, null, 2));
+            console.log('======================================');
+            // ============ DEBUG END ============
+
             await updateEvent({
               id: currentId,
-              data: buildUpdatePayload(formData),
+              data: payload,
             }).unwrap();
 
             await publishEvent(currentId).unwrap();
@@ -149,9 +166,26 @@ export function useEventSubmit({
               image.clearImage();
             }
 
+            // ============ DEBUG START ============
+            const payload = buildUpdatePayload(formData);
+
+            console.log('=== [PUT] useEventSubmit (save draft) ===');
+            console.log('formData.is_recurring =', formData.is_recurring);
+            console.log(
+              'formData.recurrence =',
+              JSON.stringify(formData.recurrence, null, 2),
+            );
+            console.log(
+              'formData.recurrence?.days_of_week =',
+              formData.recurrence?.days_of_week,
+            );
+            console.log('transform output =', JSON.stringify(payload, null, 2));
+            console.log('=========================================');
+            // ============ DEBUG END ============
+
             const response = await updateEvent({
               id: currentId,
-              data: buildUpdatePayload(formData),
+              data: payload,
             }).unwrap();
             onCreated(response.data.id);
           } else {

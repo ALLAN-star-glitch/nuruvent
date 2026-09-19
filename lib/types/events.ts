@@ -911,6 +911,8 @@ export interface GenerateEventDraftRequest {
   currency?: string;
   min_capacity?: number;
   max_capacity?: number;
+  /** Structured recurrence — when provided, the AI must use exactly this. */
+  recurrence?: RecurrenceInput | null;
 }
 
 /**
@@ -929,6 +931,17 @@ export interface GeneratedEventDraft {
 
   schedules?: ScheduleInput[];
   is_multi_day?: boolean;
+
+  is_recurring?: boolean;
+  recurrence?: {
+    pattern: 'daily' | 'weekly' | 'monthly' | 'custom';
+    interval?: number;
+    days_of_week?: string[];
+    day_of_month?: number;
+    week_of_month?: string;
+    ends_on?: string;
+    occurrences?: number;
+  };
 
   is_virtual?: boolean;
   is_hybrid?: boolean;

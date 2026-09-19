@@ -77,25 +77,25 @@ export function makeEmptyRecurrence(): RecurrenceForm {
 }
 
 export const WEEKDAY_CODES = [
-  'mon',
-  'tue',
-  'wed',
-  'thu',
-  'fri',
-  'sat',
-  'sun',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
 ] as const;
 
 export type WeekdayCode = (typeof WEEKDAY_CODES)[number];
 
 export const WEEKDAY_LABELS: Record<WeekdayCode, string> = {
-  mon: 'Mon',
-  tue: 'Tue',
-  wed: 'Wed',
-  thu: 'Thu',
-  fri: 'Fri',
-  sat: 'Sat',
-  sun: 'Sun',
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun',
 };
 
 // ============================================================
