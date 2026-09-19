@@ -119,23 +119,35 @@ function formatTime(dateString: string | undefined): string {
 
 function getStatusConfig(statusName: string) {
   const map: Record<string, { color: string; dot: string }> = {
-    Draft: { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
-    Published: { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
-    Cancelled: { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
-    Completed: { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
+    Draft: {
+      color: 'text-muted-foreground bg-muted border-border',
+      dot: 'bg-muted-foreground',
+    },
+    Published: {
+      color: 'text-tertiary-600 dark:text-tertiary-400 bg-tertiary-50 dark:bg-tertiary-950/40 border-tertiary-200 dark:border-tertiary-900/50',
+      dot: 'bg-tertiary-500',
+    },
+    Cancelled: {
+      color: 'text-destructive bg-destructive/10 border-destructive/30',
+      dot: 'bg-destructive',
+    },
+    Completed: {
+      color: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border-primary-200 dark:border-primary-900/50',
+      dot: 'bg-primary-500',
+    },
   };
   return map[statusName] ?? map.Draft;
 }
 
 function getTypeBadgeClass(typeName: string): string {
   const map: Record<string, string> = {
-    Workshop: 'bg-purple-100 text-purple-700 border-purple-200',
-    Webinar: 'bg-blue-100 text-blue-700 border-blue-200',
-    Meetup: 'bg-amber-100 text-amber-700 border-amber-200',
-    Bootcamp: 'bg-red-100 text-red-700 border-red-200',
-    Uncategorized: 'bg-gray-100 text-gray-700 border-gray-200',
+    Workshop: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50',
+    Webinar: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50',
+    Meetup: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50',
+    Bootcamp: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/50',
+    Uncategorized: 'bg-muted text-muted-foreground border-border',
   };
-  return map[typeName] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  return map[typeName] ?? 'bg-muted text-muted-foreground border-border';
 }
 
 function parseDurationMinutes(duration: string): number {
@@ -215,7 +227,6 @@ export default function TrashPage() {
   const [sortField, setSortField] = useState<SortField>('deletedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // ---- Mobile detection ----
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -223,19 +234,16 @@ export default function TrashPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // ---- Debounce search ----
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // ---- Reset page on search change ----
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
   }, [debouncedSearchQuery]);
 
-  // ---- Queries ----
   const {
     data: trashResponse,
     isLoading,
@@ -251,7 +259,6 @@ export default function TrashPage() {
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
   const [bulkPermanentlyDeleteEvents] = useBulkPermanentlyDeleteEventsMutation();
 
-  // ---- Convert events ----
   const rawEvents: Event[] = trashResponse?.data?.data ?? [];
   const totalItems = trashResponse?.data?.total ?? 0;
 
@@ -485,18 +492,18 @@ export default function TrashPage() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-6 text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-amber-50 rounded-full">
-                <Trash2 className="h-10 w-10 text-amber-600" />
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-full">
+                <Trash2 className="h-10 w-10 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               Authentication Required
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Please log in to view your trash.
             </p>
             <Button
-              className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={() => router.push('/signin')}
             >
               Go to Login
@@ -512,7 +519,7 @@ export default function TrashPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-gray-500">Loading trash...</p>
+          <p className="text-sm text-muted-foreground">Loading trash...</p>
         </div>
       </div>
     );
@@ -529,16 +536,16 @@ export default function TrashPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer"
+            className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer"
           >
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Trash2 className="h-6 w-6 text-amber-500" />
               Trash
             </h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               View and manage your soft-deleted events.
             </p>
           </div>
@@ -559,54 +566,54 @@ export default function TrashPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="border-gray-200/80 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Total in Trash
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
                   {totalItems}
                 </p>
               </div>
-              <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg flex-shrink-0 ml-2">
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-lg flex-shrink-0 ml-2">
                 <Trash2 className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-200/80 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Drafts
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
                   {draftCount}
                 </p>
               </div>
-              <div className="p-2.5 bg-gray-50 text-gray-600 rounded-lg flex-shrink-0 ml-2">
+              <div className="p-2.5 bg-muted text-muted-foreground rounded-lg flex-shrink-0 ml-2">
                 <Clock className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-gray-200/80 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Published
                 </p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">
+                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
                   {publishedCount}
                 </p>
               </div>
-              <div className="p-2.5 bg-green-50 text-green-600 rounded-lg flex-shrink-0 ml-2">
+              <div className="p-2.5 bg-tertiary-50 dark:bg-tertiary-950/40 text-tertiary-600 dark:text-tertiary-400 rounded-lg flex-shrink-0 ml-2">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
             </div>
@@ -621,7 +628,7 @@ export default function TrashPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <div className="relative w-full md:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     type="text"
                     placeholder="Search trashed events..."
@@ -632,7 +639,7 @@ export default function TrashPage() {
                   {searchQuery && (
                     <button
                       onClick={handleClearSearch}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       aria-label="Clear search"
                     >
                       <X className="h-4 w-4" />
@@ -641,15 +648,15 @@ export default function TrashPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-3">
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                  <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
                       className={`p-1.5 rounded-md cursor-pointer ${
                         viewMode === 'table'
-                          ? 'bg-white text-primary shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                          ? 'bg-background text-primary shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                       title="Table View"
                     >
@@ -659,8 +666,8 @@ export default function TrashPage() {
                       onClick={() => setViewMode('grid')}
                       className={`p-1.5 rounded-md cursor-pointer ${
                         viewMode === 'grid'
-                          ? 'bg-white text-primary shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                          ? 'bg-background text-primary shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                       title="Grid View"
                     >
@@ -668,10 +675,10 @@ export default function TrashPage() {
                     </button>
                   </div>
 
-                  <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">|</span>
 
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">Sort by:</span>
                     <Select
                       value={sortField}
                       onValueChange={(v: SortField) => {
@@ -692,7 +699,7 @@ export default function TrashPage() {
 
                     <button
                       onClick={() => setSortDirection((p) => (p === 'asc' ? 'desc' : 'asc'))}
-                      className="p-1 hover:bg-gray-100 rounded-md cursor-pointer"
+                      className="p-1 hover:bg-accent rounded-md cursor-pointer"
                       title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                     >
                       {sortDirection === 'asc' ? '↑' : '↓'}
@@ -701,7 +708,7 @@ export default function TrashPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {isFetching && <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />}
                     {filteredEvents.length} item{filteredEvents.length !== 1 ? 's' : ''} in trash
                   </span>
@@ -729,7 +736,7 @@ export default function TrashPage() {
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-foreground">
                     {selectedEvents.length} item{selectedEvents.length > 1 ? 's' : ''} selected
                   </span>
                 </div>
@@ -737,7 +744,7 @@ export default function TrashPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
+                    className="cursor-pointer text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30"
                     onClick={handleRestoreSelected}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
@@ -746,7 +753,7 @@ export default function TrashPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
+                    className="cursor-pointer text-destructive border-destructive/30 hover:bg-destructive/10"
                     onClick={handlePermanentDeleteSelected}
                   >
                     <Trash className="h-4 w-4 mr-2" />
@@ -778,7 +785,7 @@ export default function TrashPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/50">
+                  <TableRow className="bg-muted/50">
                     <TableHead className="py-3 px-4 w-10">
                       <Checkbox
                         checked={selectAll}
@@ -813,7 +820,7 @@ export default function TrashPage() {
                         <TableRow
                           key={event.id}
                           onClick={() => handleRowClick(event.id)}
-                          className={`hover:bg-gray-50/60 transition-colors group cursor-pointer ${
+                          className={`hover:bg-accent/60 transition-colors group cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
                           }`}
                         >
@@ -825,7 +832,7 @@ export default function TrashPage() {
                             />
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <div className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
                               {event.title}
                               {event.isFeatured && (
                                 <Badge className="ml-2 bg-secondary-500 text-white text-xs">
@@ -834,18 +841,18 @@ export default function TrashPage() {
                                 </Badge>
                               )}
                               {event.isPrivate && (
-                                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                                <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs">
                                   <Lock className="h-3 w-3 mr-1" />
                                   Private
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
-                              <span className="text-gray-400">{event.platform}</span>
-                              <span className="text-gray-300">•</span>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                              <span className="text-muted-foreground">{event.platform}</span>
+                              <span className="text-border">•</span>
                               <span className="text-primary font-medium">{event.priceDisplay}</span>
-                              <span className="text-gray-300">•</span>
-                              <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+                              <span className="text-border">•</span>
+                              <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -859,10 +866,10 @@ export default function TrashPage() {
                               {event.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-gray-600">
+                          <TableCell className="py-4 px-4 text-muted-foreground">
                             <div className="flex flex-col">
                               <span className="text-sm">{formatDate(event.deletedAt)}</span>
-                              <span className="text-xs text-gray-400">{formatTime(event.deletedAt)}</span>
+                              <span className="text-xs text-muted-foreground">{formatTime(event.deletedAt)}</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4 text-right">
@@ -876,7 +883,7 @@ export default function TrashPage() {
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  className="cursor-pointer text-green-600"
+                                  className="cursor-pointer text-tertiary-600 dark:text-tertiary-400"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRestoreEvent(event);
@@ -886,7 +893,7 @@ export default function TrashPage() {
                                   Restore
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="cursor-pointer text-red-600"
+                                  className="cursor-pointer text-destructive"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handlePermanentDelete(event);
@@ -903,7 +910,7 @@ export default function TrashPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-12 text-center text-gray-500">
+                      <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
                         <EmptyTrashState searchQuery={searchQuery} />
                       </TableCell>
                     </TableRow>
@@ -941,14 +948,14 @@ export default function TrashPage() {
                 />
               ))
             ) : (
-              <div className="col-span-full py-12 text-center text-gray-500">
+              <div className="col-span-full py-12 text-center text-muted-foreground">
                 <EmptyTrashState searchQuery={searchQuery} />
               </div>
             )}
           </div>
 
           {totalItems > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-card rounded-lg border border-border">
               <PaginationBar
                 currentPage={currentPage}
                 pageSize={pageSize}
@@ -977,13 +984,13 @@ export default function TrashPage() {
               />
             ))
           ) : (
-            <div className="py-12 text-center text-gray-500">
+            <div className="py-12 text-center text-muted-foreground">
               <EmptyTrashState searchQuery={searchQuery} />
             </div>
           )}
 
           {totalItems > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-card rounded-lg border border-border">
               <PaginationBar
                 currentPage={currentPage}
                 pageSize={pageSize}
@@ -1000,31 +1007,31 @@ export default function TrashPage() {
       {/* Mobile filter strip */}
       {isMobile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
-          <div className="pointer-events-auto mx-auto max-w-md bg-white/95 rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm">
+          <div className="pointer-events-auto mx-auto max-w-md bg-card/95 rounded-full shadow-lg border border-border backdrop-blur-sm">
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
+                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
               >
-                <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-sm text-gray-600 truncate">
+                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm text-muted-foreground truncate">
                   {searchQuery || 'Search trash'}
                 </span>
               </button>
-              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+              <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 relative"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5 relative"
               >
-                <Filter className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">Filters</span>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Filters</span>
               </button>
-              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+              <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
               >
-                <span className="text-sm text-gray-600 truncate max-w-[80px]">
+                <span className="text-sm text-muted-foreground truncate max-w-[80px]">
                   {sortLabel()}
                 </span>
               </button>
@@ -1042,38 +1049,38 @@ export default function TrashPage() {
                 <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-accent flex items-center justify-center"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
-              <SheetDescription className="text-sm text-gray-500">
+              <SheetDescription className="text-sm text-muted-foreground">
                 Refine your trash list
               </SheetDescription>
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto mt-6 pb-6">
               <div className="space-y-1.5 mb-5">
-                <Label className="text-sm font-medium text-gray-700">Search</Label>
+                <Label className="text-sm font-medium text-foreground">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search trashed events..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-9 h-11 border-gray-200 rounded-xl"
+                    className="pl-9 pr-9 h-11 border-border rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div className="space-y-1.5 min-w-0">
-                  <Label className="text-sm font-medium text-gray-700 truncate">Sort By</Label>
+                  <Label className="text-sm font-medium text-foreground truncate">Sort By</Label>
                   <Select
                     value={sortField}
                     onValueChange={(v: SortField) => setSortField(v)}
                   >
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                    <SelectTrigger className="h-11 cursor-pointer border-border rounded-xl w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1086,12 +1093,12 @@ export default function TrashPage() {
                 </div>
 
                 <div className="space-y-1.5 min-w-0">
-                  <Label className="text-sm font-medium text-gray-700 truncate">View</Label>
+                  <Label className="text-sm font-medium text-foreground truncate">View</Label>
                   <Select
                     value={viewMode}
                     onValueChange={(v: ViewMode) => setViewMode(v)}
                   >
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                    <SelectTrigger className="h-11 cursor-pointer border-border rounded-xl w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1103,14 +1110,14 @@ export default function TrashPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-gray-700">Sort Direction</Label>
+                <Label className="text-sm font-medium text-foreground">Sort Direction</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
                     className={`h-11 rounded-xl cursor-pointer ${
                       sortDirection === 'asc'
                         ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        : 'border-border hover:bg-accent'
                     }`}
                     onClick={() => setSortDirection('asc')}
                   >
@@ -1121,7 +1128,7 @@ export default function TrashPage() {
                     className={`h-11 rounded-xl cursor-pointer ${
                       sortDirection === 'desc'
                         ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        : 'border-border hover:bg-accent'
                     }`}
                     onClick={() => setSortDirection('desc')}
                   >
@@ -1131,16 +1138,16 @@ export default function TrashPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
+            <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50"
+                className="flex-1 h-11 rounded-xl cursor-pointer border-border hover:bg-accent"
                 onClick={handleMobileReset}
               >
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm"
+                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
@@ -1154,20 +1161,20 @@ export default function TrashPage() {
       <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-green-600">Restore Event</DialogTitle>
+            <DialogTitle className="text-tertiary-600 dark:text-tertiary-400">Restore Event</DialogTitle>
             <DialogDescription>
               Are you sure you want to restore this event from trash?
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                <div className="p-2 bg-green-100 rounded-full">
-                  <RotateCcw className="h-5 w-5 text-green-600" />
+              <div className="flex items-center gap-3 p-3 bg-tertiary-50 dark:bg-tertiary-950/30 rounded-lg border border-tertiary-100 dark:border-tertiary-900/50">
+                <div className="p-2 bg-tertiary-100 dark:bg-tertiary-950/50 rounded-full">
+                  <RotateCcw className="h-5 w-5 text-tertiary-600 dark:text-tertiary-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
@@ -1177,7 +1184,7 @@ export default function TrashPage() {
               Cancel
             </Button>
             <Button
-              className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+              className="cursor-pointer bg-tertiary-500 hover:bg-tertiary-600 text-white"
               onClick={handleConfirmRestore}
             >
               <RotateCcw className="h-4 w-4 mr-2" /> Restore Event
@@ -1190,20 +1197,20 @@ export default function TrashPage() {
       <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Permanently Delete Event</DialogTitle>
+            <DialogTitle className="text-destructive">Permanently Delete Event</DialogTitle>
             <DialogDescription>
               Are you sure you want to permanently delete this event? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                <div className="p-2 bg-red-100 rounded-full">
-                  <Trash className="h-5 w-5 text-red-600" />
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                <div className="p-2 bg-destructive/20 rounded-full">
+                  <Trash className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
@@ -1240,14 +1247,14 @@ export default function TrashPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
-            <ScrollArea className="h-32 border rounded-lg p-2">
+            <ScrollArea className="h-32 border border-border rounded-lg p-2">
               {selectedEvents.map((id) => {
                 const event = uiEvents.find((e) => e.id === id);
                 return event ? (
                   <div key={id} className="flex items-center gap-2 py-1 text-sm">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>{event.title}</span>
-                    <span className="text-gray-400">—</span>
+                    <span className="text-muted-foreground">—</span>
                     <Badge variant="outline" className="text-xs">
                       {event.status}
                     </Badge>
@@ -1261,8 +1268,8 @@ export default function TrashPage() {
             <AlertDialogAction
               className={`cursor-pointer ${
                 bulkAction === 'permanentDelete'
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-green-600 hover:bg-green-700'
+                  ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                  : 'bg-tertiary-500 hover:bg-tertiary-600 text-white'
               }`}
               onClick={() => {
                 if (bulkAction === 'restore') {
@@ -1305,7 +1312,7 @@ function TrashGridCard({
 
   return (
     <Card
-      className={`hover:shadow-lg transition-all duration-200 border-gray-200/80 ${
+      className={`hover:shadow-lg transition-all duration-200 border-border ${
         isSelected ? 'border-primary/50 bg-primary/5' : ''
       }`}
     >
@@ -1321,7 +1328,7 @@ function TrashGridCard({
               </Badge>
             )}
             {event.isPrivate && (
-              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+              <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs">
                 <Lock className="h-3 w-3 mr-1" /> Private
               </Badge>
             )}
@@ -1333,15 +1340,15 @@ function TrashGridCard({
         </div>
 
         <div>
-          <h3 className="font-semibold text-gray-900 line-clamp-2">{event.title}</h3>
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+          <h3 className="font-semibold text-foreground line-clamp-2">{event.title}</h3>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
             <span className="text-primary font-medium">{event.priceDisplay}</span>
-            <span className="text-gray-300">•</span>
-            <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+            <span className="text-border">•</span>
+            <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5" />
             <span>{event.date}</span>
@@ -1352,21 +1359,21 @@ function TrashGridCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="text-gray-400">Deleted:</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="text-muted-foreground">Deleted:</span>
           <span>{formatDate(event.deletedAt)}</span>
-          <span className="text-gray-400">({formatTime(event.deletedAt)})</span>
+          <span className="text-muted-foreground">({formatTime(event.deletedAt)})</span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
           <span>
             {event.registered} / {event.capacity || '∞'} registered
           </span>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <div className="flex items-center gap-1 text-xs text-gray-400">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Globe className="h-3.5 w-3.5" />
             <span>{event.platform}</span>
           </div>
@@ -1381,20 +1388,20 @@ function TrashGridCard({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 p-0 cursor-pointer">
-                  <MoreVertical className="h-4 w-4 text-gray-400" />
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className="cursor-pointer text-green-600"
+                  className="cursor-pointer text-tertiary-600 dark:text-tertiary-400"
                   onClick={() => onRestore(event)}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" /> Restore
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="cursor-pointer text-red-600"
+                  className="cursor-pointer text-destructive"
                   onClick={() => onPermanentDelete(event)}
                 >
                   <Trash className="h-4 w-4 mr-2" /> Delete Permanently
@@ -1411,11 +1418,11 @@ function TrashGridCard({
 function EmptyTrashState({ searchQuery }: { searchQuery: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <Trash2 className="h-8 w-8 text-gray-300" />
+      <Trash2 className="h-8 w-8 text-muted-foreground/40" />
       <p className="font-medium">
         {searchQuery ? `No trashed events match "${searchQuery}"` : 'No events in trash'}
       </p>
-      <p className="text-sm text-gray-400">
+      <p className="text-sm text-muted-foreground">
         {searchQuery
           ? 'Try adjusting your search terms.'
           : 'Deleted events will appear here. You can restore or permanently delete them.'}
@@ -1442,9 +1449,9 @@ function PaginationBar({
   onPageSizeChange,
 }: PaginationBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">Rows per page:</span>
+        <span className="text-sm text-muted-foreground">Rows per page:</span>
         <Select value={pageSize.toString()} onValueChange={(v) => onPageSizeChange(Number(v))}>
           <SelectTrigger className="h-8 w-[70px] cursor-pointer">
             <SelectValue />
@@ -1458,7 +1465,7 @@ function PaginationBar({
         </Select>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-muted-foreground">
           {totalItems > 0
             ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
             : '0 of 0'}
