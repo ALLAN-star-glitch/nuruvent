@@ -14,14 +14,9 @@ import { FieldBaseProps, fieldId } from '@/components/form/types';
 import { SEOForm } from '../new';
 import { makeEmptySEO } from '../types';
 
-
-
 // ============================================================
 // SEO FIELD (events)
 // ============================================================
-//
-// Collapsible block. Nothing is required; if the user leaves it all
-// blank, the transform skips the SEO block entirely.
 
 interface SEOFieldProps extends FieldBaseProps {
   value: SEOForm | null;
@@ -50,15 +45,15 @@ export function SEOField({
         className="flex items-center gap-2 w-full text-left cursor-pointer"
       >
         {open ? (
-          <ChevronDown className="h-4 w-4 text-neutral-gray" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="h-4 w-4 text-neutral-gray" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         )}
-        <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2 cursor-pointer">
-          <Search className="h-4 w-4 text-primary-500" />
+        <Label className="text-sm font-medium text-foreground flex items-center gap-2 cursor-pointer">
+          <Search className="h-4 w-4 text-primary" />
           SEO &amp; Social Preview
         </Label>
-        <span className="text-xs text-neutral-gray ml-auto">
+        <span className="text-xs text-muted-foreground ml-auto">
           Optional
         </span>
       </button>
@@ -135,7 +130,7 @@ export function SEOField({
         </div>
       )}
 
-      {error && <p className="text-sm text-error-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

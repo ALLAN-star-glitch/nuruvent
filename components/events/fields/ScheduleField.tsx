@@ -32,17 +32,6 @@ import { makeEmptySchedule, type ScheduleForm } from '../types';
 // ============================================================
 // SCHEDULE FIELD (events)
 // ============================================================
-//
-// List editor for one or more schedules. Collapsed accordion rows,
-// one open at a time. Every row starts collapsed — the header summary
-// is designed to stand out so the user sees where to click.
-//
-// API identical to the previous version:
-//   value: ScheduleForm[]
-//   onChange: (next: ScheduleForm[]) => void
-//   error?: string
-//   disabled?: boolean
-//   id?: string
 
 interface SchedulesFieldProps extends FieldBaseProps {
   value: ScheduleForm[];
@@ -58,18 +47,13 @@ export function SchedulesField({
   disabled,
   id,
 }: SchedulesFieldProps) {
-  // Accordion state. Only one schedule open at a time.
   const [openKey, setOpenKey] = useState<string | null>(null);
-
-  // Remove confirmation.
   const [pendingRemoveKey, setPendingRemoveKey] = useState<string | null>(null);
 
   const schedules = useMemo(
     () => (value.length > 0 ? value : [makeEmptySchedule()]),
     [value],
   );
-
-  // ---- Mutators ----
 
   const update = <K extends keyof ScheduleForm>(
     key: string,
@@ -107,11 +91,11 @@ export function SchedulesField({
     <div id={fieldId('schedules', id)} className="space-y-3">
       {/* Section header */}
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-primary-500" />
-          Schedule <span className="text-error-500">*</span>
+        <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-primary" />
+          Schedule <span className="text-destructive">*</span>
         </Label>
-        <span className="text-xs text-neutral-gray">
+        <span className="text-xs text-muted-foreground">
           {schedules.length}{' '}
           {schedules.length === 1 ? 'session' : 'sessions'}
         </span>
@@ -122,10 +106,6 @@ export function SchedulesField({
         {schedules.map((schedule, index) => {
           const isOpen = openKey === schedule._key;
           const isPendingRemove = pendingRemoveKey === schedule._key;
-          const isComplete =
-            !!schedule.start_date &&
-            !!schedule.start_time &&
-            !!schedule.end_time;
           const isEmpty =
             !schedule.start_date &&
             !schedule.start_time &&
@@ -138,20 +118,17 @@ export function SchedulesField({
             <div
               key={schedule._key}
               className={cn(
-                'border rounded-lg bg-white transition-all',
-                // Open — accent border and shadow
-                isOpen && 'border-primary-300 shadow-sm',
-                // Closed + empty — noticeably louder
+                'border rounded-lg bg-card transition-all',
+                isOpen && 'border-primary/40 shadow-sm',
                 !isOpen &&
                   isEmpty &&
-                  'border-primary-200 bg-primary-50/30 hover:border-primary-300 hover:bg-primary-50/60',
-                // Closed + complete or incomplete — neutral
+                  'border-primary/30 bg-primary/5 hover:border-primary/40 hover:bg-primary/10',
                 !isOpen &&
                   !isEmpty &&
-                  'border-neutral-light hover:border-neutral-300',
+                  'border-border hover:border-border/80',
               )}
             >
-              {/* ---- Header ---- */}
+              {/* Header */}
               <div className="flex items-start gap-3 p-4">
                 <button
                   type="button"
@@ -164,8 +141,8 @@ export function SchedulesField({
                     className={cn(
                       'pt-0.5 shrink-0',
                       !isOpen && isEmpty
-                        ? 'text-primary-600'
-                        : 'text-neutral-gray',
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
                     )}
                   >
                     {isOpen ? (
@@ -181,14 +158,14 @@ export function SchedulesField({
                         className={cn(
                           'text-sm truncate',
                           !isOpen && isEmpty
-                            ? 'font-semibold text-primary-700'
-                            : 'font-medium text-neutral-dark',
+                            ? 'font-semibold text-primary'
+                            : 'font-medium text-foreground',
                         )}
                       >
                         {displayName}
                       </span>
                       {index === 0 && (
-                        <span className="text-[10px] font-medium text-primary bg-primary-50 px-1.5 py-0.5 rounded shrink-0">
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
                           Primary
                         </span>
                       )}
@@ -206,7 +183,7 @@ export function SchedulesField({
                     type="button"
                     onClick={() => setPendingRemoveKey(schedule._key)}
                     disabled={disabled}
-                    className="p-1.5 rounded-md text-neutral-gray hover:text-error-500 hover:bg-error-50 transition-colors cursor-pointer shrink-0"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
                     aria-label={`Remove ${displayName}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -216,14 +193,14 @@ export function SchedulesField({
                 {/* Inline remove confirmation */}
                 {isPendingRemove && (
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-neutral-gray mr-1">
+                    <span className="text-xs text-muted-foreground mr-1">
                       Remove?
                     </span>
                     <button
                       type="button"
                       onClick={() => setPendingRemoveKey(null)}
                       disabled={disabled}
-                      className="px-2 py-1 text-xs rounded border border-neutral-light text-neutral-gray hover:bg-neutral-100 cursor-pointer"
+                      className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-accent cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -231,7 +208,7 @@ export function SchedulesField({
                       type="button"
                       onClick={() => confirmRemove(schedule._key)}
                       disabled={disabled}
-                      className="px-2 py-1 text-xs rounded bg-error-500 text-white hover:bg-error-600 cursor-pointer"
+                      className="px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
                     >
                       Yes
                     </button>
@@ -239,9 +216,9 @@ export function SchedulesField({
                 )}
               </div>
 
-              {/* ---- Body ---- */}
+              {/* Body */}
               {isOpen && (
-                <div className="px-4 pb-4 pt-2 border-t border-neutral-light space-y-4">
+                <div className="px-4 pb-4 pt-2 border-t border-border space-y-4">
                   {/* Session identity */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="sm:col-span-2">
@@ -282,7 +259,7 @@ export function SchedulesField({
                       label={
                         <>
                           Start Date{' '}
-                          <span className="text-error-500 ml-1">*</span>
+                          <span className="text-destructive ml-1">*</span>
                         </>
                       }
                       value={schedule.start_date}
@@ -312,7 +289,7 @@ export function SchedulesField({
                       label={
                         <>
                           Start Time{' '}
-                          <span className="text-error-500 ml-1">*</span>
+                          <span className="text-destructive ml-1">*</span>
                         </>
                       }
                       value={schedule.start_time}
@@ -326,7 +303,7 @@ export function SchedulesField({
                       label={
                         <>
                           End Time{' '}
-                          <span className="text-error-500 ml-1">*</span>
+                          <span className="text-destructive ml-1">*</span>
                         </>
                       }
                       value={schedule.end_time}
@@ -356,13 +333,13 @@ export function SchedulesField({
                   />
 
                   {/* Virtual subsection */}
-                  <div className="rounded-lg border border-neutral-light overflow-hidden">
-                    <div className="flex items-center justify-between p-3 bg-neutral-50">
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="flex items-center justify-between p-3 bg-muted">
                       <div>
-                        <Label className="text-sm font-medium text-neutral-dark">
+                        <Label className="text-sm font-medium text-foreground">
                           Virtual session
                         </Label>
-                        <p className="text-xs text-neutral-gray">
+                        <p className="text-xs text-muted-foreground">
                           Overrides the event-level setting for this session.
                         </p>
                       </div>
@@ -377,7 +354,7 @@ export function SchedulesField({
                     </div>
 
                     {schedule.is_virtual && (
-                      <div className="p-3 space-y-3 bg-white border-t border-neutral-light">
+                      <div className="p-3 space-y-3 bg-background border-t border-border">
                         <TextField
                           name={`schedule_${index}_zoom_link`}
                           label="Zoom Link"
@@ -446,7 +423,7 @@ export function SchedulesField({
 
       {/* Top-level error */}
       {error && (
-        <p className="text-sm text-error-500 flex items-center gap-1">
+        <p className="text-sm text-destructive flex items-center gap-1">
           <X className="h-3.5 w-3.5" />
           {error}
         </p>

@@ -14,11 +14,6 @@ import { fieldId, type FieldBaseProps } from './types';
 // ============================================================
 // TAGS FIELD
 // ============================================================
-//
-// Chip-style input. Enter or comma commits a tag. Backspace on an
-// empty input removes the last chip.
-//
-// Generic — no domain knowledge. Used by any form that wants tags.
 
 interface TagsFieldProps extends FieldBaseProps {
   value: string[];
@@ -96,23 +91,23 @@ export function TagsField({
     >
       <div
         className={cn(
-          'flex flex-wrap gap-1.5 items-center min-h-10 px-2 py-1.5 rounded-md border bg-white',
-          'focus-within:ring-2 focus-within:ring-primary-500/30 focus-within:border-primary-500',
-          error ? 'border-error-500' : 'border-input',
+          'flex flex-wrap gap-1.5 items-center min-h-10 px-2 py-1.5 rounded-md border bg-background',
+          'focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary',
+          error ? 'border-destructive' : 'border-input',
           disabled && 'opacity-60 cursor-not-allowed',
         )}
       >
         {value.map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-50 text-primary text-xs font-medium"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium"
           >
             {tag}
             {!disabled && (
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="hover:text-primary-700 cursor-pointer"
+                className="hover:text-primary/70 cursor-pointer"
                 aria-label={`Remove ${tag}`}
               >
                 <X className="h-3 w-3" />

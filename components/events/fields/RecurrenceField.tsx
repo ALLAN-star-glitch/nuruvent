@@ -20,17 +20,9 @@ import { FieldBaseProps, fieldId } from '@/components/form/types';
 import { RecurrenceForm, WEEKDAY_CODES, WEEKDAY_LABELS } from '../new';
 import { makeEmptyRecurrence, WeekdayCode } from '../types';
 
-
-
 // ============================================================
 // RECURRENCE FIELD (events)
 // ============================================================
-//
-// Toggle + full pattern editor. When `enabled` is false, the
-// pattern editor is hidden and `value` may be null.
-//
-// Composes generic primitives (Select, Input, Switch) but keeps its
-// own sub-layout because the pattern needs to be grouped.
 
 interface RecurrenceFieldProps extends FieldBaseProps {
   enabled: boolean;
@@ -96,10 +88,10 @@ export function RecurrenceField({
     >
       <div className="space-y-4">
         {/* Toggle */}
-        <div className="flex items-center justify-between p-3 bg-neutral-light rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
           <div>
-            <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-              <Repeat className="h-4 w-4 text-primary-500" />
+            <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Repeat className="h-4 w-4 text-primary" />
               This event repeats
             </Label>
           </div>
@@ -121,8 +113,8 @@ export function RecurrenceField({
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-neutral-dark">
-                  Repeats <span className="text-error-500">*</span>
+                <Label className="text-xs font-medium text-foreground">
+                  Repeats <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={recur.pattern}
@@ -147,7 +139,7 @@ export function RecurrenceField({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-neutral-dark">
+                <Label className="text-xs font-medium text-foreground">
                   Every
                 </Label>
                 <Input
@@ -162,7 +154,7 @@ export function RecurrenceField({
                   disabled={disabled}
                   className="cursor-text"
                 />
-                <p className="text-[11px] text-neutral-gray">
+                <p className="text-[11px] text-muted-foreground">
                   {recur.pattern === 'daily'
                     ? 'day(s)'
                     : recur.pattern === 'weekly'
@@ -176,7 +168,7 @@ export function RecurrenceField({
 
             {showWeeklyDays && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-neutral-dark">
+                <Label className="text-xs font-medium text-foreground">
                   On days
                 </Label>
                 <div className="flex flex-wrap gap-1.5">
@@ -191,8 +183,8 @@ export function RecurrenceField({
                         className={cn(
                           'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer',
                           selected
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-neutral-gray border-neutral-light hover:border-primary-300',
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground border-border hover:border-primary/40',
                           disabled && 'opacity-60 cursor-not-allowed',
                         )}
                       >
@@ -207,7 +199,7 @@ export function RecurrenceField({
             {showMonthlyFields && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-neutral-dark">
+                  <Label className="text-xs font-medium text-foreground">
                     Day of month
                   </Label>
                   <Input
@@ -229,7 +221,7 @@ export function RecurrenceField({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-neutral-dark">
+                  <Label className="text-xs font-medium text-foreground">
                     Or week of month
                   </Label>
                   <Select
@@ -262,12 +254,12 @@ export function RecurrenceField({
             )}
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-neutral-dark">
+              <Label className="text-xs font-medium text-foreground">
                 Ends
               </Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-[11px] text-neutral-gray">
+                  <Label className="text-[11px] text-muted-foreground">
                     On date
                   </Label>
                   <Input
@@ -279,7 +271,7 @@ export function RecurrenceField({
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-neutral-gray">
+                  <Label className="text-[11px] text-muted-foreground">
                     After occurrences
                   </Label>
                   <Input
@@ -299,7 +291,7 @@ export function RecurrenceField({
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-neutral-gray">
+              <p className="text-[11px] text-muted-foreground">
                 Leave both blank to repeat indefinitely.
               </p>
             </div>

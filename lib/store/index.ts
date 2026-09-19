@@ -14,15 +14,12 @@ import {
 import storage from 'redux-persist/lib/storage';
 import { api } from './api/baseApi';
 import authReducer from './slices/authSlice';
+import themeReducer from './slices/themeSlice';
 
 // ============================================================
 // AUTH PERSISTENCE
 // ============================================================
-//
-// Only user identity is persisted. Tokens live in HTTP-only cookies
-// managed by the backend, so there is nothing sensitive in
-// localStorage. The auth slice is small and its state is meaningful
-// across page reloads (user info, memberships, active account).
+
 const authPersistConfig = {
   key: 'auth',
   storage,
@@ -34,15 +31,10 @@ const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
 // ============================================================
 // ROOT REDUCER
 // ============================================================
-//
-// Note: there is no `events` slice. All events state lives in
-// RTK Query's cache (registered below as `api`). Event types,
-// statuses, categories, ticket types, and event records are all
-// queried and cached there. If you ever need a genuinely global
-// events concept (e.g. "current event ID" shared across routes),
-// add a tiny slice back rather than resurrecting the old one.
+
 const rootReducer = combineReducers({
   auth: persistedAuthReducer,
+  theme: themeReducer,
   [api.reducerPath]: api.reducer,
 });
 

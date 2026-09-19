@@ -65,8 +65,8 @@ export function TextareaField({
         disabled={disabled}
         className={cn(
           minHeightClass,
-          'cursor-text focus:ring-primary-500 focus:border-primary-500',
-          error && 'border-error-500',
+          'cursor-text focus:ring-primary focus:border-primary',
+          error && 'border-destructive',
         )}
       />
     </FieldWrapper>

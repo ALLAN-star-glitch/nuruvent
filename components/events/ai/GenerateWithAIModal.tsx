@@ -52,21 +52,7 @@ interface GenerateWithAIModalProps {
   onOpenChange: (open: boolean) => void;
   eventTypes: EventTypeModel[];
   ticketTypes: TicketTypeModel[];
-
-  /**
-   * Called when the user clicks "Edit draft" on the preview. The
-   * second argument is the event type the user picked in the modal —
-   * the AI does not echo it back, so the parent needs it to complete
-   * the payload.
-   */
   onEditDraft: (draft: GeneratedEventDraft, eventTypeId: string) => void;
-
-  /**
-   * Called when the user clicks "Publish as-is" on the preview. The
-   * parent performs the create/publish call and closes the modal on
-   * success. Return a rejected promise to keep the modal open with an
-   * error.
-   */
   onPublishDraft: (
     draft: GeneratedEventDraft,
     eventTypeId: string,
@@ -122,7 +108,7 @@ export function GenerateWithAIModal({
   const [generateDraft, { isLoading: isGenerating }] =
     useGenerateEventDraftMutation();
 
-  // ---- Reset on close ----
+  // Reset on close
   useEffect(() => {
     if (open) return;
     const t = setTimeout(() => {
@@ -134,7 +120,6 @@ export function GenerateWithAIModal({
     return () => clearTimeout(t);
   }, [open]);
 
-  // ---- Field helpers ----
   const update = <K extends keyof PromptFormState>(
     key: K,
     value: PromptFormState[K],
@@ -159,7 +144,6 @@ export function GenerateWithAIModal({
     });
   };
 
-  // ---- Validation ----
   const canGenerate = useMemo(() => {
     return (
       form.prompt.trim().length >= 10 &&
@@ -169,7 +153,6 @@ export function GenerateWithAIModal({
     );
   }, [form]);
 
-  // ---- Generate ----
   const handleGenerate = useCallback(async () => {
     if (!canGenerate) return;
 
@@ -236,7 +219,6 @@ export function GenerateWithAIModal({
     }
   }, [canGenerate, form, generateDraft]);
 
-  // ---- Preview actions ----
   const handleEditDraft = useCallback(() => {
     if (!draft) return;
     onEditDraft(draft, form.eventTypeId);
@@ -260,21 +242,16 @@ export function GenerateWithAIModal({
     }
   }, [draft, form.eventTypeId, onOpenChange, onPublishDraft]);
 
-  // ---- Retry ----
   const handleRetry = useCallback(() => {
     setError(null);
     setStep('prompt');
   }, []);
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-neutral-dark">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
             <div className="relative p-1.5 rounded-lg bg-primary/10">
               {step === 'generating' && (
                 <span className="absolute inset-0 rounded-lg bg-primary/20 animate-ping opacity-75" />
@@ -292,7 +269,7 @@ export function GenerateWithAIModal({
               Beta
             </Badge>
           </DialogTitle>
-          <DialogDescription className="text-neutral-gray">
+          <DialogDescription className="text-muted-foreground">
             {step === 'prompt' &&
               'Describe your event. The AI drafts the name, description, schedule, venue, and tickets.'}
             {step === 'generating' &&
@@ -303,34 +280,35 @@ export function GenerateWithAIModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* ==================================================== */}
-        {/* STEP: PROMPT                                          */}
-        {/* ==================================================== */}
+        {/* STEP: PROMPT */}
         {step === 'prompt' && (
           <div className="space-y-5 py-2">
             {/* Prompt */}
             <div className="space-y-1.5">
-              <Label htmlFor="ai-prompt-input" className="cursor-pointer text-sm font-medium text-neutral-dark">
-                What are you planning? <span className="text-error-500">*</span>
+              <Label
+                htmlFor="ai-prompt-input"
+                className="cursor-pointer text-sm font-medium text-foreground"
+              >
+                What are you planning? <span className="text-destructive">*</span>
               </Label>
               <Textarea
                 id="ai-prompt-input"
                 value={form.prompt}
                 onChange={(e) => update('prompt', e.target.value)}
                 placeholder="A two-day Kubernetes workshop in Nairobi for 60 engineers, hybrid, with a virtual stream and both in-person and remote tickets…"
-                className="min-h-[120px] resize-none cursor-text bg-white/60 placeholder:text-gray-400 focus-visible:ring-primary/20 transition-all"
+                className="min-h-[120px] resize-none cursor-text bg-muted/40 placeholder:text-muted-foreground focus-visible:ring-primary/20 transition-all"
                 disabled={isGenerating}
               />
               <div className="flex items-center justify-between text-xs">
-                <span className="text-neutral-gray">
+                <span className="text-muted-foreground">
                   A sentence or two is plenty.
                 </span>
                 <span
                   className={cn(
                     'tabular-nums font-mono text-[11px]',
                     form.prompt.length > PROMPT_MAX
-                      ? 'text-error-500 font-semibold'
-                      : 'text-neutral-gray',
+                      ? 'text-destructive font-semibold'
+                      : 'text-muted-foreground',
                   )}
                 >
                   {form.prompt.length} / {PROMPT_MAX}
@@ -340,14 +318,14 @@ export function GenerateWithAIModal({
 
             {/* Event type */}
             <div className="space-y-1.5">
-              <Label className="cursor-pointer text-sm font-medium text-neutral-dark">
-                Event Type <span className="text-error-500">*</span>
+              <Label className="cursor-pointer text-sm font-medium text-foreground">
+                Event Type <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.eventTypeId}
                 onValueChange={(v) => update('eventTypeId', v)}
               >
-                <SelectTrigger className="cursor-pointer bg-white/60">
+                <SelectTrigger className="cursor-pointer bg-muted/40">
                   <SelectValue placeholder="Choose event type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -366,12 +344,12 @@ export function GenerateWithAIModal({
 
             {/* Ticket types */}
             <div className="space-y-1.5">
-              <Label className="cursor-pointer text-sm font-medium text-neutral-dark">
-                Ticket Types <span className="text-error-500">*</span>
+              <Label className="cursor-pointer text-sm font-medium text-foreground">
+                Ticket Types <span className="text-destructive">*</span>
               </Label>
-              <div className="flex flex-wrap gap-2 rounded-lg border border-neutral-light bg-neutral-50/50 p-2.5">
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
                 {ticketTypes.length === 0 && (
-                  <p className="text-xs text-neutral-gray animate-pulse py-1">
+                  <p className="text-xs text-muted-foreground animate-pulse py-1">
                     Loading ticket types…
                   </p>
                 )}
@@ -385,8 +363,8 @@ export function GenerateWithAIModal({
                       className={cn(
                         'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/30',
                         selected
-                          ? 'bg-primary text-white border-primary shadow-xs'
-                          : 'bg-white text-neutral-gray border-neutral-light hover:border-primary/50 hover:bg-primary/5 hover:text-neutral-dark',
+                          ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                          : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:bg-primary/5 hover:text-foreground',
                       )}
                     >
                       {selected && <Check className="h-3 w-3 shrink-0" />}
@@ -395,56 +373,56 @@ export function GenerateWithAIModal({
                   );
                 })}
               </div>
-              <p className="text-xs text-neutral-gray">
+              <p className="text-xs text-muted-foreground">
                 Pick the ticket types the AI should use. Up to 10.
               </p>
             </div>
 
             {/* Advanced options */}
-            <details className="group rounded-lg border border-neutral-light overflow-hidden transition-all">
-              <summary className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-sm font-medium text-neutral-dark hover:bg-neutral-50 select-none transition-colors">
+            <details className="group rounded-lg border border-border overflow-hidden transition-all">
+              <summary className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-sm font-medium text-foreground hover:bg-muted/50 select-none transition-colors">
                 <span>Advanced options</span>
-                <ChevronDown className="h-4 w-4 text-neutral-gray transition-transform duration-200 group-open:rotate-180" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
               </summary>
-              <div className="p-3.5 pt-2 space-y-3 border-t border-neutral-light bg-neutral-50/30">
+              <div className="p-3.5 pt-2 space-y-3 border-t border-border bg-muted/20">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="cursor-pointer text-xs text-neutral-gray">
+                    <Label className="cursor-pointer text-xs text-muted-foreground">
                       Language
                     </Label>
                     <Input
                       value={form.language}
                       onChange={(e) => update('language', e.target.value)}
                       placeholder="en"
-                      className="cursor-text bg-white"
+                      className="cursor-text bg-background"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="cursor-pointer text-xs text-neutral-gray">
+                    <Label className="cursor-pointer text-xs text-muted-foreground">
                       Timezone
                     </Label>
                     <Input
                       value={form.timezone}
                       onChange={(e) => update('timezone', e.target.value)}
                       placeholder="Africa/Nairobi"
-                      className="cursor-text bg-white"
+                      className="cursor-text bg-background"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="cursor-pointer text-xs text-neutral-gray">
+                    <Label className="cursor-pointer text-xs text-muted-foreground">
                       Currency
                     </Label>
                     <Input
                       value={form.currency}
                       onChange={(e) => update('currency', e.target.value)}
                       placeholder="KES"
-                      className="cursor-text bg-white"
+                      className="cursor-text bg-background"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="cursor-pointer text-xs text-neutral-gray">
+                    <Label className="cursor-pointer text-xs text-muted-foreground">
                       Min capacity
                     </Label>
                     <Input
@@ -459,11 +437,11 @@ export function GenerateWithAIModal({
                         );
                       }}
                       placeholder="e.g., 10"
-                      className="cursor-text bg-white"
+                      className="cursor-text bg-background"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="cursor-pointer text-xs text-neutral-gray">
+                    <Label className="cursor-pointer text-xs text-muted-foreground">
                       Max capacity
                     </Label>
                     <Input
@@ -478,7 +456,7 @@ export function GenerateWithAIModal({
                         );
                       }}
                       placeholder="e.g., 500"
-                      className="cursor-text bg-white"
+                      className="cursor-text bg-background"
                     />
                   </div>
                 </div>
@@ -487,60 +465,51 @@ export function GenerateWithAIModal({
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* STEP: GENERATING                                      */}
-        {/* ==================================================== */}
+        {/* STEP: GENERATING */}
         {step === 'generating' && (
           <div className="py-12 flex flex-col items-center gap-4">
             <div className="relative">
-              {/* Pulsing ambient outer glow ring */}
               <div className="absolute inset-0 rounded-full bg-primary/30 blur-xl animate-pulse" />
               <div className="relative p-4 rounded-full bg-primary/10 border border-primary/20">
                 <Sparkles className="h-8 w-8 text-primary animate-pulse" />
               </div>
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold text-neutral-dark animate-pulse">
+              <p className="text-sm font-semibold text-foreground animate-pulse">
                 Generating your event…
               </p>
-              <p className="text-xs text-neutral-gray mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Drafting the name, schedule, description, and tickets.
               </p>
             </div>
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* STEP: PREVIEW                                         */}
-        {/* ==================================================== */}
+        {/* STEP: PREVIEW */}
         {step === 'preview' && draft && (
           <div className="py-2">
             <DraftPreview draft={draft} currency={form.currency || 'KES'} />
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* STEP: ERROR                                           */}
-        {/* ==================================================== */}
+        {/* STEP: ERROR */}
         {step === 'error' && (
           <div className="py-6 flex flex-col items-center gap-3 text-center">
-            <div className="p-3 rounded-full bg-error-50 border border-error-100 animate-pulse">
-              <AlertCircle className="h-7 w-7 text-error-500" />
+            <div className="p-3 rounded-full bg-destructive/10 border border-destructive/20 animate-pulse">
+              <AlertCircle className="h-7 w-7 text-destructive" />
             </div>
             <div>
-              <p className="text-sm font-medium text-neutral-dark">
+              <p className="text-sm font-medium text-foreground">
                 Generation failed
               </p>
-              <p className="text-xs text-neutral-gray mt-1 max-w-md mx-auto leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
                 {error}
               </p>
             </div>
           </div>
         )}
 
-        {/* ==================================================== */}
-        {/* FOOTER                                                */}
-        {/* ==================================================== */}
+        {/* FOOTER */}
         <DialogFooter className="gap-2 sm:gap-2">
           {step === 'prompt' && (
             <>
@@ -557,7 +526,7 @@ export function GenerateWithAIModal({
                 onClick={handleGenerate}
                 disabled={!canGenerate || isGenerating}
                 className={cn(
-                  'bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-white font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
+                  'bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
                   isGenerating && 'animate-pulse',
                 )}
               >
@@ -600,7 +569,7 @@ export function GenerateWithAIModal({
                 onClick={handlePublishDraft}
                 disabled={isPublishing}
                 className={cn(
-                  'bg-primary hover:bg-primary-600 text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
+                  'bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
                   isPublishing && 'animate-pulse cursor-wait',
                 )}
               >
@@ -629,7 +598,11 @@ export function GenerateWithAIModal({
               >
                 Close
               </Button>
-              <Button type="button" onClick={handleRetry} className="cursor-pointer">
+              <Button
+                type="button"
+                onClick={handleRetry}
+                className="cursor-pointer"
+              >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Try again
               </Button>
@@ -658,11 +631,11 @@ function DraftPreview({
     <div className="space-y-4">
       {/* Name + short description */}
       <div>
-        <h3 className="text-lg font-semibold text-neutral-dark leading-snug">
+        <h3 className="text-lg font-semibold text-foreground leading-snug">
           {draft.name}
         </h3>
         {draft.short_description && (
-          <p className="text-sm text-neutral-gray mt-1 leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
             {draft.short_description}
           </p>
         )}
@@ -671,7 +644,10 @@ function DraftPreview({
       {/* Meta row */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {schedule?.start_date && (
-          <Badge variant="outline" className="text-neutral-gray font-normal">
+          <Badge
+            variant="outline"
+            className="text-muted-foreground font-normal"
+          >
             {formatDate(schedule.start_date)}
             {schedule.start_time && ` · ${schedule.start_time}`}
             {schedule.end_time && `–${schedule.end_time}`}
@@ -685,14 +661,17 @@ function DraftPreview({
             Virtual
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-neutral-gray font-normal">
+          <Badge
+            variant="outline"
+            className="text-muted-foreground font-normal"
+          >
             In-person
           </Badge>
         )}
         {draft.is_hybrid && (
           <Badge
             variant="outline"
-            className="text-amber-600 border-amber-200 bg-amber-50 font-medium"
+            className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 font-medium"
           >
             Hybrid
           </Badge>
@@ -701,7 +680,7 @@ function DraftPreview({
           <Badge
             key={tag}
             variant="outline"
-            className="text-neutral-gray border-neutral-light bg-neutral-light/50 font-normal"
+            className="text-muted-foreground border-border bg-muted/50 font-normal"
           >
             {tag}
           </Badge>
@@ -710,11 +689,11 @@ function DraftPreview({
 
       {/* Description */}
       {draft.description && (
-        <div className="rounded-lg border border-neutral-light bg-neutral-50/50 p-3">
-          <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wider mb-1">
+        <div className="rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Description
           </p>
-          <p className="text-sm text-neutral-dark whitespace-pre-wrap line-clamp-4 leading-relaxed">
+          <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4 leading-relaxed">
             {draft.description}
           </p>
         </div>
@@ -724,11 +703,11 @@ function DraftPreview({
       {(draft.venue_name ||
         draft.venue_city ||
         draft.in_person_location) && (
-        <div className="rounded-lg border border-neutral-light p-3">
-          <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wider mb-1">
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Venue
           </p>
-          <p className="text-sm text-neutral-dark">
+          <p className="text-sm text-foreground">
             {draft.venue_name || draft.in_person_location}
             {draft.venue_city && `, ${draft.venue_city}`}
             {draft.venue_country && `, ${draft.venue_country}`}
@@ -738,31 +717,31 @@ function DraftPreview({
 
       {/* Tickets */}
       {draft.tickets && draft.tickets.length > 0 && (
-        <div className="rounded-lg border border-neutral-light p-3">
-          <p className="text-xs font-semibold text-neutral-gray uppercase tracking-wider mb-2">
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Tickets ({draft.tickets.length})
           </p>
           <div className="space-y-2">
             {draft.tickets.map((t, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between text-sm border-t border-neutral-light/60 pt-2 first:border-0 first:pt-0"
+                className="flex items-center justify-between text-sm border-t border-border/60 pt-2 first:border-0 first:pt-0"
               >
                 <div className="min-w-0 pr-2">
-                  <p className="font-medium text-neutral-dark truncate">
+                  <p className="font-medium text-foreground truncate">
                     {t.name || `Ticket ${i + 1}`}
                   </p>
                   {t.description && (
-                    <p className="text-xs text-neutral-gray truncate">
+                    <p className="text-xs text-muted-foreground truncate">
                       {t.description}
                     </p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-medium text-neutral-dark tabular-nums">
+                  <p className="font-medium text-foreground tabular-nums">
                     {t.price === 0 ? 'Free' : `${t.price} ${currency}`}
                   </p>
-                  <p className="text-xs text-neutral-gray tabular-nums">
+                  <p className="text-xs text-muted-foreground tabular-nums">
                     {t.quantity} available
                   </p>
                 </div>

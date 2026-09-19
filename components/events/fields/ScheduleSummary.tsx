@@ -11,13 +11,6 @@ import type { ScheduleForm } from '../types';
 // ============================================================
 // SCHEDULE SUMMARY
 // ============================================================
-//
-// One-line summary of a schedule, rendered inside the collapsed
-// accordion header. Three display states:
-//
-//   1. Empty       — no start date/time yet. Amber CTA.
-//   2. Incomplete  — some but not all required fields. Amber badge.
-//   3. Complete    — date · time range · timezone · virtual flag.
 
 interface ScheduleSummaryProps {
   schedule: ScheduleForm;
@@ -28,10 +21,10 @@ export function ScheduleSummary({ schedule }: ScheduleSummaryProps) {
   const hasTime = !!schedule.start_time && !!schedule.end_time;
   const isComplete = hasStart && hasTime;
 
-  // ---- Empty state — prominent call to action ----
+  // ---- Empty state ----
   if (!hasStart && !hasTime) {
     return (
-      <span className="text-xs font-medium text-amber-700 flex items-center gap-1.5">
+      <span className="text-xs font-medium text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
         <AlertCircle className="h-3.5 w-3.5" />
         Not scheduled yet — click to add date and time
       </span>
@@ -41,7 +34,7 @@ export function ScheduleSummary({ schedule }: ScheduleSummaryProps) {
   // ---- Incomplete state ----
   if (!isComplete) {
     return (
-      <span className="text-xs font-medium text-amber-600 flex items-center gap-1.5">
+      <span className="text-xs font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
         <AlertCircle className="h-3.5 w-3.5" />
         Needs {!hasStart ? 'a date' : 'a start and end time'}
       </span>
@@ -50,7 +43,7 @@ export function ScheduleSummary({ schedule }: ScheduleSummaryProps) {
 
   // ---- Complete state ----
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-gray">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       <span className="flex items-center gap-1">
         <Calendar className="h-3 w-3" />
         {formatDateRange(schedule.start_date, schedule.end_date)}
@@ -72,7 +65,7 @@ export function ScheduleSummary({ schedule }: ScheduleSummaryProps) {
         <span
           className={cn(
             'flex items-center gap-1 px-1.5 py-0.5 rounded',
-            'text-primary-700 bg-primary-50',
+            'text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40',
           )}
         >
           <Video className="h-3 w-3" />

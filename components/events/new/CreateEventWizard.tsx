@@ -71,7 +71,6 @@ import { Stepper } from './Stepper';
 
 const TOTAL_STEPS = 5;
 
-/** Must match the key used by the dashboard when stashing a draft. */
 const AI_DRAFT_STORAGE_KEY = 'nuruvent_ai_draft';
 
 export function CreateEventWizard() {
@@ -88,16 +87,13 @@ export function CreateEventWizard() {
 
   const submitInFlightRef = useRef(false);
 
-  // ---- Remote data ----
   const { data: typesResponse } = useGetEventTypesQuery();
   const { data: ticketTypesResponse } = useGetTicketTypesQuery();
   const eventTypes = typesResponse?.data ?? [];
   const ticketTypes = ticketTypesResponse?.data ?? [];
 
-  // ---- Mutations ----
   const [createEvent] = useCreateEventMutation();
 
-  // ---- Hooks ----
   const formState = useEventFormState(defaultFormData);
   const draft = useEventDraft();
   const image = useEventImage(formState.setErrors);
@@ -160,10 +156,6 @@ export function CreateEventWizard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ============================================================
-  // HANDLERS
-  // ============================================================
 
   const handleFieldChange = formState.handleFieldChange;
 
@@ -259,20 +251,6 @@ export function CreateEventWizard() {
     [createEvent],
   );
 
-  // ============================================================
-  // AI DRAFT HANDOFF FROM THE DASHBOARD
-  // ============================================================
-  //
-  // The dashboard's "Generate Event with AI" modal stashes the draft
-  // in sessionStorage and navigates here with:
-  //
-  //   /dashboard/events/new?from=ai&event_type_id=<uuid>
-  //
-  // On mount we read both and feed the draft into handleEditAIDraft,
-  // then strip the query string so a refresh doesn't re-trigger.
-  //
-  // Placement matters: this effect references handleEditAIDraft, so
-  // it must sit after that callback is declared.
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -281,8 +259,6 @@ export function CreateEventWizard() {
 
     const eventTypeId = params.get('event_type_id') ?? '';
 
-    // Always strip the query string, even if there's no draft, so a
-    // refresh doesn't keep re-checking.
     window.history.replaceState({}, '', '/dashboard/events/new');
 
     const raw = sessionStorage.getItem(AI_DRAFT_STORAGE_KEY);
@@ -297,7 +273,6 @@ export function CreateEventWizard() {
       console.error('Failed to load AI draft from sessionStorage:', err);
       sessionStorage.removeItem(AI_DRAFT_STORAGE_KEY);
     }
-    // handleEditAIDraft is stable; running once on mount is correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -341,10 +316,6 @@ export function CreateEventWizard() {
     formState.setTouched((prev) => ({ ...prev, event_type_id: true }));
   }, [formState]);
 
-  // ============================================================
-  // DERIVED
-  // ============================================================
-
   const selectedEventType: EventTypeModel | undefined = eventTypes.find(
     (t) => t.id === formState.formData.event_type_id,
   );
@@ -384,10 +355,6 @@ export function CreateEventWizard() {
     }
   }, [currentStep]);
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <div className="w-full px-1 sm:px-0">
       {/* Header */}
@@ -395,21 +362,20 @@ export function CreateEventWizard() {
         <div className="flex items-start sm:items-center gap-3">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer shrink-0"
+            className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
           >
-            <ArrowLeft className="h-5 w-5 text-neutral-gray" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-dark truncate">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">
               Create Event
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-gray mt-1 line-clamp-1 sm:line-clamp-none">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-1 sm:line-clamp-none">
               Create a new training event, workshop, or webinar.
             </p>
           </div>
         </div>
 
-        {/* Responsive action button container */}
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full xl:w-auto">
           <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 mb-1 sm:mb-0">
             <SaveStatusIndicator status={autoSave.saveStatus} />
@@ -435,7 +401,6 @@ export function CreateEventWizard() {
                 'bg-gradient-to-r from-primary-700 via-primary-500 to-primary-400 hover:from-primary-600 hover:via-primary-400 hover:to-primary-300 ring-2 ring-primary-400/30',
               )}
             >
-              {/* Shimmer light animation overlay */}
               <span
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"
@@ -458,7 +423,7 @@ export function CreateEventWizard() {
             </Button>
 
             <Button
-              className="col-span-2 sm:col-span-1 bg-primary hover:bg-primary-600 text-white cursor-pointer disabled:opacity-50 text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+              className="col-span-2 sm:col-span-1 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
               onClick={() => submit.submit('published')}
               disabled={!validation.isPublishReady || isLoadingFlow}
               title={
@@ -474,7 +439,7 @@ export function CreateEventWizard() {
                 </>
               ) : (
                 <>
-                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 text-white shrink-0" />
+                  <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 text-primary-foreground shrink-0" />
                   Publish
                 </>
               )}
@@ -484,18 +449,17 @@ export function CreateEventWizard() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-error-50 border border-error-200 text-error-600 rounded-lg text-sm flex items-center gap-2">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg text-sm flex items-center gap-2">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Horizontal scroll container for Stepper */}
       <div className="py-2 sm:py-4 overflow-x-auto no-scrollbar">
         <Stepper currentStep={currentStep} steps={STEPS} />
       </div>
 
-      {/* ---- Two-column layout: content + sidebar preview ---- */}
+      {/* Two-column layout */}
       <div
         className={cn(
           'grid gap-6 mt-2 sm:mt-4',
@@ -504,15 +468,14 @@ export function CreateEventWizard() {
             : 'grid-cols-1',
         )}
       >
-        {/* Left column: step content + nav */}
         <div className="min-w-0">
           {currentStep < TOTAL_STEPS ? (
-            <Card className="border border-neutral-light">
+            <Card className="border border-border">
               <CardHeader className="px-4 py-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg text-neutral-dark">
+                <CardTitle className="text-base sm:text-lg text-foreground">
                   {stepMeta.title}
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm text-neutral-gray">
+                <CardDescription className="text-xs sm:text-sm text-muted-foreground">
                   {stepMeta.description}
                 </CardDescription>
               </CardHeader>
@@ -561,10 +524,9 @@ export function CreateEventWizard() {
             />
           )}
 
-          {/* Progress indicator */}
           <div className="flex items-center gap-2 mt-4">
             {Object.keys(formState.validationErrors).length > 0 ? (
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-error-500">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>
                   Please fix {Object.keys(formState.validationErrors).length}{' '}
@@ -572,14 +534,13 @@ export function CreateEventWizard() {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary-500">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary-600 dark:text-tertiary-400">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>All fields are valid</span>
               </div>
             )}
           </div>
 
-          {/* Bottom nav buttons */}
           <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-6">
             <Button
               variant="outline"
@@ -593,7 +554,7 @@ export function CreateEventWizard() {
 
             {currentStep < TOTAL_STEPS ? (
               <Button
-                className="w-full sm:w-auto bg-primary hover:bg-primary-600 text-white cursor-pointer"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
                 onClick={handleNext}
               >
                 Next
@@ -611,7 +572,7 @@ export function CreateEventWizard() {
                   Save Draft
                 </Button>
                 <Button
-                  className="w-full sm:w-auto bg-primary hover:bg-primary-600 text-white cursor-pointer disabled:opacity-50"
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
                   onClick={() => submit.submit('published')}
                   disabled={!validation.isPublishReady || isLoadingFlow}
                 >
@@ -622,7 +583,7 @@ export function CreateEventWizard() {
                     </>
                   ) : (
                     <>
-                      <Send className="h-4 w-4 mr-2 text-white" />
+                      <Send className="h-4 w-4 mr-2 text-primary-foreground" />
                       Publish
                     </>
                   )}
@@ -632,15 +593,15 @@ export function CreateEventWizard() {
           </div>
         </div>
 
-        {/* Right column: live preview (hidden on mobile and step 5) */}
+        {/* Right column — live preview */}
         {!isMobile && currentStep < TOTAL_STEPS && (
           <div className="sticky top-24 h-fit space-y-4">
-            <Card className="border border-neutral-light">
+            <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-lg text-neutral-dark">
+                <CardTitle className="text-lg text-foreground">
                   Live Preview
                 </CardTitle>
-                <CardDescription className="text-neutral-gray">
+                <CardDescription className="text-muted-foreground">
                   Real-time preview of your event
                 </CardDescription>
               </CardHeader>
@@ -656,8 +617,8 @@ export function CreateEventWizard() {
               className={cn(
                 'border',
                 validation.isPublishReady
-                  ? 'border-tertiary-200 bg-tertiary-50'
-                  : 'border-neutral-light',
+                  ? 'border-tertiary-200 dark:border-tertiary-900/50 bg-tertiary-50 dark:bg-tertiary-950/30'
+                  : 'border-border',
               )}
             >
               <CardContent className="pt-4">
@@ -665,14 +626,14 @@ export function CreateEventWizard() {
                   {validation.isPublishReady ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 text-tertiary-500" />
-                      <span className="text-tertiary-700">
+                      <span className="text-tertiary-700 dark:text-tertiary-300">
                         Ready to publish
                       </span>
                     </>
                   ) : (
                     <>
                       <AlertCircle className="h-4 w-4 text-amber-500" />
-                      <span className="text-amber-700">
+                      <span className="text-amber-700 dark:text-amber-300">
                         Complete all required fields to publish
                       </span>
                     </>
@@ -684,7 +645,7 @@ export function CreateEventWizard() {
         )}
       </div>
 
-      {/* ---- Modals ---- */}
+      {/* Modals */}
       <PreviewModal
         open={isPreviewModalOpen}
         onOpenChange={setIsPreviewModalOpen}

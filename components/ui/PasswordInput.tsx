@@ -5,7 +5,7 @@
 import { useState, useMemo } from 'react';
 import { Eye, EyeOff, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { validatePassword, getPasswordStrengthColor, getPasswordStrengthLabel } from '@/lib/utils/password';
+import { validatePassword } from '@/lib/utils/password';
 
 interface PasswordInputProps {
   value: string;
@@ -40,13 +40,13 @@ export function PasswordInput({
   const getRequirementIcon = (passed: boolean) => {
     if (!value && !isFocused) return null;
     return passed ? (
-      <Check className="h-3.5 w-3.5 text-green-500" />
+      <Check className="h-3.5 w-3.5 text-tertiary-500" />
     ) : (
-      <X className="h-3.5 w-3.5 text-red-500" />
+      <X className="h-3.5 w-3.5 text-destructive" />
     );
   };
 
-  // ✅ Calculate if ALL requirements are met
+  // All five requirements met?
   const allRequirementsMet = useMemo(() => {
     if (!value || value.length === 0) return false;
     return (
@@ -58,15 +58,13 @@ export function PasswordInput({
     );
   }, [value]);
 
-  // ✅ Get the strength color - only green when ALL requirements are met
   const getStrengthColor = () => {
-    if (!value || value.length === 0) return 'bg-gray-200';
-    if (allRequirementsMet) return 'bg-green-500';
-    if (validation.score >= 3) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (!value || value.length === 0) return 'bg-muted';
+    if (allRequirementsMet) return 'bg-tertiary-500';
+    if (validation.score >= 3) return 'bg-amber-500';
+    return 'bg-destructive';
   };
 
-  // ✅ Get the strength label - only "Strong" when ALL requirements are met
   const getStrengthLabel = () => {
     if (!value || value.length === 0) return '';
     if (allRequirementsMet) return 'Strong';
@@ -74,27 +72,31 @@ export function PasswordInput({
     return 'Weak';
   };
 
-  // ✅ Get the width percentage - only 100% when ALL requirements are met
+  const getStrengthLabelColor = () => {
+    if (allRequirementsMet) return 'text-tertiary-600 dark:text-tertiary-400';
+    if (validation.score >= 3) return 'text-amber-600 dark:text-amber-400';
+    return 'text-destructive';
+  };
+
   const getWidthPercentage = () => {
     if (!value || value.length === 0) return 0;
     if (allRequirementsMet) return 100;
-    // Show partial progress based on requirements met
     const requirementsMet = [
       value.length >= 8,
       /[A-Z]/.test(value),
       /[a-z]/.test(value),
       /[0-9]/.test(value),
-      /[!@#$%^&*(),.?":{}|<>]/.test(value)
+      /[!@#$%^&*(),.?":{}|<>]/.test(value),
     ].filter(Boolean).length;
     return (requirementsMet / 5) * 100;
   };
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn('space-y-1.5', className)}>
       {label && (
-        <label className="text-sm font-medium text-gray-700">
+        <label className="text-sm font-medium text-foreground">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-destructive ml-1">*</span>}
         </label>
       )}
 
@@ -109,82 +111,92 @@ export function PasswordInput({
           required={required}
           disabled={disabled}
           className={cn(
-            "w-full px-4 py-3 rounded-xl border transition-all bg-white focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20",
-            error ? "border-red-500" : "border-gray-200",
-            disabled && "opacity-60 cursor-not-allowed"
+            'w-full px-4 py-3 rounded-xl border transition-all',
+            'bg-background text-foreground placeholder:text-muted-foreground',
+            'focus:border-primary focus:ring-2 focus:ring-primary/20',
+            error ? 'border-destructive' : 'border-border',
+            disabled && 'opacity-60 cursor-not-allowed',
           )}
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+          {showPassword ? (
+            <EyeOff className="h-5 w-5" />
+          ) : (
+            <Eye className="h-5 w-5" />
+          )}
         </button>
       </div>
 
-      {/* Password Strength - Only shows green when ALL requirements are met */}
+      {/* Strength meter */}
       {showStrength && value.length > 0 && (
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
                 className={cn(
-                  "h-full transition-all duration-300",
-                  getStrengthColor()
+                  'h-full transition-all duration-300',
+                  getStrengthColor(),
                 )}
                 style={{ width: `${getWidthPercentage()}%` }}
               />
             </div>
-            <span className={cn(
-              "text-xs font-medium whitespace-nowrap",
-              allRequirementsMet ? "text-green-600" : 
-              validation.score >= 3 ? "text-yellow-600" : 
-              "text-red-500"
-            )}>
+            <span
+              className={cn(
+                'text-xs font-medium whitespace-nowrap',
+                getStrengthLabelColor(),
+              )}
+            >
               {getStrengthLabel()}
             </span>
           </div>
         </div>
       )}
 
-      {/* Password Requirements */}
+      {/* Requirements checklist */}
       {showRequirements && (isFocused || value.length > 0) && (
         <div className="mt-1 space-y-1 text-xs">
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             {getRequirementIcon(value.length >= 8)}
-            <span className={value.length >= 8 ? 'text-gray-700' : ''}>
+            <span className={value.length >= 8 ? 'text-foreground' : ''}>
               At least 8 characters
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             {getRequirementIcon(/[A-Z]/.test(value))}
-            <span className={/[A-Z]/.test(value) ? 'text-gray-700' : ''}>
+            <span className={/[A-Z]/.test(value) ? 'text-foreground' : ''}>
               One uppercase letter
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             {getRequirementIcon(/[a-z]/.test(value))}
-            <span className={/[a-z]/.test(value) ? 'text-gray-700' : ''}>
+            <span className={/[a-z]/.test(value) ? 'text-foreground' : ''}>
               One lowercase letter
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             {getRequirementIcon(/[0-9]/.test(value))}
-            <span className={/[0-9]/.test(value) ? 'text-gray-700' : ''}>
+            <span className={/[0-9]/.test(value) ? 'text-foreground' : ''}>
               One number
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-gray-500">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             {getRequirementIcon(/[!@#$%^&*(),.?":{}|<>]/.test(value))}
-            <span className={/[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-gray-700' : ''}>
+            <span
+              className={
+                /[!@#$%^&*(),.?":{}|<>]/.test(value) ? 'text-foreground' : ''
+              }
+            >
               One special character ({'!@#$%^&*(),.?":{}|<>'})
             </span>
           </div>
         </div>
       )}
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

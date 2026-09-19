@@ -81,23 +81,23 @@ function formatDate(dateStr: string | undefined): string {
 function getStatusConfig(statusName: string) {
   const map: Record<string, { color: string; dot: string; label: string }> = {
     Draft: {
-      color: 'text-gray-600 bg-gray-50 border-gray-200',
-      dot: 'bg-gray-400',
+      color: 'text-muted-foreground bg-muted border-border',
+      dot: 'bg-muted-foreground',
       label: 'Draft',
     },
     Published: {
-      color: 'text-green-600 bg-green-50 border-green-200',
-      dot: 'bg-green-500',
+      color: 'text-tertiary-600 dark:text-tertiary-400 bg-tertiary-50 dark:bg-tertiary-950/40 border-tertiary-200 dark:border-tertiary-900/50',
+      dot: 'bg-tertiary-500',
       label: 'Published',
     },
     Cancelled: {
-      color: 'text-red-600 bg-red-50 border-red-200',
-      dot: 'bg-red-500',
+      color: 'text-destructive bg-destructive/10 border-destructive/30',
+      dot: 'bg-destructive',
       label: 'Cancelled',
     },
     Completed: {
-      color: 'text-blue-600 bg-blue-50 border-blue-200',
-      dot: 'bg-blue-500',
+      color: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border-primary-200 dark:border-primary-900/50',
+      dot: 'bg-primary-500',
       label: 'Completed',
     },
   };
@@ -115,11 +115,8 @@ export default function EventDetailPage({
 }) {
   const router = useRouter();
 
-  // Next 15 wraps dynamic params in a Promise; unwrap it.
-  // (Kept outside a hook because this component runs on the client.)
   const [eventId, setEventId] = useState<string>('');
 
-  // Await the params once.
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useMemo(() => {
     // eslint-disable-next-line react-hooks/set-state-in-render
@@ -251,14 +248,12 @@ export default function EventDetailPage({
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // ---- Loading / error ----
-
   if (isLoading || !eventId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-          <p className="text-sm text-neutral-500">Loading event details...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading event details...</p>
         </div>
       </div>
     );
@@ -268,11 +263,11 @@ export default function EventDetailPage({
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center max-w-md">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Event Not Found
           </h2>
-          <p className="text-sm text-neutral-500 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             The event you&apos;re looking for doesn&apos;t exist or you
             don&apos;t have permission to view it.
           </p>
@@ -286,8 +281,6 @@ export default function EventDetailPage({
       </div>
     );
   }
-
-  // ---- Derived values ----
 
   const hostName = getEventHostName(event);
   const hostIsInstitution = isHostInstitution(event);
@@ -304,13 +297,13 @@ export default function EventDetailPage({
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer"
+            className="p-2 hover:bg-accent rounded-lg transition-colors cursor-pointer"
           >
-            <ArrowLeft className="h-5 w-5 text-neutral-gray" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-neutral-900">
+              <h1 className="text-2xl font-bold text-foreground">
                 {event.display_name || event.name}
               </h1>
               <Badge variant="outline" className={`${statusConfig.color} border`}>
@@ -328,14 +321,14 @@ export default function EventDetailPage({
               {event.is_private && (
                 <Badge
                   variant="outline"
-                  className="text-amber-600 border-amber-200 bg-amber-50"
+                  className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40"
                 >
                   <Lock className="h-3 w-3 mr-1" />
                   Private
                 </Badge>
               )}
             </div>
-            <p className="text-sm text-neutral-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Event ID: {event.id.slice(0, 8)}...
             </p>
           </div>
@@ -346,7 +339,7 @@ export default function EventDetailPage({
           <Link href={`/dashboard/events/${event.id}/edit`}>
             <Button
               variant="outline"
-              className="cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+              className="cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -355,7 +348,7 @@ export default function EventDetailPage({
 
           {isDraft && (
             <Button
-              className="bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors"
               onClick={handlePublish}
               disabled={isPublishing}
             >
@@ -377,7 +370,7 @@ export default function EventDetailPage({
             <Link href={`/events/${event.slug}`} target="_blank">
               <Button
                 variant="outline"
-                className="cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                className="cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Public
@@ -401,7 +394,7 @@ export default function EventDetailPage({
         {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Hero image */}
-          <div className="relative w-full aspect-[21/9] rounded-xl overflow-hidden bg-neutral-100 shadow-sm">
+          <div className="relative w-full aspect-[21/9] rounded-xl overflow-hidden bg-muted shadow-sm">
             {event.image_url ? (
               <Image
                 src={event.image_url}
@@ -410,8 +403,8 @@ export default function EventDetailPage({
                 className="object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-neutral-100">
-                <CalendarDays className="h-16 w-16 text-neutral-300" />
+              <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-muted dark:from-primary-950/30 dark:to-muted">
+                <CalendarDays className="h-16 w-16 text-muted-foreground" />
               </div>
             )}
           </div>
@@ -420,11 +413,11 @@ export default function EventDetailPage({
           {event.description && (
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                  <span className="w-1 h-5 rounded-full bg-primary-500" />
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <span className="w-1 h-5 rounded-full bg-primary" />
                   About This Event
                 </h3>
-                <p className="text-sm text-neutral-600 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                   {event.description}
                 </p>
               </CardContent>
@@ -436,14 +429,14 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 rounded-lg">
-                    <Calendar className="h-4 w-4 text-primary-500" />
+                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                    <Calendar className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Date
                     </p>
-                    <p className="text-sm font-semibold text-neutral-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {formatDate(startDate)}
                     </p>
                   </div>
@@ -454,14 +447,14 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 rounded-lg">
-                    <Clock className="h-4 w-4 text-primary-500" />
+                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                    <Clock className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Time
                     </p>
-                    <p className="text-sm font-semibold text-neutral-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {startTime}
                     </p>
                   </div>
@@ -472,14 +465,14 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 rounded-lg">
-                    <MapPin className="h-4 w-4 text-primary-500" />
+                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                    <MapPin className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider">
+                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Location
                     </p>
-                    <p className="text-sm font-semibold text-neutral-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {location}
                     </p>
                   </div>
@@ -494,39 +487,39 @@ export default function EventDetailPage({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 {duration && (
                   <div>
-                    <p className="text-neutral-500">Duration</p>
-                    <p className="font-medium text-neutral-900">{duration}</p>
+                    <p className="text-muted-foreground">Duration</p>
+                    <p className="font-medium text-foreground">{duration}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-neutral-500">Price</p>
-                  <p className="font-medium text-primary-600">
+                  <p className="text-muted-foreground">Price</p>
+                  <p className="font-medium text-primary">
                     {formatPrice(price)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-neutral-500">Certificate</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Certificate</p>
+                  <p className="font-medium text-foreground">
                     {event.certificate_enabled && (event.certificate_price ?? 0) > 0
                       ? formatPrice(event.certificate_price ?? 0)
                       : 'Not available'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-neutral-500">Capacity</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Capacity</p>
+                  <p className="font-medium text-foreground">
                     {event.capacity > 0 ? event.capacity : 'Unlimited'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-neutral-500">Current Attendees</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Current Attendees</p>
+                  <p className="font-medium text-foreground">
                     {event.current_attendees ?? 0}
                   </p>
                 </div>
                 <div>
-                  <p className="text-neutral-500">Format</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Format</p>
+                  <p className="font-medium text-foreground">
                     {event.is_virtual
                       ? 'Virtual'
                       : event.is_hybrid
@@ -540,14 +533,14 @@ export default function EventDetailPage({
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-neutral-500">Created</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Created</p>
+                  <p className="font-medium text-foreground">
                     {new Date(event.created_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-neutral-500">Last Updated</p>
-                  <p className="font-medium text-neutral-900">
+                  <p className="text-muted-foreground">Last Updated</p>
+                  <p className="font-medium text-foreground">
                     {new Date(event.updated_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -557,12 +550,12 @@ export default function EventDetailPage({
                 <>
                   <Separator className="my-4" />
                   <div>
-                    <p className="text-neutral-500 text-sm">Zoom Link</p>
+                    <p className="text-muted-foreground text-sm">Zoom Link</p>
                     <a
                       href={event.zoom_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700 text-sm font-medium truncate block"
+                      className="text-primary hover:text-primary/80 text-sm font-medium truncate block"
                     >
                       {event.zoom_link}
                     </a>
@@ -574,12 +567,12 @@ export default function EventDetailPage({
                 <>
                   <Separator className="my-4" />
                   <div>
-                    <p className="text-neutral-500 text-sm">Google Meet Link</p>
+                    <p className="text-muted-foreground text-sm">Google Meet Link</p>
                     <a
                       href={event.meet_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700 text-sm font-medium truncate block"
+                      className="text-primary hover:text-primary/80 text-sm font-medium truncate block"
                     >
                       {event.meet_link}
                     </a>
@@ -595,25 +588,25 @@ export default function EventDetailPage({
           {/* Host card */}
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold text-neutral-900 mb-3">
+              <h3 className="text-sm font-semibold text-foreground mb-3">
                 Event Host
               </h3>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary-50 rounded-lg">
+                <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
                   {hostIsInstitution ? (
-                    <Building2 className="h-5 w-5 text-primary-500" />
+                    <Building2 className="h-5 w-5 text-primary" />
                   ) : (
-                    <User className="h-5 w-5 text-primary-500" />
+                    <User className="h-5 w-5 text-primary" />
                   )}
                 </div>
                 <div>
-                  <p className="font-medium text-neutral-900 flex items-center gap-1.5">
+                  <p className="font-medium text-foreground flex items-center gap-1.5">
                     {hostName}
                     {hostIsInstitution && (
-                      <BadgeCheck className="h-4 w-4 text-primary-500" />
+                      <BadgeCheck className="h-4 w-4 text-primary" />
                     )}
                   </p>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-muted-foreground">
                     {hostIsInstitution ? 'Institution Account' : 'Individual Account'}
                   </p>
                 </div>
@@ -624,14 +617,14 @@ export default function EventDetailPage({
           {/* Quick actions */}
           <Card>
             <CardContent className="p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-neutral-900">
+              <h3 className="text-sm font-semibold text-foreground">
                 Quick Actions
               </h3>
 
               <Link href={`/dashboard/events/${event.id}/edit`}>
                 <Button
                   variant="outline"
-                  className="w-full justify-start cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                  className="w-full justify-start cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Event
@@ -640,7 +633,7 @@ export default function EventDetailPage({
 
               {isDraft && (
                 <Button
-                  className="w-full justify-start bg-primary hover:bg-primary-600 text-white cursor-pointer transition-colors"
+                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors"
                   onClick={handlePublish}
                   disabled={isPublishing}
                 >
@@ -657,7 +650,7 @@ export default function EventDetailPage({
                 <Link href={`/events/${event.slug}`} target="_blank">
                   <Button
                     variant="outline"
-                    className="w-full justify-start cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                    className="w-full justify-start cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Public Page
@@ -680,28 +673,28 @@ export default function EventDetailPage({
           {/* Stats */}
           <Card>
             <CardContent className="p-6 space-y-3">
-              <h3 className="text-sm font-semibold text-neutral-900">
+              <h3 className="text-sm font-semibold text-foreground">
                 Event Stats
               </h3>
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-neutral-500">Status</span>
+                <span className="text-muted-foreground">Status</span>
                 <Badge variant="outline" className={statusConfig.color}>
                   {statusConfig.label}
                 </Badge>
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-neutral-500">Attendees</span>
-                <span className="font-medium text-neutral-900">
+                <span className="text-muted-foreground">Attendees</span>
+                <span className="font-medium text-foreground">
                   {event.current_attendees ?? 0} /{' '}
                   {event.capacity > 0 ? event.capacity : '∞'}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-sm">
-                <span className="text-neutral-500">Format</span>
-                <span className="font-medium text-neutral-900">
+                <span className="text-muted-foreground">Format</span>
+                <span className="font-medium text-foreground">
                   {event.is_virtual
                     ? 'Virtual'
                     : event.is_hybrid
@@ -712,7 +705,7 @@ export default function EventDetailPage({
 
               {event.is_featured && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500">Featured</span>
+                  <span className="text-muted-foreground">Featured</span>
                   <Badge className="bg-secondary-500 text-white border-0 text-xs">
                     Yes
                   </Badge>
@@ -721,10 +714,10 @@ export default function EventDetailPage({
 
               {event.is_private && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-500">Private</span>
+                  <span className="text-muted-foreground">Private</span>
                   <Badge
                     variant="outline"
-                    className="text-amber-600 border-amber-200 bg-amber-50 text-xs"
+                    className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs"
                   >
                     Yes
                   </Badge>
@@ -738,12 +731,12 @@ export default function EventDetailPage({
             <CardContent className="p-6">
               <Button
                 variant="outline"
-                className="w-full cursor-pointer hover:bg-primary-50 hover:text-primary hover:border-primary-200 transition-colors"
+                className="w-full cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
                 onClick={handleCopyLink}
               >
                 {copied ? (
                   <>
-                    <Check className="h-4 w-4 mr-2 text-green-500" />
+                    <Check className="h-4 w-4 mr-2 text-tertiary-500" />
                     Copied!
                   </>
                 ) : (
@@ -762,7 +755,7 @@ export default function EventDetailPage({
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
+            <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Trash2 className="h-5 w-5" />
               Move to Trash
             </DialogTitle>
@@ -772,15 +765,15 @@ export default function EventDetailPage({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-              <div className="p-2 bg-amber-100 rounded-full">
-                <Trash2 className="h-5 w-5 text-amber-600" />
+            <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-100 dark:border-amber-900/50">
+              <div className="p-2 bg-amber-100 dark:bg-amber-950/40 rounded-full">
+                <Trash2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">
+                <p className="font-medium text-foreground">
                   {event.display_name || event.name}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formatDate(startDate)} • {startTime}
                 </p>
               </div>
@@ -796,7 +789,7 @@ export default function EventDetailPage({
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+              className="cursor-pointer text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -814,27 +807,27 @@ export default function EventDetailPage({
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
               Cannot Publish Event
             </DialogTitle>
-            <DialogDescription className="text-red-600">
+            <DialogDescription className="text-destructive">
               {publishError?.message || 'Failed to publish event'}
             </DialogDescription>
           </DialogHeader>
 
           {publishError?.details && publishError.details.length > 0 && (
             <div className="py-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">
+              <p className="text-sm font-medium text-foreground mb-2">
                 Please fix the following issues:
               </p>
               <ul className="space-y-2">
                 {publishError.details.map((detail, index) => (
                   <li
                     key={index}
-                    className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg"
+                    className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded-lg"
                   >
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />
                     <span>{detail}</span>
                   </li>
                 ))}
@@ -851,7 +844,7 @@ export default function EventDetailPage({
               Close
             </Button>
             <Button
-              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={() => {
                 setIsPublishErrorDialogOpen(false);
                 router.push(`/dashboard/events/${event.id}/edit`);

@@ -24,32 +24,12 @@ import type { SignupFormData, SignupErrors } from '../types';
 // ============================================================
 
 interface InstitutionDetailsStepProps {
-  /** Current form values. Controlled by the parent. */
   formData: SignupFormData;
-
-  /** Field-level errors keyed by form field name. */
   errors: SignupErrors;
-
-  /**
-   * Institution-type options. The parent supplies these — either from
-   * `INSTITUTION_TYPES_FALLBACK` for now, or from a fetched list once
-   * `GET /api/v1/institution-types` is wired up.
-   */
   institutionTypes: InstitutionTypeOption[];
-
-  /**
-   * Generic change handler for native inputs. Uses `event.target.name`
-   * to write to the matching field on `formData`.
-   */
   onChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
-
-  /**
-   * Change handler for the institution-type dropdown. Separate from
-   * `onChange` because shadcn's `<Select>` doesn't emit a native
-   * change event with `target.name`.
-   */
   onInstitutionTypeChange: (value: InstitutionType) => void;
 }
 
@@ -68,11 +48,11 @@ export function InstitutionDetailsStep({
     <div className="space-y-3 sm:space-y-4">
       {/* Organization name */}
       <div className="space-y-1">
-        <Label className="text-xs sm:text-sm font-medium text-gray-700">
-          Organization Name <span className="text-red-500">*</span>
+        <Label className="text-xs sm:text-sm font-medium text-foreground">
+          Organization Name <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
-          <Building2 className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+          <Building2 className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             name="institutionName"
             value={formData.institutionName}
@@ -80,12 +60,12 @@ export function InstitutionDetailsStep({
             placeholder="Nairobi Training Institute"
             className={cn(
               'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-              errors.institutionName && 'border-red-500',
+              errors.institutionName && 'border-destructive',
             )}
           />
         </div>
         {errors.institutionName && (
-          <p className="text-[10px] sm:text-xs text-red-500">
+          <p className="text-[10px] sm:text-xs text-destructive">
             {errors.institutionName}
           </p>
         )}
@@ -93,11 +73,11 @@ export function InstitutionDetailsStep({
 
       {/* Organization email */}
       <div className="space-y-1">
-        <Label className="text-xs sm:text-sm font-medium text-gray-700">
-          Organization Email <span className="text-red-500">*</span>
+        <Label className="text-xs sm:text-sm font-medium text-foreground">
+          Organization Email <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
-          <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+          <Mail className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             name="institutionEmail"
             type="email"
@@ -106,12 +86,12 @@ export function InstitutionDetailsStep({
             placeholder="info@institute.com"
             className={cn(
               'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-              errors.institutionEmail && 'border-red-500',
+              errors.institutionEmail && 'border-destructive',
             )}
           />
         </div>
         {errors.institutionEmail && (
-          <p className="text-[10px] sm:text-xs text-red-500">
+          <p className="text-[10px] sm:text-xs text-destructive">
             {errors.institutionEmail}
           </p>
         )}
@@ -119,11 +99,11 @@ export function InstitutionDetailsStep({
 
       {/* Organization phone */}
       <div className="space-y-1">
-        <Label className="text-xs sm:text-sm font-medium text-gray-700">
-          Organization Phone <span className="text-red-500">*</span>
+        <Label className="text-xs sm:text-sm font-medium text-foreground">
+          Organization Phone <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
-          <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
+          <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             name="institutionPhone"
             type="tel"
@@ -132,12 +112,12 @@ export function InstitutionDetailsStep({
             placeholder="0712345678"
             className={cn(
               'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-              errors.institutionPhone && 'border-red-500',
+              errors.institutionPhone && 'border-destructive',
             )}
           />
         </div>
         {errors.institutionPhone && (
-          <p className="text-[10px] sm:text-xs text-red-500">
+          <p className="text-[10px] sm:text-xs text-destructive">
             {errors.institutionPhone}
           </p>
         )}
@@ -145,8 +125,8 @@ export function InstitutionDetailsStep({
 
       {/* Organization type */}
       <div className="space-y-1">
-        <Label className="text-xs sm:text-sm font-medium text-gray-700">
-          Organization Type <span className="text-red-500">*</span>
+        <Label className="text-xs sm:text-sm font-medium text-foreground">
+          Organization Type <span className="text-destructive">*</span>
         </Label>
         <Select
           value={formData.institutionType}
@@ -157,7 +137,7 @@ export function InstitutionDetailsStep({
           <SelectTrigger
             className={cn(
               'h-9 sm:h-10 text-sm cursor-pointer',
-              errors.institutionType && 'border-red-500',
+              errors.institutionType && 'border-destructive',
             )}
           >
             <SelectValue placeholder="Select organization type" />
@@ -175,7 +155,7 @@ export function InstitutionDetailsStep({
           </SelectContent>
         </Select>
         {errors.institutionType && (
-          <p className="text-[10px] sm:text-xs text-red-500">
+          <p className="text-[10px] sm:text-xs text-destructive">
             {errors.institutionType}
           </p>
         )}

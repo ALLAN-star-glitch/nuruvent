@@ -13,13 +13,9 @@ import { FieldBaseProps, fieldId } from '@/components/form/types';
 import { MaterialForm } from '../new';
 import { makeEmptyMaterial } from '../types';
 
-
-
 // ============================================================
 // MATERIALS FIELD (events)
 // ============================================================
-//
-// List editor for pre-event materials and resources.
 
 interface MaterialsFieldProps extends FieldBaseProps {
   value: MaterialForm[];
@@ -56,14 +52,14 @@ export function MaterialsField({
 
   return (
     <div id={fieldId('materials', id)} className="space-y-3">
-      <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-        <FileText className="h-4 w-4 text-primary-500" />
-        Materials <span className="text-neutral-gray text-xs">(optional)</span>
+      <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+        <FileText className="h-4 w-4 text-primary" />
+        Materials <span className="text-muted-foreground text-xs">(optional)</span>
       </Label>
 
       {value.length === 0 && (
-        <div className="p-4 border border-dashed border-neutral-light rounded-lg text-center">
-          <p className="text-sm text-neutral-gray mb-3">
+        <div className="p-4 border border-dashed border-border rounded-lg text-center">
+          <p className="text-sm text-muted-foreground mb-3">
             No materials yet.
           </p>
           <Button
@@ -82,17 +78,17 @@ export function MaterialsField({
       {value.map((material, index) => (
         <div
           key={material._key}
-          className="border border-neutral-light rounded-lg p-4 space-y-4 bg-white"
+          className="border border-border rounded-lg p-4 space-y-4 bg-card"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-gray uppercase tracking-wide">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Material {index + 1}
             </span>
             <button
               type="button"
               onClick={() => removeMaterial(index)}
               disabled={disabled}
-              className="p-1.5 rounded-md text-neutral-gray hover:text-error-500 hover:bg-error-50 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
               aria-label={`Remove material ${index + 1}`}
             >
               <Trash2 className="h-4 w-4" />
@@ -130,8 +126,8 @@ export function MaterialsField({
             minHeightClass="min-h-[70px]"
           />
 
-          <div className="flex items-center justify-between p-2 bg-neutral-light rounded-md">
-            <Label className="text-xs font-medium text-neutral-dark">
+          <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+            <Label className="text-xs font-medium text-foreground">
               Pre-event material
             </Label>
             <Switch
@@ -157,7 +153,7 @@ export function MaterialsField({
         </Button>
       )}
 
-      {error && <p className="text-sm text-error-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

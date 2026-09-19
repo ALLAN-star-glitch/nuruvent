@@ -124,30 +124,37 @@ function formatDateShort(dateString: string | undefined): string {
 
 function getStatusBadgeConfig(statusName: string) {
   const map: Record<string, { color: string; dot: string }> = {
-    Draft: { color: 'text-gray-600 bg-gray-50 border-gray-200', dot: 'bg-gray-400' },
-    Published: { color: 'text-green-600 bg-green-50 border-green-200', dot: 'bg-green-500' },
-    Cancelled: { color: 'text-red-600 bg-red-50 border-red-200', dot: 'bg-red-500' },
-    Completed: { color: 'text-blue-600 bg-blue-50 border-blue-200', dot: 'bg-blue-500' },
+    Draft: {
+      color: 'text-muted-foreground bg-muted border-border',
+      dot: 'bg-muted-foreground',
+    },
+    Published: {
+      color: 'text-tertiary-600 dark:text-tertiary-400 bg-tertiary-50 dark:bg-tertiary-950/40 border-tertiary-200 dark:border-tertiary-900/50',
+      dot: 'bg-tertiary-500',
+    },
+    Cancelled: {
+      color: 'text-destructive bg-destructive/10 border-destructive/30',
+      dot: 'bg-destructive',
+    },
+    Completed: {
+      color: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border-primary-200 dark:border-primary-900/50',
+      dot: 'bg-primary-500',
+    },
   };
   return map[statusName] ?? map.Draft;
 }
 
 function getTypeBadgeClass(typeName: string): string {
   const map: Record<string, string> = {
-    Workshop: 'bg-purple-100 text-purple-700 border-purple-200',
-    Webinar: 'bg-blue-100 text-blue-700 border-blue-200',
-    Meetup: 'bg-amber-100 text-amber-700 border-amber-200',
-    Bootcamp: 'bg-red-100 text-red-700 border-red-200',
-    Uncategorized: 'bg-gray-100 text-gray-700 border-gray-200',
+    Workshop: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50',
+    Webinar: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50',
+    Meetup: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50',
+    Bootcamp: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/50',
+    Uncategorized: 'bg-muted text-muted-foreground border-border',
   };
-  return map[typeName] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  return map[typeName] ?? 'bg-muted text-muted-foreground border-border';
 }
 
-/**
- * Convert the backend `Event` shape into the flat UI shape this page
- * renders. All the nested derivations (start date, min ticket price,
- * duration from schedule, etc.) happen here once.
- */
 function toUIEvent(event: Event): UIEvent {
   const startDate = event.start_date ?? event.schedules?.[0]?.start_date ?? '';
   const startTime = getEventStartTime(event);
@@ -159,8 +166,6 @@ function toUIEvent(event: Event): UIEvent {
 
   const isDeleted = Boolean(event.deleted_at);
 
-  // CPD hours are derived from duration when the event type supports
-  // certificates. The backend doesn't expose "CPD hours" directly.
   const cpdHours = event.event_type?.supports_certificate
     ? Math.round(parseDurationMinutes(duration) / 60)
     : 0;
@@ -211,7 +216,6 @@ function toUIEvent(event: Event): UIEvent {
 }
 
 function parseDurationMinutes(duration: string): number {
-  // Parse "2h 30m" / "45m" / "3h" back into minutes for CPD math.
   if (!duration) return 0;
   const hoursMatch = duration.match(/(\d+)h/);
   const minsMatch = duration.match(/(\d+)m/);
@@ -227,13 +231,8 @@ function parseDurationMinutes(duration: string): number {
 export default function EventsDashboardPage() {
   const router = useRouter();
 
-  // ---- Auth ----
-  // The events list endpoints now scope from the JWT. We don't need
-  // account/user IDs. We only need to know whether the user is
-  // authenticated to decide whether to fetch at all.
   const isAuthenticated = useAuthenticated();
 
-  // ---- Local state ----
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -256,7 +255,6 @@ export default function EventsDashboardPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isMobile, setIsMobile] = useState(false);
 
-  // ---- Mobile detection ----
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -264,13 +262,11 @@ export default function EventsDashboardPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // ---- Debounce search ----
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // ---- Reset page on search change ----
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
@@ -278,9 +274,6 @@ export default function EventsDashboardPage() {
 
   const shouldSearch = debouncedSearchQuery.trim().length > 0;
 
-
-  // `useListMyEventsQuery` hits GET /events with the auth token; the
-  // backend route is dual-mounted and picks the scoped handler.
   const {
     data: listResponse,
     isLoading: isListLoading,
@@ -288,13 +281,13 @@ export default function EventsDashboardPage() {
     error: listError,
     refetch: refetchList,
   } = useListMyEventsQuery(
-  {
-    page: currentPage,
-    page_size: pageSize,
-    only_deleted: activeTab === 'trash' ? true : undefined,
-  },
-  { skip: shouldSearch || !isAuthenticated },
-);
+    {
+      page: currentPage,
+      page_size: pageSize,
+      only_deleted: activeTab === 'trash' ? true : undefined,
+    },
+    { skip: shouldSearch || !isAuthenticated },
+  );
 
   const {
     data: searchResponse,
@@ -316,7 +309,6 @@ export default function EventsDashboardPage() {
 
   const trashedEvents = trashCountResponse?.count ?? 0;
 
-  // ---- Combine query results ----
   const activeData = shouldSearch ? searchResponse : listResponse;
   const isLoading = isListLoading || isSearchLoading;
   const isFetching = shouldSearch ? isSearchFetching : isListFetching;
@@ -326,15 +318,10 @@ export default function EventsDashboardPage() {
   const rawEvents: Event[] = activeData?.data?.data ?? [];
   const totalItems = activeData?.data?.total ?? 0;
 
-  // ---- Convert to UI shape ----
   const uiEvents: UIEvent[] = useMemo(
     () => rawEvents.map(toUIEvent),
     [rawEvents],
   );
-
-  // ============================================================
-  // MUTATIONS
-  // ============================================================
 
   const [deleteEvent] = useDeleteEventMutation();
   const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
@@ -345,14 +332,9 @@ export default function EventsDashboardPage() {
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
   const [bulkPublishEvents] = useBulkPublishEventsMutation();
 
-  // ============================================================
-  // FILTER + SORT
-  // ============================================================
-
   const filteredEvents = useMemo(() => {
     let filtered = [...uiEvents];
 
-    // Tab filter
     if (activeTab === 'trash') {
       filtered = filtered.filter((e) => e.isDeleted);
     } else if (activeTab !== 'all') {
@@ -372,7 +354,6 @@ export default function EventsDashboardPage() {
       filtered = filtered.filter((e) => !e.isDeleted);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -404,16 +385,11 @@ export default function EventsDashboardPage() {
     return filtered;
   }, [uiEvents, activeTab, sortField, sortDirection]);
 
-  // ---- Stats ----
   const activeEvents = uiEvents.filter((e) => !e.isDeleted);
   const totalEvents = totalItems;
   const totalRegistered = activeEvents.reduce((s, e) => s + e.registered, 0);
   const liveEvents = activeEvents.filter((e) => e.status === 'Published').length;
   const cpdEvents = activeEvents.filter((e) => e.cpdHours > 0).length;
-
-  // ============================================================
-  // HANDLERS
-  // ============================================================
 
   const handleRowClick = (id: string) => handleSelectEvent(id);
   const handleCardClick = (event: UIEvent) => router.push(`/dashboard/events/${event.id}`);
@@ -606,7 +582,7 @@ export default function EventsDashboardPage() {
   };
 
   const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-gray-400" />;
+    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />;
     return sortDirection === 'asc' ? (
       <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
     ) : (
@@ -675,21 +651,21 @@ export default function EventsDashboardPage() {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
-        <Card className="max-w-md w-full border-neutral-light shadow-sm">
+        <Card className="max-w-md w-full border-border shadow-sm">
           <CardContent className="pt-8 pb-6 text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-amber-50 rounded-full">
-                <LogIn className="h-10 w-10 text-amber-600" />
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-full">
+                <LogIn className="h-10 w-10 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               Authentication Required
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Please log in to view and manage your events.
             </p>
             <Button
-              className="w-full bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={() => router.push('/signin')}
             >
               <LogIn className="h-4 w-4 mr-2" />
@@ -706,7 +682,7 @@ export default function EventsDashboardPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {shouldSearch ? 'Searching events...' : 'Loading events...'}
           </p>
         </div>
@@ -717,17 +693,17 @@ export default function EventsDashboardPage() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md w-full border-red-200 shadow-sm">
+        <Card className="max-w-md w-full border-destructive/30 shadow-sm">
           <CardContent className="pt-8 pb-6 text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-red-50 rounded-full">
-                <AlertCircle className="h-10 w-10 text-red-600" />
+              <div className="p-4 bg-destructive/10 rounded-full">
+                <AlertCircle className="h-10 w-10 text-destructive" />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               Failed to load events
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-muted-foreground mb-6">
               Something went wrong while fetching your events.
             </p>
             <Button variant="outline" className="cursor-pointer" onClick={() => refetch()}>
@@ -742,17 +718,13 @@ export default function EventsDashboardPage() {
 
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Events Management</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Events Management</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Create, monitor, and manage your training sessions, workshops, and webinars.
           </p>
         </div>
@@ -768,7 +740,7 @@ export default function EventsDashboardPage() {
             Refresh
           </Button>
           <Link href="/dashboard/events/new" className="cursor-pointer">
-            <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm cursor-pointer">
+            <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm cursor-pointer">
               <Plus className="h-4 w-4" />
               Create Event
             </Button>
@@ -797,14 +769,14 @@ export default function EventsDashboardPage() {
           value={liveEvents}
           sub={`${activeEvents.filter((e) => e.status === 'Draft').length} drafts`}
           icon={<Video className="h-5 w-5" />}
-          bg="bg-red-50 text-red-600"
+          bg="bg-destructive/10 text-destructive"
         />
         <StatCard
           label="CPD Accredited"
           value={cpdEvents}
           sub={`${activeEvents.reduce((s, e) => s + e.cpdHours, 0)} total hours`}
           icon={<Award className="h-5 w-5" />}
-          bg="bg-amber-50 text-amber-600"
+          bg="bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400"
         />
         <TrashCard count={trashedEvents} onClick={() => router.push('/dashboard/trash')} />
       </div>
@@ -825,8 +797,8 @@ export default function EventsDashboardPage() {
                       }}
                       className={`px-3.5 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors whitespace-nowrap cursor-pointer ${
                         activeTab === tab
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                       }`}
                     >
                       {tab}
@@ -835,7 +807,7 @@ export default function EventsDashboardPage() {
                 </div>
 
                 <div className="relative w-full md:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     type="text"
                     placeholder="Search events..."
@@ -846,7 +818,7 @@ export default function EventsDashboardPage() {
                   {searchQuery && (
                     <button
                       onClick={handleClearSearch}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       aria-label="Clear search"
                     >
                       <X className="h-4 w-4" />
@@ -855,15 +827,15 @@ export default function EventsDashboardPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-100 pt-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-3">
                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+                  <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
                       className={`p-1.5 rounded-md cursor-pointer ${
                         viewMode === 'table'
-                          ? 'bg-white text-primary shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                          ? 'bg-background text-primary shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                       title="Table View"
                     >
@@ -873,8 +845,8 @@ export default function EventsDashboardPage() {
                       onClick={() => setViewMode('grid')}
                       className={`p-1.5 rounded-md cursor-pointer ${
                         viewMode === 'grid'
-                          ? 'bg-white text-primary shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
+                          ? 'bg-background text-primary shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                       title="Grid View"
                     >
@@ -882,10 +854,10 @@ export default function EventsDashboardPage() {
                     </button>
                   </div>
 
-                  <span className="text-xs text-gray-400 hidden sm:inline">|</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">|</span>
 
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 hidden sm:inline">Sort by:</span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">Sort by:</span>
                     <Select
                       value={sortField}
                       onValueChange={(value: SortField) => {
@@ -907,7 +879,7 @@ export default function EventsDashboardPage() {
                     </Select>
                     <button
                       onClick={() => setSortDirection((p) => (p === 'asc' ? 'desc' : 'asc'))}
-                      className="p-1 hover:bg-gray-100 rounded-md cursor-pointer"
+                      className="p-1 hover:bg-accent rounded-md cursor-pointer"
                     >
                       {sortDirection === 'asc' ? (
                         <ArrowUp className="h-4 w-4 text-primary" />
@@ -919,11 +891,11 @@ export default function EventsDashboardPage() {
                 </div>
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {isFetching && <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />}
                     {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
                     {shouldSearch && searchQuery && (
-                      <span className="text-gray-400 ml-1">(searching &quot;{searchQuery}&quot;)</span>
+                      <span className="text-muted-foreground ml-1">(searching &quot;{searchQuery}&quot;)</span>
                     )}
                   </span>
                   <Button
@@ -975,7 +947,7 @@ export default function EventsDashboardPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50/50">
+                  <TableRow className="bg-muted/50">
                     <TableHead className="py-3 px-4 w-10">
                       <Checkbox
                         checked={selectAll}
@@ -1011,9 +983,9 @@ export default function EventsDashboardPage() {
                         <TableRow
                           key={event.id}
                           onClick={() => handleRowClick(event.id)}
-                          className={`hover:bg-gray-50/60 transition-colors group cursor-pointer ${
+                          className={`hover:bg-accent/60 transition-colors group cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
-                          } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
+                          } ${isTrashed ? 'opacity-60 bg-amber-50/30 dark:bg-amber-950/10' : ''}`}
                         >
                           <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
@@ -1023,10 +995,10 @@ export default function EventsDashboardPage() {
                             />
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <div className="font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
                               {event.title}
                               {isTrashed && (
-                                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                                <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs">
                                   <Trash2 className="h-3 w-3 mr-1" /> Trashed
                                 </Badge>
                               )}
@@ -1036,17 +1008,17 @@ export default function EventsDashboardPage() {
                                 </Badge>
                               )}
                               {event.isPrivate && !isTrashed && (
-                                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-200 bg-amber-50 text-xs">
+                                <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs">
                                   <Lock className="h-3 w-3 mr-1" /> Private
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
-                              <span className="text-gray-400">{event.platform}</span>
-                              <span className="text-gray-300">•</span>
+                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                              <span className="text-muted-foreground">{event.platform}</span>
+                              <span className="text-border">•</span>
                               <span className="text-primary font-medium">{event.priceDisplay}</span>
-                              <span className="text-gray-300">•</span>
-                              <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+                              <span className="text-border">•</span>
+                              <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -1054,16 +1026,16 @@ export default function EventsDashboardPage() {
                               {event.typeDisplayName}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
+                          <TableCell className="py-4 px-4 text-muted-foreground whitespace-nowrap">
                             <div className="flex flex-col">
                               <span className="text-sm">{event.date}</span>
-                              <span className="text-xs text-gray-400">{event.time}</span>
+                              <span className="text-xs text-muted-foreground">{event.time}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-gray-600 whitespace-nowrap">
+                          <TableCell className="py-4 px-4 text-muted-foreground whitespace-nowrap">
                             <div className="flex flex-col">
                               <span className="text-sm">{formatDateShort(addedDate)}</span>
-                              <span className="text-xs text-gray-400">{addedLabel}</span>
+                              <span className="text-xs text-muted-foreground">{addedLabel}</span>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -1075,7 +1047,7 @@ export default function EventsDashboardPage() {
                           </TableCell>
                           <TableCell className="py-4 px-4">
                             {isTrashed ? (
-                              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+                              <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40">
                                 <Trash2 className="h-3 w-3 mr-1" /> Trashed
                               </Badge>
                             ) : (
@@ -1103,7 +1075,7 @@ export default function EventsDashboardPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-12 text-center text-gray-500">
+                      <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                         <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
                       </TableCell>
                     </TableRow>
@@ -1148,14 +1120,14 @@ export default function EventsDashboardPage() {
                 />
               ))
             ) : (
-              <div className="col-span-full py-12 text-center text-gray-500">
+              <div className="col-span-full py-12 text-center text-muted-foreground">
                 <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
               </div>
             )}
           </div>
 
           {totalItems > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-card rounded-lg border border-border">
               <PaginationBar
                 currentPage={currentPage}
                 pageSize={pageSize}
@@ -1172,39 +1144,39 @@ export default function EventsDashboardPage() {
       {/* Mobile floating filter strip */}
       {isMobile && (
         <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
-          <div className="pointer-events-auto mx-auto max-w-md bg-white/95 rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm">
+          <div className="pointer-events-auto mx-auto max-w-md bg-card/95 rounded-full shadow-lg border border-border backdrop-blur-sm">
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
+                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
               >
-                <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className="text-sm text-gray-600 truncate">{searchQuery || 'Search'}</span>
+                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm text-muted-foreground truncate">{searchQuery || 'Search'}</span>
               </button>
-              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+              <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5 relative"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5 relative"
               >
-                <Filter className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">Filters</span>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Filters</span>
                 {getActiveFilterCount() > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-medium">
+                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
                     {getActiveFilterCount()}
                   </span>
                 )}
               </button>
-              <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+              <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 rounded-full px-3 py-1.5"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
               >
-                <ArrowUpDown className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600 truncate max-w-[60px]">{getSortLabel()}</span>
+                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground truncate max-w-[60px]">{getSortLabel()}</span>
                 {sortDirection === 'asc' ? (
-                  <ArrowUp className="h-3 w-3 text-gray-400" />
+                  <ArrowUp className="h-3 w-3 text-muted-foreground" />
                 ) : (
-                  <ArrowDown className="h-3 w-3 text-gray-400" />
+                  <ArrowDown className="h-3 w-3 text-muted-foreground" />
                 )}
               </button>
             </div>
@@ -1233,13 +1205,13 @@ export default function EventsDashboardPage() {
               />
             ))
           ) : (
-            <div className="py-12 text-center text-gray-500">
+            <div className="py-12 text-center text-muted-foreground">
               <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
             </div>
           )}
 
           {totalItems > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-card rounded-lg border border-border">
               <PaginationBar
                 currentPage={currentPage}
                 pageSize={pageSize}
@@ -1262,33 +1234,33 @@ export default function EventsDashboardPage() {
                 <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  className="cursor-pointer h-8 w-8 rounded-full hover:bg-accent flex items-center justify-center"
                 >
-                  <X className="h-5 w-5 text-gray-500" />
+                  <X className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
-              <SheetDescription className="text-sm text-gray-500">
+              <SheetDescription className="text-sm text-muted-foreground">
                 Refine your event list
               </SheetDescription>
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto mt-6 pb-6">
               <div className="space-y-1.5 mb-5">
-                <Label className="text-sm font-medium text-gray-700">Search</Label>
+                <Label className="text-sm font-medium text-foreground">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search events..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 pr-9 h-11 border-gray-200 rounded-xl"
+                    className="pl-9 pr-9 h-11 border-border rounded-xl"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
                 <div className="space-y-1.5 min-w-0">
-                  <Label className="text-sm font-medium text-gray-700 truncate">Status</Label>
+                  <Label className="text-sm font-medium text-foreground truncate">Status</Label>
                   <Select
                     value={activeTab}
                     onValueChange={(v) => {
@@ -1296,7 +1268,7 @@ export default function EventsDashboardPage() {
                       setCurrentPage(1);
                     }}
                   >
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                    <SelectTrigger className="h-11 cursor-pointer border-border rounded-xl w-full">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1310,12 +1282,12 @@ export default function EventsDashboardPage() {
                 </div>
 
                 <div className="space-y-1.5 min-w-0">
-                  <Label className="text-sm font-medium text-gray-700 truncate">Sort By</Label>
+                  <Label className="text-sm font-medium text-foreground truncate">Sort By</Label>
                   <Select
                     value={sortField}
                     onValueChange={(v: SortField) => setSortField(v)}
                   >
-                    <SelectTrigger className="h-11 cursor-pointer border-gray-200 rounded-xl w-full">
+                    <SelectTrigger className="h-11 cursor-pointer border-border rounded-xl w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1331,14 +1303,14 @@ export default function EventsDashboardPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-gray-700">Sort Direction</Label>
+                <Label className="text-sm font-medium text-foreground">Sort Direction</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
                     className={`h-11 rounded-xl cursor-pointer ${
                       sortDirection === 'asc'
                         ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        : 'border-border hover:bg-accent'
                     }`}
                     onClick={() => setSortDirection('asc')}
                   >
@@ -1349,7 +1321,7 @@ export default function EventsDashboardPage() {
                     className={`h-11 rounded-xl cursor-pointer ${
                       sortDirection === 'desc'
                         ? 'bg-primary-300 text-white hover:bg-primary-400 shadow-sm'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        : 'border-border hover:bg-accent'
                     }`}
                     onClick={() => setSortDirection('desc')}
                   >
@@ -1359,16 +1331,16 @@ export default function EventsDashboardPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-gray-100 bg-white pb-2">
+            <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl cursor-pointer border-gray-200 hover:bg-gray-50"
+                className="flex-1 h-11 rounded-xl cursor-pointer border-border hover:bg-accent"
                 onClick={handleMobileReset}
               >
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-white shadow-sm"
+                className="flex-1 h-11 rounded-xl cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
@@ -1389,13 +1361,13 @@ export default function EventsDashboardPage() {
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                <div className="p-2 bg-amber-100 rounded-full">
-                  <Trash2 className="h-5 w-5 text-amber-600" />
+              <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-100 dark:border-amber-900/50">
+                <div className="p-2 bg-amber-100 dark:bg-amber-950/40 rounded-full">
+                  <Trash2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
@@ -1406,7 +1378,7 @@ export default function EventsDashboardPage() {
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+              className="cursor-pointer text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
               onClick={handleConfirmDelete}
             >
               <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
@@ -1419,20 +1391,20 @@ export default function EventsDashboardPage() {
       <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-600">Permanently Delete Event</DialogTitle>
+            <DialogTitle className="text-destructive">Permanently Delete Event</DialogTitle>
             <DialogDescription>
               Are you sure you want to permanently delete this event? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-                <div className="p-2 bg-red-100 rounded-full">
-                  <Trash className="h-5 w-5 text-red-600" />
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                <div className="p-2 bg-destructive/20 rounded-full">
+                  <Trash className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
@@ -1456,20 +1428,20 @@ export default function EventsDashboardPage() {
       <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-green-600">Restore Event</DialogTitle>
+            <DialogTitle className="text-tertiary-600 dark:text-tertiary-400">Restore Event</DialogTitle>
             <DialogDescription>
               Are you sure you want to restore this event from trash?
             </DialogDescription>
           </DialogHeader>
           {selectedEvent && (
             <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-                <div className="p-2 bg-green-100 rounded-full">
-                  <RotateCcw className="h-5 w-5 text-green-600" />
+              <div className="flex items-center gap-3 p-3 bg-tertiary-50 dark:bg-tertiary-950/30 rounded-lg border border-tertiary-100 dark:border-tertiary-900/50">
+                <div className="p-2 bg-tertiary-100 dark:bg-tertiary-950/50 rounded-full">
+                  <RotateCcw className="h-5 w-5 text-tertiary-600 dark:text-tertiary-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{selectedEvent.title}</p>
-                  <p className="text-sm text-gray-500">{selectedEvent.date}</p>
+                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
@@ -1483,7 +1455,7 @@ export default function EventsDashboardPage() {
               Cancel
             </Button>
             <Button
-              className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+              className="cursor-pointer bg-tertiary-500 hover:bg-tertiary-600 text-white"
               onClick={handleConfirmRestore}
             >
               <RotateCcw className="h-4 w-4 mr-2" /> Restore Event
@@ -1496,24 +1468,24 @@ export default function EventsDashboardPage() {
       <Dialog open={isPublishErrorDialogOpen} onOpenChange={setIsPublishErrorDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" /> Cannot Publish Event
             </DialogTitle>
-            <DialogDescription className="text-red-600">
+            <DialogDescription className="text-destructive">
               {publishError?.message || 'Failed to publish event'}
             </DialogDescription>
           </DialogHeader>
 
           {publishError?.details && publishError.details.length > 0 && (
             <div className="py-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Please fix the following issues:</p>
+              <p className="text-sm font-medium text-foreground mb-2">Please fix the following issues:</p>
               <ul className="space-y-2">
                 {publishError.details.map((detail, index) => (
                   <li
                     key={index}
-                    className="flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded-lg"
+                    className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded-lg"
                   >
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-500" />
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />
                     <span>{detail}</span>
                   </li>
                 ))}
@@ -1530,7 +1502,7 @@ export default function EventsDashboardPage() {
               Close
             </Button>
             <Button
-              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white cursor-pointer"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={() => {
                 setIsPublishErrorDialogOpen(false);
                 router.push(`/dashboard/events/${publishingEventId || selectedEvent?.id}/edit`);
@@ -1566,14 +1538,14 @@ export default function EventsDashboardPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
-            <ScrollArea className="h-32 border rounded-lg p-2">
+            <ScrollArea className="h-32 border border-border rounded-lg p-2">
               {selectedEvents.map((id) => {
                 const event = uiEvents.find((e) => e.id === id);
                 return event ? (
                   <div key={id} className="flex items-center gap-2 py-1 text-sm">
-                    <Calendar className="h-4 w-4 text-gray-400" />
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span>{event.title}</span>
-                    <span className="text-gray-400">—</span>
+                    <span className="text-muted-foreground">—</span>
                     <Badge variant="outline" className="text-xs">
                       {event.isDeleted ? 'Trashed' : event.statusDisplayName}
                     </Badge>
@@ -1587,10 +1559,10 @@ export default function EventsDashboardPage() {
             <AlertDialogAction
               className={`cursor-pointer ${
                 bulkAction === 'permanentDelete' || bulkAction === 'delete'
-                  ? 'bg-red-600 hover:bg-red-700'
+                  ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
                   : bulkAction === 'restore'
-                    ? 'bg-green-600 hover:bg-green-700'
-                    : 'bg-primary hover:bg-primary/90'
+                    ? 'bg-tertiary-500 hover:bg-tertiary-600 text-white'
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
               }`}
               onClick={() => {
                 if (bulkAction === 'publish') {
@@ -1633,11 +1605,6 @@ function useAuthenticated() {
   return useAppSelectorSafe((state) => state.auth.isAuthenticated);
 }
 
-/**
- * Local wrapper so this file doesn't import the auth slice directly —
- * keeps the auth module's API surface in one place. Falls back to
- * direct state access if the selector isn't exported yet.
- */
 function useAppSelectorSafe<T>(selector: (state: { auth: { isAuthenticated: boolean } }) => T): T {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useAppSelector } = require('@/lib/store/hooks');
@@ -1654,13 +1621,13 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, icon, bg }: StatCardProps) {
   return (
-    <Card className="border-gray-200/80 shadow-sm hover:shadow-md transition-all duration-200">
+    <Card className="border-border shadow-sm hover:shadow-md transition-all duration-200">
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{value}</p>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">{sub}</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+            <p className="text-xl sm:text-2xl font-bold text-foreground mt-1">{value}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">{sub}</p>
           </div>
           <div className={`p-2.5 sm:p-3 rounded-lg ${bg}`}>{icon}</div>
         </div>
@@ -1675,31 +1642,31 @@ function TrashCard({ count, onClick }: { count: number; onClick: () => void }) {
     <Card
       className={`${
         isActive
-          ? 'border-amber-300 bg-amber-50/80 ring-1 ring-amber-200/50 shadow-md shadow-amber-100/30'
-          : 'border-gray-200/80 bg-gray-50/50'
+          ? 'border-amber-300 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 ring-1 ring-amber-200/50 dark:ring-amber-900/30 shadow-md shadow-amber-100/30 dark:shadow-amber-950/20'
+          : 'border-border bg-muted/50'
       } transition-all duration-300 cursor-pointer hover:shadow-lg`}
       onClick={isActive ? onClick : undefined}
     >
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className={`text-xs font-medium uppercase tracking-wider ${isActive ? 'text-amber-600' : 'text-gray-500'}`}>
+            <p className={`text-xs font-medium uppercase tracking-wider ${isActive ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
               Trash
             </p>
             <div className="flex items-center gap-2 mt-1">
-              <p className={`text-2xl sm:text-3xl font-bold ${isActive ? 'text-amber-700' : 'text-gray-400'}`}>
+              <p className={`text-2xl sm:text-3xl font-bold ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'}`}>
                 {count}
               </p>
               {isActive && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                   {count} item{count !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
-            <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5">
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
               {isActive ? (
-                <span className="text-amber-600 font-medium flex items-center gap-1">
+                <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
                   Click to view & restore <ArrowRight className="h-3 w-3" />
                 </span>
               ) : (
@@ -1709,7 +1676,7 @@ function TrashCard({ count, onClick }: { count: number; onClick: () => void }) {
           </div>
           <div
             className={`p-3 rounded-xl transition-all duration-300 ${
-              isActive ? 'bg-amber-100 text-amber-600 shadow-inner' : 'bg-gray-100 text-gray-400'
+              isActive ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 shadow-inner' : 'bg-muted text-muted-foreground'
             }`}
           >
             <Trash2 className={`h-5 w-5 sm:h-6 sm:w-6 ${isActive ? 'animate-pulse' : ''}`} />
@@ -1751,13 +1718,13 @@ interface AttendanceBarProps {
 function AttendanceBar({ current, capacity, percent }: AttendanceBarProps) {
   return (
     <div className="w-36">
-      <div className="flex justify-between text-xs font-medium text-gray-700 mb-1">
+      <div className="flex justify-between text-xs font-medium text-foreground mb-1">
         <span>
           {current} / {capacity || '∞'}
         </span>
-        <span className="text-gray-500">{percent}%</span>
+        <span className="text-muted-foreground">{percent}%</span>
       </div>
-      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
         <div
           className="bg-primary h-1.5 rounded-full transition-all duration-300"
           style={{ width: `${Math.min(percent, 100)}%` }}
@@ -1794,12 +1761,12 @@ function EmptyState({ activeTab, searchQuery }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center gap-2">
       {activeTab === 'trash' ? (
-        <Trash2 className="h-8 w-8 text-gray-300" />
+        <Trash2 className="h-8 w-8 text-muted-foreground/40" />
       ) : (
-        <Search className="h-8 w-8 text-gray-300" />
+        <Search className="h-8 w-8 text-muted-foreground/40" />
       )}
       <p className="font-medium">{title}</p>
-      <p className="text-sm text-gray-400">{description}</p>
+      <p className="text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -1822,9 +1789,9 @@ function PaginationBar({
   onPageSizeChange,
 }: PaginationBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-gray-200">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">Rows per page:</span>
+        <span className="text-sm text-muted-foreground">Rows per page:</span>
         <Select value={pageSize.toString()} onValueChange={(v) => onPageSizeChange(Number(v))}>
           <SelectTrigger className="h-8 w-[70px] cursor-pointer">
             <SelectValue />
@@ -1838,7 +1805,7 @@ function PaginationBar({
         </Select>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-muted-foreground">
           {totalItems > 0
             ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
             : '0 of 0'}
@@ -1903,9 +1870,9 @@ function EventGridCard({
 
   return (
     <Card
-      className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-gray-200/80 ${
+      className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-border ${
         isSelected ? 'border-primary/50 bg-primary/5' : ''
-      } ${isTrashed ? 'opacity-60 bg-amber-50/30' : ''}`}
+      } ${isTrashed ? 'opacity-60 bg-amber-50/30 dark:bg-amber-950/10' : ''}`}
       onClick={onClick}
     >
       <CardContent className="p-4 space-y-3">
@@ -1920,13 +1887,13 @@ function EventGridCard({
               </Badge>
             )}
             {event.isPrivate && !isTrashed && (
-              <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
+              <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs">
                 <Lock className="h-3 w-3 mr-1" /> Private
               </Badge>
             )}
           </div>
           {isTrashed ? (
-            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50">
+            <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40">
               <Trash2 className="h-3 w-3 mr-1" /> Trashed
             </Badge>
           ) : (
@@ -1938,15 +1905,15 @@ function EventGridCard({
         </div>
 
         <div>
-          <h3 className="font-semibold text-gray-900 line-clamp-2">{event.title}</h3>
-          <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+          <h3 className="font-semibold text-foreground line-clamp-2">{event.title}</h3>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
             <span className="text-primary font-medium">{event.priceDisplay}</span>
-            <span className="text-gray-300">•</span>
-            <span className="text-amber-600 font-medium">{event.cpdHours} CPD Hrs</span>
+            <span className="text-border">•</span>
+            <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5" />
             <span>{event.date}</span>
@@ -1957,28 +1924,28 @@ function EventGridCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="text-gray-400">Added:</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="text-muted-foreground">Added:</span>
           <span>{formatDateShort(addedDate)}</span>
-          <span className="text-gray-400">({addedLabel})</span>
+          <span className="text-muted-foreground">({addedLabel})</span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Users className="h-3.5 w-3.5" />
           <span>
             {event.registered} / {event.capacity || '∞'} registered
           </span>
         </div>
 
-        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
           <div
             className="bg-primary h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-          <div className="flex items-center gap-1 text-xs text-gray-400">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Globe className="h-3.5 w-3.5" />
             <span>{event.platform}</span>
           </div>
@@ -2032,7 +1999,7 @@ function EventActionsMenu({
           size="icon"
           className={small ? 'h-7 w-7 p-0 cursor-pointer' : 'h-8 w-8 cursor-pointer'}
         >
-          <MoreVertical className={small ? 'h-4 w-4 text-gray-400' : 'h-4 w-4'} />
+          <MoreVertical className={small ? 'h-4 w-4 text-muted-foreground' : 'h-4 w-4'} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
@@ -2041,7 +2008,7 @@ function EventActionsMenu({
         {isTrashed ? (
           <>
             <DropdownMenuItem
-              className="cursor-pointer text-green-600"
+              className="cursor-pointer text-tertiary-600 dark:text-tertiary-400"
               onClick={(e) => {
                 e.stopPropagation();
                 onRestore();
@@ -2050,7 +2017,7 @@ function EventActionsMenu({
               <RotateCcw className="h-4 w-4 mr-2" /> Restore
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="cursor-pointer text-red-600"
+              className="cursor-pointer text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
                 onPermanentDelete();
@@ -2089,7 +2056,7 @@ function EventActionsMenu({
               <Copy className="h-4 w-4 mr-2" /> Duplicate
             </DropdownMenuItem>
             <DropdownMenuItem
-              className="cursor-pointer text-green-600"
+              className="cursor-pointer text-tertiary-600 dark:text-tertiary-400"
               onClick={(e) => {
                 e.stopPropagation();
                 onPublish();
@@ -2108,7 +2075,7 @@ function EventActionsMenu({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-amber-600 cursor-pointer"
+              className="text-amber-600 dark:text-amber-400 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
                 onMoveToTrash();
@@ -2159,7 +2126,7 @@ function BulkActionsBar({
     <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
         <Check className="h-4 w-4 text-primary" />
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-sm font-medium text-foreground">
           {count} event{count > 1 ? 's' : ''} selected
         </span>
       </div>
@@ -2183,7 +2150,7 @@ function BulkActionsBar({
         {allDraft && count > 0 && (
           <Button
             size="sm"
-            className="cursor-pointer bg-green-600 hover:bg-green-700 text-white"
+            className="cursor-pointer bg-tertiary-600 hover:bg-tertiary-700 text-white"
             onClick={() => {
               if (count === 1) {
                 const event = uiEvents.find((e) => e.id === selectedIds[0]);
@@ -2210,7 +2177,7 @@ function BulkActionsBar({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="cursor-pointer text-green-600 border-green-200 hover:bg-green-50"
+                  className="cursor-pointer text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30"
                   onClick={() => onBulkAction('restore')}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" /> Restore
@@ -2218,7 +2185,7 @@ function BulkActionsBar({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="cursor-pointer text-red-600 border-red-200 hover:bg-red-50"
+                  className="cursor-pointer text-destructive border-destructive/30 hover:bg-destructive/10"
                   onClick={() => onBulkAction('permanentDelete')}
                 >
                   <Trash className="h-4 w-4 mr-2" /> Delete Permanently
@@ -2237,7 +2204,7 @@ function BulkActionsBar({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+                  className="cursor-pointer text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
                   onClick={() => onBulkAction('delete')}
                 >
                   <Trash2 className="h-4 w-4 mr-2" /> Move to Trash
@@ -2251,7 +2218,7 @@ function BulkActionsBar({
           <Button
             size="sm"
             variant="outline"
-            className="cursor-pointer text-amber-600 border-amber-200 hover:bg-amber-50"
+            className="cursor-pointer text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
             onClick={() => {
               const event = uiEvents.find((e) => e.id === selectedIds[0]);
               if (event) onDeleteEvent(event);

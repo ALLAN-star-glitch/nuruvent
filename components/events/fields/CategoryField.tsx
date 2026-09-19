@@ -15,13 +15,9 @@ import { useGetCategoriesQuery } from '@/lib/store/api/eventsApi';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { FieldBaseProps, fieldId } from '@/components/form/types';
 
-
-
 // ============================================================
 // CATEGORY FIELD (events)
 // ============================================================
-//
-// Optional event category, loaded from the events categories API.
 
 interface CategoryFieldProps extends FieldBaseProps {
   value: string;
@@ -54,7 +50,7 @@ export function CategoryField({
         disabled={disabled || isLoading}
       >
         <SelectTrigger
-          className={cn('cursor-pointer', error && 'border-error-500')}
+          className={cn('cursor-pointer', error && 'border-destructive')}
         >
           <SelectValue placeholder="Choose a category" />
         </SelectTrigger>

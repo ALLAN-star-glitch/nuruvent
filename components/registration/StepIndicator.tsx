@@ -60,9 +60,11 @@ export function StepIndicator({ currentStep, labels }: StepIndicatorProps) {
                   'flex items-center justify-center flex-shrink-0',
                   'text-[10px] sm:text-sm font-medium transition-all',
                   isActive &&
-                    'bg-[#1A73E8] text-white ring-2 sm:ring-4 ring-[#1A73E8]/20',
-                  isCompleted && 'bg-green-500 text-white',
-                  !isActive && !isCompleted && 'bg-gray-200 text-gray-500',
+                    'bg-primary text-primary-foreground ring-2 sm:ring-4 ring-primary/20',
+                  isCompleted && 'bg-tertiary-500 text-white',
+                  !isActive &&
+                    !isCompleted &&
+                    'bg-muted text-muted-foreground',
                 )}
                 aria-current={isActive ? 'step' : undefined}
               >
@@ -77,9 +79,9 @@ export function StepIndicator({ currentStep, labels }: StepIndicatorProps) {
                 className={cn(
                   'text-[8px] sm:text-xs font-medium hidden xs:block truncate',
                   'max-w-[40px] sm:max-w-none',
-                  isActive && 'text-gray-900',
-                  isCompleted && 'text-gray-600',
-                  !isActive && !isCompleted && 'text-gray-400',
+                  isActive && 'text-foreground',
+                  isCompleted && 'text-foreground/80',
+                  !isActive && !isCompleted && 'text-muted-foreground',
                 )}
               >
                 {label}
@@ -88,11 +90,11 @@ export function StepIndicator({ currentStep, labels }: StepIndicatorProps) {
 
             {/* Connector line (not rendered after the last step) */}
             {!isLast && (
-              <div className="flex-1 mx-1 sm:mx-2 h-0.5 bg-gray-200 min-w-[10px]">
+              <div className="flex-1 mx-1 sm:mx-2 h-0.5 bg-muted min-w-[10px]">
                 <div
                   className={cn(
                     'h-full transition-all duration-300',
-                    isCompleted ? 'w-full bg-green-500' : 'w-0 bg-[#1A73E8]',
+                    isCompleted ? 'w-full bg-tertiary-500' : 'w-0 bg-primary',
                   )}
                 />
               </div>

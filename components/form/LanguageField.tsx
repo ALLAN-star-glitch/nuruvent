@@ -11,9 +11,6 @@ import { fieldId, type FieldBaseProps } from './types';
 // ============================================================
 // LANGUAGE FIELD
 // ============================================================
-//
-// Short BCP-47-ish language tag (e.g. "en", "sw", "fr").
-// Free-text — a Select of common languages can replace this later.
 
 interface LanguageFieldProps extends FieldBaseProps {
   value: string;
@@ -55,8 +52,8 @@ export function LanguageField({
         maxLength={MAX_LENGTH}
         disabled={disabled}
         className={cn(
-          'cursor-text focus:ring-primary-500 focus:border-primary-500',
-          error && 'border-error-500',
+          'cursor-text focus:ring-primary focus:border-primary',
+          error && 'border-destructive',
         )}
       />
     </FieldWrapper>

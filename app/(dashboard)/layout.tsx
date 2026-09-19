@@ -16,38 +16,36 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50/50 flex flex-col">
+    <div className="min-h-screen bg-muted/30 flex flex-col">
       {/* Header reads auth state from Redux automatically */}
-      <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white shadow-sm">
+      <header className="sticky top-0 z-40 w-full border-b border-border bg-background shadow-sm">
         <Header />
       </header>
 
       {/* Client Component for sidebar interaction */}
       <DashboardLayoutClient>
         <div className="p-4 md:p-6 space-y-4">
-          
           {/* Page Content */}
           {children}
         </div>
       </DashboardLayoutClient>
 
-      {/* Toaster */}
-      <Toaster 
+      {/* Toaster — sonner renders via portal, so the theme comes from
+          its own CSS vars, not Tailwind classes on the element. Use
+          `theme="system"` to follow the OS, or wire it to your Redux
+          theme state to follow the toggle. */}
+      <Toaster
         position="top-right"
         richColors
         closeButton
         expand={false}
         duration={4000}
         visibleToasts={3}
+        theme="system"
         toastOptions={{
-          style: {
-            background: 'white',
-            border: '1px solid #e5e7eb',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          classNames: {
+            toast: 'font-sans',
           },
-          className: 'font-sans',
         }}
       />
     </div>

@@ -17,14 +17,9 @@ import { Switch } from '@/components/ui/switch';
 import { TagsField } from '@/components/form/TagsField';
 import { FieldBaseProps, fieldId } from '@/components/form/types';
 
-
-
 // ============================================================
 // ACCESS & PRIVACY FIELD (events)
 // ============================================================
-//
-// Composite: visibility, password, invite-only, invited emails.
-// Uses TagsField for the email list (each email becomes a chip).
 
 type Visibility = 'public' | 'private' | 'unlisted';
 
@@ -49,14 +44,14 @@ export function AccessField({
 }: AccessFieldProps) {
   return (
     <div id={fieldId('access', id)} className="space-y-4">
-      <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-        <Shield className="h-4 w-4 text-primary-500" />
+      <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+        <Shield className="h-4 w-4 text-primary" />
         Access &amp; Privacy
       </Label>
 
       {/* Visibility */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-neutral-dark">
+        <Label className="text-xs font-medium text-foreground">
           Visibility
         </Label>
         <Select
@@ -83,9 +78,9 @@ export function AccessField({
 
       {/* Password */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-neutral-dark flex items-center gap-2">
-          <Lock className="h-3.5 w-3.5 text-neutral-gray" />
-          Password <span className="text-neutral-gray text-xs">(optional)</span>
+        <Label className="text-xs font-medium text-foreground flex items-center gap-2">
+          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+          Password <span className="text-muted-foreground text-xs">(optional)</span>
         </Label>
         <Input
           type="text"
@@ -95,18 +90,18 @@ export function AccessField({
           disabled={disabled}
           className="cursor-text"
         />
-        <p className="text-[11px] text-neutral-gray">
+        <p className="text-[11px] text-muted-foreground">
           Attendees must enter this to register.
         </p>
       </div>
 
       {/* Invite only */}
-      <div className="flex items-center justify-between p-3 bg-neutral-light rounded-lg">
+      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
         <div>
-          <Label className="text-sm font-medium text-neutral-dark">
+          <Label className="text-sm font-medium text-foreground">
             Invite only
           </Label>
-          <p className="text-xs text-neutral-gray">
+          <p className="text-xs text-muted-foreground">
             Only people you invite can register.
           </p>
         </div>
@@ -133,7 +128,7 @@ export function AccessField({
         />
       )}
 
-      {error && <p className="text-sm text-error-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

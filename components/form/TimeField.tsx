@@ -49,8 +49,8 @@ export function TimeField({
         onChange={handleChange}
         disabled={disabled}
         className={cn(
-          'cursor-text focus:ring-primary-500 focus:border-primary-500',
-          error && 'border-error-500',
+          'cursor-text focus:ring-primary focus:border-primary',
+          error && 'border-destructive',
         )}
       />
     </FieldWrapper>

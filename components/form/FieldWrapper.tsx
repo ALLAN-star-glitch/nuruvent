@@ -11,10 +11,6 @@ import { cn } from '@/lib/utils';
 // ============================================================
 // FIELD WRAPPER
 // ============================================================
-//
-// Standard label / input / helper layout used by every field.
-// Extracting this keeps spacing, error styling, and the counter
-// identical across every form in the app.
 
 interface FieldWrapperProps {
   id: string;
@@ -41,10 +37,10 @@ export function FieldWrapper({
 
   return (
     <div id={id} className={cn('space-y-2', className)}>
-      <Label className="text-sm font-medium text-neutral-dark">
+      <Label className="text-sm font-medium text-foreground">
         {label}
         {optional && (
-          <span className="text-neutral-gray text-xs ml-1">(optional)</span>
+          <span className="text-muted-foreground text-xs ml-1">(optional)</span>
         )}
       </Label>
 
@@ -54,19 +50,19 @@ export function FieldWrapper({
         <div className="flex items-center justify-between text-xs">
           <div>
             {error ? (
-              <span className="text-error-500 flex items-center gap-1">
+              <span className="text-destructive flex items-center gap-1">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {error}
               </span>
             ) : helper ? (
-              <span className="text-neutral-gray">{helper}</span>
+              <span className="text-muted-foreground">{helper}</span>
             ) : null}
           </div>
           {counter && (
             <span
               className={cn(
                 'tabular-nums',
-                counterOver ? 'text-error-500' : 'text-neutral-gray',
+                counterOver ? 'text-destructive' : 'text-muted-foreground',
               )}
             >
               {counter.current} / {counter.max}

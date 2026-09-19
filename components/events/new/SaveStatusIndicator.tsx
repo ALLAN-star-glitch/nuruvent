@@ -52,7 +52,9 @@ export function SaveStatusIndicator(props: SaveStatusIndicatorProps) {
       {status === 'saved' ? (
         <div className="flex items-center gap-2 animate-in fade-in duration-300">
           <CheckCircle2 className="h-4 w-4 text-tertiary-500" />
-          <span className="font-medium text-tertiary-600">Draft saved</span>
+          <span className="font-medium text-tertiary-600 dark:text-tertiary-400">
+            Draft saved
+          </span>
         </div>
       ) : null}
     </div>

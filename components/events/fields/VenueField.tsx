@@ -8,15 +8,9 @@ import { Label } from '@/components/ui/label';
 import { TextField } from '@/components/form/TextField';
 import { FieldBaseProps, fieldId } from '@/components/form/types';
 
-
-
 // ============================================================
 // VENUE FIELD (events)
 // ============================================================
-//
-// Composite block: name, address, city, country.
-// Only shown when the event is not virtual. The parent controls
-// visibility via `is_virtual` on the form.
 
 interface VenueValue {
   venue_name: string;
@@ -30,11 +24,17 @@ interface VenueFieldProps extends FieldBaseProps {
   onChange: <K extends keyof VenueValue>(key: K, v: VenueValue[K]) => void;
 }
 
-export function VenueField({ value, onChange, error, disabled, id }: VenueFieldProps) {
+export function VenueField({
+  value,
+  onChange,
+  error,
+  disabled,
+  id,
+}: VenueFieldProps) {
   return (
     <div id={fieldId('venue', id)} className="space-y-4">
-      <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-primary-500" />
+      <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-primary" />
         Venue
       </Label>
 
@@ -81,7 +81,7 @@ export function VenueField({ value, onChange, error, disabled, id }: VenueFieldP
       </div>
 
       {error && (
-        <p className="text-sm text-error-500">{error}</p>
+        <p className="text-sm text-destructive">{error}</p>
       )}
     </div>
   );

@@ -32,11 +32,6 @@ import type { EventSortBy } from '@/lib/types/events';
 // ICON MAPPING
 // ============================================================
 
-/**
- * Map an event type slug to a lucide icon for the sidebar.
- * Matches on substrings so new type variants fall through to a
- * default without crashing.
- */
 function getCategoryIcon(slug: string | undefined) {
   const s = (slug ?? '').toLowerCase();
   if (s.includes('workshop')) return <BookOpen className="h-4 w-4" />;
@@ -55,10 +50,6 @@ function getCategoryIcon(slug: string | undefined) {
 // ============================================================
 // SORT OPTIONS
 // ============================================================
-//
-// Path A trim: only the sort values the backend supports.
-// The backend's `sort_by` accepts: 'created_at', 'start_date', 'name'.
-// We expose three corresponding UI options.
 
 interface SortOption {
   id: string;
@@ -115,7 +106,6 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
   const { data: typesResponse, isLoading } = useGetEventTypesQuery();
   const eventTypes = typesResponse?.data ?? [];
 
-  // ---- Read current filters from the URL ----
   const typeFilter = searchParams.get('type') || '';
   const sortFilter = searchParams.get('sort') || DEFAULT_SORT_ID;
 
@@ -123,14 +113,11 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
   const [selectedSort, setSelectedSort] = useState(sortFilter);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Keep local state in sync with the URL (e.g. when the user
-  // navigates back, or when something else rewrites the query).
   useEffect(() => {
     setSelectedCategory(typeFilter);
     setSelectedSort(sortFilter);
   }, [typeFilter, sortFilter]);
 
-  // Lock body scroll while the mobile drawer is open.
   useEffect(() => {
     if (isMobileOpen) {
       document.body.style.overflow = 'hidden';
@@ -142,12 +129,6 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
     };
   }, [isMobileOpen]);
 
-  // ---- URL writers ----
-
-  /**
-   * Replace the URL query string with the given filters.
-   * Any URL param not managed here is preserved (e.g. `search`).
-   */
   const replaceUrl = (updates: { type?: string; sort?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -167,8 +148,6 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
     const queryString = params.toString();
     router.replace(`/events${queryString ? `?${queryString}` : ''}`);
   };
-
-  // ---- Handlers ----
 
   const handleCategoryClick = (id: string) => {
     const newCategory = selectedCategory === id ? '' : id;
@@ -197,8 +176,6 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
     setIsMobileOpen(false);
   };
 
-  // ---- Display helpers ----
-
   const getSelectedLabel = () => {
     if (selectedCategory) {
       const found = eventTypes.find((c) => c.id === selectedCategory);
@@ -214,23 +191,9 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
     return count;
   };
 
-  const scrollCategories = (direction: 'left' | 'right') => {
-    if (categoriesRef.current) {
-      const scrollAmount = 200;
-      const newScrollLeft =
-        categoriesRef.current.scrollLeft +
-        (direction === 'left' ? -scrollAmount : scrollAmount);
-      categoriesRef.current.scrollTo({
-        left: newScrollLeft,
-        behavior: 'smooth',
-      });
-    }
-  };
-
-  // ---- Loading state ----
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-gray-400">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span className="text-sm">Loading filters...</span>
       </div>
@@ -244,12 +207,12 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
       {/* ---- Mobile floating button ---- */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="lg:hidden fixed bottom-24 right-4 z-30 flex items-center gap-2 bg-primary text-white px-4 py-3 rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all duration-300 cursor-pointer"
+        className="lg:hidden fixed bottom-24 right-4 z-30 flex items-center gap-2 bg-primary text-primary-foreground px-4 py-3 rounded-full shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-all duration-300 cursor-pointer"
       >
         <Filter className="h-5 w-5" />
         <span className="text-sm font-medium">{getSelectedLabel()}</span>
         {activeFilterCount > 0 && (
-          <span className="bg-white text-primary text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="bg-background text-primary text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
             {activeFilterCount}
           </span>
         )}
@@ -266,17 +229,17 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
       {/* ---- Mobile drawer ---- */}
       <div
         className={`
-          fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-50 lg:hidden
+          fixed bottom-0 left-0 right-0 bg-background text-foreground rounded-t-3xl shadow-2xl z-50 lg:hidden
           transition-transform duration-300 ease-in-out
           ${isMobileOpen ? 'translate-y-0' : 'translate-y-full'}
           max-h-[85vh] overflow-hidden
         `}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Filters</h3>
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -288,7 +251,7 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
         >
           {/* Categories */}
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">
+            <h4 className="text-sm font-semibold text-foreground mb-3">
               Categories
             </h4>
             <div className="grid grid-cols-2 gap-2">
@@ -299,7 +262,7 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                   ${
                     !selectedCategory
                       ? 'bg-primary/10 text-primary font-medium border border-primary/20'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                      : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent'
                   }
                 `}
               >
@@ -316,11 +279,11 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                       ${
                         isActive
                           ? 'bg-primary/10 text-primary font-medium border border-primary/20'
-                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent'
                       }
                     `}
                   >
-                    <span className={isActive ? 'text-primary' : 'text-gray-400'}>
+                    <span className={isActive ? 'text-primary' : 'text-muted-foreground'}>
                       {getCategoryIcon(category.slug)}
                     </span>
                     <span className="truncate">
@@ -332,12 +295,12 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
             </div>
           </div>
 
-          <div className="border-t border-gray-100 my-4" />
+          <div className="border-t border-border my-4" />
 
           {/* Sort */}
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-gray-500" />
+            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
               Sort By
             </h4>
             <div className="grid grid-cols-2 gap-2">
@@ -352,13 +315,13 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                       ${
                         isActive
                           ? 'bg-primary/10 text-primary font-medium border border-primary/20'
-                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent'
+                          : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent'
                       }
                     `}
                   >
                     <Calendar
                       className={`h-4 w-4 ${
-                        isActive ? 'text-primary' : 'text-gray-400'
+                        isActive ? 'text-primary' : 'text-muted-foreground'
                       }`}
                     />
                     {option.label}
@@ -370,7 +333,7 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
         </div>
 
         {/* Mobile footer */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 flex gap-3">
+        <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4 flex gap-3">
           <Button
             variant="outline"
             onClick={clearAllFilters}
@@ -380,7 +343,7 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
           </Button>
           <Button
             onClick={() => setIsMobileOpen(false)}
-            className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer"
+            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
           >
             View Results
           </Button>
@@ -388,12 +351,12 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
       </div>
 
       {/* ---- Desktop sidebar ---- */}
-      <div className="hidden lg:block sticky top-20 max-h-[calc(100vh-100px)] overflow-y-auto">
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="hidden lg:block sticky top-50 max-h-[calc(100vh-100px)] overflow-y-auto">
+        <div className="bg-card text-card-foreground rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary-500" />
-              <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
+              <h3 className="text-sm font-semibold text-foreground">Filters</h3>
             </div>
             {activeFilterCount > 0 && (
               <button
@@ -407,7 +370,7 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
 
           {/* Categories */}
           <div className="mb-6">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Categories
             </h4>
             <div className="space-y-1">
@@ -418,13 +381,13 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                   ${
                     !selectedCategory
                       ? 'bg-primary/10 text-primary font-medium'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                   }
                 `}
               >
                 <LayoutGrid
                   className={`h-4 w-4 ${
-                    !selectedCategory ? 'text-primary' : 'text-gray-400'
+                    !selectedCategory ? 'text-primary' : 'text-muted-foreground'
                   }`}
                 />
                 All Categories
@@ -440,12 +403,12 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                       ${
                         isActive
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                       }
                     `}
                   >
                     <span
-                      className={isActive ? 'text-primary' : 'text-gray-400'}
+                      className={isActive ? 'text-primary' : 'text-muted-foreground'}
                     >
                       {getCategoryIcon(category.slug)}
                     </span>
@@ -463,11 +426,11 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
             </div>
           </div>
 
-          <div className="border-t border-gray-100 my-4" />
+          <div className="border-t border-border my-4" />
 
           {/* Sort */}
           <div className="mb-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <TrendingUp className="h-3 w-3" />
               Sort By
             </h4>
@@ -483,13 +446,13 @@ export function CategoryFilter({ onFilterChange }: CategoryFilterProps) {
                       ${
                         isActive
                           ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                       }
                     `}
                   >
                     <Calendar
                       className={`h-4 w-4 ${
-                        isActive ? 'text-primary' : 'text-gray-400'
+                        isActive ? 'text-primary' : 'text-muted-foreground'
                       }`}
                     />
                     {option.label}

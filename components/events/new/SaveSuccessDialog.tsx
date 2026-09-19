@@ -23,10 +23,6 @@ import type { EventFormData } from '../types';
 // ============================================================
 // SAVE SUCCESS DIALOG
 // ============================================================
-//
-// Shown after a successful Save Draft or Publish. The parent owns
-// `open` and the navigation callbacks; this component is purely
-// presentational.
 
 interface SaveSuccessDialogProps {
   open: boolean;
@@ -61,11 +57,11 @@ export function SaveSuccessDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-neutral-dark">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
             <CheckCircle2 className="h-6 w-6 text-tertiary-500" />
             {isPublished ? 'Event Published' : 'Draft Saved'}
           </DialogTitle>
-          <DialogDescription className="text-neutral-gray">
+          <DialogDescription className="text-muted-foreground">
             {isPublished
               ? 'Your event has been published and is now visible to attendees.'
               : 'Your event has been saved as a draft. You can publish it anytime.'}
@@ -73,11 +69,11 @@ export function SaveSuccessDialog({
         </DialogHeader>
 
         <div className="py-4 flex flex-col items-center gap-4">
-          <div className="w-full p-4 bg-neutral-light rounded-lg border border-neutral-light">
+          <div className="w-full p-4 bg-muted rounded-lg border border-border">
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <p className="font-medium text-neutral-dark">{titleLabel}</p>
-                <p className="text-sm text-neutral-gray">
+                <p className="font-medium text-foreground">{titleLabel}</p>
+                <p className="text-sm text-muted-foreground">
                   {dateLabel} • {typeLabel}
                 </p>
               </div>
@@ -85,8 +81,8 @@ export function SaveSuccessDialog({
                 variant="outline"
                 className={cn(
                   isPublished
-                    ? 'text-tertiary-600 border-tertiary-200 bg-tertiary-50'
-                    : 'text-neutral-gray border-neutral-light bg-neutral-light',
+                    ? 'text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 bg-tertiary-50 dark:bg-tertiary-950/40'
+                    : 'text-muted-foreground border-border bg-muted',
                 )}
               >
                 {isPublished ? 'Published' : 'Draft'}
@@ -104,7 +100,7 @@ export function SaveSuccessDialog({
             </Button>
             {isPublished && createdEventId && (
               <Button
-                className="flex-1 bg-primary hover:bg-primary-600 text-white cursor-pointer"
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
                 onClick={onViewEvent}
               >
                 View Event

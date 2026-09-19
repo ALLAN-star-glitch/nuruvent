@@ -2,14 +2,14 @@
 
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { 
-  ArrowRight, 
-  Sparkles, 
-  Calendar, 
-  Award, 
-  Users, 
+import {
+  ArrowRight,
+  Sparkles,
+  Calendar,
+  Award,
+  Users,
   Globe,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import { HeroSection } from '@/components/home/HeroSection';
 import { HomeEventGrid } from '@/components/home/HomeEventGrid';
@@ -75,25 +75,25 @@ export default function HomePage() {
       <HeroSection />
 
       {/* Categories Section - Compact Circles */}
-      <section className="bg-white py-8 border-b border-gray-100">
+      <section className="bg-background py-8 border-b border-border">
         <div className="container mx-auto px-4">
           <div className="text-center mb-6">
-            <h2 className="text-sm font-semibold text-gray-700 tracking-wide uppercase">
+            <h2 className="text-sm font-semibold text-foreground tracking-wide uppercase">
               Browse by Category
             </h2>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Find the perfect event or course for your career
             </p>
           </div>
-          
+
           <EventCategories />
         </div>
       </section>
 
       {/* Training Events & Courses Section */}
-      <section className="bg-gray-50/30 py-16 border-t border-gray-100">
+      <section className="bg-muted/30 py-16 border-t border-border">
         <div className="container mx-auto px-4">
-          <HomeEventGrid 
+          <HomeEventGrid
             limit={8}
             title="Explore Training Events & Courses"
             subtitle="Discover professional workshops, live bootcamps, and certified online courses from training providers worldwide"
@@ -102,100 +102,100 @@ export default function HomePage() {
       </section>
 
       {/* Why Choose Nuruvent Section */}
-      <section className="bg-white py-16 border-t border-gray-100">
+      <section className="bg-background py-16 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold bg-secondary/10 text-secondary rounded-full mb-3">
               <Sparkles className="h-3.5 w-3.5" />
               Why Nuruvent
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
               Built for Professional Growth
             </h2>
-            <p className="text-gray-600 text-sm sm:text-base mt-2">
+            <p className="text-muted-foreground text-sm sm:text-base mt-2">
               Everything you need to discover, enroll in, and excel across professional training events and online courses.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
+            <div className="text-center p-6 bg-muted/50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 mb-4">
                 <Calendar className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Events & Courses</h3>
-              <p className="text-sm text-gray-600 mt-1">Handpicked training sessions and self-paced courses from verified professionals worldwide</p>
+              <h3 className="text-base font-semibold text-foreground">Events & Courses</h3>
+              <p className="text-sm text-muted-foreground mt-1">Handpicked training sessions and self-paced courses from verified professionals worldwide</p>
             </div>
 
-            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-secondary-100 text-secondary-600 mb-4">
+            <div className="text-center p-6 bg-muted/50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-secondary-100 dark:bg-secondary-950/40 text-secondary-600 dark:text-secondary-400 mb-4">
                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Expert Instructors</h3>
-              <p className="text-sm text-gray-600 mt-1">Learn from industry experts with real-world experience across the globe</p>
+              <h3 className="text-base font-semibold text-foreground">Expert Instructors</h3>
+              <p className="text-sm text-muted-foreground mt-1">Learn from industry experts with real-world experience across the globe</p>
             </div>
 
-            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-tertiary-100 text-tertiary-600 mb-4">
+            <div className="text-center p-6 bg-muted/50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-tertiary-100 dark:bg-tertiary-950/40 text-tertiary-600 dark:text-tertiary-400 mb-4">
                 <Award className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Certified Learning</h3>
-              <p className="text-sm text-gray-600 mt-1">Earn recognized QR-verified CPD certificates to boost your career</p>
+              <h3 className="text-base font-semibold text-foreground">Certified Learning</h3>
+              <p className="text-sm text-muted-foreground mt-1">Earn recognized QR-verified CPD certificates to boost your career</p>
             </div>
 
-            <div className="text-center p-6 bg-gray-50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 text-primary-600 mb-4">
+            <div className="text-center p-6 bg-muted/50 rounded-2xl hover:shadow-md transition-shadow cursor-default">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-primary-100 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 mb-4">
                 <Globe className="h-6 w-6" />
               </div>
-              <h3 className="text-base font-semibold text-gray-900">Flexible Formats</h3>
-              <p className="text-sm text-gray-600 mt-1">In-person workshops, virtual webinars, and self-paced online courses to fit your schedule</p>
+              <h3 className="text-base font-semibold text-foreground">Flexible Formats</h3>
+              <p className="text-sm text-muted-foreground mt-1">In-person workshops, virtual webinars, and self-paced online courses to fit your schedule</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Professional CTA Section */}
-      <section className="bg-white py-16 border-t border-gray-100">
+      <section className="bg-background py-16 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full mb-4">
               <Sparkles className="h-3.5 w-3.5" />
               Get Started Today
             </div>
-            
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight mb-4">
+
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight mb-4">
               Ready to Grow Your Career?
             </h2>
-            
-            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto mb-8">
-              Join thousands of professionals and training providers who are advancing their careers 
+
+            <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+              Join thousands of professionals and training providers who are advancing their careers
               and growing their businesses through Nuruvent. Discover your next event or course today.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link href="/events" className="cursor-pointer">
-                <Button 
-                  size="lg" 
+                <Button
+                  size="lg"
                   className="bg-primary-600 hover:bg-primary-700 text-white font-semibold px-8 py-6 rounded-full shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group"
                 >
                   Explore Events & Courses
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
-              
+
               <Link href="/how-it-works" className="cursor-pointer">
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  className="border-2 border-gray-300 hover:border-primary-400 text-gray-700 hover:text-primary-600 font-semibold px-8 py-6 rounded-full transition-all duration-300 cursor-pointer"
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-2 border-border hover:border-primary-400 text-foreground hover:text-primary-600 font-semibold px-8 py-6 rounded-full transition-all duration-300 cursor-pointer"
                 >
                   Learn More
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               </Link>
             </div>
-            
+
             {/* Trust indicators */}
-            <div className="mt-8 flex flex-wrap justify-center items-center gap-6 text-xs text-gray-500">
+            <div className="mt-8 flex flex-wrap justify-center items-center gap-6 text-xs text-muted-foreground">
               <span className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-400" />
                 No credit card required

@@ -21,31 +21,21 @@ import type { SignupAccountType } from '../types';
 // ============================================================
 
 interface AccountTypeStepProps {
-  /** Currently selected account type, or null if none picked yet. */
   selected: SignupAccountType | null;
-  /** Called when the user clicks one of the cards. */
   onSelect: (type: SignupAccountType) => void;
 }
 
-/**
- * Shape of one card's visual configuration. Not exported — this is
- * internal to the step and would move into `constants.ts` if we ever
- * needed to render it elsewhere.
- */
 interface AccountTypeOptionConfig {
   type: SignupAccountType;
   icon: typeof User;
   label: string;
   description: string;
   features: string[];
-  /** Tailwind gradient classes for the 3D circle. */
   iconBg: string;
-  /** RGBA color for the glow/shadow effects. */
   shadowColor: string;
   borderColor: string;
   ringColor: string;
   selectedBg: string;
-  /** Whether to show the "POPULAR" badge on desktop. */
   popular: boolean;
 }
 
@@ -69,7 +59,7 @@ const ACCOUNT_TYPE_OPTIONS: AccountTypeOptionConfig[] = [
     shadowColor: 'rgba(59, 130, 246, 0.4)',
     borderColor: 'border-blue-500',
     ringColor: 'ring-blue-500',
-    selectedBg: 'bg-blue-50',
+    selectedBg: 'bg-blue-50 dark:bg-blue-950/30',
     popular: true,
   },
   {
@@ -89,7 +79,7 @@ const ACCOUNT_TYPE_OPTIONS: AccountTypeOptionConfig[] = [
     shadowColor: 'rgba(168, 85, 247, 0.4)',
     borderColor: 'border-purple-500',
     ringColor: 'ring-purple-500',
-    selectedBg: 'bg-purple-50',
+    selectedBg: 'bg-purple-50 dark:bg-purple-950/30',
     popular: false,
   },
 ];
@@ -103,13 +93,13 @@ export function AccountTypeStep({ selected, onSelect }: AccountTypeStepProps) {
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-gray-200">
-          <Users className="h-4 w-4 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-full border border-border">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
             Choose Your Account Type
           </span>
         </div>
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-muted-foreground mt-2">
           Select how you want to use Nuruvent
         </p>
       </div>
@@ -127,17 +117,17 @@ export function AccountTypeStep({ selected, onSelect }: AccountTypeStepProps) {
       </div>
 
       {/* "Already have an account?" */}
-      <div className="pt-4 border-t-2 border-gray-200 text-center">
-        <p className="text-sm sm:text-base text-gray-700">
+      <div className="pt-4 border-t-2 border-border text-center">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Already have an account?{' '}
           <Link
             href="/signin"
-            className="text-[#1A73E8] font-bold hover:underline hover:text-[#1557B0] transition-colors cursor-pointer text-base sm:text-lg"
+            className="text-primary font-bold hover:underline hover:text-primary-600 transition-colors cursor-pointer text-base sm:text-lg"
           >
             Sign In →
           </Link>
         </p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Access your dashboard, manage events, and track your growth
         </p>
       </div>
@@ -155,12 +145,6 @@ interface AccountTypeCardProps {
   onSelect: (type: SignupAccountType) => void;
 }
 
-/**
- * One selectable account-type card.
- *
- * Extracted from the parent so each option's JSX is written once
- * instead of being duplicated inside a `.map()`.
- */
 function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps) {
   const OptionIcon = option.icon;
 
@@ -170,17 +154,14 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
       onClick={() => onSelect(option.type)}
       className={cn(
         'group relative flex transition-all duration-300 cursor-pointer',
-        // Mobile: clean circle with label below
         'flex-col items-center justify-center gap-2 p-3 rounded-2xl',
-        // Desktop: full card with features
         'sm:flex-col sm:items-start sm:p-6 sm:rounded-2xl sm:gap-0 sm:border-2',
         'sm:shadow-lg hover:sm:shadow-2xl',
         isSelected &&
           'sm:ring-4 sm:ring-blue-500 sm:border-blue-500 sm:shadow-xl sm:shadow-blue-500/30',
         !isSelected &&
-          'sm:border-gray-200 sm:bg-white sm:hover:border-gray-300 sm:shadow-md',
-        // Mobile selected state - subtle background
-        isSelected && 'bg-gradient-to-b from-blue-50/50 to-transparent',
+          'sm:border-border sm:bg-card sm:hover:border-border/80 sm:shadow-md',
+        isSelected && 'bg-gradient-to-b from-blue-50/50 to-transparent dark:from-blue-950/30 dark:to-transparent',
       )}
     >
       {/* Glow overlay when selected (desktop only) */}
@@ -192,7 +173,7 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
       {isSelected && (
         <div
           className={cn(
-            'absolute -top-1.5 -right-1.5 bg-green-500 rounded-full shadow-lg shadow-green-500/40 animate-pulse',
+            'absolute -top-1.5 -right-1.5 bg-tertiary-500 rounded-full shadow-lg shadow-tertiary-500/40 animate-pulse',
             'p-0.5 sm:p-1.5 h-5 w-5 sm:h-6 sm:w-6',
             'flex items-center justify-center z-10',
           )}
@@ -281,16 +262,16 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
             'text-sm sm:text-base md:text-xl',
             isSelected
               ? option.type === 'account_type_personal'
-                ? 'text-blue-600'
-                : 'text-purple-600'
-              : 'text-gray-800 group-hover:text-gray-900',
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-purple-600 dark:text-purple-400'
+              : 'text-foreground group-hover:text-foreground/90',
           )}
         >
           {option.label}
         </span>
 
         {/* Description (desktop only) */}
-        <p className="text-xs text-gray-500 hidden sm:block mt-0.5">
+        <p className="text-xs text-muted-foreground hidden sm:block mt-0.5">
           {option.description.split(',')[0]}
         </p>
       </div>
@@ -303,8 +284,8 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
           className={cn(
             'px-2 py-0.5 rounded-full text-[10px] font-medium sm:hidden',
             option.type === 'account_type_personal'
-              ? 'bg-blue-100 text-blue-600'
-              : 'bg-purple-100 text-purple-600',
+              ? 'bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400'
+              : 'bg-purple-100 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400',
           )}
         >
           ✓ Selected
@@ -316,14 +297,14 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
         {option.features.slice(0, 3).map((feature, idx) => (
           <div
             key={idx}
-            className="flex items-center gap-2.5 text-xs text-gray-700"
+            className="flex items-center gap-2.5 text-xs text-foreground/80"
           >
             <div
               className={cn(
                 'flex-shrink-0 h-4 w-4 rounded-full flex items-center justify-center',
                 isSelected
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-200 text-gray-500 group-hover:bg-gray-300',
+                  ? 'bg-tertiary-500 text-white'
+                  : 'bg-muted text-muted-foreground group-hover:bg-accent',
               )}
             >
               <Check className="h-2.5 w-2.5" />
@@ -340,7 +321,7 @@ function AccountTypeCard({ option, isSelected, onSelect }: AccountTypeCardProps)
             'w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 text-center',
             isSelected
               ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30'
-              : 'bg-gray-100 text-gray-700 group-hover:bg-gray-200 group-hover:shadow-md',
+              : 'bg-muted text-foreground group-hover:bg-accent group-hover:shadow-md',
           )}
         >
           {isSelected ? (

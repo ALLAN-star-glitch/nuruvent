@@ -89,8 +89,8 @@ interface BookingFormData {
 
 function EventDetailSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50">
-      <div className="bg-white/80 backdrop-blur-xl border-b border-neutral-200/20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ function EventDetailSkeleton() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="border-neutral-200/60 shadow-sm">
+                <Card key={i} className="border-border shadow-sm">
                   <CardContent className="p-4 sm:p-5">
                     <div className="flex items-center gap-3 sm:gap-4">
                       <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
@@ -133,8 +133,8 @@ function EventDetailSkeleton() {
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
-            <Card className="border-neutral-200/60 shadow-lg overflow-hidden">
-              <div className="px-5 py-4 sm:py-5 border-b border-neutral-200/30">
+            <Card className="border-border shadow-lg overflow-hidden">
+              <div className="px-5 py-4 sm:py-5 border-b border-border">
                 <Skeleton className="h-4 w-24 mb-2 rounded" />
                 <Skeleton className="h-8 w-32 rounded" />
               </div>
@@ -168,7 +168,6 @@ export default function EventDetailPage() {
 
   const event: Event | undefined = response?.data;
 
-  // ---- Auth state (from selectors) ----
   const user = useAppSelector(selectUser);
   const account = useAppSelector(selectActiveAccount);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -189,7 +188,6 @@ export default function EventDetailPage() {
     certificate: true,
   });
 
-  // Pre-fill form with authenticated user's details.
   useEffect(() => {
     if (isAuthenticated) {
       const name = account?.displayName || account?.name || user?.name || '';
@@ -206,7 +204,6 @@ export default function EventDetailPage() {
     }
   }, [isAuthenticated, account, user]);
 
-  // When the user authenticates mid-booking, complete the pending booking.
   useEffect(() => {
     if (isAuthenticated && pendingBooking && !registrationComplete) {
       const name = account?.displayName || account?.name || user?.name || '';
@@ -268,7 +265,6 @@ export default function EventDetailPage() {
     setBookingError('');
 
     try {
-      // TODO: replace with real booking API call.
       await new Promise((resolve) => setTimeout(resolve, 1500));
       setBookingSuccess(true);
       setIsBooking(false);
@@ -337,19 +333,17 @@ export default function EventDetailPage() {
     router.back();
   };
 
-  // ---- Loading / error ----
-
   if (isLoading) return <EventDetailSkeleton />;
 
   if (error || !event) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center max-w-md px-4">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-neutral-900 mb-2">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Event Not Found
           </h2>
-          <p className="text-sm text-neutral-500 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             The event you&apos;re looking for doesn&apos;t exist or has been
             removed.
           </p>
@@ -360,8 +354,6 @@ export default function EventDetailPage() {
       </div>
     );
   }
-
-  // ---- Derived display values ----
 
   const startDate = event.start_date ?? event.schedules?.[0]?.start_date ?? '';
   const startTime = getEventStartTime(event);
@@ -399,14 +391,14 @@ export default function EventDetailPage() {
   const attendees = event.current_attendees ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       {/* ---- Top bar ---- */}
-      <div className="bg-white/80 backdrop-blur-xl border-b border-neutral-200/20">
+      <div className="bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <button
               onClick={handleBack}
-              className="inline-flex items-center gap-2 text-sm sm:text-base text-neutral-500 hover:text-neutral-900 transition-all duration-200 group cursor-pointer bg-transparent border-0"
+              className="inline-flex items-center gap-2 text-sm sm:text-base text-muted-foreground hover:text-foreground transition-all duration-200 group cursor-pointer bg-transparent border-0"
             >
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:-translate-x-1" />
               <span className="font-medium hidden sm:inline">Back to Events</span>
@@ -416,7 +408,7 @@ export default function EventDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 sm:h-10 sm:w-10 p-0 text-neutral-500 hover:text-neutral-900 cursor-pointer"
+                className="h-9 w-9 sm:h-10 sm:w-10 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={() => setIsSaved(!isSaved)}
                 type="button"
               >
@@ -429,7 +421,7 @@ export default function EventDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 sm:h-10 px-3 sm:px-4 text-neutral-500 hover:text-neutral-900 cursor-pointer"
+                className="h-9 sm:h-10 px-3 sm:px-4 text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={handleShare}
                 type="button"
               >
@@ -449,7 +441,7 @@ export default function EventDetailPage() {
           {/* Left column */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
             {/* Hero image */}
-            <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl overflow-hidden bg-neutral-100 shadow-lg">
+            <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl overflow-hidden bg-muted shadow-lg">
               {event.image_url ? (
                 <Image
                   src={event.image_url}
@@ -459,8 +451,8 @@ export default function EventDetailPage() {
                   priority
                 />
               ) : (
-                <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-neutral-100">
-                  <CalendarDays className="h-16 w-16 sm:h-24 sm:w-24 text-neutral-300" />
+                <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-muted dark:from-primary-950/30 dark:to-muted">
+                  <CalendarDays className="h-16 w-16 sm:h-24 sm:w-24 text-muted-foreground" />
                 </div>
               )}
 
@@ -480,7 +472,7 @@ export default function EventDetailPage() {
                   </Badge>
                 )}
                 {isPast && (
-                  <Badge className="bg-neutral-700/90 backdrop-blur-sm text-white border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
+                  <Badge className="bg-foreground/80 backdrop-blur-sm text-background border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
                     Ended
                   </Badge>
                 )}
@@ -494,27 +486,27 @@ export default function EventDetailPage() {
 
             {/* Title + host */}
             <div className="space-y-3">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-neutral-900 leading-tight">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
                 {event.display_name || event.name}
               </h1>
-              <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base text-neutral-500">
+              <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base text-muted-foreground">
                 <div className="flex items-center gap-2">
                   {hostIsInstitution ? (
                     <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
                   ) : (
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   )}
                   <span className="hidden xs:inline">Hosted by</span>
-                  <span className="font-medium text-neutral-700 flex items-center gap-1">
+                  <span className="font-medium text-foreground flex items-center gap-1">
                     {hostName}
                     {hostIsInstitution && (
                       <BadgeCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
                     )}
                   </span>
                 </div>
-                <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300 hidden xs:block" />
+                <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden xs:block" />
                 <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                  <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <span>
                     {event.is_virtual
                       ? 'Virtual Event'
@@ -525,8 +517,8 @@ export default function EventDetailPage() {
                 </div>
                 {!isPast && !isFullyBooked && timeRemaining && (
                   <>
-                    <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300 hidden sm:block" />
-                    <div className="flex items-center gap-2 text-secondary-600 font-medium">
+                    <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden sm:block" />
+                    <div className="flex items-center gap-2 text-secondary-600 dark:text-secondary-400 font-medium">
                       <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span>{timeRemaining}</span>
                     </div>
@@ -537,17 +529,17 @@ export default function EventDetailPage() {
 
             {/* Details grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
+              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 rounded-xl">
+                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
                       <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
                         Date
                       </p>
-                      <p className="text-sm sm:text-base font-semibold text-neutral-900">
+                      <p className="text-sm sm:text-base font-semibold text-foreground">
                         {fullDate}
                       </p>
                     </div>
@@ -555,17 +547,17 @@ export default function EventDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
+              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 rounded-xl">
+                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
                       <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
                         Time
                       </p>
-                      <p className="text-sm sm:text-base font-semibold text-neutral-900">
+                      <p className="text-sm sm:text-base font-semibold text-foreground">
                         {startTime}
                       </p>
                     </div>
@@ -573,17 +565,17 @@ export default function EventDetailPage() {
                 </CardContent>
               </Card>
 
-              <Card className="border-neutral-200/60 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
+              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
                 <CardContent className="p-4 sm:p-5">
                   <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 rounded-xl">
+                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
                       <MapPinIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
                         Location
                       </p>
-                      <p className="text-sm sm:text-base font-semibold text-neutral-900 truncate">
+                      <p className="text-sm sm:text-base font-semibold text-foreground truncate">
                         {location}
                       </p>
                     </div>
@@ -594,13 +586,13 @@ export default function EventDetailPage() {
 
             {/* Description */}
             {event.description && (
-              <Card className="border-neutral-200/60 shadow-sm cursor-default">
+              <Card className="border-border shadow-sm cursor-default">
                 <CardContent className="p-5 sm:p-6 lg:p-7">
-                  <h3 className="text-sm sm:text-base font-semibold text-neutral-900 mb-3 flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-semibold text-foreground mb-3 flex items-center gap-2">
                     <span className="w-1 h-5 sm:h-6 rounded-full bg-primary-500" />
                     About This Event
                   </h3>
-                  <p className="text-sm sm:text-base text-neutral-600 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
                     {event.description}
                   </p>
                 </CardContent>
@@ -608,25 +600,25 @@ export default function EventDetailPage() {
             )}
 
             {/* Footer details */}
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm sm:text-base text-neutral-500 pb-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm sm:text-base text-muted-foreground pb-4">
               {duration && (
                 <div className="flex items-center gap-2 cursor-default">
-                  <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                  <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   <span>{duration}</span>
                 </div>
               )}
               {hasCertificate && (
                 <>
-                  <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300" />
+                  <span className="w-px h-4 sm:h-5 rounded-full bg-border" />
                   <div className="flex items-center gap-2 cursor-default">
-                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                     <span>Certificate: {formatPrice(certificatePrice)}</span>
                   </div>
                 </>
               )}
-              <span className="w-px h-4 sm:h-5 rounded-full bg-neutral-300 hidden sm:block" />
+              <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden sm:block" />
               <div className="flex items-center gap-2 cursor-default">
-                <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                 <span className="hidden sm:inline">ID: {event.id.slice(0, 8)}</span>
                 <span className="sm:hidden">#{event.id.slice(0, 6)}</span>
               </div>
@@ -636,34 +628,36 @@ export default function EventDetailPage() {
           {/* Right column — booking */}
           <div className="lg:col-span-1">
             <div className="space-y-4">
-              <Card className="border-neutral-200/60 shadow-lg overflow-hidden cursor-default">
-                <div className="bg-gradient-to-r from-primary-500/5 to-primary-500/10 px-5 py-4 sm:py-5 border-b border-neutral-200/30">
-                  <p className="text-xs sm:text-sm text-neutral-400 font-medium uppercase tracking-wider">
+              <Card className="border-border shadow-lg overflow-hidden cursor-default">
+                <div className="bg-gradient-to-r from-primary-500/5 to-primary-500/10 dark:from-primary-950/30 dark:to-primary-950/20 px-5 py-4 sm:py-5 border-b border-border">
+                  <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
                     Registration
                   </p>
                   <div className="flex items-end gap-2 mt-1">
                     <span
                       className={cn(
                         'text-3xl sm:text-4xl font-bold',
-                        totalPrice === 0 ? 'text-tertiary-600' : 'text-primary-600',
+                        totalPrice === 0
+                          ? 'text-tertiary-600 dark:text-tertiary-400'
+                          : 'text-primary-600 dark:text-primary-400',
                       )}
                     >
                       {formatPrice(totalPrice)}
                     </span>
-                    <span className="text-sm sm:text-base text-neutral-400">
+                    <span className="text-sm sm:text-base text-muted-foreground">
                       total
                     </span>
                   </div>
                   {hasCertificate && !isFree && (
-                    <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-neutral-500">
+                    <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-muted-foreground">
                       <span className="line-through">
                         {formatPrice(minPrice)}
                       </span>
-                      <span className="text-neutral-300">+</span>
-                      <span className="text-amber-600 font-medium">
+                      <span className="text-muted-foreground/60">+</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">
                         {formatPrice(certificatePrice)}
                       </span>
-                      <span className="text-neutral-400">certificate</span>
+                      <span className="text-muted-foreground">certificate</span>
                     </div>
                   )}
                 </div>
@@ -672,16 +666,16 @@ export default function EventDetailPage() {
                   {/* Attendees */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm sm:text-base">
-                      <div className="flex items-center gap-2 text-neutral-600 cursor-default">
-                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-400" />
+                      <div className="flex items-center gap-2 text-muted-foreground cursor-default">
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                         <span>Attendees</span>
                       </div>
-                      <span className="font-semibold text-neutral-900 cursor-default">
+                      <span className="font-semibold text-foreground cursor-default">
                         {attendees} / {capacity > 0 ? capacity : '∞'}
                       </span>
                     </div>
                     {capacity > 0 && (
-                      <div className="w-full h-1.5 sm:h-2 bg-neutral-100 rounded-full overflow-hidden cursor-default">
+                      <div className="w-full h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden cursor-default">
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-500',
@@ -696,7 +690,7 @@ export default function EventDetailPage() {
                       </div>
                     )}
                     {spotsLeft !== null && !isPast && !isFullyBooked && (
-                      <p className="text-xs sm:text-sm text-neutral-500 cursor-default">
+                      <p className="text-xs sm:text-sm text-muted-foreground cursor-default">
                         {spotsLeft} spots remaining
                       </p>
                     )}
@@ -705,21 +699,21 @@ export default function EventDetailPage() {
                   <Separator />
 
                   {hasCertificate && (
-                    <div className="flex items-center justify-between bg-amber-50/70 rounded-lg px-3 py-2.5 sm:py-3 border-2 border-amber-400">
+                    <div className="flex items-center justify-between bg-amber-50/70 dark:bg-amber-950/20 rounded-lg px-3 py-2.5 sm:py-3 border-2 border-amber-400 dark:border-amber-900/50">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-amber-100 rounded-lg">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                        <div className="p-1.5 bg-amber-100 dark:bg-amber-950/40 rounded-lg">
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
-                          <span className="text-sm sm:text-base font-semibold text-amber-800">
+                          <span className="text-sm sm:text-base font-semibold text-amber-800 dark:text-amber-200">
                             Certificate Included
                           </span>
-                          <p className="text-xs sm:text-sm text-amber-600">
+                          <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400">
                             Included in total price
                           </p>
                         </div>
                       </div>
-                      <span className="text-sm sm:text-base font-semibold text-amber-800 ml-auto">
+                      <span className="text-sm sm:text-base font-semibold text-amber-800 dark:text-amber-200 ml-auto">
                         {formatPrice(certificatePrice)}
                       </span>
                     </div>
@@ -729,15 +723,15 @@ export default function EventDetailPage() {
                     <>
                       {showSuccess ? (
                         <div className="space-y-4">
-                          <div className="flex items-center gap-3 bg-tertiary-50 border border-tertiary-200 rounded-xl p-4 cursor-default">
-                            <CheckCircle className="h-7 w-7 text-tertiary-600 flex-shrink-0" />
+                          <div className="flex items-center gap-3 bg-tertiary-50 dark:bg-tertiary-950/30 border border-tertiary-200 dark:border-tertiary-900/50 rounded-xl p-4 cursor-default">
+                            <CheckCircle className="h-7 w-7 text-tertiary-600 dark:text-tertiary-400 flex-shrink-0" />
                             <div>
-                              <p className="font-semibold text-tertiary-800 text-sm sm:text-base">
+                              <p className="font-semibold text-tertiary-800 dark:text-tertiary-200 text-sm sm:text-base">
                                 {!isAuthenticated && registrationComplete
                                   ? 'Account Created & Ticket Booked!'
                                   : 'Booking Confirmed!'}
                               </p>
-                              <p className="text-sm text-tertiary-700">
+                              <p className="text-sm text-tertiary-700 dark:text-tertiary-300">
                                 {!isAuthenticated && registrationComplete
                                   ? 'Your account has been created and your ticket is confirmed. Redirecting to payment...'
                                   : 'Redirecting to payment...'}
@@ -746,7 +740,7 @@ export default function EventDetailPage() {
                           </div>
                           <Button
                             onClick={handleResetBooking}
-                            className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border border-tertiary-200 text-tertiary-700 hover:bg-tertiary-50 transition-all duration-200 cursor-pointer"
+                            className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border border-tertiary-200 dark:border-tertiary-900/50 text-tertiary-700 dark:text-tertiary-300 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30 transition-all duration-200 cursor-pointer"
                             variant="outline"
                           >
                             View Other Events
@@ -755,9 +749,9 @@ export default function EventDetailPage() {
                       ) : (
                         <form onSubmit={handleBooking} className="space-y-4">
                           {!isAuthenticated && (
-                            <div className="flex items-center gap-2 bg-amber-50 rounded-lg px-3 py-2 border border-amber-200 cursor-default">
-                              <LogIn className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-amber-700">
+                            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200 dark:border-amber-900/50 cursor-default">
+                              <LogIn className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">
                                 You&apos;ll be prompted to sign in or create an
                                 account to complete booking
                               </span>
@@ -765,9 +759,9 @@ export default function EventDetailPage() {
                           )}
 
                           {isAuthenticated && (
-                            <div className="flex items-center gap-2 bg-green-50 rounded-lg px-3 py-2 border border-green-200 cursor-default">
-                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-green-700">
+                            <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 py-2 border border-green-200 dark:border-green-900/50 cursor-default">
+                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                              <span className="text-xs sm:text-sm text-green-700 dark:text-green-300">
                                 Booking as{' '}
                                 {account?.displayName || account?.name || user?.name}
                               </span>
@@ -776,10 +770,10 @@ export default function EventDetailPage() {
 
                           <div className="space-y-1.5">
                             <Label htmlFor="fullName" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Full Name <span className="text-red-500">*</span>
+                              Full Name <span className="text-destructive">*</span>
                             </Label>
                             <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-neutral-400 pointer-events-none" />
+                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
                               <Input
                                 id="fullName"
                                 placeholder="Enter your full name"
@@ -795,10 +789,10 @@ export default function EventDetailPage() {
 
                           <div className="space-y-1.5">
                             <Label htmlFor="email" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Email Address <span className="text-red-500">*</span>
+                              Email Address <span className="text-destructive">*</span>
                             </Label>
                             <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-neutral-400 pointer-events-none" />
+                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
                               <Input
                                 id="email"
                                 type="email"
@@ -818,7 +812,7 @@ export default function EventDetailPage() {
                               Phone Number
                             </Label>
                             <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-neutral-400 pointer-events-none" />
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
                               <Input
                                 id="phone"
                                 type="tel"
@@ -837,7 +831,7 @@ export default function EventDetailPage() {
                               Special Requests
                             </Label>
                             <div className="relative">
-                              <MessageSquare className="absolute left-3 top-3 h-4 w-4 sm:h-5 sm:w-5 text-neutral-400 pointer-events-none" />
+                              <MessageSquare className="absolute left-3 top-3 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
                               <Textarea
                                 id="specialRequests"
                                 placeholder="Any special requirements or questions..."
@@ -854,7 +848,7 @@ export default function EventDetailPage() {
                           </div>
 
                           {bookingError && (
-                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-sm sm:text-base text-red-700 cursor-default">
+                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-3 text-sm sm:text-base text-red-700 dark:text-red-300 cursor-default">
                               <XCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                               {bookingError}
                             </div>
@@ -886,7 +880,7 @@ export default function EventDetailPage() {
                             )}
                           </Button>
 
-                          <p className="text-xs sm:text-sm text-center text-neutral-400 cursor-default">
+                          <p className="text-xs sm:text-sm text-center text-muted-foreground cursor-default">
                             By booking, you agree to our terms and conditions
                           </p>
                         </form>
@@ -894,7 +888,7 @@ export default function EventDetailPage() {
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      <div className="flex items-center justify-center gap-2 text-neutral-500 mb-2 cursor-default">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground mb-2 cursor-default">
                         {isPast ? (
                           <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
                         ) : (
@@ -908,7 +902,7 @@ export default function EventDetailPage() {
                               : 'Registration Closed'}
                         </span>
                       </div>
-                      <p className="text-sm sm:text-base text-neutral-400 cursor-default">
+                      <p className="text-sm sm:text-base text-muted-foreground cursor-default">
                         {isPast
                           ? 'Check out our upcoming events'
                           : 'No more spots available'}
@@ -919,11 +913,11 @@ export default function EventDetailPage() {
               </Card>
 
               {/* Share card */}
-              <Card className="border-neutral-200/60 shadow-sm cursor-default">
+              <Card className="border-border shadow-sm cursor-default">
                 <CardContent className="p-4">
                   <Button
                     variant="outline"
-                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border-neutral-200 hover:border-primary-300 hover:bg-primary-50/50 transition-all duration-200 cursor-pointer"
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border-border hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50/50 dark:hover:bg-primary-950/30 transition-all duration-200 cursor-pointer"
                     onClick={handleShare}
                     type="button"
                   >

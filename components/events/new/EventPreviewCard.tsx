@@ -21,11 +21,6 @@ import type { EventFormData } from '../types';
 // ============================================================
 // EVENT PREVIEW CARD
 // ============================================================
-//
-// Read-only card that mirrors how the event will render to attendees.
-// Date / time / duration come from the first usable schedule.
-// Price comes from the first usable ticket.
-// Capacity comes from the top-level `capacity` field.
 
 interface EventPreviewCardProps {
   data: EventFormData;
@@ -61,7 +56,6 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : null;
 
-  // ---- Price from first usable ticket ----
   const firstTicket = data.tickets?.find(
     (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
   );
@@ -70,7 +64,6 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
     (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
   ).length ?? 0;
 
-  // ---- Price label ----
   let priceLabel: string;
   if (!firstTicket) {
     priceLabel = 'Free';
@@ -80,7 +73,6 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
     priceLabel = `${ticketPrice} KES${ticketCount > 1 ? '+' : ''}`;
   }
 
-  // Location
   const locationText =
     primarySchedule?.location ||
     data.venue_name ||
@@ -88,9 +80,9 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
     'Location TBD';
 
   return (
-    <div className="border border-neutral-light rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+    <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow">
       {data.imagePreview ? (
-        <div className="w-full h-48 bg-neutral-light overflow-hidden">
+        <div className="w-full h-48 bg-muted overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={data.imagePreview}
@@ -101,8 +93,8 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
       ) : (
         <div className="w-full h-48 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
           <div className="text-center">
-            <Calendar className="h-10 w-10 text-primary-300 mx-auto" />
-            <p className="text-sm text-neutral-gray mt-2">Event Image</p>
+            <Calendar className="h-10 w-10 text-primary/60 mx-auto" />
+            <p className="text-sm text-muted-foreground mt-2">Event Image</p>
           </div>
         </div>
       )}
@@ -111,7 +103,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
         {/* Title + badges */}
         <div>
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-lg font-bold text-neutral-dark line-clamp-2 flex-1">
+            <h3 className="text-lg font-bold text-foreground line-clamp-2 flex-1">
               {data.name || 'Untitled Event'}
             </h3>
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -124,7 +116,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
               {data.is_private && (
                 <Badge
                   variant="outline"
-                  className="text-amber-600 border-amber-200 bg-amber-50 text-xs"
+                  className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-xs"
                 >
                   <Lock className="h-3 w-3 mr-1" />
                   Private
@@ -134,7 +126,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
           </div>
 
           {data.short_description && (
-            <p className="text-sm text-neutral-gray line-clamp-2 mt-1">
+            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
               {data.short_description}
             </p>
           )}
@@ -142,7 +134,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
 
         {/* Event type */}
         {eventType && (
-          <div className="flex items-center gap-2 text-sm text-neutral-gray">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="capitalize">
               {eventType.display_name || eventType.name}
             </span>
@@ -151,7 +143,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
 
         {/* Date + time */}
         {(startDate || startTime) && (
-          <div className="flex items-start gap-2 text-sm text-neutral-gray">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div>
               {formatDate(startDate)}
@@ -161,7 +153,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
         )}
 
         {/* Location / virtual */}
-        <div className="flex items-center gap-2 text-sm text-neutral-gray">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {data.is_virtual ? (
             <Video className="h-4 w-4 flex-shrink-0" />
           ) : (
@@ -171,13 +163,13 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
         </div>
 
         {/* Price + capacity */}
-        <div className="flex items-center justify-between pt-2 border-t border-neutral-light">
-          <div className="flex items-center gap-1 text-sm font-semibold text-neutral-dark">
-            <DollarSign className="h-4 w-4 text-neutral-gray" />
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
             {priceLabel}
           </div>
           {data.capacity && data.capacity > 0 && (
-            <div className="flex items-center gap-1 text-sm text-neutral-gray">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
               <span>{data.capacity} spots</span>
             </div>
@@ -186,7 +178,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
 
         {/* Duration */}
         {duration && duration > 0 && (
-          <div className="flex items-center gap-2 text-sm text-neutral-gray">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>{duration} minutes</span>
           </div>

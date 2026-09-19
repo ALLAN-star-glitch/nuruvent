@@ -5,6 +5,7 @@ import { InstallPrompt } from "@/components/PWA/InstallPrompt";
 import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
 import Script from "next/script";
 import StoreProvider from "./StoreProvider";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -65,7 +66,15 @@ export default function RootLayout({
   const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Anti-flash: apply `.dark` to <html> before first paint.
+            Must be a raw inline <script> (not next/script) so it runs
+            synchronously in <head>, ahead of the framework boot. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
         {/* Render child layout route groups: (public) or (dashboard) */}
         <StoreProvider>{children}</StoreProvider>

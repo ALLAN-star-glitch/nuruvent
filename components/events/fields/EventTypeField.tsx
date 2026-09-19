@@ -15,16 +15,9 @@ import type { EventType as EventTypeModel } from '@/lib/types/events';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { FieldBaseProps, fieldId } from '@/components/form/types';
 
-
-
 // ============================================================
 // EVENT TYPE FIELD
 // ============================================================
-//
-// Event types are passed in as props (loaded by the parent) rather
-// than fetched here. Reason: the parent often needs the same list to
-// resolve the selected type's display_name for the preview card, and
-// we don't want two subscriptions to the same query.
 
 interface EventTypeFieldProps extends FieldBaseProps {
   value: string;
@@ -47,7 +40,7 @@ export function EventTypeField({
       id={fieldId('event_type_id', id)}
       label={
         <>
-          Event Type <span className="text-error-500 ml-1">*</span>
+          Event Type <span className="text-destructive ml-1">*</span>
         </>
       }
       error={error}
@@ -61,7 +54,7 @@ export function EventTypeField({
         disabled={disabled}
       >
         <SelectTrigger
-          className={cn('cursor-pointer', error && 'border-error-500')}
+          className={cn('cursor-pointer', error && 'border-destructive')}
         >
           <SelectValue placeholder="Select event type" />
         </SelectTrigger>

@@ -32,15 +32,11 @@ export function SignupFlow() {
   const meta = getStepMeta(form.currentStep, form.accountType);
   const animationKey = stepAnimationKey(form.currentStep, form.accountType);
 
-  // The "continue" button is not shown on the first, OTP, or success
-  // steps: those have their own primary actions (select a card, click
-  // "Verify Email", or navigate away).
   const showContinueButton =
     form.currentStep !== 'account-type' &&
     form.currentStep !== 'otp' &&
     form.currentStep !== 'success';
 
-  // Compute the label shown on the primary button.
   const continueLabel = computeContinueLabel(
     form.accountType,
     form.currentStep,
@@ -55,13 +51,13 @@ export function SignupFlow() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center py-8 sm:py-12 px-3 sm:px-4 overflow-hidden bg-white">
+    <div className="relative min-h-screen flex items-center justify-center py-8 sm:py-12 px-3 sm:px-4 overflow-hidden bg-background">
       {/* Background layer */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/registration-bg.jpeg')" }}
       />
-      <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
+      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
 
       {/* Dot pattern (hidden on mobile) */}
       <div className="absolute inset-0 pointer-events-none hidden sm:block">
@@ -94,16 +90,16 @@ export function SignupFlow() {
       <div className="relative z-10 w-full max-w-3xl">
         {/* Page header */}
         <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             Create Your Account
           </h1>
-          <p className="text-gray-500 text-sm sm:text-base mt-0.5 sm:mt-1">
+          <p className="text-muted-foreground text-sm sm:text-base mt-0.5 sm:mt-1">
             Join Nuruvent and start your professional journey
           </p>
         </div>
 
         {/* Card */}
-        <Card className="relative bg-white/80 backdrop-blur-xl shadow-2xl border border-white/60">
+        <Card className="relative bg-card/80 backdrop-blur-xl shadow-2xl border border-border">
           <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
             {/* Back button */}
             {form.canGoBack && (
@@ -113,7 +109,7 @@ export function SignupFlow() {
                   size="sm"
                   onClick={form.goBack}
                   disabled={form.isLoading}
-                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100/80 px-2 sm:px-3 py-1 h-auto text-xs sm:text-sm font-medium cursor-pointer"
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent px-2 sm:px-3 py-1 h-auto text-xs sm:text-sm font-medium cursor-pointer"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                   Back
@@ -131,10 +127,10 @@ export function SignupFlow() {
 
             {/* Step title + description */}
             <div className="text-center mt-1.5 sm:mt-2">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">
                 {meta.title}
               </h2>
-              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-gray-500">
+              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-muted-foreground">
                 {meta.description}
               </p>
             </div>
@@ -223,7 +219,7 @@ export function SignupFlow() {
                     <Button
                       onClick={form.next}
                       disabled={form.isLoading}
-                      className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-5 sm:py-6 text-sm sm:text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-5 sm:py-6 text-sm sm:text-base rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {form.isSubmitting ? (
                         <span className="flex items-center gap-2">
@@ -248,10 +244,10 @@ export function SignupFlow() {
 
         {/* Footer */}
         <div className="text-center mt-4 sm:mt-6">
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-gray-400">
+          <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
             <Shield className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             <span>Secure & encrypted</span>
-            <span className="w-px h-2.5 sm:h-3 bg-gray-300" />
+            <span className="w-px h-2.5 sm:h-3 bg-border" />
             <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
             <span>Powered by Nuruvent</span>
           </div>
@@ -262,16 +258,11 @@ export function SignupFlow() {
 }
 
 // ============================================================
-// HELPERS
+// HELPERS (unchanged)
 // ============================================================
 
 type SignupForm = ReturnType<typeof useSignupForm>;
 
-/**
- * Pick the email to display on the OTP and success steps.
- * Falls back to the appropriate form field if the slice hasn't yet
- * caught up (e.g. after a page refresh mid-flow).
- */
 function resolveDisplayEmail(form: SignupForm): string {
   if (form.otpEmail) return form.otpEmail;
   if (form.accountType === 'account_type_institution') {
@@ -280,10 +271,6 @@ function resolveDisplayEmail(form: SignupForm): string {
   return form.formData.email;
 }
 
-/**
- * Pick the display name for the success step.
- * Institution accounts greet the admin; personal accounts greet the user.
- */
 function resolveDisplayName(form: SignupForm): string {
   if (form.accountType === 'account_type_institution') {
     return form.formData.adminName;
@@ -291,9 +278,6 @@ function resolveDisplayName(form: SignupForm): string {
   return form.formData.name;
 }
 
-/**
- * Decide what the primary continue button says for the current step.
- */
 function computeContinueLabel(
   accountType: SignupForm['accountType'],
   step: SignupForm['currentStep'],
@@ -305,10 +289,6 @@ function computeContinueLabel(
   return 'Continue';
 }
 
-/**
- * True when the current step's "continue" click will result in the final
- * account-creation API call — used to swap the loading text.
- */
 function isFinalSubmit(
   accountType: SignupForm['accountType'],
   step: SignupForm['currentStep'],

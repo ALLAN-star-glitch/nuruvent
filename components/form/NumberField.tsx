@@ -61,7 +61,7 @@ export function NumberField({
         suffix ? (
           <>
             {label}{' '}
-            <span className="text-neutral-gray text-xs">({suffix})</span>
+            <span className="text-muted-foreground text-xs">({suffix})</span>
           </>
         ) : (
           label
@@ -81,8 +81,8 @@ export function NumberField({
         step={step}
         disabled={disabled}
         className={cn(
-          'cursor-text focus:ring-primary-500 focus:border-primary-500',
-          error && 'border-error-500',
+          'cursor-text focus:ring-primary focus:border-primary',
+          error && 'border-destructive',
         )}
       />
     </FieldWrapper>

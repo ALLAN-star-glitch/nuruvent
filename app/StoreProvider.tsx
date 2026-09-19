@@ -5,8 +5,9 @@
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from '@/lib/store';
+import { ThemeProvider } from '@/components/providers/ThemeProvider'; // <-- add
 
-export default function StoreProvider({ 
+export default function StoreProvider({
   children,
 }: {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ export default function StoreProvider({
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>   {/* <-- wrap */}
       </PersistGate>
     </Provider>
   );

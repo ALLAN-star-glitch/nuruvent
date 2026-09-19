@@ -38,13 +38,6 @@ import { makeEmptyTicket, type TicketForm } from '../types';
 // ============================================================
 // TICKET LIST FIELD (events)
 // ============================================================
-//
-// Accordion list editor for one or more tickets. One open at a time.
-// Header shows a summary; body shows the fields.
-//
-// A ticket is "usable" when it has a ticket_type_id and quantity > 0.
-// Rows that are still empty are visually marked but not dropped —
-// the transform layer filters them out of the payload.
 
 interface TicketListFieldProps extends FieldBaseProps {
   value: TicketForm[];
@@ -72,7 +65,6 @@ export function TicketListField({
     [value],
   );
 
-  // Auto-expand the first incomplete ticket on mount.
   useEffect(() => {
     if (openKey !== null) return;
     const firstIncomplete = tickets.find(
@@ -83,8 +75,6 @@ export function TicketListField({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ---- Mutators ----
 
   const update = <K extends keyof TicketForm>(
     key: string,
@@ -97,8 +87,6 @@ export function TicketListField({
   const addTicket = () => {
     if (tickets.length >= MAX_TICKETS) return;
     const next = makeEmptyTicket();
-    // Default to the first available ticket type so the user has one
-    // less decision to make.
     next.ticket_type_id = ticketTypes[0]?.id ?? '';
     onChange([...tickets, next]);
     setOpenKey(next._key);
@@ -119,23 +107,23 @@ export function TicketListField({
     <div id={fieldId('tickets', id)} className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-          <TicketIcon className="h-4 w-4 text-primary-500" />
-          Tickets <span className="text-error-500">*</span>
+        <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+          <TicketIcon className="h-4 w-4 text-primary" />
+          Tickets <span className="text-destructive">*</span>
         </Label>
-        <span className="text-xs text-neutral-gray">
+        <span className="text-xs text-muted-foreground">
           {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'}
         </span>
       </div>
 
       {/* Loading state */}
       {isLoadingTypes && (
-        <p className="text-xs text-neutral-gray">Loading ticket types…</p>
+        <p className="text-xs text-muted-foreground">Loading ticket types…</p>
       )}
 
       {/* No types available */}
       {!isLoadingTypes && ticketTypes.length === 0 && (
-        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
+        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 text-sm text-amber-700 dark:text-amber-300">
           No ticket types available. Add one in the admin panel before
           creating tickets.
         </div>
@@ -161,13 +149,13 @@ export function TicketListField({
             <div
               key={ticket._key}
               className={cn(
-                'border rounded-lg bg-white transition-shadow',
+                'border rounded-lg bg-card transition-shadow',
                 isOpen
-                  ? 'border-primary-300 shadow-sm'
-                  : 'border-neutral-light hover:border-neutral-300',
+                  ? 'border-primary/40 shadow-sm'
+                  : 'border-border hover:border-border/80',
               )}
             >
-              {/* ---- Header ---- */}
+              {/* Header */}
               <div className="flex items-start gap-3 p-3">
                 <button
                   type="button"
@@ -176,7 +164,7 @@ export function TicketListField({
                   className="flex-1 flex items-start gap-3 text-left cursor-pointer min-w-0"
                   aria-expanded={isOpen}
                 >
-                  <div className="pt-0.5 text-neutral-gray">
+                  <div className="pt-0.5 text-muted-foreground">
                     {isOpen ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
@@ -186,10 +174,10 @@ export function TicketListField({
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-neutral-dark truncate">
+                      <span className="text-sm font-medium text-foreground truncate">
                         {displayName}
                       </span>
-                      <span className="text-[10px] font-medium text-neutral-gray bg-neutral-100 px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
                         {typeLabel}
                       </span>
                     </div>
@@ -209,7 +197,7 @@ export function TicketListField({
                     type="button"
                     onClick={() => setPendingRemoveKey(ticket._key)}
                     disabled={disabled}
-                    className="p-1.5 rounded-md text-neutral-gray hover:text-error-500 hover:bg-error-50 transition-colors cursor-pointer shrink-0"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
                     aria-label={`Remove ${displayName}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -219,14 +207,14 @@ export function TicketListField({
                 {/* Inline remove confirmation */}
                 {isPendingRemove && (
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs text-neutral-gray mr-1">
+                    <span className="text-xs text-muted-foreground mr-1">
                       Remove?
                     </span>
                     <button
                       type="button"
                       onClick={() => setPendingRemoveKey(null)}
                       disabled={disabled}
-                      className="px-2 py-1 text-xs rounded border border-neutral-light text-neutral-gray hover:bg-neutral-100 cursor-pointer"
+                      className="px-2 py-1 text-xs rounded border border-border text-muted-foreground hover:bg-accent cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -234,7 +222,7 @@ export function TicketListField({
                       type="button"
                       onClick={() => confirmRemove(ticket._key)}
                       disabled={disabled}
-                      className="px-2 py-1 text-xs rounded bg-error-500 text-white hover:bg-error-600 cursor-pointer"
+                      className="px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
                     >
                       Yes
                     </button>
@@ -242,13 +230,13 @@ export function TicketListField({
                 )}
               </div>
 
-              {/* ---- Body ---- */}
+              {/* Body */}
               {isOpen && (
-                <div className="px-4 pb-4 pt-1 border-t border-neutral-light space-y-4">
+                <div className="px-4 pb-4 pt-1 border-t border-border space-y-4">
                   {/* Ticket type */}
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium text-neutral-dark">
-                      Ticket Type <span className="text-error-500 ml-1">*</span>
+                    <Label className="text-sm font-medium text-foreground">
+                      Ticket Type <span className="text-destructive ml-1">*</span>
                     </Label>
                     <Select
                       value={ticket.ticket_type_id || undefined}
@@ -316,7 +304,7 @@ export function TicketListField({
                       name={`ticket_${index}_quantity`}
                       label={
                         <>
-                          Quantity <span className="text-error-500 ml-1">*</span>
+                          Quantity <span className="text-destructive ml-1">*</span>
                         </>
                       }
                       placeholder="e.g., 100"
@@ -376,13 +364,13 @@ export function TicketListField({
       )}
 
       {tickets.length >= MAX_TICKETS && (
-        <p className="text-xs text-neutral-gray text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Maximum of {MAX_TICKETS} tickets reached.
         </p>
       )}
 
       {/* Error */}
-      {error && <p className="text-sm text-error-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -399,7 +387,7 @@ interface TicketSummaryProps {
 function TicketSummary({ ticket, isUsable }: TicketSummaryProps) {
   if (!isUsable) {
     return (
-      <span className="text-xs text-amber-600 italic">
+      <span className="text-xs text-amber-600 dark:text-amber-400 italic">
         Needs ticket type and quantity
       </span>
     );
@@ -410,8 +398,8 @@ function TicketSummary({ ticket, isUsable }: TicketSummaryProps) {
   const quantity = ticket.quantity ?? 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-gray">
-      <span className="font-medium text-neutral-dark">{priceLabel}</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span className="font-medium text-foreground">{priceLabel}</span>
       <span>·</span>
       <span>{quantity} available</span>
       {ticket.max_per_person && (

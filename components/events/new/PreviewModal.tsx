@@ -16,13 +16,9 @@ import type { EventType as EventTypeModel } from '@/lib/types/events';
 import { EventPreviewCard } from './EventPreviewCard';
 import { EventFormData } from '../types';
 
-
 // ============================================================
 // PREVIEW MODAL (mobile only)
 // ============================================================
-//
-// On small screens there's no room for the sticky sidebar preview, so
-// the user opens this dialog from the header's Preview button.
 
 interface PreviewModalProps {
   open: boolean;
@@ -41,8 +37,8 @@ export function PreviewModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-neutral-dark">Event Preview</DialogTitle>
-          <DialogDescription className="text-neutral-gray">
+          <DialogTitle className="text-foreground">Event Preview</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Preview of your event as it will appear to attendees
           </DialogDescription>
         </DialogHeader>

@@ -13,13 +13,9 @@ import { FieldBaseProps, fieldId } from '@/components/form/types';
 import { SpeakerForm } from '../new';
 import { makeEmptySpeaker } from '../types';
 
-
-
 // ============================================================
 // SPEAKERS FIELD (events)
 // ============================================================
-//
-// List editor. Add/remove speaker rows.
 
 interface SpeakersFieldProps extends FieldBaseProps {
   value: SpeakerForm[];
@@ -56,14 +52,14 @@ export function SpeakersField({
 
   return (
     <div id={fieldId('speakers', id)} className="space-y-3">
-      <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
-        <UserCheck className="h-4 w-4 text-primary-500" />
-        Speakers <span className="text-neutral-gray text-xs">(optional)</span>
+      <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+        <UserCheck className="h-4 w-4 text-primary" />
+        Speakers <span className="text-muted-foreground text-xs">(optional)</span>
       </Label>
 
       {value.length === 0 && (
-        <div className="p-4 border border-dashed border-neutral-light rounded-lg text-center">
-          <p className="text-sm text-neutral-gray mb-3">
+        <div className="p-4 border border-dashed border-border rounded-lg text-center">
+          <p className="text-sm text-muted-foreground mb-3">
             No speakers yet.
           </p>
           <Button
@@ -82,17 +78,17 @@ export function SpeakersField({
       {value.map((speaker, index) => (
         <div
           key={speaker._key}
-          className="border border-neutral-light rounded-lg p-4 space-y-4 bg-white"
+          className="border border-border rounded-lg p-4 space-y-4 bg-card"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-neutral-gray uppercase tracking-wide">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Speaker {index + 1}
             </span>
             <button
               type="button"
               onClick={() => removeSpeaker(index)}
               disabled={disabled}
-              className="p-1.5 rounded-md text-neutral-gray hover:text-error-500 hover:bg-error-50 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
               aria-label={`Remove speaker ${index + 1}`}
             >
               <Trash2 className="h-4 w-4" />
@@ -141,8 +137,8 @@ export function SpeakersField({
             type="url"
           />
 
-          <div className="flex items-center justify-between p-2 bg-neutral-light rounded-md">
-            <Label className="text-xs font-medium text-neutral-dark">
+          <div className="flex items-center justify-between p-2 bg-muted rounded-md">
+            <Label className="text-xs font-medium text-foreground">
               Keynote speaker
             </Label>
             <Switch
@@ -168,7 +164,7 @@ export function SpeakersField({
         </Button>
       )}
 
-      {error && <p className="text-sm text-error-500">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

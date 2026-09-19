@@ -89,7 +89,6 @@ interface EditEventWizardProps {
 export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const router = useRouter();
 
-  // ---- Wizard-level state ----
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublished, setIsPublished] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
@@ -107,18 +106,15 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
   const submitInFlightRef = useRef(false);
 
-  // ---- Remote data ----
   const { data: typesResponse } = useGetEventTypesQuery();
   const { data: ticketTypesResponse } = useGetTicketTypesQuery();
   const eventTypes = typesResponse?.data ?? [];
   const ticketTypes = ticketTypesResponse?.data ?? [];
 
-  // ---- Mutations ----
   const [deleteEvent, { isLoading: isDeleting }] = useDeleteEventMutation();
   const [updateEvent] = useUpdateEventMutation();
   const [publishEvent] = usePublishEventMutation();
 
-  // ---- Hooks ----
   const formState = useEventFormState(defaultFormData);
   const draft = useEventDraft({
     persistence: false,
@@ -168,7 +164,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     submitInFlightRef,
   });
 
-  // ---- Mobile detection ----
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -176,12 +171,10 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // ---- Hydration status ----
   const isLoading = hydration.isLoading;
   const notFound = hydration.notFound;
   const hydrationError = hydration.error;
 
-  // ---- Derived: published status ----
   const event = hydration.event;
   const isPublishedStatus =
     !!event?.published_at || event?.event_status?.slug === 'published';
@@ -190,10 +183,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     event?.event_status?.display_name ||
     event?.event_status?.name ||
     (isPublishedStatus ? 'Published' : 'Draft');
-
-  // ============================================================
-  // HANDLERS
-  // ============================================================
 
   const handleFieldChange = formState.handleFieldChange;
 
@@ -357,10 +346,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     formState.setTouched((prev) => ({ ...prev, event_type_id: true }));
   }, [formState]);
 
-  // ============================================================
-  // DERIVED
-  // ============================================================
-
   const selectedEventType: EventTypeModel | undefined = eventTypes.find(
     (t) => t.id === formState.formData.event_type_id,
   );
@@ -400,16 +385,12 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     }
   }, [currentStep]);
 
-  // ============================================================
-  // LOADING / ERROR STATES
-  // ============================================================
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-neutral-gray">Loading event…</p>
+          <p className="text-sm text-muted-foreground">Loading event…</p>
         </div>
       </div>
     );
@@ -419,11 +400,11 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     return (
       <div className="flex items-center justify-center min-h-[400px] px-4">
         <div className="text-center max-w-md w-full">
-          <AlertCircle className="h-12 w-12 text-error-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-neutral-dark mb-2">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             {notFound ? 'Event Not Found' : 'Could not load event'}
           </h2>
-          <p className="text-sm text-neutral-gray mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             {notFound
               ? "The event you're trying to edit doesn't exist or you don't have permission to view it."
               : hydrationError}
@@ -439,10 +420,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     );
   }
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <div className="w-full px-1 sm:px-0">
       {/* Header */}
@@ -450,13 +427,13 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
         <div className="flex items-start sm:items-center gap-3">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-primary-50 rounded-lg transition-colors cursor-pointer shrink-0"
+            className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
           >
-            <ArrowLeft className="h-5 w-5 text-neutral-gray" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <h1 className="text-xl sm:text-2xl font-bold text-neutral-dark truncate">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">
                 Edit Event
               </h1>
               <Badge
@@ -464,20 +441,20 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 className={cn(
                   'shrink-0',
                   isPublishedStatus
-                    ? 'text-tertiary-600 border-tertiary-200 bg-tertiary-50'
-                    : 'text-neutral-gray border-neutral-light bg-neutral-light',
+                    ? 'text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 bg-tertiary-50 dark:bg-tertiary-950/40'
+                    : 'text-muted-foreground border-border bg-muted',
                 )}
               >
                 {statusLabel}
               </Badge>
             </div>
-            <p className="text-xs sm:text-sm text-neutral-gray mt-1 line-clamp-1 sm:line-clamp-none">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-1 sm:line-clamp-none">
               Edit your event details. Changes are saved automatically.
             </p>
           </div>
         </div>
 
-        {/* Action button bar with responsive wrapping */}
+        {/* Action button bar */}
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full xl:w-auto">
           <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 mb-1 sm:mb-0">
             <SaveStatusIndicator status={autoSave.saveStatus} />
@@ -526,7 +503,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
             {!isPublishedStatus && (
               <Button
-                className="col-span-2 sm:col-span-1 bg-primary hover:bg-primary-600 text-white cursor-pointer disabled:opacity-50 text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+                className="col-span-2 sm:col-span-1 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
                 onClick={() => submit.submit('published')}
                 disabled={!validation.isPublishReady || isLoadingFlow}
                 title={
@@ -553,7 +530,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={isLoadingFlow}
-              className="col-span-2 sm:col-span-1 cursor-pointer text-error-500 hover:text-error-600 hover:bg-error-50 border-error-200 h-9 sm:h-10 px-3"
+              className="col-span-2 sm:col-span-1 cursor-pointer text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 h-9 sm:h-10 px-3"
               aria-label="Delete event"
             >
               <Trash2 className="h-4 w-4 mr-1 sm:mr-0" />
@@ -564,18 +541,18 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-error-50 border border-error-200 text-error-600 rounded-lg text-sm flex items-center gap-2">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg text-sm flex items-center gap-2">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Responsive horizontal Stepper container */}
+      {/* Stepper */}
       <div className="py-2 sm:py-4 overflow-x-auto no-scrollbar">
         <Stepper currentStep={currentStep} steps={STEPS} />
       </div>
 
-      {/* ---- Two-column layout: content + sidebar preview ---- */}
+      {/* Two-column layout */}
       <div
         className={cn(
           'grid gap-6 mt-2 sm:mt-4',
@@ -584,15 +561,15 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
             : 'grid-cols-1',
         )}
       >
-        {/* Left column: step content + nav */}
+        {/* Left column */}
         <div className="min-w-0">
           {currentStep < TOTAL_STEPS ? (
-            <Card className="border border-neutral-light">
+            <Card className="border border-border">
               <CardHeader className="px-4 py-4 sm:p-6">
-                <CardTitle className="text-base sm:text-lg text-neutral-dark">
+                <CardTitle className="text-base sm:text-lg text-foreground">
                   {stepMeta.title}
                 </CardTitle>
-                <CardDescription className="text-xs sm:text-sm text-neutral-gray">
+                <CardDescription className="text-xs sm:text-sm text-muted-foreground">
                   {stepMeta.description}
                 </CardDescription>
               </CardHeader>
@@ -644,7 +621,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
           {/* Progress indicator */}
           <div className="flex items-center gap-2 mt-4">
             {Object.keys(formState.validationErrors).length > 0 ? (
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-error-500">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>
                   Please fix {Object.keys(formState.validationErrors).length}{' '}
@@ -652,7 +629,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary-500">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-tertiary-600 dark:text-tertiary-400">
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
                 <span>
                   {autoSave.hasChanges
@@ -663,7 +640,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
             )}
           </div>
 
-          {/* Bottom nav buttons */}
+          {/* Bottom nav */}
           <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 mt-6">
             <Button
               variant="outline"
@@ -677,7 +654,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
             {currentStep < TOTAL_STEPS ? (
               <Button
-                className="w-full sm:w-auto bg-primary hover:bg-primary-600 text-white cursor-pointer"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
                 onClick={handleNext}
               >
                 Next
@@ -696,7 +673,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 </Button>
                 {!isPublishedStatus && (
                   <Button
-                    className="w-full sm:w-auto bg-primary hover:bg-primary-600 text-white cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
                     onClick={() => submit.submit('published')}
                     disabled={!validation.isPublishReady || isLoadingFlow}
                   >
@@ -718,15 +695,15 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
           </div>
         </div>
 
-        {/* Right column: live preview (hidden on mobile and step 5) */}
+        {/* Right column — live preview */}
         {!isMobile && currentStep < TOTAL_STEPS && (
           <div className="sticky top-24 h-fit space-y-4">
-            <Card className="border border-neutral-light">
+            <Card className="border border-border">
               <CardHeader>
-                <CardTitle className="text-lg text-neutral-dark">
+                <CardTitle className="text-lg text-foreground">
                   Live Preview
                 </CardTitle>
-                <CardDescription className="text-neutral-gray">
+                <CardDescription className="text-muted-foreground">
                   Real-time preview of your event
                 </CardDescription>
               </CardHeader>
@@ -742,8 +719,8 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
               className={cn(
                 'border',
                 validation.isPublishReady
-                  ? 'border-tertiary-200 bg-tertiary-50'
-                  : 'border-neutral-light',
+                  ? 'border-tertiary-200 dark:border-tertiary-900/50 bg-tertiary-50 dark:bg-tertiary-950/30'
+                  : 'border-border',
               )}
             >
               <CardContent className="pt-4">
@@ -751,7 +728,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                   {validation.isPublishReady ? (
                     <>
                       <CheckCircle2 className="h-4 w-4 text-tertiary-500" />
-                      <span className="text-tertiary-700">
+                      <span className="text-tertiary-700 dark:text-tertiary-300">
                         {isPublishedStatus
                           ? 'Event is published'
                           : 'Ready to publish'}
@@ -760,7 +737,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                   ) : (
                     <>
                       <AlertCircle className="h-4 w-4 text-amber-500" />
-                      <span className="text-amber-700">
+                      <span className="text-amber-700 dark:text-amber-300">
                         Complete all required fields to publish
                       </span>
                     </>
@@ -772,7 +749,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
         )}
       </div>
 
-      {/* ---- Modals ---- */}
+      {/* Modals */}
       <PreviewModal
         open={isPreviewModalOpen}
         onOpenChange={setIsPreviewModalOpen}
@@ -800,7 +777,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
         onDismiss={() => setIsSaveDialogOpen(false)}
       />
 
-      {/* AI modal */}
       <GenerateWithAIModal
         open={isAIModalOpen}
         onOpenChange={setIsAIModalOpen}
@@ -817,11 +793,11 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       >
         <DialogContent className="sm:max-w-md w-[95vw]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-neutral-dark text-base sm:text-lg">
+            <DialogTitle className="flex items-center gap-2 text-foreground text-base sm:text-lg">
               <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
               Replace current form data?
             </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm text-neutral-gray">
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
               The AI-generated draft will overwrite everything currently in
               the form. Any edits you&apos;ve made will be lost. Do you want
               to continue?
@@ -841,7 +817,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
             </Button>
             <Button
               onClick={confirmReplaceWithAIDraft}
-              className="w-full sm:w-auto bg-primary hover:bg-primary-600 text-white cursor-pointer"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Replace form
@@ -854,11 +830,11 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-md w-[95vw]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-error-600 text-base sm:text-lg">
+            <DialogTitle className="flex items-center gap-2 text-destructive text-base sm:text-lg">
               <Trash2 className="h-5 w-5 shrink-0" />
               Delete Event
             </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm text-neutral-gray">
+            <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
               Are you sure you want to delete this event? This action cannot
               be undone.
             </DialogDescription>
@@ -866,16 +842,16 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
           {event && (
             <div className="py-2 sm:py-4">
-              <div className="flex items-center gap-3 p-3 bg-error-50 rounded-lg border border-error-100">
-                <div className="p-2 bg-error-100 rounded-full shrink-0">
-                  <AlertCircle className="h-5 w-5 text-error-600" />
+              <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                <div className="p-2 bg-destructive/20 rounded-full shrink-0">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-neutral-dark text-sm truncate">
+                  <p className="font-medium text-foreground text-sm truncate">
                     {event.name}
                   </p>
                   {formState.formData.schedules[0]?.start_date && (
-                    <p className="text-xs sm:text-sm text-neutral-gray">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {formState.formData.schedules[0].start_date}
                     </p>
                   )}

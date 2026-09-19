@@ -31,53 +31,53 @@ const getCategoryStyle = (slug: string) => {
   > = {
     workshop: {
       icon: <BookOpen className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-blue-50 text-blue-600',
-      hoverColor: 'hover:bg-blue-100',
+      bgColor: 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400',
+      hoverColor: 'hover:bg-blue-100 dark:hover:bg-blue-950/60',
     },
     webinar: {
       icon: <Monitor className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-purple-50 text-purple-600',
-      hoverColor: 'hover:bg-purple-100',
+      bgColor: 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400',
+      hoverColor: 'hover:bg-purple-100 dark:hover:bg-purple-950/60',
     },
     bootcamp: {
       icon: <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-green-50 text-green-600',
-      hoverColor: 'hover:bg-green-100',
+      bgColor: 'bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400',
+      hoverColor: 'hover:bg-green-100 dark:hover:bg-green-950/60',
     },
     meetup: {
       icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-orange-50 text-orange-600',
-      hoverColor: 'hover:bg-orange-100',
+      bgColor: 'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400',
+      hoverColor: 'hover:bg-orange-100 dark:hover:bg-orange-950/60',
     },
     conference: {
       icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-red-50 text-red-600',
-      hoverColor: 'hover:bg-red-100',
+      bgColor: 'bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400',
+      hoverColor: 'hover:bg-red-100 dark:hover:bg-red-950/60',
     },
     training: {
       icon: <Building2 className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-teal-50 text-teal-600',
-      hoverColor: 'hover:bg-teal-100',
+      bgColor: 'bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400',
+      hoverColor: 'hover:bg-teal-100 dark:hover:bg-teal-950/60',
     },
     professional: {
       icon: <Briefcase className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-indigo-50 text-indigo-600',
-      hoverColor: 'hover:bg-indigo-100',
+      bgColor: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400',
+      hoverColor: 'hover:bg-indigo-100 dark:hover:bg-indigo-950/60',
     },
     ngo: {
       icon: <Globe className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-emerald-50 text-emerald-600',
-      hoverColor: 'hover:bg-emerald-100',
+      bgColor: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400',
+      hoverColor: 'hover:bg-emerald-100 dark:hover:bg-emerald-950/60',
     },
     seminar: {
       icon: <BookOpen className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-amber-50 text-amber-600',
-      hoverColor: 'hover:bg-amber-100',
+      bgColor: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400',
+      hoverColor: 'hover:bg-amber-100 dark:hover:bg-amber-950/60',
     },
     networking: {
       icon: <Users className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-      bgColor: 'bg-rose-50 text-rose-600',
-      hoverColor: 'hover:bg-rose-100',
+      bgColor: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400',
+      hoverColor: 'hover:bg-rose-100 dark:hover:bg-rose-950/60',
     },
   };
 
@@ -89,8 +89,8 @@ const getCategoryStyle = (slug: string) => {
 
   return {
     icon: <LayoutGrid className="h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8" />,
-    bgColor: 'bg-gray-50 text-gray-600',
-    hoverColor: 'hover:bg-gray-100',
+    bgColor: 'bg-muted text-muted-foreground',
+    hoverColor: 'hover:bg-accent',
   };
 };
 
@@ -101,14 +101,12 @@ const getCategoryStyle = (slug: string) => {
 export function EventCategories() {
   const { data: response, isLoading, error } = useGetEventTypesQuery();
 
-  // Unwrap the BaseResponse envelope. On the first render (before the
-  // query resolves), `response` is undefined; default to an empty array.
   const eventTypes = response?.data ?? [];
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-6">
-        <div className="flex items-center gap-2 text-gray-400">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-xs">Loading...</span>
         </div>
@@ -120,7 +118,6 @@ export function EventCategories() {
     return null;
   }
 
-  // Filter out "uncategorized" and show up to 6 categories.
   const categories = eventTypes
     .filter((category) => {
       const name =
@@ -158,7 +155,7 @@ export function EventCategories() {
               {icon}
             </div>
 
-            <span className="text-xs sm:text-sm lg:text-base font-medium text-gray-600 text-center group-hover:text-primary-600 transition-colors max-w-[70px] sm:max-w-[90px] lg:max-w-[120px] truncate">
+            <span className="text-xs sm:text-sm lg:text-base font-medium text-muted-foreground text-center group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors max-w-[70px] sm:max-w-[90px] lg:max-w-[120px] truncate">
               {category.display_name || category.name}
             </span>
           </Link>

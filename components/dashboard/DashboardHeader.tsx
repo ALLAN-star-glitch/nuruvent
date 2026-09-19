@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  Menu, 
+import {
+  Menu,
   PlusCircle,
   LogOut,
   ChevronDown,
@@ -14,18 +14,18 @@ import {
   CheckCircle,
   RefreshCw,
   ArrowLeftRight,
-  Sun
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { UserMenu } from '@/components/layout/UserMenu';
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetHeader, 
-  SheetTitle, 
-  SheetTrigger, 
-  SheetClose 
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -141,10 +141,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
   const toggleTeamSwitcher = () => {
     setShowTeamSwitcher(!showTeamSwitcher);
-  };
-
-  const handleThemeToggle = () => {
-    console.log('Theme toggle - coming soon');
   };
 
   return (
@@ -282,12 +278,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   aria-label="Switch team"
                 >
                   <ArrowLeftRight className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-                  
+
                   {/* Text hidden on mobile (<768px), visible on tablets/laptops (md+) */}
                   <span className="hidden md:inline-block text-gray-700 dark:text-gray-300 font-medium">
                     Switch Team
                   </span>
-                  
+
                   {/* Current team name shown on larger tablets/desktops (lg+) */}
                   <span className="hidden lg:inline-block max-w-[90px] xl:max-w-[120px] truncate text-gray-500 dark:text-gray-400">
                     ({currentTeam.name})
@@ -316,8 +312,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             onClick={() => handleTeamSwitch(team)}
                             className={cn(
                               "flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-left transition-colors cursor-pointer",
-                              isActive 
-                                ? "bg-blue-50 dark:bg-blue-950/30" 
+                              isActive
+                                ? "bg-blue-50 dark:bg-blue-950/30"
                                 : "hover:bg-gray-50 dark:hover:bg-[#3C4043]/50"
                             )}
                           >
@@ -368,15 +364,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <span className="hidden lg:inline">Create Event</span>
               </button>
 
-              {/* Theme Toggle - Icon only */}
-              <button
-                type="button"
-                onClick={handleThemeToggle}
-                className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors flex items-center justify-center dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
-                aria-label="Toggle theme (coming soon)"
-              >
-                <Sun className="h-4 w-4 md:h-4.5 md:w-4.5" />
-              </button>
+              {/* Theme Toggle — replaces the old stub button */}
+              <ThemeToggle />
 
               <UserMenu user={user} onLogout={handleLogout} />
             </div>

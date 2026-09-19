@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Redux imports
 import { useAppDispatch } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
@@ -46,10 +45,6 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Updated navigation layout:
-// 1. Main items with Dashboard at the top
-// 2. Quick Actions moved right above Settings
-// 3. Settings at the bottom
 const navGroups: NavGroup[] = [
   {
     id: 'main',
@@ -91,10 +86,10 @@ interface DashboardSidebarProps {
   collapsed?: boolean;
 }
 
-export function DashboardSidebar({ 
-  role = 'host', 
+export function DashboardSidebar({
+  role = 'host',
   onCollapseChange,
-  collapsed: externalCollapsed
+  collapsed: externalCollapsed,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -102,10 +97,8 @@ export function DashboardSidebar({
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  // Internal state: CLOSED by default (true = collapsed)
   const [internalCollapsed, setInternalCollapsed] = useState(true);
 
-  // Keep internal state in sync if parent controls `collapsed` prop
   useEffect(() => {
     if (externalCollapsed !== undefined) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -113,7 +106,8 @@ export function DashboardSidebar({
     }
   }, [externalCollapsed]);
 
-  const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
+  const collapsed =
+    externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
 
   const toggleSidebar = () => {
     const newState = !collapsed;
@@ -146,7 +140,7 @@ export function DashboardSidebar({
   };
 
   const isGroupActive = (items: NavItem[]) => {
-    return items.some(item => isActiveLink(item.href));
+    return items.some((item) => isActiveLink(item.href));
   };
 
   return (
@@ -154,36 +148,38 @@ export function DashboardSidebar({
       <aside
         onClick={(e: MouseEvent<HTMLElement>) => e.stopPropagation()}
         className={cn(
-          'hidden md:flex md:flex-col bg-white/90 backdrop-blur-xl shadow-2xl transition-all duration-300 select-none shrink-0',
+          'hidden md:flex md:flex-col bg-card/90 backdrop-blur-xl shadow-2xl transition-all duration-300 select-none shrink-0',
           'fixed left-6 z-30 overflow-hidden',
-          'rounded-3xl border border-white/30',
+          'rounded-3xl border border-border/60',
           collapsed ? 'w-[72px]' : 'w-[260px]',
           'top-[140px] h-[calc(100vh-200px)]',
-          'before:absolute before:inset-0 before:pointer-events-none before:rounded-3xl before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)]',
-          'after:absolute after:inset-0 after:pointer-events-none after:rounded-3xl after:bg-gradient-to-br after:from-white/5 after:via-transparent after:to-white/5'
+          'before:absolute before:inset-0 before:pointer-events-none before:rounded-3xl before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] dark:before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
+          'after:absolute after:inset-0 after:pointer-events-none after:rounded-3xl after:bg-gradient-to-br after:from-white/5 after:via-transparent after:to-white/5 dark:after:from-white/[0.02] dark:after:to-white/[0.02]',
         )}
       >
         {/* Sidebar toggle header */}
         <div
           onClick={toggleSidebar}
           className={cn(
-            "flex items-center justify-between p-4 flex-shrink-0 cursor-pointer relative",
-            "border-b border-gray-200/20",
-            collapsed ? "justify-center px-2" : "px-4"
+            'flex items-center justify-between p-4 flex-shrink-0 cursor-pointer relative',
+            'border-b border-border/40',
+            collapsed ? 'justify-center px-2' : 'px-4',
           )}
         >
           {!collapsed ? (
             <>
-              <span className="text-xs font-medium text-gray-400">Close Sidebar</span>
-              <ChevronLeft className="h-5 w-5 text-gray-400 hover:text-[#1A73E8] transition-colors" />
+              <span className="text-xs font-medium text-muted-foreground">
+                Close Sidebar
+              </span>
+              <ChevronLeft className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
             </>
           ) : (
-            <ChevronRight className="h-5 w-5 text-gray-400 hover:text-[#1A73E8] transition-colors" />
+            <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+        <nav className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           <div className="space-y-3">
             {navGroups.map((group) => {
               const groupActive = isGroupActive(group.items);
@@ -193,13 +189,12 @@ export function DashboardSidebar({
 
               return (
                 <div key={group.id} className="space-y-1">
-                  {/* Render header label only for groups with a label defined */}
-                  {group.label && (
-                    !collapsed ? (
+                  {group.label &&
+                    (!collapsed ? (
                       <div
                         className={cn(
                           'flex items-center gap-2 px-2 py-1 text-xs font-medium transition-colors',
-                          groupActive ? 'text-[#1A73E8]' : 'text-gray-400'
+                          groupActive ? 'text-primary' : 'text-muted-foreground',
                         )}
                       >
                         {GroupIcon && <GroupIcon className="h-3.5 w-3.5" />}
@@ -207,13 +202,18 @@ export function DashboardSidebar({
                       </div>
                     ) : (
                       <div className="flex items-center justify-center px-2 py-1">
-                        {GroupIcon && <GroupIcon className="h-4 w-4 text-gray-400" />}
+                        {GroupIcon && (
+                          <GroupIcon className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
-                    )
-                  )}
+                    ))}
 
-                  {/* Group items */}
-                  <div className={cn("space-y-0.5", !collapsed && group.label && "pl-1")}>
+                  <div
+                    className={cn(
+                      'space-y-0.5',
+                      !collapsed && group.label && 'pl-1',
+                    )}
+                  >
                     {group.items.map((item) => {
                       const isActive = isActiveLink(item.href);
                       const Icon = item.icon;
@@ -227,23 +227,25 @@ export function DashboardSidebar({
                             className={cn(
                               'flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 group relative',
                               isActive
-                                ? isTrash ? 'bg-red-50 text-red-600' : 'bg-[#1A73E8]/10 text-[#1A73E8]'
-                                : isTrash 
-                                  ? 'text-red-500 hover:bg-red-50/60 hover:text-red-600' 
-                                  : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
+                                ? isTrash
+                                  ? 'bg-destructive/10 text-destructive'
+                                  : 'bg-primary/10 text-primary'
+                                : isTrash
+                                  ? 'text-destructive hover:bg-destructive/10'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                             )}
                           >
                             <Icon
                               className={cn(
                                 'h-5 w-5 flex-shrink-0 transition-colors',
                                 isTrash
-                                  ? 'text-red-500 group-hover:text-red-600'
+                                  ? 'text-destructive'
                                   : isActive
-                                    ? 'text-[#1A73E8]'
-                                    : 'text-gray-400 group-hover:text-gray-600'
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground group-hover:text-foreground',
                               )}
                             />
-                            <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-gray-900/90 backdrop-blur-sm text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
+                            <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
                               {item.label}
                             </div>
                           </Link>
@@ -257,40 +259,44 @@ export function DashboardSidebar({
                           className={cn(
                             'flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group relative',
                             isActive
-                              ? isTrash ? 'bg-red-50 text-red-600 shadow-sm' : 'bg-[#1A73E8]/10 text-[#1A73E8] shadow-sm'
-                              : isTrash 
-                                ? 'text-red-500 hover:bg-red-50/60 hover:text-red-600' 
-                                : 'text-gray-500 hover:bg-gray-100/60 hover:text-gray-900'
+                              ? isTrash
+                                ? 'bg-destructive/10 text-destructive shadow-sm'
+                                : 'bg-primary/10 text-primary shadow-sm'
+                              : isTrash
+                                ? 'text-destructive hover:bg-destructive/10'
+                                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                           )}
                         >
                           <Icon
                             className={cn(
                               'h-5 w-5 flex-shrink-0 transition-colors',
                               isTrash
-                                ? 'text-red-500 group-hover:text-red-600'
+                                ? 'text-destructive'
                                 : isActive
-                                  ? 'text-[#1A73E8]'
-                                  : 'text-gray-400 group-hover:text-gray-600'
+                                  ? 'text-primary'
+                                  : 'text-muted-foreground group-hover:text-foreground',
                             )}
                           />
                           <span
                             className={cn(
-                              "text-sm font-medium whitespace-nowrap",
+                              'text-sm font-medium whitespace-nowrap',
                               isTrash
-                                ? "text-red-500 group-hover:text-red-600"
-                                : isActive 
-                                  ? "text-[#1A73E8]" 
-                                  : "text-gray-700"
+                                ? 'text-destructive'
+                                : isActive
+                                  ? 'text-primary'
+                                  : 'text-foreground',
                             )}
                           >
                             {item.label}
                           </span>
                           {isActive && (
-                            <div 
+                            <div
                               className={cn(
-                                "ml-auto w-1 h-6 rounded-full shadow-sm",
-                                isTrash ? "bg-red-500 shadow-red-500/30" : "bg-[#1A73E8] shadow-[#1A73E8]/30"
-                              )} 
+                                'ml-auto w-1 h-6 rounded-full shadow-sm',
+                                isTrash
+                                  ? 'bg-destructive shadow-destructive/30'
+                                  : 'bg-primary shadow-primary/30',
+                              )}
                             />
                           )}
                         </Link>
@@ -298,12 +304,12 @@ export function DashboardSidebar({
                     })}
                   </div>
 
-                  {/* Divider between groups */}
-                  {!collapsed && group.id !== navGroups[navGroups.length - 1].id && (
-                    <div className="relative my-2 mx-2">
-                      <div className="w-full border-t border-gray-200/20" />
-                    </div>
-                  )}
+                  {!collapsed &&
+                    group.id !== navGroups[navGroups.length - 1].id && (
+                      <div className="relative my-2 mx-2">
+                        <div className="w-full border-t border-border/40" />
+                      </div>
+                    )}
                 </div>
               );
             })}
@@ -311,32 +317,28 @@ export function DashboardSidebar({
         </nav>
 
         {/* User & Logout */}
-        <div className={cn(
-          "relative flex flex-col gap-2",
-          "border-t border-gray-200/20",
-          collapsed ? "px-2 py-3" : "px-3 py-3"
-        )}>
+        <div
+          className={cn(
+            'relative flex flex-col gap-2',
+            'border-t border-border/40',
+            collapsed ? 'px-2 py-3' : 'px-3 py-3',
+          )}
+        >
           <button
             type="button"
             onClick={openLogoutDialog}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 w-full",
-              "text-red-500 hover:bg-red-50/60 active:scale-95",
-              collapsed && "justify-center px-0"
+              'flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 w-full',
+              'text-destructive hover:bg-destructive/10 active:scale-95',
+              collapsed && 'justify-center px-0',
             )}
           >
-            <LogOut className={cn(
-              "h-4 w-4 flex-shrink-0",
-              collapsed ? "text-red-400" : "text-red-500"
-            )} />
-            {!collapsed && (
-              <span className="text-sm font-medium">Sign out</span>
-            )}
+            <LogOut className="h-4 w-4 flex-shrink-0 text-destructive" />
+            {!collapsed && <span className="text-sm font-medium">Sign out</span>}
           </button>
         </div>
       </aside>
 
-      {/* Logout Confirmation Dialog */}
       <LogoutDialog
         open={showLogoutDialog}
         onOpenChange={setShowLogoutDialog}

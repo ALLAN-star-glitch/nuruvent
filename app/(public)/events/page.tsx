@@ -64,12 +64,12 @@ function EventGridWrapper() {
           {[...Array(8)].map((_, i) => (
             <div
               key={i}
-              className="bg-white dark:bg-[#2D2E32] rounded-xl border border-gray-200 dark:border-[#3C4043] p-4 animate-pulse"
+              className="bg-card rounded-xl border border-border p-4 animate-pulse"
             >
-              <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg mb-4"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
-              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
-              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+              <div className="h-32 bg-muted rounded-lg mb-4"></div>
+              <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-muted rounded w-1/2 mb-2"></div>
+              <div className="h-3 bg-muted rounded w-1/4"></div>
             </div>
           ))}
         </div>
@@ -82,7 +82,7 @@ function EventGridWrapper() {
 
 export default function EventsPage() {
   return (
-    <div className="min-h-screen bg-white dark:bg-[#202124] text-slate-900 dark:text-white selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* JSON-LD Structured Data */}
       <script
         type="application/ld+json"
@@ -119,7 +119,7 @@ export default function EventsPage() {
       />
 
       {/* ===== HERO SECTION WITH FADE OUT & BACKGROUND IMAGE ===== */}
-      <section className="relative overflow-hidden bg-white dark:bg-[#202124] py-14 md:py-20 border-b border-gray-200 dark:border-[#3C4043]">
+      <section className="relative overflow-hidden bg-background py-14 md:py-20 border-b border-border">
         {/* Background Image Container */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -132,13 +132,13 @@ export default function EventsPage() {
 
           {/* Smooth left-to-right & bottom fade out gradient overlay */}
           <div className="hidden lg:block absolute inset-0 pointer-events-none">
-            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-transparent dark:from-[#202124] dark:via-[#202124]/85" />
-            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent dark:from-[#202124]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background to-transparent" />
           </div>
 
           {/* Mobile & Tablet Fallback Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/70 lg:hidden dark:from-[#202124] dark:via-[#202124]/90 dark:to-[#202124]/70" />
-          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent lg:hidden dark:from-[#202124]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/70 lg:hidden" />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background to-transparent lg:hidden" />
         </div>
 
         {/* Pattern Overlay on Left Side */}
@@ -166,21 +166,21 @@ export default function EventsPage() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-2xl text-center lg:text-left">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-400 px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 dark:border-primary/20 shadow-xs cursor-default">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 shadow-xs cursor-default">
               <Sparkles className="h-4 w-4" />
               <span>Certified Events, Bootcamps & Courses</span>
             </div>
 
             {/* Heading */}
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight leading-tight mb-3">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground tracking-tight leading-tight mb-3">
               Explore Training Events &{' '}
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-800 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-primary via-primary-600 to-primary-800 bg-clip-text text-transparent">
                 Courses
               </span>
             </h1>
 
             {/* Subheading */}
-            <p className="text-base md:text-lg text-gray-700 dark:text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
+            <p className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
               Elevate your skills with certified online courses, live workshops, bootcamps, and technical masterclasses led by global practitioners.
             </p>
           </div>

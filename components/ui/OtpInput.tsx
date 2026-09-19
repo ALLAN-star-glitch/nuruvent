@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface OtpInputProps {
@@ -15,7 +15,7 @@ interface OtpInputProps {
   className?: string;
   inputClassName?: string;
   autoFocus?: boolean;
-  id?: string;  // ✅ Added id prop
+  id?: string;
   onComplete?: (value: string) => void;
 }
 
@@ -29,7 +29,7 @@ export function OtpInput({
   className = '',
   inputClassName = '',
   autoFocus = false,
-  id = 'otp-input',  // ✅ Default id
+  id = 'otp-input',
   onComplete,
 }: OtpInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,28 +41,27 @@ export function OtpInput({
     }
   }, [autoFocus]);
 
-  // Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, length);
     onChange(val);
-    
-    // Call onComplete when full OTP is entered
+
     if (val.length === length && onComplete) {
       onComplete(val);
     }
   };
 
-  // Handle paste
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+    const pasted = e.clipboardData
+      .getData('text')
+      .replace(/\D/g, '')
+      .slice(0, length);
     onChange(pasted);
     if (pasted.length === length && onComplete) {
       onComplete(pasted);
     }
   };
 
-  // Handle key down (for Enter key)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && value.length === length && onComplete) {
       onComplete(value);
@@ -74,7 +73,7 @@ export function OtpInput({
       <div className="relative">
         <input
           ref={inputRef}
-          id={id}  // ✅ Pass id to input
+          id={id}
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
@@ -87,25 +86,35 @@ export function OtpInput({
           disabled={disabled}
           autoFocus={autoFocus}
           className={cn(
-            "w-full px-4 py-3 rounded-xl border-2 transition-all bg-white focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 text-center text-lg font-mono tracking-widest",
-            error ? "border-red-500 focus:border-red-500 focus:ring-red-500/20" : "border-gray-200 focus:border-[#1A73E8]",
-            disabled && "opacity-60 cursor-not-allowed",
-            inputClassName
+            'w-full px-4 py-3 rounded-xl border-2 transition-all',
+            'bg-background text-foreground placeholder:text-muted-foreground',
+            'text-center text-lg font-mono tracking-widest',
+            error
+              ? 'border-destructive focus:border-destructive focus:ring-2 focus:ring-destructive/20'
+              : 'border-border focus:border-primary focus:ring-2 focus:ring-primary/20',
+            disabled && 'opacity-60 cursor-not-allowed',
+            inputClassName,
           )}
         />
-        {/* Character counter */}
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-          {value.length}/{length}
-        </span>
+
+        {/* Character counter — hidden when the input is empty, so the
+            placeholder isn't crowded. */}
+        {value.length > 0 && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+            {value.length}/{length}
+          </span>
+        )}
       </div>
-      
-      {/* Error message */}
+
+      {/* Error message — suppressed when the input already shows the
+          destructive border? No: keep both. The border is a visual
+          cue, the text is the explanation. */}
       {error && (
-        <p className="text-xs text-red-500 mt-1.5">{error}</p>
+        <p className="text-xs text-destructive mt-1.5">{error}</p>
       )}
-      
-      {/* Hint about OTP format */}
-      <p className="text-xs text-gray-400 mt-1.5">
+
+      {/* Hint */}
+      <p className="text-xs text-muted-foreground mt-1.5">
         Enter the {length}-digit code sent to your email
       </p>
     </div>
