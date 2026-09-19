@@ -23,7 +23,6 @@ import type {
 // ============================================================
 
 interface EventGridProps {
-  /** Page size for the query. Defaults to 12. */
   limit?: number;
   title?: string;
   subtitle?: string;
@@ -32,10 +31,6 @@ interface EventGridProps {
 // ============================================================
 // URL → ListEventsParams
 // ============================================================
-//
-// The URL is the source of truth for filter state. `CategoryFilter`
-// writes to it; this component reads from it and turns it into a
-// backend query. The backend does the filtering, sorting, and paging.
 
 function sortFromUrl(sortParam: string): {
   sort_by: EventSortBy;
@@ -48,9 +43,6 @@ function sortFromUrl(sortParam: string): {
       return { sort_by: 'name', sort_order: 'asc' };
     case 'date':
     default:
-      // "date" is the default — most-recently-created first.
-      // The EventGrid no longer offers a "popular" or "price" sort
-      // because the backend doesn't support them yet (Path A).
       return { sort_by: 'created_at', sort_order: 'desc' };
   }
 }
@@ -84,8 +76,6 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Rebuild the query params from the URL on every render. If nothing
-  // in the URL changed, RTK Query serves the cached response.
   const params = useMemo(
     () => buildQueryParams(searchParams, limit),
     [searchParams, limit],
@@ -100,28 +90,26 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
   const typeFilter = searchParams.get('type') ?? '';
   const hasActiveFilter = Boolean(typeFilter);
 
-  // ----------------------------------------------------------
   // Loading skeleton
-  // ----------------------------------------------------------
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(limit)].map((_, i) => (
           <div
             key={i}
-            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 animate-pulse"
+            className="bg-card rounded-2xl overflow-hidden shadow-sm border border-border animate-pulse"
           >
-            <div className="aspect-[16/9] bg-gradient-to-br from-gray-200 to-gray-100" />
+            <div className="aspect-[16/9] bg-muted" />
             <div className="p-5 space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-200 rounded w-1/2" />
+              <div className="h-4 bg-muted rounded w-3/4" />
+              <div className="h-3 bg-muted rounded w-1/2" />
               <div className="space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-full" />
-                <div className="h-3 bg-gray-200 rounded w-2/3" />
+                <div className="h-3 bg-muted rounded w-full" />
+                <div className="h-3 bg-muted rounded w-2/3" />
               </div>
               <div className="flex justify-between pt-2">
-                <div className="h-8 bg-gray-200 rounded w-20" />
-                <div className="h-8 bg-gray-200 rounded w-24" />
+                <div className="h-8 bg-muted rounded w-20" />
+                <div className="h-8 bg-muted rounded w-24" />
               </div>
             </div>
           </div>
@@ -130,25 +118,23 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
     );
   }
 
-  // ----------------------------------------------------------
   // Error state
-  // ----------------------------------------------------------
   if (isError) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-        <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-red-100 text-red-500 mb-4">
+      <div className="bg-destructive/10 border border-destructive/30 rounded-2xl p-8 text-center">
+        <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-destructive/20 text-destructive mb-4">
           <SearchX className="h-7 w-7" />
         </div>
-        <h3 className="text-lg font-semibold text-red-800">
+        <h3 className="text-lg font-semibold text-foreground">
           Unable to load events
         </h3>
-        <p className="text-sm text-red-600 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           We&apos;re having trouble fetching events. Please try refreshing the
           page.
         </p>
         <Button
           variant="outline"
-          className="mt-4 border-red-200 text-red-700 hover:bg-red-50 cursor-pointer"
+          className="mt-4 border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer"
           onClick={() => refetch()}
         >
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -158,19 +144,17 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
     );
   }
 
-  // ----------------------------------------------------------
   // Empty state
-  // ----------------------------------------------------------
   if (events.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
+      <div className="bg-card rounded-2xl border border-border p-12 text-center shadow-sm">
         <div className="inline-flex items-center justify-center h-14 w-14 rounded-full bg-primary/10 text-primary mb-4">
           <Calendar className="h-7 w-7" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900">
+        <h3 className="text-xl font-semibold text-foreground">
           No events found
         </h3>
-        <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+        <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
           {hasActiveFilter
             ? 'No events match your current filters. Try adjusting your criteria.'
             : 'There are no events at the moment. Check back soon!'}
@@ -188,31 +172,29 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
     );
   }
 
-  // ----------------------------------------------------------
   // Grid
-  // ----------------------------------------------------------
   return (
     <div>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
           {title && (
-            <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
+            <h2 className="text-3xl font-bold text-foreground tracking-tight">
               {title}
             </h2>
           )}
           {subtitle && (
-            <p className="text-gray-600 text-sm mt-1">{subtitle}</p>
+            <p className="text-muted-foreground text-sm mt-1">{subtitle}</p>
           )}
 
           {isFetching && (
-            <div className="flex items-center gap-2 text-xs text-gray-400 mt-2">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
               <Loader2 className="h-3 w-3 animate-spin" />
               Refreshing...
             </div>
           )}
 
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Showing {events.length} of {total} events
           </p>
         </div>
@@ -223,7 +205,7 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
             size="sm"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="text-gray-400 hover:text-gray-600 cursor-pointer"
+            className="text-muted-foreground hover:text-foreground cursor-pointer"
           >
             <RefreshCw
               className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`}
@@ -250,7 +232,7 @@ export function EventGrid({ limit = 12, title, subtitle }: EventGridProps) {
         ))}
       </div>
 
-      {/* Pagination hint when the page is full */}
+      {/* Pagination hint */}
       {total > events.length && (
         <div className="text-center mt-10">
           <Button
