@@ -239,7 +239,7 @@ export function PricingContent() {
                       <Smartphone className="h-4 w-4 text-tertiary" />
                       M-Pesa / Airtel Money
                     </span>
-                    <span className="font-bold text-tertiary">1.5%</span>
+                    <span className="font-bold text-tertiary">3.5%</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-2 text-muted-foreground">
@@ -259,7 +259,7 @@ export function PricingContent() {
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     On a {formatPrice(7.69)} M-Pesa ticket, you receive{' '}
-                    <span className="font-bold text-foreground">{formatPrice(7.23)}</span>.
+                    <span className="font-bold text-foreground">{formatPrice(7.08)}</span>.
                   </p>
                 </div>
               </div>
@@ -300,7 +300,7 @@ export function PricingContent() {
           <div className="text-center p-6 bg-gradient-to-r from-tertiary/5 via-primary/5 to-secondary/5 border border-primary/15 rounded-2xl">
             <p className="text-sm md:text-base text-muted-foreground">
               <span className="font-bold text-foreground">
-                On a KES 1,000 M-Pesa ticket, you receive KES 940.
+                On a KES 1,000 M-Pesa ticket, you receive KES 920.
               </span>{' '}
               No monthly fees. No fixed per-ticket charges. Payouts every Monday.
             </p>
@@ -421,9 +421,9 @@ export function PricingContent() {
                 </td>
                 <td className="py-4 px-6 text-primary font-bold">4.5%</td>
                 <td className="py-4 px-6 text-primary font-bold">KES 0</td>
-                <td className="py-4 px-6 text-primary font-bold">1.5% M-Pesa</td>
+                <td className="py-4 px-6 text-primary font-bold">3.5% M-Pesa</td>
                 <td className="py-4 px-6 text-right font-black text-tertiary">
-                  KES 36,660
+                  KES 35,880
                 </td>
               </tr>
               <tr className="text-muted-foreground">
@@ -462,15 +462,17 @@ export function PricingContent() {
           Eventbrite pay out via international settlement.
         </p>
 
-        {/* Advantage callouts */}
+        {/* Advantage callouts — corrected numbers */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
             <div className="p-2.5 bg-tertiary/10 rounded-xl">
               <TrendingUp className="h-5 w-5 text-tertiary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">More than Luma</p>
-              <p className="text-lg font-black text-tertiary">+ KES 741</p>
+              <p className="text-xs text-muted-foreground">vs. Luma</p>
+              <p className="text-lg font-black text-tertiary">
+                − KES 39
+              </p>
             </div>
           </div>
           <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
@@ -479,7 +481,9 @@ export function PricingContent() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">More than Enkare</p>
-              <p className="text-lg font-black text-tertiary">+ KES 1,560</p>
+              <p className="text-lg font-black text-tertiary">
+                + KES 780
+              </p>
             </div>
           </div>
           <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
@@ -488,7 +492,9 @@ export function PricingContent() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">More than Eventbrite</p>
-              <p className="text-lg font-black text-tertiary">+ KES 5,668</p>
+              <p className="text-lg font-black text-tertiary">
+                + KES 4,888
+              </p>
             </div>
           </div>
         </div>
@@ -512,7 +518,7 @@ export function PricingContent() {
               },
               {
                 q: 'What does a paid event cost me?',
-                a: 'A 4.5% Nuruvent fee, plus payment processing charged at cost by our provider. M-Pesa and Airtel Money are 1.5%. Local cards are 3.5%. International cards are 4.5%. On a KES 1,000 M-Pesa ticket, you receive KES 940.',
+                a: 'A 4.5% Nuruvent fee, plus payment processing charged at cost by our provider. M-Pesa and Airtel Money are 3.5%. Local cards are 3.5%. International cards are 4.5%. On a KES 1,000 M-Pesa ticket, you receive KES 920.',
               },
               {
                 q: 'Can I pass the fees to my attendees instead?',
@@ -532,7 +538,7 @@ export function PricingContent() {
               },
               {
                 q: 'How is Nuruvent different from Luma or Eventbrite?',
-                a: 'Two big things. First, price: on a KES 39,000 M-Pesa event, you keep KES 36,660 with Nuruvent — about KES 741 more than Luma, and KES 5,668 more than Eventbrite. Second, payouts: we pay out weekly to your M-Pesa, not through international bank settlement.',
+                a: 'Two big things. First, price: on a KES 39,000 M-Pesa event, you keep KES 35,880 with Nuruvent — about KES 780 more than Enkare, and KES 4,888 more than Eventbrite. Second, payouts: we pay out weekly to your M-Pesa, not through international bank settlement.',
               },
             ].map((faq) => (
               <div

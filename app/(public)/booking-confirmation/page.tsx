@@ -2,8 +2,9 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   CheckCircle,
   Calendar,
@@ -11,7 +12,6 @@ import {
   Ticket,
   Mail,
   User,
-  Clock,
   Printer,
   Download,
   Share2,
@@ -24,6 +24,8 @@ import {
   CalendarPlus,
   Info,
   ChevronRight,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,58 +34,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
-// ============================================================
-// PLACEHOLDER DATA
-// ============================================================
-//
-// Replace this with whatever hydrates the page once the real
-// booking/event data is fetched.
-
-interface PlaceholderEvent {
-  id: string;
-  slug: string;
-  name: string;
-  display_name: string;
-  description: string;
-  date: string;
-  time: string;
-  duration: number;
-  price: number;
-  certificate_price: number;
-  certificate_enabled: boolean;
-  is_virtual: boolean;
-  is_hybrid: boolean;
-  location: string;
-  image_url?: string;
-}
-
-interface PlaceholderAttendee {
-  name: string;
-  email: string;
-}
-
-const PLACEHOLDER_EVENT: PlaceholderEvent = {
-  id: 'placeholder-event-id',
-  slug: 'demo-event',
-  name: 'Hands-on Kubernetes Workshop',
-  display_name: 'Kubernetes Workshop 2026',
-  description:
-    'A two-day deep-dive into production Kubernetes for backend engineers.',
-  date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-  time: '09:00',
-  duration: 480,
-  price: 2500,
-  certificate_price: 500,
-  certificate_enabled: true,
-  is_virtual: false,
-  is_hybrid: true,
-  location: 'Nairobi, Kenya',
-};
-
-const PLACEHOLDER_ATTENDEE: PlaceholderAttendee = {
-  name: 'Jane Doe',
-  email: 'jane@example.com',
-};
+import { useGetRegistrationQuery } from '@/lib/store/api/registrationsApi';
+import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
 
 // ============================================================
 // HELPERS
@@ -91,7 +43,7 @@ const PLACEHOLDER_ATTENDEE: PlaceholderAttendee = {
 
 const formatPrice = (price: number) => {
   if (price === 0) return 'Free';
-  return `KSh ${price.toLocaleString()}`;
+  return `KSh ${(price / 100).toLocaleString()}`;
 };
 
 const formatDateForCalendar = (dateStr: string) => {
@@ -104,33 +56,78 @@ const formatDateForCalendar = (dateStr: string) => {
 // ============================================================
 
 export default function BookingConfirmationPage() {
-  const [countdown, setCountdown] = useState(5);
+  const search = useSearchParams();
+
+  const reference = search.get('reference');
+  const registrationId = search.get('registration');
+  const slug = search.get('slug') ?? '';
+  const guestEmail = search.get('email') ?? undefined;
+
   const [copied, setCopied] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  // ---- TODO: hydrate from a real booking endpoint ----
-  const event = PLACEHOLDER_EVENT;
-  const attendee = PLACEHOLDER_ATTENDEE;
+  const {
+    data: regRes,
+    isLoading: regLoading,
+    isError: regError,
+  } = useGetRegistrationQuery(
+    { id: registrationId ?? '', guestEmail },
+    { skip: !registrationId },
+  );
 
-  // Countdown timer for auto-redirect
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
+  const {
+    data: eventRes,
+    isLoading: eventLoading,
+    isError: eventError,
+  } = useGetEventBySlugQuery(slug, { skip: !slug });
 
-  const isFree =
-    event.price === 0 && event.certificate_price === 0;
+  const registration = regRes?.data;
+  const event = eventRes?.data;
 
-  const totalPrice =
-    event.price + (event.certificate_price > 0 ? event.certificate_price : 0);
+  const isLoading = regLoading || eventLoading;
+  const isError = regError || eventError || !registration || !event;
+
+  if (!reference || !registrationId || !slug) {
+    return (
+      <ErrorState
+        title="Missing booking information"
+        message="This page requires a booking reference. Please check your confirmation email."
+      />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !registration || !event) {
+    return (
+      <ErrorState
+        title="Booking not found"
+        message="We couldn't load this booking. It may have expired or the link is invalid."
+      />
+    );
+  }
+
+  // ---- Derived values ----
+  const total = registration.pricing.total;
+  const discount = registration.pricing.discount_total;
+  const isFree = total === 0;
+
+  const attendeeName = registration.guest?.name ?? 'Guest';
+  const attendeeEmail = registration.guest?.email ?? guestEmail ?? '';
+
+  const eventDate = event.start_date ?? event.schedules?.[0]?.start_date ?? '';
+  const eventLocation = event.is_virtual
+    ? 'Virtual Event'
+    : event.in_person_location || event.venue?.city || 'Location TBD';
 
   // ---- Handlers ----
-
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -143,11 +140,11 @@ export default function BookingConfirmationPage() {
       try {
         await navigator.share({
           title: `Booking Confirmation - ${event.display_name || event.name}`,
-          text: `I've registered for ${event.display_name || event.name}! Join me!`,
+          text: `I've registered for ${event.display_name || event.name}!`,
           url: window.location.href,
         });
       } catch {
-        // Share cancelled — no-op
+        /* cancelled */
       }
     } else {
       handleCopyLink();
@@ -155,8 +152,9 @@ export default function BookingConfirmationPage() {
   };
 
   const handleAddToCalendar = () => {
-    const startDate = formatDateForCalendar(event.date);
-    const endDate = new Date(event.date);
+    if (!eventDate) return;
+    const startDate = formatDateForCalendar(eventDate);
+    const endDate = new Date(eventDate);
     endDate.setHours(endDate.getHours() + 3);
     const endDateStr =
       endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -165,76 +163,58 @@ export default function BookingConfirmationPage() {
       event.display_name || event.name,
     )}&dates=${startDate}/${endDateStr}&details=${encodeURIComponent(
       event.description || 'Event',
-    )}&location=${encodeURIComponent(
-      event.is_virtual ? 'Virtual Event' : event.location || '',
-    )}`;
+    )}&location=${encodeURIComponent(eventLocation)}`;
 
     window.open(calendarUrl, '_blank');
   };
 
   const handleDownloadTicket = () => {
-    // TODO: Implement actual ticket download
     alert('Ticket download will be available soon!');
   };
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-br from-neutral-50 via-white to-neutral-50/50 py-8 px-4 sm:px-6"
       ref={printRef}
+      className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4 sm:px-6"
     >
       <div className="max-w-4xl mx-auto">
-        {/* Top Navigation */}
+        {/* Top nav */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <Link
             href={`/events/${event.slug}`}
-            className="inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer group"
           >
             <ChevronRight className="h-4 w-4 rotate-180 transition-transform group-hover:-translate-x-0.5" />
             Back to Event
           </Link>
-          <div className="flex items-center gap-2">
-            <Badge
-              variant="outline"
-              className="text-xs bg-green-50 text-green-700 border-green-200"
-            >
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Confirmed
-            </Badge>
-          </div>
+          <Badge
+            variant="outline"
+            className="text-xs border-primary/30 bg-primary/10 text-primary"
+          >
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Confirmed
+          </Badge>
         </div>
 
-        {/* Main Card */}
-        <Card className="border-neutral-200/60 shadow-xl overflow-hidden">
-          {/* Header */}
-          <div
-            className={cn(
-              'px-6 py-8 sm:py-10 text-center relative',
-              isFree
-                ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600'
-                : 'bg-gradient-to-r from-green-500 to-green-600',
-            )}
-          >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-4 animate-in zoom-in duration-500">
-              <CheckCircle className="h-10 w-10 text-white" />
+        <Card className="border-border/60 shadow-xl overflow-hidden bg-card">
+          {/* Header banner */}
+          <div className="px-6 py-8 sm:py-10 text-center relative bg-gradient-to-r from-primary to-primary/80">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-background/20 backdrop-blur-sm mb-4">
+              <CheckCircle className="h-10 w-10 text-primary-foreground" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold text-primary-foreground">
               {isFree ? 'Booking Confirmed!' : 'Payment Successful!'}
             </h1>
-            <p
-              className={cn(
-                'mt-1',
-                isFree ? 'text-tertiary-100' : 'text-green-100',
-              )}
-            >
+            <p className="mt-1 text-primary-foreground/80">
               {isFree
                 ? "You're all set for the event"
                 : 'Your ticket has been confirmed'}
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-6 bg-white rounded-t-3xl" />
+            <div className="absolute bottom-0 left-0 right-0 h-6 bg-card rounded-t-3xl" />
           </div>
 
           <CardContent className="p-6 sm:p-8 space-y-6">
-            {/* Quick Actions */}
+            {/* Quick actions */}
             <div className="flex flex-wrap items-center justify-center gap-2 pb-2">
               <Button
                 variant="outline"
@@ -280,7 +260,7 @@ export default function BookingConfirmationPage() {
               >
                 {copied ? (
                   <>
-                    <Check className="h-3.5 w-3.5 mr-1.5 text-green-600" />
+                    <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
                     Copied!
                   </>
                 ) : (
@@ -294,122 +274,127 @@ export default function BookingConfirmationPage() {
 
             <Separator />
 
-            {/* Success Message */}
+            {/* Success message */}
             <div className="text-center">
-              <p className="text-neutral-600 text-sm sm:text-base">
+              <p className="text-muted-foreground text-sm sm:text-base">
                 You have successfully registered for{' '}
-                <span className="font-semibold text-neutral-900">
+                <span className="font-semibold text-foreground">
                   {event.display_name || event.name}
                 </span>
               </p>
-              <p className="text-sm text-neutral-500 mt-1">
-                A confirmation email has been sent to your registered email
-                address.
+              <p className="text-sm text-muted-foreground mt-1">
+                A confirmation email has been sent to{' '}
+                <span className="font-medium text-foreground">
+                  {attendeeEmail || 'your registered email'}
+                </span>
+                .
               </p>
-              <div className="flex items-center justify-center gap-1 mt-2 text-xs text-neutral-400">
+              <div className="flex items-center justify-center gap-1 mt-2 text-xs text-muted-foreground">
                 <Info className="h-3 w-3" />
                 <span>
-                  Booking Reference: #
-                  {event.id?.slice(0, 8).toUpperCase() || 'N/A'}
+                  Booking Reference: #{registration.registration_number}
                 </span>
               </div>
             </div>
 
             <Separator />
 
-            {/* Event Details */}
+            {/* Event + Attendee */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-primary-50 rounded-xl p-4 space-y-2">
-                <h3 className="font-semibold text-primary-800 text-sm flex items-center gap-2">
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
+                <h3 className="font-semibold text-primary text-sm flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Event Details
                 </h3>
                 <div className="space-y-1.5">
-                  <div className="flex items-start gap-2 text-sm text-primary-700">
-                    <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>
-                      {new Date(event.date).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm text-primary-700">
-                    <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{event.time || 'TBD'}</span>
-                  </div>
+                  {eventDate && (
+                    <div className="flex items-start gap-2 text-sm text-foreground/80">
+                      <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                      <span>
+                        {new Date(eventDate).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  )}
                   {event.is_virtual ? (
-                    <div className="flex items-start gap-2 text-sm text-primary-700">
-                      <Video className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex items-start gap-2 text-sm text-foreground/80">
+                      <Video className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
                       <span>Virtual Event</span>
                     </div>
                   ) : (
-                    <div className="flex items-start gap-2 text-sm text-primary-700">
-                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>{event.location || 'Location TBD'}</span>
+                    <div className="flex items-start gap-2 text-sm text-foreground/80">
+                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+                      <span>{eventLocation}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-amber-50 rounded-xl p-4 space-y-2">
-                <h3 className="font-semibold text-amber-800 text-sm flex items-center gap-2">
+              <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-2">
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Ticket Holder
                 </h3>
                 <div className="space-y-1.5">
-                  <div className="flex items-start gap-2 text-sm text-amber-700">
-                    <User className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{attendee.name}</span>
+                  <div className="flex items-start gap-2 text-sm text-foreground/80">
+                    <User className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                    <span>{attendeeName}</span>
                   </div>
-                  <div className="flex items-start gap-2 text-sm text-amber-700">
-                    <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <span>{attendee.email}</span>
+                  <div className="flex items-start gap-2 text-sm text-foreground/80">
+                    <Mail className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                    <span>{attendeeEmail || '—'}</span>
                   </div>
                   {!isFree && (
-                    <div className="flex items-start gap-2 text-sm text-amber-700">
-                      <Ticket className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>Paid: {formatPrice(totalPrice)}</span>
+                    <div className="flex items-start gap-2 text-sm text-foreground/80">
+                      <Ticket className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                      <span>Paid: {formatPrice(total)}</span>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Payment Summary — Only for paid events */}
+            {/* Payment summary */}
             {!isFree && (
               <>
                 <Separator />
-                <div className="bg-neutral-50 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-neutral-900 text-sm flex items-center gap-2">
+                <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
                     Payment Summary
                   </h3>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-neutral-600">Registration Fee</span>
-                      <span className="font-medium">
-                        {formatPrice(event.price)}
-                      </span>
-                    </div>
-                    {event.certificate_price > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-neutral-600">
-                          Certificate Fee
+                    {registration.selections.map((sel, i) => (
+                      <div
+                        key={`${sel.ticket_type_id}-${i}`}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-muted-foreground">
+                          {sel.quantity} × ticket
                         </span>
-                        <span className="font-medium">
-                          {formatPrice(event.certificate_price)}
+                        <span className="font-medium text-foreground">
+                          {formatPrice(sel.line_total)}
+                        </span>
+                      </div>
+                    ))}
+                    {discount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Discount</span>
+                        <span className="font-medium text-primary">
+                          −{formatPrice(discount)}
                         </span>
                       </div>
                     )}
-                    <div className="border-t border-neutral-200 pt-2 flex items-center justify-between">
-                      <span className="font-semibold text-neutral-900">
+                    <div className="border-t border-border pt-2 flex items-center justify-between">
+                      <span className="font-semibold text-foreground">
                         Total Paid
                       </span>
-                      <span className="font-bold text-green-600">
-                        {formatPrice(totalPrice)}
+                      <span className="font-bold text-primary">
+                        {formatPrice(total)}
                       </span>
                     </div>
                   </div>
@@ -419,63 +404,66 @@ export default function BookingConfirmationPage() {
 
             <Separator />
 
-            {/* Action Buttons */}
-            <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Button
-                  asChild
-                  className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
-                  variant="outline"
-                >
-                  <Link href={`/events/${event.slug}`}>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Event Details
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  className="w-full h-12 text-base font-semibold rounded-xl bg-primary-500 hover:bg-primary-600 cursor-pointer"
-                >
-                  <Link href="/events">
-                    Browse More Events
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-              </div>
+            {/* Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <Button
+                asChild
+                variant="outline"
+                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
+              >
+                <Link href={`/events/${event.slug}`}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Event Details
+                </Link>
+              </Button>
+              <Button
+                asChild
+                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
+              >
+                <Link href="/events">
+                  Browse More Events
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
             </div>
 
-            {/* Auto-redirect */}
-            <p className="text-xs text-center text-neutral-400">
-              Redirecting to events page in {countdown} seconds...
+            {/* Encouragement (non-intrusive) */}
+            <p className="text-xs text-center text-muted-foreground">
+              Want to find more events like this?{' '}
               <Link
                 href="/events"
-                className="ml-1 text-primary-500 hover:underline cursor-pointer"
+                className="text-primary hover:underline cursor-pointer"
               >
-                (skip)
+                Browse all events
               </Link>
             </p>
 
-            {/* Footer */}
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs text-neutral-400 border-t border-neutral-100">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs text-muted-foreground border-t border-border">
               <span>Secure Booking</span>
-              <span className="w-px h-3 bg-neutral-300" />
+              <span className="w-px h-3 bg-border" />
               <span>Powered by Nuruvent</span>
             </div>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
 
-        {/* Related Events Suggestion */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-neutral-400">
-            Want to discover more events?{' '}
-            <Link
-              href="/events"
-              className="text-primary-500 hover:underline cursor-pointer"
-            >
-              Browse all events
-            </Link>
-          </p>
-        </div>
+// ============================================================
+// ERROR STATE
+// ============================================================
+
+function ErrorState({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] px-4">
+      <div className="text-center max-w-md">
+        <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-semibold mb-2">{title}</h2>
+        <p className="text-sm text-muted-foreground mb-6">{message}</p>
+        <Button asChild className="cursor-pointer">
+          <Link href="/events">Browse Events</Link>
+        </Button>
       </div>
     </div>
   );

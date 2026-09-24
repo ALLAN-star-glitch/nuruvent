@@ -1,8 +1,9 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // app/(public)/events/[slug]/page.tsx
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -14,6 +15,7 @@ import {
   Calendar as CalendarIcon,
   CalendarDays,
   CheckCircle,
+  CheckCircle2,
   Clock as ClockIcon,
   CreditCard,
   FileText,
@@ -21,10 +23,8 @@ import {
   Heart,
   HeartOff,
   Loader2,
-  LogIn,
   Mail,
   MapPin as MapPinIcon,
-  MessageSquare,
   Phone,
   Share2,
   Tag,
@@ -34,7 +34,6 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { AuthModal } from '@/components/auth/AuthModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,30 +41,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
+import { useRegisterForEventMutation } from '@/lib/store/api/registrationsApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import {
   selectActiveAccount,
   selectIsAuthenticated,
   selectUser,
 } from '@/lib/store/slices/authSlice';
-import type { Event } from '@/lib/types/events';
+import type { Event, Ticket } from '@/lib/types/events';
+import type { Registration } from '@/lib/types/registration';
 import {
-  formatEventDateBadge,
   formatPrice,
   getCertificatePrice,
   getEventDuration,
   getEventFillRate,
   getEventHostName,
   getEventLocation,
-  getEventMinPrice,
   getEventStartTime,
   getSpotsLeft,
   getTimeUntilEvent,
-  isEventFree,
   isEventFullyBooked,
   isEventPast,
   isHostInstitution,
@@ -75,12 +72,136 @@ import {
 // TYPES
 // ============================================================
 
-interface BookingFormData {
-  fullName: string;
+interface GuestForm {
+  name: string;
   email: string;
   phone: string;
-  specialRequests: string;
-  certificate: boolean;
+}
+
+// ============================================================
+// TICKET SELECTOR — SINGLE-SELECT RADIO STYLE
+// ============================================================
+
+interface TicketSelectorProps {
+  tickets: Ticket[];
+  selectedTicketTypeId: string | null;
+  onSelect: (ticketTypeId: string) => void;
+  disabled?: boolean;
+}
+
+function TicketSelector({
+  tickets,
+  selectedTicketTypeId,
+  onSelect,
+  disabled,
+}: TicketSelectorProps) {
+  if (!tickets || tickets.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground p-4 bg-muted/40 rounded-xl border border-dashed border-border cursor-default">
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span>No tickets currently available for this event</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5" role="radiogroup" aria-label="Select a ticket type">
+      {tickets.map((ticket) => {
+        const type = ticket.ticket_type;
+        const typeId = type?.id;
+        const isSoldOut = ticket.quantity <= 0;
+        const isInactive = !ticket.is_active;
+        const isDisabled = disabled || isSoldOut || isInactive || !typeId;
+        const isSelected = !!typeId && selectedTicketTypeId === typeId;
+
+        return (
+          <div
+            key={ticket.id}
+            onClick={() => {
+              if (typeId && !isDisabled) {
+                onSelect(typeId);
+              }
+            }}
+            tabIndex={isDisabled ? -1 : 0}
+            role="radio"
+            aria-checked={isSelected}
+            aria-disabled={isDisabled}
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && typeId && !isDisabled) {
+                e.preventDefault();
+                onSelect(typeId);
+              }
+            }}
+            className={cn(
+              'relative group w-full text-left rounded-xl border p-3.5 transition-all duration-200 outline-none',
+              isSelected
+                ? 'border-primary ring-2 ring-primary/20 bg-primary/5 shadow-sm'
+                : 'border-border bg-card hover:border-primary/40 hover:bg-accent/30',
+              isDisabled
+                ? 'opacity-50 cursor-not-allowed bg-muted/20 hover:border-border hover:bg-transparent'
+                : 'cursor-pointer'
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              {/* Radio Icon + Information */}
+              <div className="flex items-start gap-3 min-w-0">
+                <div
+                  className={cn(
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+                    isSelected
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-muted-foreground/40 group-hover:border-primary/60'
+                  )}
+                >
+                  {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-background" />}
+                </div>
+
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground leading-none">
+                      {ticket.name}
+                    </span>
+                    {type?.display_name && (
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] uppercase tracking-wider px-1.5 py-0 font-medium cursor-default"
+                      >
+                        {type.display_name}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {ticket.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                      {ticket.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                    <Users className="h-3 w-3 shrink-0" />
+                    {isSoldOut ? (
+                      <span className="text-destructive font-medium">Sold out</span>
+                    ) : isInactive ? (
+                      <span>Unavailable</span>
+                    ) : (
+                      <span>{ticket.quantity} spots available</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Price Display */}
+              <div className="text-right shrink-0 pt-0.5">
+                <span className="text-sm font-bold text-foreground">
+                  {formatPrice(ticket.price)}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ============================================================
@@ -93,57 +214,27 @@ function EventDetailSkeleton() {
       <div className="bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
+            <Skeleton className="h-4 w-32 rounded" />
             <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-4 sm:h-5 sm:w-5 rounded-full" />
-              <Skeleton className="h-4 w-24 sm:w-32 rounded" />
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <Skeleton className="h-9 w-9 sm:h-10 sm:w-10 rounded-full" />
-              <Skeleton className="h-9 w-9 sm:h-10 sm:w-10 rounded-full" />
+              <Skeleton className="h-9 w-9 rounded-full" />
+              <Skeleton className="h-9 w-9 rounded-full" />
             </div>
           </div>
         </div>
       </div>
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-            <Skeleton className="w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl" />
-            <div className="space-y-3">
-              <Skeleton className="h-8 sm:h-10 lg:h-12 w-3/4 rounded" />
-              <div className="flex flex-wrap items-center gap-3">
-                <Skeleton className="h-5 w-32 rounded" />
-                <Skeleton className="h-5 w-24 rounded" />
-                <Skeleton className="h-5 w-28 rounded" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="w-full aspect-[16/9] rounded-2xl" />
+            <Skeleton className="h-10 w-3/4 rounded" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="border-border shadow-sm">
-                  <CardContent className="p-4 sm:p-5">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl" />
-                      <div>
-                        <Skeleton className="h-3 w-12 mb-1 rounded" />
-                        <Skeleton className="h-5 w-24 rounded" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Skeleton key={i} className="h-20 rounded-xl" />
               ))}
             </div>
           </div>
-          <div className="lg:col-span-1 space-y-4">
-            <Card className="border-border shadow-lg overflow-hidden">
-              <div className="px-5 py-4 sm:py-5 border-b border-border">
-                <Skeleton className="h-4 w-24 mb-2 rounded" />
-                <Skeleton className="h-8 w-32 rounded" />
-              </div>
-              <CardContent className="p-5 space-y-4">
-                <Skeleton className="h-11 w-full rounded-lg" />
-                <Skeleton className="h-11 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-xl" />
-              </CardContent>
-            </Card>
+          <div className="lg:col-span-1">
+            <Skeleton className="h-[420px] rounded-2xl" />
           </div>
         </div>
       </div>
@@ -152,7 +243,7 @@ function EventDetailSkeleton() {
 }
 
 // ============================================================
-// PAGE
+// MAIN PAGE
 // ============================================================
 
 export default function EventDetailPage() {
@@ -160,11 +251,9 @@ export default function EventDetailPage() {
   const router = useRouter();
   const slug = params?.slug as string;
 
-  const {
-    data: response,
-    isLoading,
-    error,
-  } = useGetEventBySlugQuery(slug, { skip: !slug });
+  const { data: response, isLoading, error } = useGetEventBySlugQuery(slug, {
+    skip: !slug,
+  });
 
   const event: Event | undefined = response?.data;
 
@@ -172,160 +261,132 @@ export default function EventDetailPage() {
   const account = useAppSelector(selectActiveAccount);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
+  // ---- Mutation ----
+  const [registerForEvent, { isLoading: isRegistering }] =
+    useRegisterForEventMutation();
+
+  // ---- UI state ----
   const [isShared, setIsShared] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const [isBooking, setIsBooking] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
   const [bookingError, setBookingError] = useState('');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [pendingBooking, setPendingBooking] = useState<BookingFormData | null>(null);
-  const [registrationComplete, setRegistrationComplete] = useState(false);
-  const [formData, setFormData] = useState<BookingFormData>({
-    fullName: '',
+  const [registration, setRegistration] = useState<Registration | null>(null);
+
+  // ---- Explicit Single Ticket State ----
+  const [selectedTicketTypeId, setSelectedTicketTypeId] = useState<string | null>(
+    null,
+  );
+
+  // ---- Guest details ----
+  const [guest, setGuest] = useState<GuestForm>({
+    name: '',
     email: '',
     phone: '',
-    specialRequests: '',
-    certificate: true,
   });
 
+  // Prefill guest inputs on auth load
   useEffect(() => {
     if (isAuthenticated) {
-      const name = account?.displayName || account?.name || user?.name || '';
-      const email = user?.email || '';
-      const phone = user?.phone || '';
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData((prev) => ({
-        ...prev,
-        fullName: name || prev.fullName,
-        email: email || prev.email,
-        phone: phone || prev.phone,
-      }));
-    }
-  }, [isAuthenticated, account, user]);
-
-  useEffect(() => {
-    if (isAuthenticated && pendingBooking && !registrationComplete) {
-      const name = account?.displayName || account?.name || user?.name || '';
-      const email = user?.email || '';
-      const phone = user?.phone || '';
-
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData((prev) => ({
-        ...prev,
-        fullName: name || prev.fullName,
-        email: email || prev.email,
-        phone: phone || prev.phone,
-      }));
-
-      // eslint-disable-next-line react-hooks/immutability
-      handleBookingSubmit({
-        ...pendingBooking,
-        fullName: name || pendingBooking.fullName,
-        email: email || pendingBooking.email,
-        phone: phone || pendingBooking.phone,
+      setGuest({
+        name: account?.displayName || account?.name || user?.name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
       });
-
-      setPendingBooking(null);
-      setShowAuthModal(false);
-      setRegistrationComplete(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, account, user]);
+
+  // Derive active single ticket & total
+  const selectedTicket = useMemo(() => {
+    if (!event?.tickets || !selectedTicketTypeId) return null;
+    return (
+      event.tickets.find((t) => t.ticket_type?.id === selectedTicketTypeId) ?? null
+    );
+  }, [event, selectedTicketTypeId]);
+
+  const totalPrice = selectedTicket?.price ?? 0;
+  const hasSelection = !!selectedTicket;
+
+  const handleSelectTicket = (ticketTypeId: string) => {
+    setSelectedTicketTypeId(ticketTypeId);
+    setBookingError('');
+  };
 
   const handleShare = async () => {
     if (!event) return;
+    const url = window.location.href;
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: event.display_name || event.name,
-          text: `Check out this event: ${event.display_name || event.name}`,
-          url: window.location.href,
-        });
+        await navigator.share({ title: event.display_name || event.name, url });
         setIsShared(true);
         setTimeout(() => setIsShared(false), 3000);
       } catch {
-        // user cancelled or share failed
+        /* share dismissed */
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(url);
         setIsShared(true);
         setTimeout(() => setIsShared(false), 3000);
       } catch {
-        // clipboard denied
+        /* clipboard denied */
       }
     }
   };
 
-  const handleBookingSubmit = async (data: BookingFormData) => {
-    if (!event) return;
-
-    setIsBooking(true);
-    setBookingError('');
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setBookingSuccess(true);
-      setIsBooking(false);
-
-      const isFree = isEventFree(event);
-
-      setTimeout(() => {
-        if (isFree) {
-          router.push(`/booking-confirmation?event=${event.slug}`);
-        } else {
-          router.push(`/checkout/${event.slug}?booking=success`);
-        }
-      }, 500);
-    } catch {
-      setBookingError('Failed to book. Please try again.');
-      setIsBooking(false);
-    }
-  };
-
-  const handleBooking = async (e: React.FormEvent) => {
+  // ---- Handle Registration Submission ----
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!event) {
-      setBookingError('Event not found');
+    if (!event) return;
+
+    if (!selectedTicketTypeId) {
+      setBookingError('Please select a ticket to continue.');
       return;
     }
 
     if (!isAuthenticated) {
-      setPendingBooking({ ...formData });
-      setShowAuthModal(true);
-      return;
+      if (!guest.name.trim() || !guest.email.trim()) {
+        setBookingError('Please fill in both your full name and email address.');
+        return;
+      }
     }
 
-    await handleBookingSubmit(formData);
-  };
+    // Always payload array with exactly 1 quantity for single-selection
+    const selections = [
+      { ticket_type_id: selectedTicketTypeId, quantity: 1 },
+    ];
 
-  const handleAuthSuccess = () => {
-    // Handled by the effect above.
-  };
+    try {
+      const res = await registerForEvent({
+        eventId: event.id,
+        body: {
+          selections,
+          guest: isAuthenticated ? undefined : guest,
+        },
+      }).unwrap();
 
-  const handleAuthModalClose = () => {
-    setShowAuthModal(false);
-    setPendingBooking(null);
-  };
-
-  const handleResetBooking = () => {
-    setBookingSuccess(false);
-    setRegistrationComplete(false);
-    if (isAuthenticated) {
-      const name = account?.displayName || account?.name || user?.name || '';
-      const email = user?.email || '';
-      const phone = user?.phone || '';
-
-      setFormData({
-        fullName: name,
-        email: email,
-        phone: phone,
-        specialRequests: '',
-        certificate: true,
-      });
+      setRegistration(res.data);
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ||
+        'Registration failed. Please review your details and try again.';
+      setBookingError(msg);
     }
+  };
+
+  // ---- Handle Proceed to Payment ----
+  const handleProceedToPayment = () => {
+    if (!registration || !event) return;
+
+    // For guests, email lives on registration.guest.email.
+    // For authenticated users, fall back to the logged-in user's email.
+    const email = registration.guest?.email || user?.email || '';
+    const emailParam = email
+      ? `&email=${encodeURIComponent(email)}`
+      : '';
+
+    router.push(
+      `/checkout/${event.slug}?registration=${registration.id}${emailParam}`
+    );
   };
 
   const handleBack = (e: React.MouseEvent) => {
@@ -337,18 +398,15 @@ export default function EventDetailPage() {
 
   if (error || !event) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center max-w-md px-4">
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
+        <div className="text-center max-w-md">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Event Not Found
-          </h2>
+          <h2 className="text-xl font-semibold mb-2">Event Not Found</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            The event you&apos;re looking for doesn&apos;t exist or has been
-            removed.
+            The event you are looking for does not exist, has been made private, or was removed.
           </p>
           <Button onClick={() => router.push('/')} className="cursor-pointer">
-            Go Home
+            Explore Events
           </Button>
         </div>
       </div>
@@ -359,17 +417,17 @@ export default function EventDetailPage() {
   const startTime = getEventStartTime(event);
   const duration = getEventDuration(event);
   const location = getEventLocation(event);
-  const minPrice = getEventMinPrice(event);
   const certificatePrice = getCertificatePrice(event);
   const hostName = getEventHostName(event);
   const hostIsInstitution = isHostInstitution(event);
   const isPast = isEventPast(event);
   const isFullyBooked = isEventFullyBooked(event);
-  const isFree = isEventFree(event);
   const spotsLeft = getSpotsLeft(event);
   const fillRate = getEventFillRate(event);
   const timeRemaining = getTimeUntilEvent(event);
   const hasCertificate = certificatePrice > 0;
+  const capacity = event.capacity ?? 0;
+  const attendees = event.current_attendees ?? 0;
 
   const fullDate = startDate
     ? new Date(startDate).toLocaleDateString('en-US', {
@@ -381,52 +439,47 @@ export default function EventDetailPage() {
     : 'TBD';
 
   const canBook = !isPast && !isFullyBooked;
-  const showSuccess = bookingSuccess || registrationComplete;
-
-  const totalPrice = isFree
-    ? certificatePrice
-    : minPrice + (hasCertificate ? certificatePrice : 0);
-
-  const capacity = event.capacity ?? 0;
-  const attendees = event.current_attendees ?? 0;
+  const showSuccess = !!registration;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-      {/* ---- Top bar ---- */}
-      <div className="bg-background/80 backdrop-blur-xl border-b border-border">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Top Bar Navigation */}
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-border">
         <div className="container max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 sm:h-16">
             <button
               onClick={handleBack}
-              className="inline-flex items-center gap-2 text-sm sm:text-base text-muted-foreground hover:text-foreground transition-all duration-200 group cursor-pointer bg-transparent border-0"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-all group cursor-pointer bg-transparent border-0"
             >
-              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:-translate-x-1" />
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
               <span className="font-medium hidden sm:inline">Back to Events</span>
               <span className="font-medium sm:hidden">Back</span>
             </button>
-            <div className="flex items-center gap-2 sm:gap-3">
+
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 sm:h-10 sm:w-10 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="h-9 w-9 p-0 cursor-pointer rounded-full"
                 onClick={() => setIsSaved(!isSaved)}
                 type="button"
+                aria-label="Save Event"
               >
                 {isSaved ? (
-                  <Heart className="h-5 w-5 text-red-500 fill-red-500" />
+                  <Heart className="h-4 w-4 text-red-500 fill-red-500" />
                 ) : (
-                  <HeartOff className="h-5 w-5" />
+                  <HeartOff className="h-4 w-4" />
                 )}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 sm:h-10 px-3 sm:px-4 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="h-9 px-3 cursor-pointer rounded-full"
                 onClick={handleShare}
                 type="button"
               >
-                <Share2 className="h-5 w-5" />
-                <span className="ml-1.5 sm:ml-2 text-xs sm:text-sm hidden sm:inline">
+                <Share2 className="h-4 w-4 mr-1.5" />
+                <span className="text-xs font-medium">
                   {isShared ? 'Copied!' : 'Share'}
                 </span>
               </Button>
@@ -435,13 +488,13 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      {/* ---- Main ---- */}
+      {/* Main Container */}
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-          {/* Left column */}
+          {/* Left Details Column */}
           <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-            {/* Hero image */}
-            <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-xl sm:rounded-2xl overflow-hidden bg-muted shadow-lg">
+            {/* Banner Media */}
+            <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-2xl overflow-hidden bg-muted shadow-md border border-border/50">
               {event.image_url ? (
                 <Image
                   src={event.image_url}
@@ -451,62 +504,61 @@ export default function EventDetailPage() {
                   priority
                 />
               ) : (
-                <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-muted dark:from-primary-950/30 dark:to-muted">
-                  <CalendarDays className="h-16 w-16 sm:h-24 sm:w-24 text-muted-foreground" />
+                <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary/10 via-muted to-muted/80">
+                  <CalendarDays className="h-20 w-20 text-muted-foreground/40" />
                 </div>
               )}
-
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
                 {event.is_featured && (
-                  <Badge className="bg-gradient-to-r from-secondary-400 to-secondary-500 text-white border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
-                    <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                  <Badge className="bg-amber-500 text-white border-0 px-3 py-1 font-semibold rounded-full shadow-sm">
+                    <Award className="h-3.5 w-3.5 mr-1" />
                     Featured
                   </Badge>
                 )}
                 {event.is_virtual && (
-                  <Badge className="bg-primary-500/90 backdrop-blur-sm text-white border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
-                    <Video className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
+                  <Badge className="bg-primary/90 backdrop-blur-sm text-primary-foreground border-0 px-3 py-1 font-semibold rounded-full shadow-sm">
+                    <Video className="h-3.5 w-3.5 mr-1" />
                     Virtual
                   </Badge>
                 )}
                 {isPast && (
-                  <Badge className="bg-foreground/80 backdrop-blur-sm text-background border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
+                  <Badge className="bg-black/70 backdrop-blur-sm text-white border-0 px-3 py-1 font-semibold rounded-full">
                     Ended
                   </Badge>
                 )}
                 {isFullyBooked && !isPast && (
-                  <Badge className="bg-red-500/90 backdrop-blur-sm text-white border-0 shadow-lg px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-full cursor-default">
-                    Full
+                  <Badge className="bg-destructive/90 backdrop-blur-sm text-white border-0 px-3 py-1 font-semibold rounded-full">
+                    Sold Out
                   </Badge>
                 )}
               </div>
             </div>
 
-            {/* Title + host */}
+            {/* Header Content */}
             <div className="space-y-3">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-tight">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
                 {event.display_name || event.name}
               </h1>
-              <div className="flex flex-wrap items-center gap-3 text-sm sm:text-base text-muted-foreground">
+
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   {hostIsInstitution ? (
-                    <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
+                    <Building2 className="h-4 w-4 text-primary shrink-0" />
                   ) : (
-                    <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                    <User className="h-4 w-4 shrink-0" />
                   )}
-                  <span className="hidden xs:inline">Hosted by</span>
+                  <span>Hosted by</span>
                   <span className="font-medium text-foreground flex items-center gap-1">
                     {hostName}
                     {hostIsInstitution && (
-                      <BadgeCheck className="h-4 w-4 sm:h-5 sm:w-5 text-primary-500" />
+                      <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
                     )}
                   </span>
                 </div>
-                <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden xs:block" />
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                <span className="w-1 h-1 rounded-full bg-border hidden sm:block" />
+                <div className="flex items-center gap-1.5">
+                  <Globe className="h-4 w-4 shrink-0" />
                   <span>
                     {event.is_virtual
                       ? 'Virtual Event'
@@ -517,9 +569,9 @@ export default function EventDetailPage() {
                 </div>
                 {!isPast && !isFullyBooked && timeRemaining && (
                   <>
-                    <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden sm:block" />
-                    <div className="flex items-center gap-2 text-secondary-600 dark:text-secondary-400 font-medium">
-                      <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span className="w-1 h-1 rounded-full bg-border hidden sm:block" />
+                    <div className="flex items-center gap-1.5 text-primary font-medium">
+                      <ClockIcon className="h-4 w-4 shrink-0" />
                       <span>{timeRemaining}</span>
                     </div>
                   </>
@@ -527,170 +579,124 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            {/* Details grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
-                      <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
+            {/* Key Information Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {[
+                { label: 'Date', value: fullDate, icon: CalendarIcon },
+                { label: 'Time', value: startTime, icon: ClockIcon },
+                { label: 'Location', value: location, icon: MapPinIcon },
+              ].map((item) => (
+                <Card
+                  key={item.label}
+                  className="border-border/60 shadow-sm bg-card/60 backdrop-blur-sm cursor-default"
+                >
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2.5 bg-primary/10 rounded-xl text-primary shrink-0">
+                      <item.icon className="h-5 w-5" />
                     </div>
-                    <div>
-                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
-                        Date
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
+                        {item.label}
                       </p>
-                      <p className="text-sm sm:text-base font-semibold text-foreground">
-                        {fullDate}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
-                      <ClockIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
-                        Time
-                      </p>
-                      <p className="text-sm sm:text-base font-semibold text-foreground">
-                        {startTime}
+                      <p className="text-sm font-semibold truncate text-foreground">
+                        {item.value}
                       </p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-border shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default">
-                <CardContent className="p-4 sm:p-5">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className="p-2.5 sm:p-3 bg-primary-50 dark:bg-primary-950/40 rounded-xl">
-                      <MapPinIcon className="h-5 w-5 sm:h-6 sm:w-6 text-primary-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
-                        Location
-                      </p>
-                      <p className="text-sm sm:text-base font-semibold text-foreground truncate">
-                        {location}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {/* Description */}
+            {/* Event Description */}
             {event.description && (
-              <Card className="border-border shadow-sm cursor-default">
-                <CardContent className="p-5 sm:p-6 lg:p-7">
-                  <h3 className="text-sm sm:text-base font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <span className="w-1 h-5 sm:h-6 rounded-full bg-primary-500" />
+              <Card className="border-border/60 shadow-sm cursor-default">
+                <CardContent className="p-6">
+                  <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-foreground">
+                    <span className="w-1 h-5 rounded-full bg-primary" />
                     About This Event
                   </h3>
-                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                     {event.description}
                   </p>
                 </CardContent>
               </Card>
             )}
 
-            {/* Footer details */}
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm sm:text-base text-muted-foreground pb-4">
+            {/* Supplemental Footer Meta */}
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-2">
               {duration && (
-                <div className="flex items-center gap-2 cursor-default">
-                  <ClockIcon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                  <span>{duration}</span>
+                <div className="flex items-center gap-1.5">
+                  <ClockIcon className="h-4 w-4" />
+                  <span>Duration: {duration}</span>
                 </div>
               )}
               {hasCertificate && (
                 <>
-                  <span className="w-px h-4 sm:h-5 rounded-full bg-border" />
-                  <div className="flex items-center gap-2 cursor-default">
-                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                    <span>Certificate: {formatPrice(certificatePrice)}</span>
+                  <span className="w-1 h-1 rounded-full bg-border" />
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" />
+                    <span>Certificate Fee: {formatPrice(certificatePrice)}</span>
                   </div>
                 </>
               )}
-              <span className="w-px h-4 sm:h-5 rounded-full bg-border hidden sm:block" />
-              <div className="flex items-center gap-2 cursor-default">
-                <Tag className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                <span className="hidden sm:inline">ID: {event.id.slice(0, 8)}</span>
-                <span className="sm:hidden">#{event.id.slice(0, 6)}</span>
+              <span className="w-1 h-1 rounded-full bg-border" />
+              <div className="flex items-center gap-1.5">
+                <Tag className="h-4 w-4" />
+                <span>Ref: #{event.id.slice(0, 8)}</span>
               </div>
             </div>
           </div>
 
-          {/* Right column — booking */}
+          {/* Right Sticky Sidebar — Ticket Selection & Registration */}
           <div className="lg:col-span-1">
-            <div className="space-y-4">
-              <Card className="border-border shadow-lg overflow-hidden cursor-default">
-                <div className="bg-gradient-to-r from-primary-500/5 to-primary-500/10 dark:from-primary-950/30 dark:to-primary-950/20 px-5 py-4 sm:py-5 border-b border-border">
-                  <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">
-                    Registration
+            <div className="space-y-4 lg:sticky lg:top-20">
+              <Card className="border-border shadow-xl overflow-hidden bg-card">
+                {/* Header Pricing Summary */}
+                <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 border-b border-border">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {showSuccess ? 'Registration Summary' : 'Select Ticket'}
                   </p>
-                  <div className="flex items-end gap-2 mt-1">
-                    <span
-                      className={cn(
-                        'text-3xl sm:text-4xl font-bold',
-                        totalPrice === 0
-                          ? 'text-tertiary-600 dark:text-tertiary-400'
-                          : 'text-primary-600 dark:text-primary-400',
-                      )}
-                    >
+                  <div className="flex items-baseline gap-2 mt-1.5">
+                    <span className="text-3xl font-bold tracking-tight text-foreground">
                       {formatPrice(totalPrice)}
                     </span>
-                    <span className="text-sm sm:text-base text-muted-foreground">
-                      total
-                    </span>
+                    {hasSelection && (
+                      <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                        ({selectedTicket?.name})
+                      </span>
+                    )}
                   </div>
-                  {hasCertificate && !isFree && (
-                    <div className="flex items-center gap-2 mt-1 text-xs sm:text-sm text-muted-foreground">
-                      <span className="line-through">
-                        {formatPrice(minPrice)}
-                      </span>
-                      <span className="text-muted-foreground/60">+</span>
-                      <span className="text-amber-600 dark:text-amber-400 font-medium">
-                        {formatPrice(certificatePrice)}
-                      </span>
-                      <span className="text-muted-foreground">certificate</span>
-                    </div>
-                  )}
                 </div>
 
                 <CardContent className="p-5 space-y-4">
-                  {/* Attendees */}
+                  {/* Capacity & Progress Meter */}
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm sm:text-base">
-                      <div className="flex items-center gap-2 text-muted-foreground cursor-default">
-                        <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                        <span>Attendees</span>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>Attendance</span>
                       </div>
-                      <span className="font-semibold text-foreground cursor-default">
+                      <span className="text-foreground font-semibold">
                         {attendees} / {capacity > 0 ? capacity : '∞'}
                       </span>
                     </div>
                     {capacity > 0 && (
-                      <div className="w-full h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden cursor-default">
+                      <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-500',
                             fillRate >= 90
-                              ? 'bg-red-500'
+                              ? 'bg-destructive'
                               : fillRate >= 70
                                 ? 'bg-amber-500'
-                                : 'bg-tertiary-500',
+                                : 'bg-primary'
                           )}
-                          style={{ width: `${fillRate}%` }}
+                          style={{ width: `${Math.min(fillRate, 100)}%` }}
                         />
                       </div>
                     )}
                     {spotsLeft !== null && !isPast && !isFullyBooked && (
-                      <p className="text-xs sm:text-sm text-muted-foreground cursor-default">
+                      <p className="text-[11px] text-muted-foreground text-right">
                         {spotsLeft} spots remaining
                       </p>
                     )}
@@ -698,251 +704,181 @@ export default function EventDetailPage() {
 
                   <Separator />
 
-                  {hasCertificate && (
-                    <div className="flex items-center justify-between bg-amber-50/70 dark:bg-amber-950/20 rounded-lg px-3 py-2.5 sm:py-3 border-2 border-amber-400 dark:border-amber-900/50">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-amber-100 dark:bg-amber-950/40 rounded-lg">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
-                        </div>
-                        <div>
-                          <span className="text-sm sm:text-base font-semibold text-amber-800 dark:text-amber-200">
-                            Certificate Included
-                          </span>
-                          <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400">
-                            Included in total price
-                          </p>
-                        </div>
+                  {!canBook ? (
+                    <div className="text-center py-6 cursor-default space-y-2">
+                      <div className="inline-flex p-3 rounded-full bg-muted/50 text-muted-foreground mb-1">
+                        {isPast ? <XCircle className="h-6 w-6" /> : <Users className="h-6 w-6" />}
                       </div>
-                      <span className="text-sm sm:text-base font-semibold text-amber-800 dark:text-amber-200 ml-auto">
-                        {formatPrice(certificatePrice)}
-                      </span>
+                      <p className="font-semibold text-foreground text-sm">
+                        {isPast
+                          ? 'This event has ended'
+                          : isFullyBooked
+                            ? 'All spots filled'
+                            : 'Registration closed'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Stay tuned for future sessions or upcoming events.
+                      </p>
                     </div>
-                  )}
-
-                  {canBook ? (
-                    <>
-                      {showSuccess ? (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-3 bg-tertiary-50 dark:bg-tertiary-950/30 border border-tertiary-200 dark:border-tertiary-900/50 rounded-xl p-4 cursor-default">
-                            <CheckCircle className="h-7 w-7 text-tertiary-600 dark:text-tertiary-400 flex-shrink-0" />
-                            <div>
-                              <p className="font-semibold text-tertiary-800 dark:text-tertiary-200 text-sm sm:text-base">
-                                {!isAuthenticated && registrationComplete
-                                  ? 'Account Created & Ticket Booked!'
-                                  : 'Booking Confirmed!'}
-                              </p>
-                              <p className="text-sm text-tertiary-700 dark:text-tertiary-300">
-                                {!isAuthenticated && registrationComplete
-                                  ? 'Your account has been created and your ticket is confirmed. Redirecting to payment...'
-                                  : 'Redirecting to payment...'}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={handleResetBooking}
-                            className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border border-tertiary-200 dark:border-tertiary-900/50 text-tertiary-700 dark:text-tertiary-300 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30 transition-all duration-200 cursor-pointer"
-                            variant="outline"
-                          >
-                            View Other Events
-                          </Button>
+                  ) : showSuccess ? (
+                    // ---- SUCCESS STATE ----
+                    <div className="space-y-4">
+                      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
+                          <CheckCircle2 className="h-5 w-5 shrink-0" />
+                          <span>Registration Created</span>
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          Status:{' '}
+                          <span className="font-medium text-foreground">
+                            {registration.status.display_name}
+                          </span>
+                        </p>
+                        <p className="text-[11px] font-mono text-muted-foreground">
+                          Ref #{registration.registration_number}
+                        </p>
+                      </div>
+
+                      {totalPrice > 0 ? (
+                        <Button
+                          onClick={handleProceedToPayment}
+                          className="w-full h-11 font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm cursor-pointer"
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Proceed to Checkout
+                        </Button>
                       ) : (
-                        <form onSubmit={handleBooking} className="space-y-4">
-                          {!isAuthenticated && (
-                            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 rounded-lg px-3 py-2 border border-amber-200 dark:border-amber-900/50 cursor-default">
-                              <LogIn className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-amber-700 dark:text-amber-300">
-                                You&apos;ll be prompted to sign in or create an
-                                account to complete booking
-                              </span>
-                            </div>
-                          )}
+                        <p className="text-xs text-center text-muted-foreground py-2">
+                          Free registration confirmed. We sent your confirmation pass to your email!
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    // ---- FORM REGISTRATION ----
+                    <form onSubmit={handleRegister} className="space-y-4">
+                      {bookingError && (
+                        <div className="p-3 text-xs bg-destructive/10 border border-destructive/20 text-destructive rounded-xl flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                          <span>{bookingError}</span>
+                        </div>
+                      )}
 
-                          {isAuthenticated && (
-                            <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 py-2 border border-green-200 dark:border-green-900/50 cursor-default">
-                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
-                              <span className="text-xs sm:text-sm text-green-700 dark:text-green-300">
-                                Booking as{' '}
-                                {account?.displayName || account?.name || user?.name}
-                              </span>
-                            </div>
-                          )}
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                          1. Select Ticket
+                        </Label>
+                        <TicketSelector
+                          tickets={event.tickets ?? []}
+                          selectedTicketTypeId={selectedTicketTypeId}
+                          onSelect={handleSelectTicket}
+                          disabled={isRegistering}
+                        />
+                      </div>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="fullName" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Full Name <span className="text-destructive">*</span>
-                            </Label>
-                            <div className="relative">
-                              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
-                              <Input
-                                id="fullName"
-                                placeholder="Enter your full name"
-                                className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
-                                value={formData.fullName}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, fullName: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                          </div>
+                      {/* Guest or Account Info Block */}
+                      {hasSelection && (
+                        <div className="space-y-3 pt-2">
+                          <Separator />
+                          <Label className="text-xs font-semibold text-foreground uppercase tracking-wider block">
+                            2. Attendee Information
+                          </Label>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Email Address <span className="text-destructive">*</span>
-                            </Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
-                              <Input
-                                id="email"
-                                type="email"
-                                placeholder="you@example.com"
-                                className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
-                                value={formData.email}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, email: e.target.value })
-                                }
-                                required
-                              />
+                          {isAuthenticated ? (
+                            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-muted/40 border border-border">
+                              <User className="h-4 w-4 text-primary shrink-0" />
+                              <div className="min-w-0 text-xs">
+                                <p className="font-medium text-foreground truncate">
+                                  {account?.displayName || account?.name || user?.name}
+                                </p>
+                                <p className="text-muted-foreground truncate">{user?.email}</p>
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label htmlFor="guestName" className="text-xs">
+                                  Full Name <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="relative">
+                                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                  <Input
+                                    id="guestName"
+                                    value={guest.name}
+                                    onChange={(e) =>
+                                      setGuest({ ...guest, name: e.target.value })
+                                    }
+                                    placeholder="Jane Doe"
+                                    className="pl-9 h-10 text-xs rounded-lg"
+                                    required
+                                  />
+                                </div>
+                              </div>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="phone" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Phone Number
-                            </Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
-                              <Input
-                                id="phone"
-                                type="tel"
-                                placeholder="+254 700 000 000"
-                                className="pl-9 sm:pl-10 h-11 sm:h-12 text-sm sm:text-base cursor-text"
-                                value={formData.phone}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, phone: e.target.value })
-                                }
-                              />
-                            </div>
-                          </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="guestEmail" className="text-xs">
+                                  Email Address <span className="text-destructive">*</span>
+                                </Label>
+                                <div className="relative">
+                                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                  <Input
+                                    id="guestEmail"
+                                    type="email"
+                                    value={guest.email}
+                                    onChange={(e) =>
+                                      setGuest({ ...guest, email: e.target.value })
+                                    }
+                                    placeholder="jane@example.com"
+                                    className="pl-9 h-10 text-xs rounded-lg"
+                                    required
+                                  />
+                                </div>
+                              </div>
 
-                          <div className="space-y-1.5">
-                            <Label htmlFor="specialRequests" className="text-sm sm:text-base font-medium cursor-pointer">
-                              Special Requests
-                            </Label>
-                            <div className="relative">
-                              <MessageSquare className="absolute left-3 top-3 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground pointer-events-none" />
-                              <Textarea
-                                id="specialRequests"
-                                placeholder="Any special requirements or questions..."
-                                className="pl-9 sm:pl-10 min-h-[80px] sm:min-h-[100px] resize-none text-sm sm:text-base cursor-text"
-                                value={formData.specialRequests}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    specialRequests: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-
-                          {bookingError && (
-                            <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-3 text-sm sm:text-base text-red-700 dark:text-red-300 cursor-default">
-                              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                              {bookingError}
+                              <div className="space-y-1">
+                                <Label htmlFor="guestPhone" className="text-xs">
+                                  Phone Number (Optional)
+                                </Label>
+                                <div className="relative">
+                                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                  <Input
+                                    id="guestPhone"
+                                    type="tel"
+                                    value={guest.phone}
+                                    onChange={(e) =>
+                                      setGuest({ ...guest, phone: e.target.value })
+                                    }
+                                    placeholder="+254 700 000 000"
+                                    className="pl-9 h-10 text-xs rounded-lg"
+                                  />
+                                </div>
+                              </div>
                             </div>
                           )}
 
                           <Button
                             type="submit"
-                            className={cn(
-                              'w-full h-12 sm:h-14 text-base sm:text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 cursor-pointer',
-                              totalPrice === 0
-                                ? 'bg-tertiary-500 hover:bg-tertiary-600 shadow-tertiary-500/30'
-                                : 'bg-primary-500 hover:bg-primary-600 shadow-primary-500/30',
-                              isBooking && 'opacity-70 cursor-not-allowed hover:opacity-70',
-                            )}
-                            disabled={isBooking}
+                            disabled={isRegistering || !selectedTicketTypeId}
+                            className="w-full h-11 font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm cursor-pointer mt-2"
                           >
-                            {isBooking ? (
+                            {isRegistering ? (
                               <>
-                                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 animate-spin mr-2" />
-                                Processing...
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Registering...
                               </>
                             ) : (
-                              <>
-                                <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                                {totalPrice === 0
-                                  ? 'Register Now'
-                                  : 'Proceed to Buy Ticket'}
-                              </>
+                              'Complete Registration'
                             )}
                           </Button>
-
-                          <p className="text-xs sm:text-sm text-center text-muted-foreground cursor-default">
-                            By booking, you agree to our terms and conditions
-                          </p>
-                        </form>
+                        </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="text-center py-4">
-                      <div className="flex items-center justify-center gap-2 text-muted-foreground mb-2 cursor-default">
-                        {isPast ? (
-                          <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-                        ) : (
-                          <Users className="h-5 w-5 sm:h-6 sm:w-6" />
-                        )}
-                        <span className="font-medium text-sm sm:text-base">
-                          {isPast
-                            ? 'Event has ended'
-                            : isFullyBooked
-                              ? 'Fully Booked'
-                              : 'Registration Closed'}
-                        </span>
-                      </div>
-                      <p className="text-sm sm:text-base text-muted-foreground cursor-default">
-                        {isPast
-                          ? 'Check out our upcoming events'
-                          : 'No more spots available'}
-                      </p>
-                    </div>
+                    </form>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* Share card */}
-              <Card className="border-border shadow-sm cursor-default">
-                <CardContent className="p-4">
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 sm:h-12 text-sm sm:text-base font-medium rounded-xl border-border hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50/50 dark:hover:bg-primary-950/30 transition-all duration-200 cursor-pointer"
-                    onClick={handleShare}
-                    type="button"
-                  >
-                    <Share2 className="h-5 w-5 sm:h-6 sm:w-6 mr-2" />
-                    {isShared ? 'Link Copied!' : 'Share Event'}
-                  </Button>
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Auth modal for unauthenticated booking */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={handleAuthModalClose}
-        onSuccess={handleAuthSuccess}
-        defaultMode="signin"
-        prefillData={{
-          name: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-        }}
-      />
     </div>
   );
 }
