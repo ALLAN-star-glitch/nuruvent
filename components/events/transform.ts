@@ -22,6 +22,10 @@ import type {
 // ============================================================
 // SCHEDULES
 // ============================================================
+//
+// Schedules are the single source of truth for timing, venue, and
+// virtual/hybrid info. The backend derives event-level fields from
+// them. This module never sends event-level derived fields.
 
 function schedulesToRequest(schedules: ScheduleForm[]) {
   const usable = schedules.filter(
@@ -31,7 +35,7 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
 
   return usable.map((s) => ({
     start_date: s.start_date,
-    end_date: s.end_date || s.start_date,
+    end_date: s.end_date || undefined,
     start_time: s.start_time,
     end_time: s.end_time,
     timezone: s.timezone || 'Africa/Nairobi',
@@ -39,41 +43,13 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
     is_virtual: s.is_virtual,
+    // zoom_link / meet_link are only sent when the host pasted a link
+    // manually. When they're empty, the backend auto-creates a meeting
+    // on the host's connected account.
     zoom_link: s.zoom_link || undefined,
     meet_link: s.meet_link || undefined,
     max_attendees: s.max_attendees ?? undefined,
   }));
-}
-
-/**
- * Multi-day is implied by the schedules:
- *   - more than one schedule, OR
- *   - any schedule whose end_date differs from its start_date
- */
-function deriveIsMultiDay(schedules: ScheduleForm[]): boolean {
-  if (schedules.length > 1) return true;
-  return schedules.some(
-    (s) => !!s.end_date && s.end_date !== s.start_date,
-  );
-}
-
-/**
- * Top-level start/end date come from the first / last usable schedule.
- */
-function deriveStartEnd(schedules: ScheduleForm[]) {
-  const first = schedules.find(
-    (s) => s.start_date && s.start_time && s.end_time,
-  );
-  if (!first) return { start_date: undefined, end_date: undefined };
-
-  const last = [...schedules]
-    .reverse()
-    .find((s) => s.start_date && s.start_time && s.end_time);
-
-  return {
-    start_date: first.start_date || undefined,
-    end_date: last?.end_date || last?.start_date || undefined,
-  };
 }
 
 // ============================================================
@@ -81,9 +57,9 @@ function deriveStartEnd(schedules: ScheduleForm[]) {
 // ============================================================
 //
 // The backend publish-readiness check requires:
-//   - pattern weekly  → days_of_week must be non-empty
-//   - pattern monthly → day_of_month OR week_of_month must be set
-//   - pattern custom  → days_of_week must be non-empty
+//   - pattern weekly  -> days_of_week must be non-empty
+//   - pattern monthly -> day_of_month OR week_of_month must be set
+//   - pattern custom  -> days_of_week must be non-empty
 //
 // If those conditions aren't met, we drop the recurrence entirely
 // rather than send `days_of_week: []` (which the backend rejects).
@@ -234,8 +210,6 @@ function seoToRequest(seo: SEOForm | null) {
 
 function buildCommonFields(form: EventFormData) {
   const schedules = schedulesToRequest(form.schedules);
-  const { start_date, end_date } = deriveStartEnd(form.schedules);
-  const is_multi_day = deriveIsMultiDay(form.schedules);
   const tickets = ticketsToRequest(form.tickets);
   const is_free = deriveIsFree(form.tickets);
 
@@ -246,9 +220,6 @@ function buildCommonFields(form: EventFormData) {
 
   return {
     schedules,
-    start_date,
-    end_date,
-    is_multi_day,
     tickets,
     is_free,
     recurrence,
@@ -259,15 +230,14 @@ function buildCommonFields(form: EventFormData) {
 // ============================================================
 // DRAFT PAYLOAD
 // ============================================================
+//
+// Event-level timing, venue, and virtual/hybrid fields are NOT sent.
+// The backend derives them from `schedules`. The client still carries
+// them in the form for UI display, but they are omitted here.
 
 export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
-  const {
-    schedules,
-    tickets,
-    is_free,
-    recurrence,
-    is_recurring,
-  } = buildCommonFields(form);
+  const { schedules, tickets, is_free, recurrence, is_recurring } =
+    buildCommonFields(form);
 
   return {
     name: form.name?.trim() || 'Untitled Event',
@@ -280,24 +250,6 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
     schedules,
     is_recurring: is_recurring || undefined,
     recurrence,
-    is_virtual: form.is_virtual,
-    is_hybrid: form.is_hybrid || undefined,
-    zoom_link: form.zoom_link || undefined,
-    meet_link: form.meet_link || undefined,
-    virtual_platform: form.virtual_platform || undefined,
-    virtual_platform_url: form.virtual_platform_url || undefined,
-    venue_name:
-      !form.is_virtual && form.venue_name
-        ? form.venue_name
-        : !form.is_virtual && form.location
-          ? form.location
-          : undefined,
-    in_person_location: !form.is_virtual
-      ? form.venue_address || form.location || undefined
-      : undefined,
-    venue_address: form.venue_address || undefined,
-    venue_city: form.venue_city || undefined,
-    venue_country: form.venue_country || undefined,
     is_free,
     capacity: form.capacity ?? undefined,
     tickets,
@@ -324,13 +276,8 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
 // ============================================================
 
 export function buildPublishPayload(form: EventFormData): CreateEventRequest {
-  const {
-    schedules,
-    tickets,
-    is_free,
-    recurrence,
-    is_recurring,
-  } = buildCommonFields(form);
+  const { schedules, tickets, is_free, recurrence, is_recurring } =
+    buildCommonFields(form);
 
   return {
     name: form.name?.trim() || 'Untitled Event',
@@ -345,24 +292,6 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
     recurrence,
     tickets: tickets ?? [],
     visibility: (form.is_private ? 'private' : 'public') as EventVisibility,
-    is_virtual: form.is_virtual,
-    is_hybrid: form.is_hybrid || undefined,
-    zoom_link: form.zoom_link || undefined,
-    meet_link: form.meet_link || undefined,
-    virtual_platform: form.virtual_platform || undefined,
-    virtual_platform_url: form.virtual_platform_url || undefined,
-    venue_name:
-      !form.is_virtual && form.venue_name
-        ? form.venue_name
-        : !form.is_virtual && form.location
-          ? form.location
-          : undefined,
-    in_person_location: !form.is_virtual
-      ? form.venue_address || form.location || undefined
-      : undefined,
-    venue_address: form.venue_address || undefined,
-    venue_city: form.venue_city || undefined,
-    venue_country: form.venue_country || undefined,
     is_free,
     capacity: form.capacity ?? undefined,
     waitlist_enabled: form.waitlist_enabled || undefined,
@@ -396,13 +325,8 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
 export function buildUpdatePayload(
   form: EventFormData,
 ): UpdateEventRequest {
-  const {
-    schedules,
-    tickets,
-    is_free,
-    recurrence,
-    is_recurring,
-  } = buildCommonFields(form);
+  const { schedules, tickets, is_free, recurrence, is_recurring } =
+    buildCommonFields(form);
 
   return {
     name: form.name?.trim() || undefined,
@@ -415,24 +339,6 @@ export function buildUpdatePayload(
     schedules,
     is_recurring,
     recurrence: recurrence,
-    is_virtual: form.is_virtual,
-    is_hybrid: form.is_hybrid,
-    zoom_link: form.zoom_link || undefined,
-    meet_link: form.meet_link || undefined,
-    virtual_platform: form.virtual_platform || undefined,
-    virtual_platform_url: form.virtual_platform_url || undefined,
-    venue_name:
-      !form.is_virtual && form.venue_name
-        ? form.venue_name
-        : !form.is_virtual && form.location
-          ? form.location
-          : undefined,
-    in_person_location: !form.is_virtual
-      ? form.venue_address || form.location || undefined
-      : undefined,
-    venue_address: form.venue_address || undefined,
-    venue_city: form.venue_city || undefined,
-    venue_country: form.venue_country || undefined,
     is_free,
     capacity: form.capacity ?? undefined,
     waitlist_enabled: form.waitlist_enabled,
@@ -458,6 +364,16 @@ export function buildUpdatePayload(
 // ============================================================
 // AI DRAFT → FORM MAPPING
 // ============================================================
+//
+// The AI draft (v8+) carries only identity, discovery, pricing,
+// policy, and ONE canonical schedule. Event-level timing, venue, and
+// virtual/hybrid flags are NOT part of the AI's output — they are
+// derived from schedules by the backend.
+//
+// We populate only what the form still owns: identity fields,
+// schedules, recurrence, and tickets. Event-level derived fields are
+// computed on the fly by preview components via the derive* helpers
+// in ./types.
 
 export function mapAIDraftToForm(
   draft: GeneratedEventDraft,
@@ -469,29 +385,22 @@ export function mapAIDraftToForm(
             ? crypto.randomUUID()
             : `sched-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 9)}`,
         start_date: s.start_date ?? '',
-        end_date: s.end_date ?? '',
+        end_date: '',
         start_time: s.start_time ?? '',
         end_time: s.end_time ?? '',
-        timezone: s.timezone ?? draft.timezone ?? 'Africa/Nairobi',
+        timezone: s.timezone ?? 'Africa/Nairobi',
         session_name: s.session_name ?? '',
         session_number: s.session_number ?? null,
         location: s.location ?? '',
-        is_virtual: s.is_virtual ?? draft.is_virtual ?? true,
-        zoom_link: s.zoom_link ?? '',
-        meet_link: s.meet_link ?? '',
+        is_virtual: s.is_virtual ?? false,
+        // Left blank on purpose. The backend creates the meeting if
+        // the schedule is virtual and the host is connected.
+        zoom_link: '',
+        meet_link: '',
         max_attendees: s.max_attendees ?? null,
       }))
     : undefined;
 
-    // ---- Recurrence ----
-  // The AI returns recurrence in the same shape as GeneratedRecurrence,
-  // which mirrors the wizard's RecurrenceForm. But it may omit `interval`
-  // (default 1) and it uses null for missing fields, while the wizard
-  // form uses '' for missing strings and null for missing numbers.
-  //
-  // We coerce everything into RecurrenceForm's expected types here so the
-  // RecurrenceField renders correctly. Weekdays arrive already normalized
-  // to full lowercase names by the backend correction layer.
   const recurrence: RecurrenceForm | null =
     draft.is_recurring && draft.recurrence
       ? {
@@ -524,50 +433,30 @@ export function mapAIDraftToForm(
       }))
     : undefined;
 
-  const locationCandidate =
-    draft.in_person_location ||
-    draft.venue_city ||
-    draft.venue_address ||
-    '';
-
-  const isVirtual = draft.is_virtual ?? true;
-
-  const firstSchedule = draft.schedules?.[0];
-  const zoomLink =
-    firstSchedule?.zoom_link ?? draft.virtual_platform_url ?? '';
-  const meetLink = firstSchedule?.meet_link ?? '';
-
   return {
+    // ---- Basic ----
     name: draft.name ?? undefined,
     description: draft.description ?? undefined,
     short_description: draft.short_description ?? undefined,
     tags: draft.tags ?? undefined,
     language: draft.language ?? undefined,
 
+    // ---- Schedule ----
     schedules,
 
     // ---- Recurrence ----
-    is_recurring: !!draft.is_recurring,  
+    is_recurring: !!draft.is_recurring,
     recurrence,
 
+    // ---- Tickets ----
     tickets,
     capacity: draft.capacity ?? undefined,
 
-    is_virtual: isVirtual,
-    is_hybrid: draft.is_hybrid ?? undefined,
-    location: !isVirtual ? locationCandidate : '',
-    zoom_link: isVirtual ? zoomLink : '',
-    meet_link: isVirtual ? meetLink : '',
-    virtual_platform: draft.virtual_platform ?? undefined,
-    virtual_platform_url: draft.virtual_platform_url ?? undefined,
-    venue_name: draft.venue_name ?? undefined,
-    venue_address: draft.venue_address ?? undefined,
-    venue_city: draft.venue_city ?? undefined,
-    venue_country: draft.venue_country ?? undefined,
-
+    // ---- Access ----
     invite_only: draft.invite_only ?? undefined,
     is_private: draft.visibility === 'private' ? true : undefined,
 
+    // ---- Monetization ----
     is_featured: draft.is_featured ?? undefined,
     certificate_enabled: draft.certificate_enabled ?? undefined,
   };

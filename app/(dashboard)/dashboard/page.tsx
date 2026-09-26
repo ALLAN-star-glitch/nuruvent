@@ -3,6 +3,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,7 +19,9 @@ import {
   Loader2,
   MessageSquare,
   PieChart as PieChartIcon,
+  Plug,
   PlusCircle,
+  Settings,
   Share2,
   Sparkles,
   Star,
@@ -57,7 +60,11 @@ import {
   useGetTicketTypesQuery,
   useListMyEventsQuery,
 } from '@/lib/store/api/eventsApi';
-import type { Event, GeneratedEventDraft } from '@/lib/types/events';
+import type {
+  Event,
+  GeneratedEventDraft,
+  VideoPlatform,
+} from '@/lib/types/events';
 import {
   formatPrice,
   getEventDuration,
@@ -68,6 +75,12 @@ import {
 
 import { GenerateWithAIModal } from '@/components/events/ai/GenerateWithAIModal';
 import { draftToPublishPayload } from '@/components/events/ai/draftToPublishPayload';
+import {
+  PlatformPickerModal,
+  PLATFORMS,
+  type PlatformMeta,
+} from '@/components/events/video/PlatformPickerModal';
+import { useVideoConnection } from '@/components/events/video/useVideoConnection';
 
 // ============================================================
 // CONSTANTS
@@ -91,13 +104,6 @@ const CHART_COLORS = [
   COLORS.tertiary,
   COLORS.error,
   COLORS.neutral,
-];
-
-const QUICK_ACTIONS = [
-  { icon: PlusCircle, label: 'Create Event', href: '/dashboard/events/new', color: 'text-primary', bg: 'bg-primary/10' },
-  { icon: Users, label: 'Attendees', href: '/dashboard/attendees', color: 'text-tertiary', bg: 'bg-tertiary/10' },
-  { icon: Award, label: 'Certificates', href: '/dashboard/certificates', color: 'text-secondary', bg: 'bg-secondary/10' },
-  { icon: Video, label: 'Replays', href: '/dashboard/replays', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-950/40' },
 ];
 
 const AI_DRAFT_STORAGE_KEY = 'nuruvent_ai_draft';
@@ -163,11 +169,14 @@ export default function DashboardPage() {
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
 
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
+  const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
+    null,
+  );
 
-  const {
-    data: listResponse,
-    isLoading: eventsLoading,
-  } = useListMyEventsQuery(
+  const video = useVideoConnection();
+
+  const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
     { limit: 50, offset: 0, include_creator: false },
     { skip: !isAuthenticated },
   );
@@ -180,6 +189,24 @@ export default function DashboardPage() {
   const [createEvent] = useCreateEventMutation();
 
   const events: Event[] = listResponse?.data?.data ?? [];
+
+  // ---- Video connection state ----
+  const zoomConnection = video.getConnection('zoom');
+  const googleMeetConnection = video.getConnection('google_meet');
+  const hasAnyConnection = !!zoomConnection || !!googleMeetConnection;
+  const connectedCount =
+    (zoomConnection ? 1 : 0) + (googleMeetConnection ? 1 : 0);
+
+  // ---- Picker helpers ----
+  const openPickerFromList = () => {
+    setPickedPlatform(null);
+    setIsPlatformPickerOpen(true);
+  };
+
+  const openPlatformDetail = (platform: VideoPlatform) => {
+    setPickedPlatform(platform);
+    setIsPlatformPickerOpen(true);
+  };
 
   const handleEditAIDraft = useCallback(
     (draft: GeneratedEventDraft, eventTypeId: string) => {
@@ -224,10 +251,7 @@ export default function DashboardPage() {
       (s, e) => s + (e.current_attendees ?? 0),
       0,
     );
-    const totalRevenue = events.reduce(
-      (s, e) => s + getEventMinPrice(e),
-      0,
-    );
+    const totalRevenue = events.reduce((s, e) => s + getEventMinPrice(e), 0);
     const liveEvents = events.filter(isEventPublished).length;
     const draftEvents = events.filter(
       (e) => getEventStatusName(e) === 'Draft',
@@ -296,7 +320,9 @@ export default function DashboardPage() {
 
     events.forEach((event) => {
       const typeName =
-        event.event_type?.display_name || event.event_type?.name || 'Uncategorized';
+        event.event_type?.display_name ||
+        event.event_type?.name ||
+        'Uncategorized';
       if (!types[typeName]) {
         types[typeName] = { name: typeName, value: 0 };
       }
@@ -310,13 +336,12 @@ export default function DashboardPage() {
     () =>
       events.slice(0, 5).map((event) => {
         const statusName = getEventStatusName(event);
-        const startDate =
-          event.start_date ?? event.schedules?.[0]?.start_date;
+        const startDate = event.start_date ?? event.schedules?.[0]?.start_date;
 
         const statusColorMap: Record<string, string> = {
-          Draft: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40',
-          Published: 'text-tertiary-600 dark:text-tertiary-400 bg-tertiary-50 dark:bg-tertiary-950/40',
-          Completed: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40',
+          Draft: 'text-muted-foreground bg-muted',
+          Published: 'text-primary bg-primary/10',
+          Completed: 'text-primary bg-primary/10',
           Cancelled: 'text-destructive bg-destructive/10',
         };
 
@@ -337,7 +362,8 @@ export default function DashboardPage() {
             : 'TBD',
           attendees,
           status: statusName,
-          statusColor: statusColorMap[statusName] ?? 'text-muted-foreground bg-muted',
+          statusColor:
+            statusColorMap[statusName] ?? 'text-muted-foreground bg-muted',
           progress,
           isFeatured: event.is_featured,
           isPrivate: event.visibility === 'private',
@@ -345,6 +371,59 @@ export default function DashboardPage() {
       }),
     [events],
   );
+
+  const quickActions = useMemo(() => {
+    const base: Array<{
+      icon: typeof PlusCircle;
+      label: string;
+      href: string;
+      color: string;
+      bg: string;
+      onClick?: () => void;
+    }> = [
+      {
+        icon: PlusCircle,
+        label: 'Create Event',
+        href: '/dashboard/events/new',
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+      },
+      {
+        icon: Users,
+        label: 'Attendees',
+        href: '/dashboard/attendees',
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+      },
+      {
+        icon: Award,
+        label: 'Certificates',
+        href: '/dashboard/certificates',
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+      },
+      {
+        icon: Video,
+        label: 'Replays',
+        href: '/dashboard/replays',
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+      },
+    ];
+
+    if (isAuthenticated && !video.isLoading) {
+      base.push({
+        icon: Plug,
+        label: hasAnyConnection ? 'Manage platforms' : 'Connect platform',
+        href: '#',
+        color: 'text-primary',
+        bg: 'bg-primary/10',
+        onClick: openPickerFromList,
+      });
+    }
+
+    return base;
+  }, [video.isLoading, isAuthenticated, hasAnyConnection]);
 
   const previousMonthRevenue =
     monthlyData.length > 1
@@ -356,7 +435,8 @@ export default function DashboardPage() {
       : 0;
   const revenueGrowth =
     previousMonthRevenue > 0
-      ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100
+      ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) *
+        100
       : 0;
 
   const compactStats = [
@@ -373,7 +453,7 @@ export default function DashboardPage() {
       label: 'Attendees',
       value: metrics.totalAttendees.toLocaleString(),
       icon: Users,
-      color: 'text-tertiary',
+      color: 'text-primary',
       detail: `Across ${metrics.totalEvents} events`,
       growth: metrics.totalAttendees > 0 ? '+8%' : '0%',
       growthTrend: 'up' as const,
@@ -382,7 +462,7 @@ export default function DashboardPage() {
       label: 'Revenue',
       value: formatPrice(metrics.totalRevenue),
       icon: CreditCard,
-      color: 'text-secondary',
+      color: 'text-primary',
       detail: `${metrics.completedEvents} completed`,
       growth:
         revenueGrowth > 0
@@ -407,8 +487,8 @@ export default function DashboardPage() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-6 text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-full">
-                <AlertCircle className="h-10 w-10 text-amber-600 dark:text-amber-400" />
+              <div className="p-4 bg-muted rounded-full">
+                <AlertCircle className="h-10 w-10 text-muted-foreground" />
               </div>
             </div>
             <h2 className="text-xl font-semibold text-foreground mb-2">
@@ -448,21 +528,17 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button
             onClick={() => setIsAIModalOpen(true)}
-            size="sm"
+            size="lg"
             className={cn(
-              'relative group overflow-hidden cursor-pointer border border-primary-300/40 text-white transition-all duration-300 shadow-sm hover:shadow-md active:scale-[0.98] text-xs sm:text-sm h-9 px-3.5',
-              'bg-gradient-to-r from-primary-700 via-primary-500 to-primary-400 hover:from-primary-600 hover:via-primary-400 hover:to-primary-300 ring-2 ring-primary-400/30',
+              'relative group overflow-hidden cursor-pointer',
+              'bg-primary hover:bg-primary/90 text-primary-foreground',
+              'font-semibold shadow-sm hover:shadow',
+              'transition-colors duration-200',
+              'h-11 px-5 text-sm sm:text-base',
             )}
           >
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:animate-shimmer"
-            />
-
-            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 text-primary-100 animate-pulse transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 shrink-0" />
-            <span className="font-semibold tracking-wide truncate">
-              Generate Event with AI
-            </span>
+            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 mr-2 shrink-0" />
+            <span className="tracking-wide truncate">Create with AI</span>
           </Button>
 
           <Badge
@@ -472,12 +548,175 @@ export default function DashboardPage() {
             <Sparkles className="h-3 w-3 mr-1" />
             Pro Plan
           </Badge>
-          <Badge variant="secondary" className="bg-primary/10 text-primary py-1.5 px-2.5">
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary py-1.5 px-2.5"
+          >
             <Activity className="h-3 w-3 mr-1" />
             Live: {metrics.liveEvents}
           </Badge>
         </div>
       </div>
+
+      {/* ============================================================
+          PLATFORM CONNECTION BANNER
+          ============================================================ */}
+      {!video.isLoading && (
+        <div
+          className={cn(
+            'rounded-lg border p-4 flex items-start gap-3 relative overflow-hidden',
+            hasAnyConnection
+              ? 'border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10'
+              : 'border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5',
+          )}
+        >
+          <div
+            className={cn(
+              'p-2 rounded-lg shrink-0',
+              hasAnyConnection
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-primary text-primary-foreground',
+            )}
+          >
+            {hasAnyConnection ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <Video className="h-5 w-5" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-foreground">
+                {hasAnyConnection
+                  ? `${connectedCount} platform${connectedCount > 1 ? 's' : ''} connected`
+                  : 'Connect a video platform'}
+              </p>
+              {!hasAnyConnection && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-medium border-primary/30 text-primary bg-primary/5"
+                >
+                  Recommended
+                </Badge>
+              )}
+              {hasAnyConnection && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-medium border-primary/30 text-primary bg-primary/5"
+                >
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Active
+                </Badge>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              {hasAnyConnection ? (
+                <>
+                  Connected accounts:{' '}
+                  <span className="font-medium text-foreground">
+                    {[
+                      zoomConnection ? 'Zoom' : null,
+                      googleMeetConnection ? 'Google Meet' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </span>
+                  . Meeting links are created automatically for your virtual
+                  sessions.
+                </>
+              ) : (
+                <>
+                  We&apos;ll create meeting links for each virtual session and
+                  track attendance automatically. Takes 30 seconds.
+                </>
+              )}
+            </p>
+
+            {/* ---- Actions row ---- */}
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <Button
+                size="default"
+                onClick={openPickerFromList}
+                className={cn(
+                  'cursor-pointer',
+                  'bg-primary hover:bg-primary/90 text-primary-foreground',
+                  'font-semibold shadow-sm',
+                  'h-10 px-4',
+                )}
+              >
+                <Plug className="h-4 w-4 mr-2" />
+                {hasAnyConnection ? 'Manage platforms' : 'Connect platform'}
+              </Button>
+
+              {/* Platform logo shortcuts */}
+              <div className="flex items-center gap-1.5 ml-1">
+                {PLATFORMS.map((meta: PlatformMeta) => {
+                  const isConnected = !!video.getConnection(meta.platform);
+
+                  return (
+                    <button
+                      key={meta.platform}
+                      type="button"
+                      disabled={!meta.available}
+                      onClick={() =>
+                        meta.available && openPlatformDetail(meta.platform)
+                      }
+                      title={
+                        meta.available
+                          ? `${isConnected ? 'Manage' : 'Connect'} ${meta.label}`
+                          : `${meta.label} — coming soon`
+                      }
+                      aria-label={`${isConnected ? 'Manage' : 'Connect'} ${meta.label}`}
+                      className={cn(
+                        'relative h-10 w-10 rounded-lg transition-all',
+                        'flex items-center justify-center',
+                        'bg-background border border-border p-1.5',
+                        meta.available
+                          ? 'hover:border-primary/50 hover:bg-primary/5 cursor-pointer active:scale-95'
+                          : 'opacity-50 cursor-not-allowed',
+                      )}
+                    >
+                      <Image
+                        src={meta.logo}
+                        alt={`${meta.label} logo`}
+                        width={28}
+                        height={28}
+                        className="h-full w-full object-contain"
+                      />
+                      {isConnected && (
+                        <span
+                          className={cn(
+                            'absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full',
+                            'bg-primary border-2 border-background',
+                            'flex items-center justify-center',
+                          )}
+                          aria-hidden="true"
+                        >
+                          <CheckCircle2 className="h-2 w-2 text-primary-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer text-xs text-muted-foreground"
+                asChild
+              >
+                <Link href="/dashboard/settings?tab=integrations">
+                  <Settings className="h-3.5 w-3.5 mr-1.5" />
+                  Settings
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main layout */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -501,7 +740,7 @@ export default function DashboardPage() {
                           className={cn(
                             'flex items-center gap-0.5 text-[10px] font-medium',
                             stat.growthTrend === 'up'
-                              ? 'text-tertiary-600 dark:text-tertiary-400'
+                              ? 'text-primary'
                               : 'text-destructive',
                           )}
                         >
@@ -517,7 +756,9 @@ export default function DashboardPage() {
                     <p className="text-lg font-bold text-foreground mt-1">
                       {stat.value}
                     </p>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {stat.label}
+                    </p>
                     <p className="text-[10px] text-muted-foreground/80 mt-0.5">
                       {stat.detail}
                     </p>
@@ -541,7 +782,7 @@ export default function DashboardPage() {
                       Revenue
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-tertiary" />
+                      <span className="w-2 h-2 rounded-full bg-primary/50" />
                       Attendees
                     </span>
                   </div>
@@ -579,17 +820,20 @@ export default function DashboardPage() {
                         >
                           <stop
                             offset="5%"
-                            stopColor={COLORS.tertiary}
-                            stopOpacity={0.3}
+                            stopColor={COLORS.primary}
+                            stopOpacity={0.15}
                           />
                           <stop
                             offset="95%"
-                            stopColor={COLORS.tertiary}
+                            stopColor={COLORS.primary}
                             stopOpacity={0}
                           />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--border)"
+                      />
                       <XAxis
                         dataKey="month"
                         stroke="var(--muted-foreground)"
@@ -613,9 +857,10 @@ export default function DashboardPage() {
                       <Area
                         type="monotone"
                         dataKey="attendees"
-                        stroke={COLORS.tertiary}
+                        stroke={COLORS.primary}
                         fill="url(#attendeesGradient)"
                         strokeWidth={2}
+                        strokeOpacity={0.5}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -696,7 +941,7 @@ export default function DashboardPage() {
                               {event.title}
                             </p>
                             {event.isFeatured && (
-                              <Badge className="bg-secondary-500 text-white text-[10px] px-1.5">
+                              <Badge className="bg-secondary text-secondary-foreground text-[10px] px-1.5">
                                 <Star className="h-2 w-2 mr-0.5" />
                                 Featured
                               </Badge>
@@ -704,7 +949,7 @@ export default function DashboardPage() {
                             {event.isPrivate && (
                               <Badge
                                 variant="outline"
-                                className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 text-[10px] px-1.5"
+                                className="text-muted-foreground border-border bg-muted text-[10px] px-1.5"
                               >
                                 Private
                               </Badge>
@@ -728,7 +973,7 @@ export default function DashboardPage() {
                             {event.progress > 0 && event.progress < 100 && (
                               <>
                                 <span className="hidden sm:inline">•</span>
-                                <span className="text-amber-600 dark:text-amber-400 hidden sm:inline">
+                                <span className="text-muted-foreground hidden sm:inline">
                                   {event.progress}%
                                 </span>
                               </>
@@ -743,7 +988,7 @@ export default function DashboardPage() {
                           </div>
                         )}
                         {event.progress === 100 && (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-tertiary-500 flex-shrink-0" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                         )}
                       </div>
                     </Link>
@@ -771,14 +1016,10 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 space-y-0.5">
-              {QUICK_ACTIONS.map((action) => {
+              {quickActions.map((action) => {
                 const Icon = action.icon;
-                return (
-                  <Link
-                    key={action.label}
-                    href={action.href}
-                    className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-accent/60 transition-all duration-200 group border border-transparent hover:border-border"
-                  >
+                const content = (
+                  <>
                     <div
                       className={cn(
                         'p-1.5 rounded-lg group-hover:scale-105 transition-transform duration-200',
@@ -791,6 +1032,25 @@ export default function DashboardPage() {
                       {action.label}
                     </span>
                     <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-primary transition-colors" />
+                  </>
+                );
+
+                return action.onClick ? (
+                  <button
+                    key={action.label}
+                    type="button"
+                    onClick={action.onClick}
+                    className="w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-accent/60 transition-all duration-200 group border border-transparent hover:border-border cursor-pointer text-left"
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <Link
+                    key={action.label}
+                    href={action.href}
+                    className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-accent/60 transition-all duration-200 group border border-transparent hover:border-border"
+                  >
+                    {content}
                   </Link>
                 );
               })}
@@ -842,7 +1102,7 @@ export default function DashboardPage() {
           <Card className="border-border shadow-sm">
             <CardHeader className="pb-1.5 px-4 pt-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-secondary" />
+                <Lightbulb className="h-4 w-4 text-muted-foreground" />
                 Tips
               </CardTitle>
             </CardHeader>
@@ -853,14 +1113,14 @@ export default function DashboardPage() {
                   Send reminders to boost attendance
                 </p>
               </div>
-              <div className="flex items-start gap-2 p-1.5 rounded-lg bg-tertiary/5 border border-tertiary/10">
-                <Award className="h-3.5 w-3.5 text-tertiary mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 p-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                <Award className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-muted-foreground">
                   Issue certificates within 48 hours
                 </p>
               </div>
-              <div className="flex items-start gap-2 p-1.5 rounded-lg bg-secondary/5 border border-secondary/10">
-                <Share2 className="h-3.5 w-3.5 text-secondary mt-0.5 flex-shrink-0" />
+              <div className="flex items-start gap-2 p-1.5 rounded-lg bg-primary/5 border border-primary/10">
+                <Share2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-xs text-muted-foreground">
                   Share replays for 45% more engagement
                 </p>
@@ -878,6 +1138,14 @@ export default function DashboardPage() {
         ticketTypes={ticketTypes}
         onEditDraft={handleEditAIDraft}
         onPublishDraft={handlePublishAIDraft}
+      />
+
+      {/* Platform Picker Modal */}
+      <PlatformPickerModal
+        open={isPlatformPickerOpen}
+        onOpenChange={setIsPlatformPickerOpen}
+        returnUrl="/dashboard"
+        initialPlatform={pickedPlatform}
       />
     </div>
   );

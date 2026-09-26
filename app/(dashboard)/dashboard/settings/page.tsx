@@ -1,7 +1,10 @@
+// app/(dashboard)/dashboard/settings/page.tsx
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Settings,
   User,
@@ -37,11 +40,22 @@ import {
   Zap,
   RefreshCw,
   LayoutDashboard,
+  Video,
+  Plug,
+  ExternalLink,
+  Loader2,
+  ArrowLeft,
+  XCircle,
 } from 'lucide-react';
 
-// Shadcn components
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -80,8 +94,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
-// Types
+import {
+  PlatformPickerModal,
+  PLATFORMS,
+} from '@/components/events/video/PlatformPickerModal';
+import { useVideoConnection } from '@/components/events/video/useVideoConnection';
+import type { VideoPlatform } from '@/lib/types/events';
+
+// ============================================================
+// TYPES
+// ============================================================
+
 interface GeneralSettings {
   appTheme: 'light' | 'dark' | 'system';
   appLanguage: string;
@@ -121,7 +146,6 @@ interface PaymentSettings {
   minPayoutAmount: number;
 }
 
-// Mock Data
 const mockGeneral: GeneralSettings = {
   appTheme: 'light',
   appLanguage: 'English',
@@ -163,13 +187,183 @@ const mockPayment: PaymentSettings = {
 
 const currencies = ['KES', 'USD', 'EUR', 'GBP', 'NGN', 'TZS', 'UGX'];
 const languages = ['English', 'Swahili', 'French', 'Arabic', 'Portuguese'];
-const timezones = ['Africa/Nairobi', 'Africa/Lagos', 'Africa/Cairo', 'Africa/Johannesburg', 'Africa/Casablanca', 'Europe/London', 'America/New_York', 'Asia/Dubai'];
+const timezones = [
+  'Africa/Nairobi',
+  'Africa/Lagos',
+  'Africa/Cairo',
+  'Africa/Johannesburg',
+  'Africa/Casablanca',
+  'Europe/London',
+  'America/New_York',
+  'Asia/Dubai',
+];
 const dateFormats = ['MMM DD, YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
+
+// ============================================================
+// INTEGRATIONS TAB
+// ============================================================
+//
+// Shows every platform in PLATFORMS. Clicking any row opens the
+// shared PlatformPickerModal, which handles connect, manage, and
+// disconnect for that platform.
+
+function IntegrationsTab() {
+  const video = useVideoConnection();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
+    null,
+  );
+
+  const openList = () => {
+    setPickedPlatform(null);
+    setIsPickerOpen(true);
+  };
+
+  const openPlatform = (platform: VideoPlatform) => {
+    setPickedPlatform(platform);
+    setIsPickerOpen(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Plug className="h-5 w-5 text-primary" />
+              Integrations
+            </CardTitle>
+            <CardDescription>
+              Connect your video platforms so Nuruvent can create meeting
+              links and track attendance automatically.
+            </CardDescription>
+          </div>
+          <Button
+            size="sm"
+            onClick={openList}
+            className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shrink-0"
+          >
+            <Plug className="h-3.5 w-3.5 mr-1.5" />
+            Manage
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {PLATFORMS.map((meta) => {
+            const connection = video.getConnection(meta.platform);
+            const isConnected = !!connection;
+
+            return (
+              <button
+                key={meta.platform}
+                type="button"
+                disabled={!meta.available}
+                onClick={() => meta.available && openPlatform(meta.platform)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-4 rounded-lg border text-left transition-all',
+                  isConnected
+                    ? 'border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10 cursor-pointer group'
+                    : meta.available
+                      ? 'border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer group'
+                      : 'border-border opacity-70 cursor-not-allowed',
+                )}
+              >
+                <div
+                  className={cn(
+                    'shrink-0 h-12 w-12 rounded-lg flex items-center justify-center',
+                    'bg-background border border-border overflow-hidden p-2',
+                    meta.available && 'group-hover:border-primary/30',
+                  )}
+                >
+                  <Image
+                    src={meta.logo}
+                    alt={`${meta.label} logo`}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-semibold text-foreground">
+                      {meta.label}
+                    </h3>
+                    {isConnected && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-primary/30 text-primary bg-primary/10"
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Connected
+                      </Badge>
+                    )}
+                    {!meta.available && !isConnected && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-border text-muted-foreground bg-muted"
+                      >
+                        Coming soon
+                      </Badge>
+                    )}
+                  </div>
+
+                  <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
+                    {meta.description}
+                  </p>
+
+                  {isConnected && connection && (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      Connected as{' '}
+                      <span className="font-medium text-foreground">
+                        {connection.external_email}
+                      </span>
+                      {' · '}
+                      {new Date(connection.connected_at).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+
+                <div className="shrink-0">
+                  {isConnected ? (
+                    <span className="text-sm font-semibold text-primary">
+                      Manage
+                    </span>
+                  ) : meta.available ? (
+                    <span className="text-sm font-semibold text-primary">
+                      Connect
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      Soon
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Picker modal — owns connect / manage / disconnect */}
+      <PlatformPickerModal
+        open={isPickerOpen}
+        onOpenChange={setIsPickerOpen}
+        returnUrl="/dashboard/settings?tab=integrations"
+        initialPlatform={pickedPlatform}
+      />
+    </div>
+  );
+}
+
+// ============================================================
+// PAGE
+// ============================================================
 
 export default function SettingsPage() {
   const router = useRouter();
   const [general, setGeneral] = useState<GeneralSettings>(mockGeneral);
-  const [notifications, setNotifications] = useState<NotificationSettings>(mockNotifications);
+  const [notifications, setNotifications] =
+    useState<NotificationSettings>(mockNotifications);
   const [security, setSecurity] = useState<SecuritySettings>(mockSecurity);
   const [payment, setPayment] = useState<PaymentSettings>(mockPayment);
   const [showPassword, setShowPassword] = useState(false);
@@ -177,32 +371,26 @@ export default function SettingsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
 
-  const handleGeneralChange = (key: keyof GeneralSettings, value: string | boolean) => {
-    setGeneral(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+  const handleGeneralChange = (
+    key: keyof GeneralSettings,
+    value: string | boolean,
+  ) => {
+    setGeneral((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleNotificationToggle = (key: keyof NotificationSettings) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSecurityToggle = (key: keyof SecuritySettings) => {
-    setSecurity(prev => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    setSecurity((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handlePaymentChange = (key: keyof PaymentSettings, value: string | number) => {
-    setPayment(prev => ({
-      ...prev,
-      [key]: value,
-    }));
+  const handlePaymentChange = (
+    key: keyof PaymentSettings,
+    value: string | number,
+  ) => {
+    setPayment((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSaveSettings = () => {
@@ -214,13 +402,13 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage your account preferences and platform settings.
           </p>
         </div>
-        <Button 
-          className="bg-primary hover:bg-primary/90 text-white cursor-pointer"
+        <Button
+          className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
           onClick={handleSaveSettings}
         >
           <Save className="h-4 w-4 mr-2" />
@@ -229,25 +417,51 @@ export default function SettingsPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-gray-100 p-1 rounded-lg">
-          <TabsTrigger value="general" className="cursor-pointer flex items-center gap-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
+        <TabsList className="grid grid-cols-2 md:grid-cols-6 gap-2 bg-muted p-1 rounded-lg">
+          <TabsTrigger
+            value="general"
+            className="cursor-pointer flex items-center gap-2"
+          >
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">General</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="cursor-pointer flex items-center gap-2">
+          <TabsTrigger
+            value="notifications"
+            className="cursor-pointer flex items-center gap-2"
+          >
             <Bell className="h-4 w-4" />
             <span className="hidden sm:inline">Notifications</span>
           </TabsTrigger>
-          <TabsTrigger value="security" className="cursor-pointer flex items-center gap-2">
+          <TabsTrigger
+            value="security"
+            className="cursor-pointer flex items-center gap-2"
+          >
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Security</span>
           </TabsTrigger>
-          <TabsTrigger value="payments" className="cursor-pointer flex items-center gap-2">
+          <TabsTrigger
+            value="payments"
+            className="cursor-pointer flex items-center gap-2"
+          >
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Payments</span>
           </TabsTrigger>
-          <TabsTrigger value="danger" className="cursor-pointer flex items-center gap-2 text-red-600 hover:text-red-700">
+          <TabsTrigger
+            value="integrations"
+            className="cursor-pointer flex items-center gap-2"
+          >
+            <Plug className="h-4 w-4" />
+            <span className="hidden sm:inline">Integrations</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="danger"
+            className="cursor-pointer flex items-center gap-2 text-destructive hover:text-destructive"
+          >
             <AlertCircle className="h-4 w-4" />
             <span className="hidden sm:inline">Danger</span>
           </TabsTrigger>
@@ -268,15 +482,23 @@ export default function SettingsPage() {
                   <Label>App Theme</Label>
                   <Select
                     value={general.appTheme}
-                    onValueChange={(value) => handleGeneralChange('appTheme', value)}
+                    onValueChange={(value) =>
+                      handleGeneralChange('appTheme', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="light" className="cursor-pointer">Light</SelectItem>
-                      <SelectItem value="dark" className="cursor-pointer">Dark</SelectItem>
-                      <SelectItem value="system" className="cursor-pointer">System</SelectItem>
+                      <SelectItem value="light" className="cursor-pointer">
+                        Light
+                      </SelectItem>
+                      <SelectItem value="dark" className="cursor-pointer">
+                        Dark
+                      </SelectItem>
+                      <SelectItem value="system" className="cursor-pointer">
+                        System
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -285,14 +507,20 @@ export default function SettingsPage() {
                   <Label>App Language</Label>
                   <Select
                     value={general.appLanguage}
-                    onValueChange={(value) => handleGeneralChange('appLanguage', value)}
+                    onValueChange={(value) =>
+                      handleGeneralChange('appLanguage', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {languages.map((lang) => (
-                        <SelectItem key={lang} value={lang} className="cursor-pointer">
+                        <SelectItem
+                          key={lang}
+                          value={lang}
+                          className="cursor-pointer"
+                        >
                           {lang}
                         </SelectItem>
                       ))}
@@ -304,14 +532,20 @@ export default function SettingsPage() {
                   <Label>Time Zone</Label>
                   <Select
                     value={general.timezone}
-                    onValueChange={(value) => handleGeneralChange('timezone', value)}
+                    onValueChange={(value) =>
+                      handleGeneralChange('timezone', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {timezones.map((tz) => (
-                        <SelectItem key={tz} value={tz} className="cursor-pointer">
+                        <SelectItem
+                          key={tz}
+                          value={tz}
+                          className="cursor-pointer"
+                        >
                           {tz}
                         </SelectItem>
                       ))}
@@ -323,14 +557,20 @@ export default function SettingsPage() {
                   <Label>Date Format</Label>
                   <Select
                     value={general.dateFormat}
-                    onValueChange={(value) => handleGeneralChange('dateFormat', value)}
+                    onValueChange={(value) =>
+                      handleGeneralChange('dateFormat', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {dateFormats.map((format) => (
-                        <SelectItem key={format} value={format} className="cursor-pointer">
+                        <SelectItem
+                          key={format}
+                          value={format}
+                          className="cursor-pointer"
+                        >
                           {format}
                         </SelectItem>
                       ))}
@@ -342,14 +582,20 @@ export default function SettingsPage() {
                   <Label>Time Format</Label>
                   <Select
                     value={general.timeFormat}
-                    onValueChange={(value) => handleGeneralChange('timeFormat', value)}
+                    onValueChange={(value) =>
+                      handleGeneralChange('timeFormat', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="12h" className="cursor-pointer">12-hour (AM/PM)</SelectItem>
-                      <SelectItem value="24h" className="cursor-pointer">24-hour</SelectItem>
+                      <SelectItem value="12h" className="cursor-pointer">
+                        12-hour (AM/PM)
+                      </SelectItem>
+                      <SelectItem value="24h" className="cursor-pointer">
+                        24-hour
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -361,33 +607,47 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm font-medium">Compact View</Label>
-                    <p className="text-xs text-gray-500">Display more content with compact spacing</p>
+                    <p className="text-xs text-muted-foreground">
+                      Display more content with compact spacing
+                    </p>
                   </div>
                   <Switch
                     checked={general.compactView}
-                    onCheckedChange={(checked) => handleGeneralChange('compactView', checked)}
+                    onCheckedChange={(checked) =>
+                      handleGeneralChange('compactView', checked)
+                    }
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-sm font-medium">Auto-Play Videos</Label>
-                    <p className="text-xs text-gray-500">Automatically play videos when they appear</p>
+                    <Label className="text-sm font-medium">
+                      Auto-Play Videos
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically play videos when they appear
+                    </p>
                   </div>
                   <Switch
                     checked={general.autoPlayVideos}
-                    onCheckedChange={(checked) => handleGeneralChange('autoPlayVideos', checked)}
+                    onCheckedChange={(checked) =>
+                      handleGeneralChange('autoPlayVideos', checked)
+                    }
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm font-medium">Reduce Motion</Label>
-                    <p className="text-xs text-gray-500">Minimize animations and transitions</p>
+                    <p className="text-xs text-muted-foreground">
+                      Minimize animations and transitions
+                    </p>
                   </div>
                   <Switch
                     checked={general.reduceMotion}
-                    onCheckedChange={(checked) => handleGeneralChange('reduceMotion', checked)}
+                    onCheckedChange={(checked) =>
+                      handleGeneralChange('reduceMotion', checked)
+                    }
                   />
                 </div>
               </div>
@@ -406,93 +666,76 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Email Reminders</Label>
-                    <p className="text-xs text-gray-500">Receive email reminders for upcoming events</p>
+                {[
+                  {
+                    key: 'emailReminders' as const,
+                    label: 'Email Reminders',
+                    description:
+                      'Receive email reminders for upcoming events',
+                  },
+                  {
+                    key: 'smsReminders' as const,
+                    label: 'SMS Reminders',
+                    description:
+                      'Receive SMS reminders for upcoming events',
+                  },
+                  {
+                    key: 'marketingEmails' as const,
+                    label: 'Marketing Emails',
+                    description:
+                      'Receive promotional emails and offers',
+                  },
+                  {
+                    key: 'paymentAlerts' as const,
+                    label: 'Payment Alerts',
+                    description:
+                      'Receive alerts for payment transactions',
+                  },
+                  {
+                    key: 'certificateAlerts' as const,
+                    label: 'Certificate Alerts',
+                    description:
+                      'Receive alerts when certificates are issued',
+                  },
+                  {
+                    key: 'eventUpdates' as const,
+                    label: 'Event Updates',
+                    description:
+                      'Receive updates about events you manage',
+                  },
+                  {
+                    key: 'systemAnnouncements' as const,
+                    label: 'System Announcements',
+                    description:
+                      'Receive important system announcements',
+                  },
+                  {
+                    key: 'weeklyDigest' as const,
+                    label: 'Weekly Digest',
+                    description:
+                      'Receive a weekly summary of your events',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.key}
+                    className="flex items-center justify-between"
+                  >
+                    <div>
+                      <Label className="text-sm font-medium">
+                        {item.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        {item.description}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications[item.key]}
+                      onCheckedChange={() =>
+                        handleNotificationToggle(item.key)
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={notifications.emailReminders}
-                    onCheckedChange={() => handleNotificationToggle('emailReminders')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">SMS Reminders</Label>
-                    <p className="text-xs text-gray-500">Receive SMS reminders for upcoming events</p>
-                  </div>
-                  <Switch
-                    checked={notifications.smsReminders}
-                    onCheckedChange={() => handleNotificationToggle('smsReminders')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Marketing Emails</Label>
-                    <p className="text-xs text-gray-500">Receive promotional emails and offers</p>
-                  </div>
-                  <Switch
-                    checked={notifications.marketingEmails}
-                    onCheckedChange={() => handleNotificationToggle('marketingEmails')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Payment Alerts</Label>
-                    <p className="text-xs text-gray-500">Receive alerts for payment transactions</p>
-                  </div>
-                  <Switch
-                    checked={notifications.paymentAlerts}
-                    onCheckedChange={() => handleNotificationToggle('paymentAlerts')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Certificate Alerts</Label>
-                    <p className="text-xs text-gray-500">Receive alerts when certificates are issued</p>
-                  </div>
-                  <Switch
-                    checked={notifications.certificateAlerts}
-                    onCheckedChange={() => handleNotificationToggle('certificateAlerts')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Event Updates</Label>
-                    <p className="text-xs text-gray-500">Receive updates about events you manage</p>
-                  </div>
-                  <Switch
-                    checked={notifications.eventUpdates}
-                    onCheckedChange={() => handleNotificationToggle('eventUpdates')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">System Announcements</Label>
-                    <p className="text-xs text-gray-500">Receive important system announcements</p>
-                  </div>
-                  <Switch
-                    checked={notifications.systemAnnouncements}
-                    onCheckedChange={() => handleNotificationToggle('systemAnnouncements')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-medium">Weekly Digest</Label>
-                    <p className="text-xs text-gray-500">Receive a weekly summary of your events</p>
-                  </div>
-                  <Switch
-                    checked={notifications.weeklyDigest}
-                    onCheckedChange={() => handleNotificationToggle('weeklyDigest')}
-                  />
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -520,12 +763,18 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 cursor-pointer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
-                  <Button variant="outline" className="cursor-pointer">Update Password</Button>
+                  <Button variant="outline" className="cursor-pointer">
+                    Update Password
+                  </Button>
                 </div>
               </div>
 
@@ -534,8 +783,12 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                    <p className="text-xs text-gray-500">Add an extra layer of security to your account</p>
+                    <Label className="text-sm font-medium">
+                      Two-Factor Authentication
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Add an extra layer of security to your account
+                    </p>
                   </div>
                   <Button variant="outline" className="cursor-pointer">
                     {security.twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
@@ -545,7 +798,9 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm font-medium">Login Alerts</Label>
-                    <p className="text-xs text-gray-500">Receive alerts for new device logins</p>
+                    <p className="text-xs text-muted-foreground">
+                      Receive alerts for new device logins
+                    </p>
                   </div>
                   <Switch
                     checked={security.loginAlerts}
@@ -557,26 +812,45 @@ export default function SettingsPage() {
                   <Label>Session Timeout</Label>
                   <Select
                     value={String(security.sessionTimeout)}
-                    onValueChange={(value) => setSecurity({ ...security, sessionTimeout: Number(value) })}
+                    onValueChange={(value) =>
+                      setSecurity({
+                        ...security,
+                        sessionTimeout: Number(value),
+                      })
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="15" className="cursor-pointer">15 minutes</SelectItem>
-                      <SelectItem value="30" className="cursor-pointer">30 minutes</SelectItem>
-                      <SelectItem value="60" className="cursor-pointer">1 hour</SelectItem>
-                      <SelectItem value="120" className="cursor-pointer">2 hours</SelectItem>
+                      <SelectItem value="15" className="cursor-pointer">
+                        15 minutes
+                      </SelectItem>
+                      <SelectItem value="30" className="cursor-pointer">
+                        30 minutes
+                      </SelectItem>
+                      <SelectItem value="60" className="cursor-pointer">
+                        1 hour
+                      </SelectItem>
+                      <SelectItem value="120" className="cursor-pointer">
+                        2 hours
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-sm font-medium">Device Management</Label>
-                    <p className="text-xs text-gray-500">Manage devices that are logged into your account</p>
+                    <Label className="text-sm font-medium">
+                      Device Management
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Manage devices that are logged into your account
+                    </p>
                   </div>
-                  <Button variant="outline" className="cursor-pointer">Manage Devices</Button>
+                  <Button variant="outline" className="cursor-pointer">
+                    Manage Devices
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -598,14 +872,20 @@ export default function SettingsPage() {
                   <Label>Default Currency</Label>
                   <Select
                     value={payment.defaultCurrency}
-                    onValueChange={(value) => handlePaymentChange('defaultCurrency', value)}
+                    onValueChange={(value) =>
+                      handlePaymentChange('defaultCurrency', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {currencies.map((currency) => (
-                        <SelectItem key={currency} value={currency} className="cursor-pointer">
+                        <SelectItem
+                          key={currency}
+                          value={currency}
+                          className="cursor-pointer"
+                        >
                           {currency}
                         </SelectItem>
                       ))}
@@ -617,15 +897,23 @@ export default function SettingsPage() {
                   <Label>Default Payment Method</Label>
                   <Select
                     value={payment.paymentMethod}
-                    onValueChange={(value) => handlePaymentChange('paymentMethod', value)}
+                    onValueChange={(value) =>
+                      handlePaymentChange('paymentMethod', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mpesa" className="cursor-pointer">M-Pesa</SelectItem>
-                      <SelectItem value="card" className="cursor-pointer">Card</SelectItem>
-                      <SelectItem value="bank" className="cursor-pointer">Bank Transfer</SelectItem>
+                      <SelectItem value="mpesa" className="cursor-pointer">
+                        M-Pesa
+                      </SelectItem>
+                      <SelectItem value="card" className="cursor-pointer">
+                        Card
+                      </SelectItem>
+                      <SelectItem value="bank" className="cursor-pointer">
+                        Bank Transfer
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -634,7 +922,9 @@ export default function SettingsPage() {
                   <Label>M-Pesa Number</Label>
                   <Input
                     value={payment.mpesaNumber}
-                    onChange={(e) => handlePaymentChange('mpesaNumber', e.target.value)}
+                    onChange={(e) =>
+                      handlePaymentChange('mpesaNumber', e.target.value)
+                    }
                     className="mt-1 cursor-text"
                   />
                 </div>
@@ -643,7 +933,9 @@ export default function SettingsPage() {
                   <Label>Bank Account</Label>
                   <Input
                     value={payment.bankAccount}
-                    onChange={(e) => handlePaymentChange('bankAccount', e.target.value)}
+                    onChange={(e) =>
+                      handlePaymentChange('bankAccount', e.target.value)
+                    }
                     className="mt-1 cursor-text"
                   />
                 </div>
@@ -652,7 +944,9 @@ export default function SettingsPage() {
                   <Label>Bank Name</Label>
                   <Input
                     value={payment.bankName}
-                    onChange={(e) => handlePaymentChange('bankName', e.target.value)}
+                    onChange={(e) =>
+                      handlePaymentChange('bankName', e.target.value)
+                    }
                     className="mt-1 cursor-text"
                   />
                 </div>
@@ -661,16 +955,26 @@ export default function SettingsPage() {
                   <Label>Payout Frequency</Label>
                   <Select
                     value={payment.payoutFrequency}
-                    onValueChange={(value) => handlePaymentChange('payoutFrequency', value)}
+                    onValueChange={(value) =>
+                      handlePaymentChange('payoutFrequency', value)
+                    }
                   >
                     <SelectTrigger className="mt-1 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="daily" className="cursor-pointer">Daily</SelectItem>
-                      <SelectItem value="weekly" className="cursor-pointer">Weekly</SelectItem>
-                      <SelectItem value="biweekly" className="cursor-pointer">Bi-Weekly</SelectItem>
-                      <SelectItem value="monthly" className="cursor-pointer">Monthly</SelectItem>
+                      <SelectItem value="daily" className="cursor-pointer">
+                        Daily
+                      </SelectItem>
+                      <SelectItem value="weekly" className="cursor-pointer">
+                        Weekly
+                      </SelectItem>
+                      <SelectItem value="biweekly" className="cursor-pointer">
+                        Bi-Weekly
+                      </SelectItem>
+                      <SelectItem value="monthly" className="cursor-pointer">
+                        Monthly
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -680,7 +984,12 @@ export default function SettingsPage() {
                   <Input
                     type="number"
                     value={payment.minPayoutAmount}
-                    onChange={(e) => handlePaymentChange('minPayoutAmount', Number(e.target.value))}
+                    onChange={(e) =>
+                      handlePaymentChange(
+                        'minPayoutAmount',
+                        Number(e.target.value),
+                      )
+                    }
                     className="mt-1 cursor-text"
                   />
                 </div>
@@ -689,24 +998,33 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Integrations Tab */}
+        <TabsContent value="integrations">
+          <IntegrationsTab />
+        </TabsContent>
+
         {/* Danger Tab */}
         <TabsContent value="danger">
-          <Card className="border-red-200">
-            <CardHeader className="bg-red-50">
-              <CardTitle className="text-red-600">Danger Zone</CardTitle>
-              <CardDescription className="text-red-500">
+          <Card className="border-destructive/30">
+            <CardHeader className="bg-destructive/5">
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardDescription className="text-destructive">
                 Irreversible actions that affect your account.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="p-4 border border-red-200 rounded-lg bg-red-50/30">
+              <div className="p-4 border border-destructive/30 rounded-lg bg-destructive/5">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 bg-red-100 rounded-full">
-                    <LogOut className="h-6 w-6 text-red-600" />
+                  <div className="p-2 bg-destructive/20 rounded-full">
+                    <LogOut className="h-6 w-6 text-destructive" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">Logout All Sessions</h4>
-                    <p className="text-sm text-gray-500">Logout all active sessions across all devices</p>
+                    <h4 className="font-semibold text-foreground">
+                      Logout All Sessions
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Logout all active sessions across all devices
+                    </p>
                   </div>
                   <Button variant="destructive" className="cursor-pointer">
                     Logout All
@@ -714,19 +1032,21 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="p-4 border border-red-200 rounded-lg bg-red-50/30">
+              <div className="p-4 border border-destructive/30 rounded-lg bg-destructive/5">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 bg-red-100 rounded-full">
-                    <Trash2 className="h-6 w-6 text-red-600" />
+                  <div className="p-2 bg-destructive/20 rounded-full">
+                    <Trash2 className="h-6 w-6 text-destructive" />
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">Delete Account</h4>
-                    <p className="text-sm text-gray-500">
+                    <h4 className="font-semibold text-foreground">
+                      Delete Account
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
                       Permanently delete your account and all associated data
                     </p>
                   </div>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     className="cursor-pointer"
                     onClick={() => setIsDeleteDialogOpen(true)}
                   >
@@ -748,16 +1068,18 @@ export default function SettingsPage() {
               Your settings have been updated successfully.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
+          <div className="py-4 flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <CheckCircle2 className="h-6 w-6 text-primary" />
             <div>
-              <p className="font-medium text-gray-900">Changes Saved</p>
-              <p className="text-sm text-gray-500">Your settings have been updated.</p>
+              <p className="font-medium text-foreground">Changes Saved</p>
+              <p className="text-sm text-muted-foreground">
+                Your settings have been updated.
+              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              className="bg-primary hover:bg-primary/90 cursor-pointer"
+            <Button
+              className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               onClick={() => {
                 setIsSaveDialogOpen(false);
               }}
@@ -769,37 +1091,48 @@ export default function SettingsPage() {
       </Dialog>
 
       {/* Delete Account Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">Delete Account</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">
+              Delete Account
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action is permanent and cannot be undone. All your events, attendees, payments, 
-              and certificates will be deleted forever.
+              This action is permanent and cannot be undone. All your events,
+              attendees, payments, and certificates will be deleted forever.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
-            <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-100">
-              <div className="p-2 bg-red-100 rounded-full">
-                <AlertCircle className="h-6 w-6 text-red-600" />
+            <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <div className="p-2 bg-destructive/20 rounded-full">
+                <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">Are you sure?</p>
-                <p className="text-sm text-gray-500">This action cannot be reversed.</p>
+                <p className="font-medium text-foreground">Are you sure?</p>
+                <p className="text-sm text-muted-foreground">
+                  This action cannot be reversed.
+                </p>
               </div>
             </div>
             <div className="mt-4">
-              <Label className="text-xs text-gray-500">Type &quot;DELETE&quot; to confirm</Label>
-              <Input 
+              <Label className="text-xs text-muted-foreground">
+                Type &quot;DELETE&quot; to confirm
+              </Label>
+              <Input
                 placeholder="Type DELETE to confirm"
                 className="mt-1 cursor-text"
               />
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-red-600 hover:bg-red-700 cursor-pointer"
+            <AlertDialogCancel className="cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground cursor-pointer"
               onClick={() => setIsDeleteDialogOpen(false)}
             >
               Delete Account

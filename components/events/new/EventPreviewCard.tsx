@@ -21,6 +21,9 @@ import type { EventFormData } from '../types';
 // ============================================================
 // EVENT PREVIEW CARD
 // ============================================================
+//
+// Live preview shown during the wizard. Event-level fields
+// (is_virtual, location) are derived from the primary schedule.
 
 interface EventPreviewCardProps {
   data: EventFormData;
@@ -56,13 +59,20 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : null;
 
+  // Derived from the primary schedule — event-level timing and venue
+  // are computed by the backend from schedules. Here we only need a
+  // cheap projection for the preview.
+  const isVirtual = primarySchedule?.is_virtual ?? false;
+  const locationText = primarySchedule?.location || 'Location TBD';
+
   const firstTicket = data.tickets?.find(
     (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
   );
   const ticketPrice = firstTicket?.price ?? null;
-  const ticketCount = data.tickets?.filter(
-    (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
-  ).length ?? 0;
+  const ticketCount =
+    data.tickets?.filter(
+      (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
+    ).length ?? 0;
 
   let priceLabel: string;
   if (!firstTicket) {
@@ -72,12 +82,6 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
   } else {
     priceLabel = `${ticketPrice} KES${ticketCount > 1 ? '+' : ''}`;
   }
-
-  const locationText =
-    primarySchedule?.location ||
-    data.venue_name ||
-    data.location ||
-    'Location TBD';
 
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow">
@@ -152,14 +156,14 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
           </div>
         )}
 
-        {/* Location / virtual */}
+        {/* Location / virtual — derived from the primary schedule */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {data.is_virtual ? (
+          {isVirtual ? (
             <Video className="h-4 w-4 flex-shrink-0" />
           ) : (
             <MapPin className="h-4 w-4 flex-shrink-0" />
           )}
-          <span>{data.is_virtual ? 'Virtual Event' : locationText}</span>
+          <span>{isVirtual ? 'Virtual Event' : locationText}</span>
         </div>
 
         {/* Price + capacity */}

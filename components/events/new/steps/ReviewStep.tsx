@@ -9,7 +9,7 @@ import type { EventType as EventTypeModel } from '@/lib/types/events';
 
 import { EventPreviewCard } from '../EventPreviewCard';
 
-import type { EventFormData } from '../../types';
+import { deriveVirtualFlags, type EventFormData } from '../../types';
 
 // ============================================================
 // REVIEW STEP (Step 5)
@@ -18,6 +18,10 @@ import type { EventFormData } from '../../types';
 // Read-only summary of everything the user entered, followed by the
 // same preview card used in the desktop sidebar. Nothing here mutates
 // state.
+//
+// Event-level derived fields (is_virtual, is_hybrid, location, venue)
+// are computed on the fly from `formData.schedules` — the backend
+// computes them the same way from the same source.
 
 interface ReviewStepProps {
   formData: EventFormData;
@@ -39,6 +43,18 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
     0,
     (formData.schedules?.length ?? 0) - 1,
   );
+
+  // ---- Derived event-level display values ----
+  const derived = deriveVirtualFlags(formData.schedules);
+  const isVirtual = derived.allVirtual;
+  const isHybrid = derived.isHybrid;
+  const primaryLocation = primary?.location ?? '';
+
+  const formatLabel = isHybrid
+    ? 'Hybrid'
+    : isVirtual
+      ? 'Virtual'
+      : 'In-person';
 
   const dateLabel = primary?.start_date || 'Not set';
   const endDateLabel =
@@ -189,28 +205,23 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
                 </p>
               </div>
 
-              {/* Virtual */}
+              {/* Format — derived from schedules */}
               <div className="col-span-2">
                 <p className="text-neutral-gray">Format</p>
                 <p className="font-medium text-neutral-dark">
-                  {formData.is_virtual ? 'Virtual' : 'In-person'}
-                  {formData.is_hybrid && ' (hybrid)'}
+                  {formatLabel}
                 </p>
               </div>
 
-              {/* Location */}
-              {!formData.is_virtual &&
-                (formData.venue_name || formData.location) && (
-                  <div className="col-span-2">
-                    <p className="text-neutral-gray">Location</p>
-                    <p className="font-medium text-neutral-dark">
-                      {formData.venue_name || formData.location}
-                      {formData.venue_city && `, ${formData.venue_city}`}
-                      {formData.venue_country &&
-                        `, ${formData.venue_country}`}
-                    </p>
-                  </div>
-                )}
+              {/* Location — derived from the primary schedule */}
+              {!isVirtual && primaryLocation && (
+                <div className="col-span-2">
+                  <p className="text-neutral-gray">Location</p>
+                  <p className="font-medium text-neutral-dark">
+                    {primaryLocation}
+                  </p>
+                </div>
+              )}
 
               {/* Certificate */}
               {formData.certificate_enabled && (

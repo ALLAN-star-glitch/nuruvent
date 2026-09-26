@@ -3,6 +3,13 @@
 // ============================================================
 // FORM SHAPE — flat scalars + nested structured slices
 // ============================================================
+//
+// Event-level timing, venue, and virtual/hybrid fields have been
+// REMOVED from EventFormData. They are derived by the backend from
+// `schedules[]`. The schedules are the single source of truth.
+//
+// The preview/review components compute any event-level display
+// values on the fly from the schedules.
 
 // ============================================================
 // SCHEDULE
@@ -20,6 +27,11 @@ export interface ScheduleForm {
   session_number: number | null;
   location: string;
   is_virtual: boolean;
+  /**
+   * Manual override. When empty and is_virtual is true, the backend
+   * auto-creates a meeting on the host's connected account. When set,
+   * the backend uses the pasted link and skips auto-creation.
+   */
   zoom_link: string;
   meet_link: string;
   max_attendees: number | null;
@@ -246,6 +258,18 @@ export function makeEmptySEO(): SEOForm {
 // ============================================================
 // EVENT FORM DATA
 // ============================================================
+//
+// Note on derived fields:
+//
+// Event-level timing (start_date, end_date, duration), venue
+// (venue_name, venue_address, venue_city, venue_country,
+// in_person_location), virtual/hybrid flags (is_virtual, is_hybrid),
+// platform info (virtual_platform, virtual_platform_url), and meeting
+// links (zoom_link, meet_link) are NOT stored on the form.
+//
+// They are computed by the backend from `schedules[]` and returned in
+// the Event response. UI that needs them (preview cards, review step)
+// computes them on the fly from `schedules`.
 
 export interface EventFormData {
   // ---- Basic info ----
@@ -258,25 +282,12 @@ export interface EventFormData {
   tags: string[];
   language: string;
 
-  // ---- Schedule (array of sessions) ----
+  // ---- Schedule (source of truth for timing + venue + virtual) ----
   schedules: ScheduleForm[];
 
   // ---- Recurrence ----
   is_recurring: boolean;
   recurrence: RecurrenceForm | null;
-
-  // ---- Venue ----
-  is_virtual: boolean;
-  is_hybrid: boolean;
-  location: string;
-  zoom_link: string;
-  meet_link: string;
-  virtual_platform: string;
-  virtual_platform_url: string;
-  venue_name: string;
-  venue_address: string;
-  venue_city: string;
-  venue_country: string;
 
   // ---- Tickets ----
   // The ticket list is the source of truth for per-ticket pricing.
@@ -323,9 +334,6 @@ export interface FormErrors {
   tickets?: string;
   capacity?: string;
   certificate_price?: string;
-  location?: string;
-  zoom_link?: string;
-  meet_link?: string;
   image?: string;
   recurrence?: string;
   speakers?: string;
@@ -354,19 +362,6 @@ export const defaultFormData: EventFormData = {
   // Recurrence
   is_recurring: false,
   recurrence: null,
-
-  // Venue
-  is_virtual: true,
-  is_hybrid: false,
-  location: '',
-  zoom_link: '',
-  meet_link: '',
-  virtual_platform: '',
-  virtual_platform_url: '',
-  venue_name: '',
-  venue_address: '',
-  venue_city: '',
-  venue_country: '',
 
   // Tickets — start with one empty row
   tickets: makeEmptyTickets(),
@@ -413,3 +408,88 @@ export const DRAFT_ID_STORAGE_KEY = 'nuruvent_draft_id';
 export const DEFAULT_TICKET_TYPE_SLUG = 'general-admission';
 
 export const NO_CATEGORY = '__none__';
+
+// ============================================================
+// DERIVED EVENT-LEVEL HELPERS
+// ============================================================
+//
+// Compute event-level display values from schedules. These mirror the
+// backend's `deriveEventFromSchedules` and are used only for UI.
+//
+// Never send these to the backend. They are computed there.
+
+/** Earliest session start date (ISO YYYY-MM-DD), or '' if none. */
+export function deriveStartDate(schedules: ScheduleForm[]): string {
+  let earliest = '';
+  for (const s of schedules) {
+    if (!s.start_date) continue;
+    if (!earliest || s.start_date < earliest) earliest = s.start_date;
+  }
+  return earliest;
+}
+
+/** Latest session end date (or start if no end), ISO YYYY-MM-DD, or ''. */
+export function deriveEndDate(schedules: ScheduleForm[]): string {
+  let latest = '';
+  for (const s of schedules) {
+    const candidate = s.end_date || s.start_date;
+    if (!candidate) continue;
+    if (!latest || candidate > latest) latest = candidate;
+  }
+  return latest;
+}
+
+/** Whether the event spans more than one calendar day. */
+export function deriveIsMultiDay(schedules: ScheduleForm[]): boolean {
+  if (schedules.length > 1) {
+    const start = deriveStartDate(schedules);
+    const end = deriveEndDate(schedules);
+    if (start && end && start !== end) return true;
+  }
+  return schedules.some(
+    (s) => !!s.end_date && s.end_date !== s.start_date,
+  );
+}
+
+/**
+ * Virtual/hybrid flags. Returns:
+ *   allVirtual  → true when every session is virtual
+ *   isHybrid    → true when some are virtual and some aren't
+ */
+export function deriveVirtualFlags(schedules: ScheduleForm[]): {
+  allVirtual: boolean;
+  isHybrid: boolean;
+} {
+  let virtual = 0;
+  let inPerson = 0;
+  for (const s of schedules) {
+    if (s.is_virtual) virtual++;
+    else inPerson++;
+  }
+  return {
+    allVirtual: virtual > 0 && inPerson === 0,
+    isHybrid: virtual > 0 && inPerson > 0,
+  };
+}
+
+/** First in-person location label, or ''. */
+export function deriveInPersonLocation(schedules: ScheduleForm[]): string {
+  for (const s of schedules) {
+    if (!s.is_virtual && s.location) return s.location;
+  }
+  return '';
+}
+
+/** First virtual platform implied by a schedule link, or ''. */
+export function deriveVirtualPlatform(schedules: ScheduleForm[]): string {
+  for (const s of schedules) {
+    if (s.zoom_link) return 'zoom';
+    if (s.meet_link) return 'google_meet';
+  }
+  return '';
+}
+
+/** First schedule's location label. Useful for hybrid previews. */
+export function derivePrimaryLocation(schedules: ScheduleForm[]): string {
+  return schedules[0]?.location ?? '';
+}

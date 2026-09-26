@@ -14,19 +14,14 @@ import type {
 // Turns the AI's draft into a payload the backend's POST /events
 // endpoint accepts.
 //
-// The AI's shape is close to the request shape but a few things
-// need normalizing:
+// The AI draft carries only identity, discovery, pricing, policy, and
+// one canonical schedule. Event-level timing, venue, and virtual/
+// hybrid flags are NOT part of the AI's output. The backend derives
+// them from the schedules.
 //
-//   - Schedules come with nullable end_date, zoom_link, meet_link.
-//     The request expects optional strings, not nulls.
-//   - Tickets come with nullable max_per_person. Same normalization.
-//   - The AI does not send is_recurring / recurrence.
-//   - display_name is not sent — the backend derives it from name.
-//   - event_type_id and category_id are inputs to the modal, not
-//     outputs from the AI. They're passed in by the caller.
-//
-// A "usable" schedule has start_date, start_time, end_time.
-// A "usable" ticket has a ticket_type_id and quantity >= 1.
+// This function therefore emits NO event-level derived fields
+// (is_virtual, is_hybrid, zoom_link, meet_link, virtual_platform,
+// venue_*, in_person_location). The backend will compute them.
 
 export function draftToPublishPayload(
   draft: GeneratedEventDraft,
@@ -35,18 +30,6 @@ export function draftToPublishPayload(
 ): CreateEventRequest {
   const schedules = buildSchedules(draft);
   const tickets = buildTickets(draft);
-
-  const inPersonLocation =
-    !draft.is_virtual && !draft.is_hybrid
-      ? draft.venue_address || draft.in_person_location || undefined
-      : draft.venue_address || undefined;
-
-  const venueName =
-    !draft.is_virtual && draft.venue_name
-      ? draft.venue_name
-      : !draft.is_virtual && draft.in_person_location
-        ? draft.in_person_location
-        : undefined;
 
   return {
     // ---- Required ----
@@ -63,34 +46,32 @@ export function draftToPublishPayload(
     tags: draft.tags?.length ? draft.tags : undefined,
     language: draft.language || undefined,
 
-    // ---- Venue ----
-    is_virtual: draft.is_virtual ?? false,
-    is_hybrid: draft.is_hybrid ?? false,
-    virtual_platform: draft.virtual_platform || undefined,
-    virtual_platform_url: draft.virtual_platform_url || undefined,
-    venue_name: venueName,
-    in_person_location: inPersonLocation,
-    venue_address: draft.venue_address || undefined,
-    venue_city: draft.venue_city || undefined,
-    venue_country: draft.venue_country || undefined,
-    zoom_link: undefined,
-    meet_link: undefined,
+    // ---- Recurrence ----
+    is_recurring: draft.is_recurring || undefined,
+    recurrence: draft.recurrence
+      ? {
+          pattern: draft.recurrence.pattern,
+          interval: draft.recurrence.interval,
+          days_of_week: draft.recurrence.days_of_week,
+          day_of_month: draft.recurrence.day_of_month,
+          week_of_month: draft.recurrence.week_of_month,
+          ends_on: draft.recurrence.ends_on,
+          occurrences: draft.recurrence.occurrences,
+        }
+      : undefined,
 
     // ---- Tickets / capacity ----
     is_free: deriveIsFree(tickets),
     capacity: draft.capacity ?? undefined,
-    waitlist_enabled: undefined,
 
     // ---- Access ----
     invite_only: draft.invite_only || undefined,
-    invited_emails: undefined,
-    password: undefined,
 
     // ---- Monetization ----
     is_featured: draft.is_featured || undefined,
     certificate_enabled: draft.certificate_enabled || undefined,
 
-    // ---- Content (not produced by the AI) ----
+    // ---- Not produced by AI ----
     speakers: undefined,
     materials: undefined,
     seo: undefined,
@@ -108,16 +89,15 @@ function buildSchedules(draft: GeneratedEventDraft): ScheduleInput[] {
 
   return usable.map((s) => ({
     start_date: s.start_date,
-    end_date: s.end_date || undefined,
     start_time: s.start_time,
     end_time: s.end_time,
-    timezone: s.timezone || draft.timezone || 'Africa/Nairobi',
+    timezone: s.timezone || 'Africa/Nairobi',
     session_name: s.session_name || undefined,
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
-    is_virtual: s.is_virtual ?? draft.is_virtual ?? false,
-    zoom_link: s.zoom_link || undefined,
-    meet_link: s.meet_link || undefined,
+    is_virtual: s.is_virtual,
+    // zoom_link / meet_link intentionally omitted — the backend
+    // creates the meeting if the schedule is virtual.
     max_attendees: s.max_attendees ?? undefined,
   }));
 }

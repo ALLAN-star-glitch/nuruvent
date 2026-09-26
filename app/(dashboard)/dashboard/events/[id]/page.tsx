@@ -26,6 +26,8 @@ import {
   Building2,
   BadgeCheck,
   XCircle,
+  Video,
+  Link2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +50,7 @@ import {
   useGetEventByIdQuery,
   usePublishEventMutation,
 } from '@/lib/store/api/eventsApi';
-import type { Event } from '@/lib/types/events';
+import type { Event, Schedule } from '@/lib/types/events';
 import {
   formatPrice,
   getEventDuration,
@@ -65,6 +67,13 @@ import {
 // ============================================================
 // HELPERS
 // ============================================================
+
+const PUBLIC_SITE_URL =
+  process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://nuruvent.com';
+
+function getPublicEventUrl(slug: string): string {
+  return `${PUBLIC_SITE_URL}/events/${slug}`;
+}
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return 'TBD';
@@ -86,8 +95,8 @@ function getStatusConfig(statusName: string) {
       label: 'Draft',
     },
     Published: {
-      color: 'text-tertiary-600 dark:text-tertiary-400 bg-tertiary-50 dark:bg-tertiary-950/40 border-tertiary-200 dark:border-tertiary-900/50',
-      dot: 'bg-tertiary-500',
+      color: 'text-primary bg-primary/10 border-primary/30',
+      dot: 'bg-primary',
       label: 'Published',
     },
     Cancelled: {
@@ -96,12 +105,77 @@ function getStatusConfig(statusName: string) {
       label: 'Cancelled',
     },
     Completed: {
-      color: 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 border-primary-200 dark:border-primary-900/50',
-      dot: 'bg-primary-500',
+      color: 'text-primary bg-primary/10 border-primary/30',
+      dot: 'bg-primary',
       label: 'Completed',
     },
   };
   return map[statusName] ?? map.Draft;
+}
+
+/**
+ * Resolves the primary join link for an event. Preference:
+ *   1. First virtual schedule's zoom_link
+ *   2. First virtual schedule's meet_link
+ *   3. Event-level zoom_link (derived mirror of #1)
+ *   4. Event-level meet_link
+ *   5. undefined for in-person events
+ */
+function getPrimaryMeetingLink(event: Event): string | undefined {
+  const virtualSchedule = event.schedules?.find(
+    (s) => s.is_virtual && (s.zoom_link || s.meet_link),
+  );
+  if (virtualSchedule) {
+    return virtualSchedule.zoom_link || virtualSchedule.meet_link || undefined;
+  }
+  return event.zoom_link || event.meet_link || undefined;
+}
+
+/**
+ * Returns the platform label for the primary meeting link.
+ */
+function getMeetingPlatformLabel(event: Event): string {
+  if (!event.is_virtual) return 'In-Person';
+  if (event.zoom_link) return 'Zoom';
+  if (event.meet_link) return 'Google Meet';
+  return 'Virtual';
+}
+
+/**
+ * Copies text to the clipboard. Uses the async Clipboard API when
+ * available; falls back to a hidden textarea for older browsers.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
+  try {
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to legacy path
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function isScheduleVirtualWithMeeting(s: Schedule): boolean {
+  return !!(s.is_virtual && (s.zoom_link || s.meet_link));
 }
 
 // ============================================================
@@ -129,7 +203,8 @@ export default function EventDetailPage({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedEvent, setCopiedEvent] = useState(false);
+  const [copiedJoin, setCopiedJoin] = useState(false);
   const [publishError, setPublishError] = useState<{
     message: string;
     details: string[];
@@ -239,13 +314,34 @@ export default function EventDetailPage({
     }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyEventLink = async () => {
     if (!event) return;
-    const url = `${window.location.origin}/events/${event.slug}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    toast.success('Event link copied to clipboard!');
-    setTimeout(() => setCopied(false), 3000);
+    const url = getPublicEventUrl(event.slug);
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setCopiedEvent(true);
+      toast.success('Event link copied to clipboard');
+      setTimeout(() => setCopiedEvent(false), 2000);
+    } else {
+      toast.error('Could not copy the link');
+    }
+  };
+
+  const handleCopyJoinLink = async () => {
+    if (!event) return;
+    const link = getPrimaryMeetingLink(event);
+    if (!link) {
+      toast.error('No meeting link yet');
+      return;
+    }
+    const ok = await copyToClipboard(link);
+    if (ok) {
+      setCopiedJoin(true);
+      toast.success('Join link copied to clipboard');
+      setTimeout(() => setCopiedJoin(false), 2000);
+    } else {
+      toast.error('Could not copy the link');
+    }
   };
 
   if (isLoading || !eventId) {
@@ -289,6 +385,12 @@ export default function EventDetailPage({
   const duration = getEventDuration(event);
   const location = getEventLocation(event);
   const price = getEventMinPrice(event);
+
+  const meetingLink = getPrimaryMeetingLink(event);
+  const meetingPlatform = getMeetingPlatformLabel(event);
+  const virtualSchedules = (event.schedules ?? []).filter(
+    isScheduleVirtualWithMeeting,
+  );
 
   return (
     <div className="w-full">
@@ -339,7 +441,7 @@ export default function EventDetailPage({
           <Link href={`/dashboard/events/${event.id}/edit`}>
             <Button
               variant="outline"
-              className="cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
+              className="cursor-pointer"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -370,7 +472,7 @@ export default function EventDetailPage({
             <Link href={`/events/${event.slug}`} target="_blank">
               <Button
                 variant="outline"
-                className="cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
+                className="cursor-pointer"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Public
@@ -403,11 +505,150 @@ export default function EventDetailPage({
                 className="object-cover"
               />
             ) : (
-              <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary-50 to-muted dark:from-primary-950/30 dark:to-muted">
+              <div className="flex items-center justify-center h-full bg-gradient-to-br from-primary/10 to-muted">
                 <CalendarDays className="h-16 w-16 text-muted-foreground" />
               </div>
             )}
           </div>
+
+          {/* Meeting card — primary CTA for hosts */}
+          {event.is_virtual && (
+            <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
+                    <Video className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-semibold text-foreground">
+                        Meeting
+                      </h3>
+                      <Badge
+                        variant="outline"
+                        className="text-primary border-primary/30 bg-primary/10 text-xs"
+                      >
+                        {meetingPlatform}
+                      </Badge>
+                    </div>
+
+                    {meetingLink ? (
+                      <>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Share this link with your attendees. They can join
+                          from any browser.
+                        </p>
+                        <p className="text-xs font-mono text-foreground/70 mt-2 truncate bg-background/60 rounded px-2 py-1.5 border border-border">
+                          {meetingLink}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                            onClick={() => {
+                              window.open(
+                                meetingLink,
+                                '_blank',
+                                'noopener,noreferrer',
+                              );
+                            }}
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Join Meeting
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="cursor-pointer"
+                            onClick={handleCopyJoinLink}
+                          >
+                            {copiedJoin ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                                Copy link
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {isDraft
+                            ? 'A meeting link will be created when you publish this event.'
+                            : 'No meeting link yet. Connect Zoom in the event editor to create one automatically, or paste a link manually.'}
+                        </p>
+                        <div className="flex items-center gap-2 mt-3">
+                          <Link href={`/dashboard/events/${event.id}/edit`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="cursor-pointer"
+                            >
+                              <Edit className="h-3.5 w-3.5 mr-1.5" />
+                              Configure meeting
+                            </Button>
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* All virtual schedules — shown when there's more than one */}
+                {virtualSchedules.length > 1 && (
+                  <>
+                    <Separator className="my-4" />
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                        All sessions ({virtualSchedules.length})
+                      </p>
+                      <div className="space-y-2">
+                        {virtualSchedules.map((s) => {
+                          const link = s.zoom_link || s.meet_link;
+                          const label =
+                            s.session_name ||
+                            `Session ${s.session_number ?? ''}`.trim();
+                          return (
+                            <div
+                              key={s.id}
+                              className="flex items-center justify-between gap-3 p-2 rounded-lg bg-background/60 border border-border"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {label}
+                                </p>
+                                {s.start_time && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {s.start_time}
+                                    {s.end_time && ` – ${s.end_time}`}
+                                  </p>
+                                )}
+                              </div>
+                              <a
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline shrink-0"
+                              >
+                                <Link2 className="h-3 w-3" />
+                                Join
+                              </a>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Description */}
           {event.description && (
@@ -429,7 +670,7 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                  <div className="p-2 bg-primary/10 rounded-lg">
                     <Calendar className="h-4 w-4 text-primary" />
                   </div>
                   <div>
@@ -447,7 +688,7 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                  <div className="p-2 bg-primary/10 rounded-lg">
                     <Clock className="h-4 w-4 text-primary" />
                   </div>
                   <div>
@@ -465,7 +706,7 @@ export default function EventDetailPage({
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                  <div className="p-2 bg-primary/10 rounded-lg">
                     <MapPin className="h-4 w-4 text-primary" />
                   </div>
                   <div>
@@ -545,40 +786,6 @@ export default function EventDetailPage({
                   </p>
                 </div>
               </div>
-
-              {event.zoom_link && (
-                <>
-                  <Separator className="my-4" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Zoom Link</p>
-                    <a
-                      href={event.zoom_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:text-primary/80 text-sm font-medium truncate block"
-                    >
-                      {event.zoom_link}
-                    </a>
-                  </div>
-                </>
-              )}
-
-              {event.meet_link && (
-                <>
-                  <Separator className="my-4" />
-                  <div>
-                    <p className="text-muted-foreground text-sm">Google Meet Link</p>
-                    <a
-                      href={event.meet_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:text-primary/80 text-sm font-medium truncate block"
-                    >
-                      {event.meet_link}
-                    </a>
-                  </div>
-                </>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -592,7 +799,7 @@ export default function EventDetailPage({
                 Event Host
               </h3>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary-50 dark:bg-primary-950/40 rounded-lg">
+                <div className="p-2 bg-primary/10 rounded-lg">
                   {hostIsInstitution ? (
                     <Building2 className="h-5 w-5 text-primary" />
                   ) : (
@@ -616,15 +823,15 @@ export default function EventDetailPage({
 
           {/* Quick actions */}
           <Card>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="p-6 space-y-3">
               <h3 className="text-sm font-semibold text-foreground">
                 Quick Actions
               </h3>
 
-              <Link href={`/dashboard/events/${event.id}/edit`}>
+              <Link href={`/dashboard/events/${event.id}/edit`} className="block">
                 <Button
                   variant="outline"
-                  className="w-full justify-start cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
+                  className="w-full justify-start cursor-pointer"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Event
@@ -647,15 +854,53 @@ export default function EventDetailPage({
               )}
 
               {isPublished && (
-                <Link href={`/events/${event.slug}`} target="_blank">
+                <Link href={`/events/${event.slug}`} target="_blank" className="block">
                   <Button
                     variant="outline"
-                    className="w-full justify-start cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
+                    className="w-full justify-start cursor-pointer"
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
                     View Public Page
                   </Button>
                 </Link>
+              )}
+
+              <Button
+                variant="outline"
+                className="w-full justify-start cursor-pointer"
+                onClick={handleCopyEventLink}
+              >
+                {copiedEvent ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2 text-primary" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Event Link
+                  </>
+                )}
+              </Button>
+
+              {event.is_virtual && meetingLink && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start cursor-pointer"
+                  onClick={handleCopyJoinLink}
+                >
+                  {copiedJoin ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2 text-primary" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Copy Join Link
+                    </>
+                  )}
+                </Button>
               )}
 
               <Button
@@ -723,29 +968,6 @@ export default function EventDetailPage({
                   </Badge>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Share */}
-          <Card>
-            <CardContent className="p-6">
-              <Button
-                variant="outline"
-                className="w-full cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30 hover:text-primary hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors"
-                onClick={handleCopyLink}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2 text-tertiary-500" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Event Link
-                  </>
-                )}
-              </Button>
             </CardContent>
           </Card>
         </div>

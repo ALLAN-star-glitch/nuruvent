@@ -949,6 +949,8 @@ function DraftPreview({
   currency: string;
 }) {
   const schedule = draft.schedules?.[0];
+  const isVirtual = schedule?.is_virtual ?? false;
+  const locationLabel = schedule?.location ?? '';
 
   return (
     <div className="space-y-4">
@@ -971,7 +973,7 @@ function DraftPreview({
             {schedule.end_time && `–${schedule.end_time}`}
           </Badge>
         )}
-        {draft.is_virtual ? (
+        {isVirtual ? (
           <Badge
             variant="outline"
             className="text-primary border-primary/30 bg-primary/5 font-medium"
@@ -981,14 +983,6 @@ function DraftPreview({
         ) : (
           <Badge variant="outline" className="text-muted-foreground font-normal">
             In-person
-          </Badge>
-        )}
-        {draft.is_hybrid && (
-          <Badge
-            variant="outline"
-            className="text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/40 font-medium"
-          >
-            Hybrid
           </Badge>
         )}
         {draft.is_recurring && draft.recurrence && (
@@ -1022,16 +1016,12 @@ function DraftPreview({
         </div>
       )}
 
-      {(draft.venue_name || draft.venue_city || draft.in_person_location) && (
+      {locationLabel && (
         <div className="rounded-lg border border-border p-3">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-            Venue
+            {isVirtual ? 'Location' : 'Venue'}
           </p>
-          <p className="text-sm text-foreground">
-            {draft.venue_name || draft.in_person_location}
-            {draft.venue_city && `, ${draft.venue_city}`}
-            {draft.venue_country && `, ${draft.venue_country}`}
-          </p>
+          <p className="text-sm text-foreground">{locationLabel}</p>
         </div>
       )}
 

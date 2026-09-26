@@ -56,6 +56,7 @@ export const api = createApi({
     'Waitlist',
     'Orders',
     'Payments',
+    'VideoConnections', 
       ],
   endpoints: () => ({}),
 });

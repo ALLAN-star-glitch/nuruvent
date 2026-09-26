@@ -1,3 +1,5 @@
+// components/events/EditEventWizard.tsx
+
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -55,6 +57,7 @@ import {
 } from '@/components/events/new';
 import { GenerateWithAIModal } from '@/components/events/ai/GenerateWithAIModal';
 import { draftToPublishPayload } from '@/components/events/ai/draftToPublishPayload';
+import { PlatformPickerModal } from '@/components/events/video/PlatformPickerModal';
 
 import { useEventFormState } from './new/hooks/useEventFormState';
 import { useEventDraft } from './new/hooks/useEventDraft';
@@ -97,6 +100,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
   const [isAIConfirmReplaceOpen, setIsAIConfirmReplaceOpen] = useState(false);
   const [pendingAIDraft, setPendingAIDraft] = useState<{
     draft: GeneratedEventDraft;
@@ -486,7 +490,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 />
                 <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 text-primary-100 animate-pulse transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110 shrink-0" />
                 <span className="font-semibold tracking-wide truncate">
-                  Edit with AI
+                  Create with AI
                 </span>
               </Button>
             )}
@@ -582,6 +586,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                     onFieldChange={handleFieldChange}
                     onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
+                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
                   />
                 )}
                 {currentStep === 2 && (
@@ -784,6 +789,13 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
         ticketTypes={ticketTypes}
         onEditDraft={handleEditAIDraft}
         onPublishDraft={handlePublishAIDraft}
+      />
+
+      {/* Platform picker — connect / manage / disconnect */}
+      <PlatformPickerModal
+        open={isPlatformPickerOpen}
+        onOpenChange={setIsPlatformPickerOpen}
+        returnUrl={`/dashboard/events/${eventId}/edit`}
       />
 
       {/* AI draft replace confirmation */}

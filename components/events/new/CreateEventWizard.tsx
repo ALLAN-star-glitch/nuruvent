@@ -45,6 +45,7 @@ import {
 } from '@/components/events/new';
 import { GenerateWithAIModal } from '@/components/events/ai/GenerateWithAIModal';
 import { draftToPublishPayload } from '@/components/events/ai/draftToPublishPayload';
+import { PlatformPickerModal } from '@/components/events/video/PlatformPickerModal';
 
 import { useEventFormState } from './hooks/useEventFormState';
 import { useEventDraft } from './hooks/useEventDraft';
@@ -83,6 +84,7 @@ export function CreateEventWizard() {
   const [isMobile, setIsMobile] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submitInFlightRef = useRef(false);
@@ -488,6 +490,7 @@ export function CreateEventWizard() {
                     onFieldChange={handleFieldChange}
                     onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
+                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
                   />
                 )}
                 {currentStep === 2 && (
@@ -681,6 +684,13 @@ export function CreateEventWizard() {
         ticketTypes={ticketTypes}
         onEditDraft={handleEditAIDraft}
         onPublishDraft={handlePublishAIDraft}
+      />
+
+      {/* Platform picker — connect / manage / disconnect */}
+      <PlatformPickerModal
+        open={isPlatformPickerOpen}
+        onOpenChange={setIsPlatformPickerOpen}
+        returnUrl="/dashboard/events/new"
       />
     </div>
   );

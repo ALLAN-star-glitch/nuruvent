@@ -18,6 +18,7 @@ import type {
 import type {
   EventFormData,
   FormErrors,
+  ScheduleForm,
 } from '../../types';
 
 // ============================================================
@@ -36,6 +37,10 @@ import type {
 // The AI generation flow now lives in the wizard header, not here.
 // `onAIDraft` is kept for backward compatibility with the wizard's
 // `handleAIDraft` handler, which is still called by the AI modal.
+//
+// `onOpenConnectModal` is threaded down from the wizard so the
+// SchedulesField can offer the "Connect Zoom" CTA when a virtual
+// session has no link and the host isn't connected.
 
 interface BasicInfoStepProps {
   formData: EventFormData;
@@ -47,6 +52,7 @@ interface BasicInfoStepProps {
   ) => void;
   onAIDraft: (draft: GeneratedEventDraft) => void;
   onEventTypeTouched: () => void;
+  onOpenConnectModal?: () => void;
 }
 
 export function BasicInfoStep({
@@ -55,6 +61,7 @@ export function BasicInfoStep({
   eventTypes,
   onFieldChange,
   onEventTypeTouched,
+  onOpenConnectModal,
 }: BasicInfoStepProps) {
   return (
     <div className="space-y-5">
@@ -94,8 +101,9 @@ export function BasicInfoStep({
       {/* ---- Schedules ---- */}
       <SchedulesField
         value={formData.schedules}
-        onChange={(v) => onFieldChange('schedules', v)}
+        onChange={(v: ScheduleForm[]) => onFieldChange('schedules', v)}
         error={validationErrors.schedules}
+        onOpenConnectModal={onOpenConnectModal}
       />
 
       {/* ---- Short Description ---- */}

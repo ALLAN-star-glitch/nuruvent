@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react';
 import type {
   EventFormData,
   FormErrors,
+  ScheduleForm,
   TicketForm,
 } from '@/components/events/new';
 
@@ -25,9 +26,14 @@ import type {
 // Steps (5-step wizard):
 //   1  Basic Info   name, event type, first schedule, description
 //   2  Tickets      at least one usable ticket, capacity vs quantities
-//   3  Details      virtual link / location, recurrence, invite-only
+//   3  Details      recurrence, certificate, invite-only
 //   4  Content      nothing required
 //   5  Review       nothing required
+//
+// Schedule-level checks live in validateSchedule() and run on step 1
+// and during publish readiness. Meeting-link and location validation
+// are per-session: a session is either virtual (needs a link or a
+// connected host) or in-person (needs a location label).
 //
 // Rules mirror the backend's ValidateForPublish. When the backend
 // adds a rule, add it here too.
@@ -40,6 +46,54 @@ export interface UseEventValidationResult {
 /** A ticket is usable when it has a type and a positive quantity. */
 function isUsableTicket(t: TicketForm): boolean {
   return !!t.ticket_type_id && (t.quantity ?? 0) > 0;
+}
+
+/** A schedule is usable when it has all required date/time fields. */
+function isUsableSchedule(s: ScheduleForm): boolean {
+  return !!(s.start_date && s.start_time && s.end_time);
+}
+
+/**
+ * Validate a single schedule row. Returns an error string or null.
+ *
+ * Rules:
+ *   - start_date, start_time, end_time required
+ *   - end_time > start_time
+ *   - end_date >= start_date when set
+ *   - if virtual: no link is required (backend auto-creates), but if a
+ *     link IS provided it must be a plausible URL
+ *   - if not virtual: location label required
+ */
+function validateSchedule(s: ScheduleForm, index: number): string | null {
+  const prefix = `Session ${index + 1}`;
+
+  if (!s.start_date) return `${prefix}: start date is required`;
+  if (!s.start_time) return `${prefix}: start time is required`;
+  if (!s.end_time) return `${prefix}: end time is required`;
+  if (s.start_time >= s.end_time) {
+    return `${prefix}: end time must be after start time`;
+  }
+  if (s.end_date && s.start_date && s.end_date < s.start_date) {
+    return `${prefix}: end date cannot be before start date`;
+  }
+
+  if (s.is_virtual) {
+    // Manual links are optional. If provided, they must look like URLs.
+    const zoom = s.zoom_link?.trim();
+    if (zoom && !/^https?:\/\//i.test(zoom)) {
+      return `${prefix}: Zoom link must start with http:// or https://`;
+    }
+    const meet = s.meet_link?.trim();
+    if (meet && !/^https?:\/\//i.test(meet)) {
+      return `${prefix}: Google Meet link must start with http:// or https://`;
+    }
+  } else {
+    if (!s.location?.trim()) {
+      return `${prefix}: location is required for in-person sessions`;
+    }
+  }
+
+  return null;
 }
 
 export function useEventValidation(
@@ -63,23 +117,19 @@ export function useEventValidation(
             newErrors.event_type_id = 'Event type is required';
           }
 
-          const first = formData.schedules?.[0];
-          if (!first) {
+          // ---- Schedules ----
+          // Every schedule must validate. The first message wins so the
+          // form shows one actionable error at a time.
+          if (!formData.schedules || formData.schedules.length === 0) {
             newErrors.schedules = 'Add at least one schedule';
-          } else if (!first.start_date) {
-            newErrors.schedules = 'Start date is required';
-          } else if (!first.start_time) {
-            newErrors.schedules = 'Start time is required';
-          } else if (!first.end_time) {
-            newErrors.schedules = 'End time is required';
-          } else if (first.start_time >= first.end_time) {
-            newErrors.schedules = 'End time must be after start time';
-          } else if (
-            first.end_date &&
-            first.start_date &&
-            first.end_date < first.start_date
-          ) {
-            newErrors.schedules = 'End date cannot be before start date';
+          } else {
+            for (let i = 0; i < formData.schedules.length; i++) {
+              const err = validateSchedule(formData.schedules[i], i);
+              if (err) {
+                newErrors.schedules = err;
+                break;
+              }
+            }
           }
 
           if (!formData.description?.trim()) {
@@ -108,7 +158,7 @@ export function useEventValidation(
               }
             }
 
-            // Each ticket's quantity must be positive
+            // Each ticket's quantity must be positive.
             const badIndex = formData.tickets.findIndex(
               (t) => t.ticket_type_id && (t.quantity ?? 0) <= 0,
             );
@@ -117,7 +167,7 @@ export function useEventValidation(
             }
           }
 
-          // Waitlist requires capacity
+          // Waitlist requires capacity.
           if (
             formData.waitlist_enabled &&
             (formData.capacity === null || formData.capacity === 0)
@@ -130,27 +180,10 @@ export function useEventValidation(
         }
 
         case 3: {
-          // ---- Details: location / meeting link ----
-          if (formData.is_virtual) {
-            const hasLink =
-              formData.zoom_link ||
-              formData.meet_link ||
-              formData.virtual_platform_url;
-            if (!hasLink) {
-              newErrors.zoom_link =
-                'At least one meeting link is required for virtual events';
-            }
-          } else {
-            const hasLocation =
-              formData.location ||
-              formData.venue_name ||
-              formData.venue_address;
-            if (!hasLocation) {
-              newErrors.location = 'Location is required for in-person events';
-            }
-          }
+          // ---- Details: recurrence + certificate ----
+          // Location and meeting-link validation moved to step 1
+          // (they are per-schedule now).
 
-          // Certificate price
           if (
             formData.certificate_enabled &&
             formData.certificate_price !== null &&
@@ -160,7 +193,6 @@ export function useEventValidation(
               'Certificate price cannot be negative';
           }
 
-          // Recurrence
           if (formData.is_recurring && formData.recurrence) {
             const r = formData.recurrence;
             if (!r.pattern) {
@@ -207,16 +239,12 @@ export function useEventValidation(
     const hasEventType = !!formData.event_type_id;
     const hasDescription = !!formData.description?.trim();
 
-    const first = formData.schedules?.[0];
-    const hasSchedule =
-      !!first &&
-      !!first.start_date &&
-      !!first.start_time &&
-      !!first.end_time &&
-      first.start_time < first.end_time &&
-      (!first.end_date ||
-        !first.start_date ||
-        first.end_date >= first.start_date);
+    // All schedules must be usable and validate cleanly.
+    const schedules = formData.schedules ?? [];
+    const hasSchedules = schedules.length > 0;
+    const allSchedulesValid =
+      hasSchedules &&
+      schedules.every((s) => validateSchedule(s, 0) === null);
 
     const usableTickets = formData.tickets.filter(isUsableTicket);
     const hasTickets = usableTickets.length > 0;
@@ -230,18 +258,6 @@ export function useEventValidation(
     const waitlistOk =
       !formData.waitlist_enabled ||
       (formData.capacity !== null && formData.capacity > 0);
-
-    const hasLocationOrLink = formData.is_virtual
-      ? !!(
-          formData.zoom_link ||
-          formData.meet_link ||
-          formData.virtual_platform_url
-        )
-      : !!(
-          formData.location ||
-          formData.venue_name ||
-          formData.venue_address
-        );
 
     const recurrenceOk =
       !formData.is_recurring ||
@@ -263,11 +279,10 @@ export function useEventValidation(
       hasName &&
       hasEventType &&
       hasDescription &&
-      hasSchedule &&
+      allSchedulesValid &&
       hasTickets &&
       capacityOk &&
       waitlistOk &&
-      hasLocationOrLink &&
       recurrenceOk &&
       certificateOk;
 

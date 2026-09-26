@@ -224,16 +224,7 @@ export function mapEventToForm(event: EventModel): EventFormData {
   // ---- Recurrence ----
   const recurrence = mapRecurrence(event.recurrence);
 
-  // ---- Location fallback chain ----
-  // venue.city is preferred; then in_person_location; then legacy
-  // location from the API response.
-  const location =
-    event.venue?.city ??
-    event.in_person_location ??
-    '';
 
-  // ---- Virtual link fallback chain ----
-  const virtualPlatformUrl = event.virtual_platform_url ?? '';
 
   return {
     // ---- Basic ----
@@ -252,19 +243,6 @@ export function mapEventToForm(event: EventModel): EventFormData {
     // ---- Recurrence ----
     is_recurring: event.is_recurring ?? false,
     recurrence,
-
-    // ---- Venue ----
-    is_virtual: event.is_virtual ?? true,
-    is_hybrid: event.is_hybrid ?? false,
-    location,
-    zoom_link: event.zoom_link ?? '',
-    meet_link: event.meet_link ?? '',
-    virtual_platform: event.virtual_platform ?? '',
-    virtual_platform_url: virtualPlatformUrl,
-    venue_name: event.venue?.name ?? '',
-    venue_address: event.venue?.address ?? '',
-    venue_city: event.venue?.city ?? '',
-    venue_country: event.venue?.country ?? '',
 
     // ---- Tickets ----
     tickets,

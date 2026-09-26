@@ -3,12 +3,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import {
+  ArrowRight,
   CalendarClock,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Link2,
+  Pencil,
+  Plug,
   Plus,
+  Sparkles,
   Trash2,
+  Video,
   X,
 } from 'lucide-react';
 
@@ -28,6 +36,8 @@ import {
 
 import { ScheduleSummary } from './ScheduleSummary';
 import { makeEmptySchedule, type ScheduleForm } from '../types';
+import { useVideoConnection } from '../video/useVideoConnection';
+import { PLATFORMS, type PlatformMeta } from '../video/PlatformPickerModal';
 
 // ============================================================
 // SCHEDULE FIELD (events)
@@ -36,6 +46,8 @@ import { makeEmptySchedule, type ScheduleForm } from '../types';
 interface SchedulesFieldProps extends FieldBaseProps {
   value: ScheduleForm[];
   onChange: (value: ScheduleForm[]) => void;
+  /** Called when the host wants to open the platform picker. */
+  onOpenConnectModal?: () => void;
 }
 
 const MAX_SCHEDULES = 20;
@@ -46,9 +58,13 @@ export function SchedulesField({
   error,
   disabled,
   id,
+  onOpenConnectModal,
 }: SchedulesFieldProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [pendingRemoveKey, setPendingRemoveKey] = useState<string | null>(null);
+  const [manualMode, setManualMode] = useState<Record<string, boolean>>({});
+
+  const video = useVideoConnection();
 
   const schedules = useMemo(
     () => (value.length > 0 ? value : [makeEmptySchedule()]),
@@ -62,6 +78,12 @@ export function SchedulesField({
   ) => {
     onChange(
       schedules.map((s) => (s._key === key ? { ...s, [field]: v } : s)),
+    );
+  };
+
+  const updateFields = (key: string, patch: Partial<ScheduleForm>) => {
+    onChange(
+      schedules.map((s) => (s._key === key ? { ...s, ...patch } : s)),
     );
   };
 
@@ -177,7 +199,6 @@ export function SchedulesField({
                   </div>
                 </button>
 
-                {/* Remove button */}
                 {schedules.length > 1 && !isPendingRemove && (
                   <button
                     type="button"
@@ -190,7 +211,6 @@ export function SchedulesField({
                   </button>
                 )}
 
-                {/* Inline remove confirmation */}
                 {isPendingRemove && (
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs text-muted-foreground mr-1">
@@ -219,7 +239,6 @@ export function SchedulesField({
               {/* Body */}
               {isOpen && (
                 <div className="px-4 pb-4 pt-2 border-t border-border space-y-4">
-                  {/* Session identity */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="sm:col-span-2">
                       <TextField
@@ -252,7 +271,6 @@ export function SchedulesField({
                     />
                   </div>
 
-                  {/* Dates */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <DateField
                       name={`schedule_${index}_start_date`}
@@ -282,7 +300,6 @@ export function SchedulesField({
                     />
                   </div>
 
-                  {/* Times */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <TimeField
                       name={`schedule_${index}_start_time`}
@@ -314,76 +331,53 @@ export function SchedulesField({
                     />
                   </div>
 
-                  {/* Timezone */}
                   <TimezoneField
                     value={schedule.timezone}
                     onChange={(v) => update(schedule._key, 'timezone', v)}
                     disabled={disabled}
                   />
 
-                  {/* Location */}
                   <TextField
                     name={`schedule_${index}_location`}
-                    label="Location"
-                    placeholder="e.g., Main Auditorium, Nairobi"
+                    label={schedule.is_virtual ? 'Location' : 'Venue'}
+                    placeholder={
+                      schedule.is_virtual
+                        ? 'e.g., Virtual on Zoom'
+                        : 'e.g., Serena Hotel, Nairobi'
+                    }
                     value={schedule.location}
                     onChange={(v) => update(schedule._key, 'location', v)}
                     optional
                     disabled={disabled}
                   />
 
-                  {/* Virtual subsection */}
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <div className="flex items-center justify-between p-3 bg-muted">
-                      <div>
-                        <Label className="text-sm font-medium text-foreground">
-                          Virtual session
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Overrides the event-level setting for this session.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={schedule.is_virtual}
-                        onCheckedChange={(c) =>
-                          update(schedule._key, 'is_virtual', c)
-                        }
-                        disabled={disabled}
-                        className="cursor-pointer"
-                      />
-                    </div>
+                  <DeliveryModeSection
+                    schedule={schedule}
+                    index={index}
+                    disabled={disabled}
+                    video={video}
+                    manualMode={manualMode[schedule._key] ?? false}
+                    setManualMode={(on) =>
+                      setManualMode((prev) => ({
+                        ...prev,
+                        [schedule._key]: on,
+                      }))
+                    }
+                    onToggleVirtual={(on) =>
+                      updateFields(schedule._key, {
+                        is_virtual: on,
+                        ...(on ? {} : { zoom_link: '', meet_link: '' }),
+                      })
+                    }
+                    onUpdateZoomLink={(v) =>
+                      update(schedule._key, 'zoom_link', v)
+                    }
+                    onUpdateMeetLink={(v) =>
+                      update(schedule._key, 'meet_link', v)
+                    }
+                    onOpenConnectModal={onOpenConnectModal}
+                  />
 
-                    {schedule.is_virtual && (
-                      <div className="p-3 space-y-3 bg-background border-t border-border">
-                        <TextField
-                          name={`schedule_${index}_zoom_link`}
-                          label="Zoom Link"
-                          placeholder="https://zoom.us/..."
-                          value={schedule.zoom_link}
-                          onChange={(v) =>
-                            update(schedule._key, 'zoom_link', v)
-                          }
-                          optional
-                          disabled={disabled}
-                          type="url"
-                        />
-                        <TextField
-                          name={`schedule_${index}_meet_link`}
-                          label="Google Meet Link"
-                          placeholder="https://meet.google.com/..."
-                          value={schedule.meet_link}
-                          onChange={(v) =>
-                            update(schedule._key, 'meet_link', v)
-                          }
-                          optional
-                          disabled={disabled}
-                          type="url"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Max attendees */}
                   <TextField
                     name={`schedule_${index}_max_attendees`}
                     label="Max Attendees"
@@ -407,27 +401,440 @@ export function SchedulesField({
         })}
       </div>
 
-      {/* Add button */}
       {schedules.length < MAX_SCHEDULES && (
         <Button
           type="button"
           variant="outline"
           onClick={addSchedule}
           disabled={disabled}
-          className="w-full cursor-pointer"
+          className="w-full cursor-pointer bg-primary-50"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add another session
         </Button>
       )}
 
-      {/* Top-level error */}
       {error && (
         <p className="text-sm text-destructive flex items-center gap-1">
           <X className="h-3.5 w-3.5" />
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// DELIVERY MODE SECTION
+// ============================================================
+
+interface DeliveryModeSectionProps {
+  schedule: ScheduleForm;
+  index: number;
+  disabled?: boolean;
+  video: ReturnType<typeof useVideoConnection>;
+  manualMode: boolean;
+  setManualMode: (on: boolean) => void;
+  onToggleVirtual: (on: boolean) => void;
+  onUpdateZoomLink: (v: string) => void;
+  onUpdateMeetLink: (v: string) => void;
+  onOpenConnectModal?: () => void;
+}
+
+function DeliveryModeSection({
+  schedule,
+  index,
+  disabled,
+  video,
+  manualMode,
+  setManualMode,
+  onToggleVirtual,
+  onUpdateZoomLink,
+  onUpdateMeetLink,
+  onOpenConnectModal,
+}: DeliveryModeSectionProps) {
+  return (
+    <div className="rounded-xl border border-border overflow-hidden bg-card">
+      <div className="flex items-center justify-between p-4 bg-muted/50">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              'p-2 rounded-lg transition-colors',
+              schedule.is_virtual
+                ? 'bg-primary/10 text-primary'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
+            <Video className="h-4 w-4" />
+          </div>
+          <div>
+            <Label className="text-sm font-semibold text-foreground">
+              Virtual session
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {schedule.is_virtual
+                ? 'A meeting link will be created automatically.'
+                : 'This session takes place in person.'}
+            </p>
+          </div>
+        </div>
+        <Switch
+          checked={schedule.is_virtual}
+          onCheckedChange={onToggleVirtual}
+          disabled={disabled}
+          className="cursor-pointer"
+        />
+      </div>
+
+      {schedule.is_virtual && (
+        <DeliveryModeContent
+          schedule={schedule}
+          index={index}
+          disabled={disabled}
+          video={video}
+          manualMode={manualMode}
+          setManualMode={setManualMode}
+          onUpdateZoomLink={onUpdateZoomLink}
+          onUpdateMeetLink={onUpdateMeetLink}
+          onOpenConnectModal={onOpenConnectModal}
+        />
+      )}
+    </div>
+  );
+}
+
+interface DeliveryModeContentProps {
+  schedule: ScheduleForm;
+  index: number;
+  disabled?: boolean;
+  video: ReturnType<typeof useVideoConnection>;
+  manualMode: boolean;
+  setManualMode: (on: boolean) => void;
+  onUpdateZoomLink: (v: string) => void;
+  onUpdateMeetLink: (v: string) => void;
+  onOpenConnectModal?: () => void;
+}
+
+function DeliveryModeContent({
+  schedule,
+  index,
+  disabled,
+  video,
+  manualMode,
+  setManualMode,
+  onUpdateZoomLink,
+  onUpdateMeetLink,
+  onOpenConnectModal,
+}: DeliveryModeContentProps) {
+  const hasLink = !!(schedule.zoom_link?.trim() || schedule.meet_link?.trim());
+  const showManual = manualMode || hasLink;
+
+  const connectedPlatform: PlatformMeta | undefined = PLATFORMS.find(
+    (p) => p.available && !!video.getConnection(p.platform),
+  );
+  const anyConnected = !!connectedPlatform;
+
+  if (showManual) {
+    return (
+      <ManualLinkState
+        schedule={schedule}
+        index={index}
+        disabled={disabled}
+        onUpdateZoomLink={onUpdateZoomLink}
+        onUpdateMeetLink={onUpdateMeetLink}
+        onUseAuto={() => {
+          setManualMode(false);
+          onUpdateZoomLink('');
+          onUpdateMeetLink('');
+        }}
+      />
+    );
+  }
+
+  if (anyConnected && connectedPlatform) {
+    const connection = video.getConnection(connectedPlatform.platform);
+    return (
+      <ConnectedState
+        platform={connectedPlatform}
+        email={connection?.external_email ?? ''}
+        disabled={disabled}
+        onUseManual={() => setManualMode(true)}
+        onOpenConnectModal={onOpenConnectModal}
+      />
+    );
+  }
+
+  return (
+    <NotConnectedState
+      disabled={disabled}
+      onConnect={() => onOpenConnectModal?.()}
+      onUseManual={() => setManualMode(true)}
+    />
+  );
+}
+
+// ============================================================
+// STATE 1 — Manual link
+// ============================================================
+//
+// Two rows — Zoom and Google Meet — each with the platform logo next
+// to its input. Only these two are persisted by the backend
+// (`ScheduleInput.zoom_link` / `.meet_link`).
+
+function ManualLinkState({
+  schedule,
+  index,
+  disabled,
+  onUpdateZoomLink,
+  onUpdateMeetLink,
+  onUseAuto,
+}: {
+  schedule: ScheduleForm;
+  index: number;
+  disabled?: boolean;
+  onUpdateZoomLink: (v: string) => void;
+  onUpdateMeetLink: (v: string) => void;
+  onUseAuto: () => void;
+}) {
+  return (
+    <div className="p-4 space-y-4 border-t border-border bg-background">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-muted text-muted-foreground shrink-0">
+          <Link2 className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            Manual link
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Attendance won&apos;t be tracked automatically for this session.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {/* Zoom */}
+        <div className="flex items-start gap-3">
+          <div
+            className={cn(
+              'shrink-0 h-10 w-10 mt-6 rounded-lg flex items-center justify-center',
+              'bg-background border border-border overflow-hidden p-1.5',
+            )}
+          >
+            <Image
+              src="/platforms/zoom.png"
+              alt="Zoom logo"
+              width={32}
+              height={32}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <TextField
+              name={`schedule_${index}_zoom_link`}
+              label="Zoom Link"
+              placeholder="https://zoom.us/j/..."
+              value={schedule.zoom_link}
+              onChange={onUpdateZoomLink}
+              optional
+              disabled={disabled}
+              type="url"
+            />
+          </div>
+        </div>
+
+        {/* Google Meet */}
+        <div className="flex items-start gap-3">
+          <div
+            className={cn(
+              'shrink-0 h-10 w-10 mt-6 rounded-lg flex items-center justify-center',
+              'bg-background border border-border overflow-hidden p-1.5',
+            )}
+          >
+            <Image
+              src="/platforms/google-meet.png"
+              alt="Google Meet logo"
+              width={32}
+              height={32}
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <TextField
+              name={`schedule_${index}_meet_link`}
+              label="Google Meet Link"
+              placeholder="https://meet.google.com/..."
+              value={schedule.meet_link}
+              onChange={onUpdateMeetLink}
+              optional
+              disabled={disabled}
+              type="url"
+            />
+          </div>
+        </div>
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onUseAuto}
+        disabled={disabled}
+        className={cn(
+          'cursor-pointer font-semibold',
+          'border-primary/40 text-primary hover:bg-primary/5 hover:border-primary',
+        )}
+      >
+        <Sparkles className="h-4 w-4 mr-2" />
+        Use automatic meeting creation instead
+      </Button>
+    </div>
+  );
+}
+
+// ============================================================
+// STATE 2 — Connected
+// ============================================================
+
+function ConnectedState({
+  platform,
+  email,
+  disabled,
+  onUseManual,
+  onOpenConnectModal,
+}: {
+  platform: PlatformMeta;
+  email: string;
+  disabled?: boolean;
+  onUseManual: () => void;
+  onOpenConnectModal?: () => void;
+}) {
+  return (
+    <div className="p-4 border-t border-border bg-primary/5">
+      <div className="flex items-start gap-3">
+        <div className="h-10 w-10 rounded-lg bg-background border border-border flex items-center justify-center p-1.5 shrink-0">
+          <Image
+            src={platform.logo}
+            alt={`${platform.label} logo`}
+            width={32}
+            height={32}
+            className="h-full w-full object-contain"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-base font-semibold text-foreground">
+            Meeting will be created automatically
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Using your {platform.label} account{' '}
+            {email && (
+              <span className="font-medium text-foreground">{email}</span>
+            )}
+            . The join link appears here when you publish.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mt-4">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onUseManual}
+          disabled={disabled}
+          className={cn(
+            'cursor-pointer font-semibold h-9',
+            'border-border text-muted-foreground hover:text-foreground hover:bg-accent',
+          )}
+        >
+          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+          Use a different link
+        </Button>
+
+        {onOpenConnectModal && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onOpenConnectModal}
+            disabled={disabled}
+            className={cn(
+              'cursor-pointer font-semibold h-9',
+              'border-primary/40 text-primary hover:bg-primary/5 hover:border-primary',
+            )}
+          >
+            <Plug className="h-3.5 w-3.5 mr-1.5" />
+            Manage connection
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// STATE 3 — Not connected
+// ============================================================
+
+function NotConnectedState({
+  disabled,
+  onConnect,
+  onUseManual,
+}: {
+  disabled?: boolean;
+  onConnect: () => void;
+  onUseManual: () => void;
+}) {
+  return (
+    <div className="p-4 border-t border-border bg-gradient-to-br from-primary/5 to-primary/10">
+      <div className="flex items-start gap-3">
+        <div className="p-2.5 rounded-lg bg-primary text-primary-foreground shrink-0 shadow-sm">
+          <Plug className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-base font-semibold text-foreground">
+            Connect a video platform to create this meeting automatically
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            We&apos;ll create a meeting on your connected account and track
+            attendance for you. Takes 30 seconds.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-4">
+        <Button
+          type="button"
+          size="lg"
+          onClick={onConnect}
+          disabled={disabled}
+          className={cn(
+            'cursor-pointer w-full sm:w-auto',
+            'bg-primary hover:bg-primary/90 text-primary-foreground',
+            'font-semibold shadow-sm',
+          )}
+        >
+          <Plug className="h-4 w-4 mr-2" />
+          Connect platform
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={onUseManual}
+          disabled={disabled}
+          className={cn(
+            'cursor-pointer w-full sm:w-auto',
+            'border-border bg-background/80 backdrop-blur',
+            'text-primary-500 hover:bg-primary-500 hover:text-primary-50',
+            'font-semibold',
+          )}
+        >
+          <Link2 className=" h-4 w-4 mr-2" />
+          Paste a link manually
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Button>
+      </div>
     </div>
   );
 }
