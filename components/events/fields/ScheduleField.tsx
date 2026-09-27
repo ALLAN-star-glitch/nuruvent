@@ -7,7 +7,7 @@ import Image from 'next/image';
 import {
   ArrowRight,
   CalendarClock,
-  CheckCircle2,
+  ExternalLink,
   ChevronDown,
   ChevronRight,
   Link2,
@@ -351,6 +351,37 @@ export function SchedulesField({
                     disabled={disabled}
                   />
 
+                  {/* Current meeting info — only shown when a meeting exists */}
+                  {schedule.video_meeting_id && (
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                            Linked Zoom Meeting
+                          </p>
+                          <p className="font-mono text-sm text-foreground mt-0.5">
+                            {schedule.video_meeting_id}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Changes to the session time or name update this
+                            meeting automatically.
+                          </p>
+                        </div>
+                        {schedule.zoom_link && (
+                          <a
+                            href={schedule.zoom_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Open
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <DeliveryModeSection
                     schedule={schedule}
                     index={index}
@@ -366,7 +397,13 @@ export function SchedulesField({
                     onToggleVirtual={(on) =>
                       updateFields(schedule._key, {
                         is_virtual: on,
-                        ...(on ? {} : { zoom_link: '', meet_link: '' }),
+                        ...(on
+                          ? {}
+                          : {
+                              zoom_link: '',
+                              meet_link: '',
+                              video_meeting_id: null,
+                            }),
                       })
                     }
                     onUpdateZoomLink={(v) =>
@@ -374,6 +411,13 @@ export function SchedulesField({
                     }
                     onUpdateMeetLink={(v) =>
                       update(schedule._key, 'meet_link', v)
+                    }
+                    onClearMeeting={() =>
+                      updateFields(schedule._key, {
+                        zoom_link: '',
+                        meet_link: '',
+                        video_meeting_id: null,
+                      })
                     }
                     onOpenConnectModal={onOpenConnectModal}
                   />
@@ -407,7 +451,7 @@ export function SchedulesField({
           variant="outline"
           onClick={addSchedule}
           disabled={disabled}
-          className="w-full cursor-pointer bg-primary-50"
+          className="w-full cursor-pointer"
         >
           <Plus className="h-4 w-4 mr-2" />
           Add another session
@@ -438,6 +482,7 @@ interface DeliveryModeSectionProps {
   onToggleVirtual: (on: boolean) => void;
   onUpdateZoomLink: (v: string) => void;
   onUpdateMeetLink: (v: string) => void;
+  onClearMeeting: () => void;
   onOpenConnectModal?: () => void;
 }
 
@@ -451,6 +496,7 @@ function DeliveryModeSection({
   onToggleVirtual,
   onUpdateZoomLink,
   onUpdateMeetLink,
+  onClearMeeting,
   onOpenConnectModal,
 }: DeliveryModeSectionProps) {
   return (
@@ -496,6 +542,7 @@ function DeliveryModeSection({
           setManualMode={setManualMode}
           onUpdateZoomLink={onUpdateZoomLink}
           onUpdateMeetLink={onUpdateMeetLink}
+          onClearMeeting={onClearMeeting}
           onOpenConnectModal={onOpenConnectModal}
         />
       )}
@@ -512,6 +559,7 @@ interface DeliveryModeContentProps {
   setManualMode: (on: boolean) => void;
   onUpdateZoomLink: (v: string) => void;
   onUpdateMeetLink: (v: string) => void;
+  onClearMeeting: () => void;
   onOpenConnectModal?: () => void;
 }
 
@@ -524,10 +572,12 @@ function DeliveryModeContent({
   setManualMode,
   onUpdateZoomLink,
   onUpdateMeetLink,
+  onClearMeeting,
   onOpenConnectModal,
 }: DeliveryModeContentProps) {
   const hasLink = !!(schedule.zoom_link?.trim() || schedule.meet_link?.trim());
-  const showManual = manualMode || hasLink;
+  const hasMeeting = !!schedule.video_meeting_id;
+  const showManual = manualMode || (hasLink && !hasMeeting);
 
   const connectedPlatform: PlatformMeta | undefined = PLATFORMS.find(
     (p) => p.available && !!video.getConnection(p.platform),
@@ -546,6 +596,7 @@ function DeliveryModeContent({
           setManualMode(false);
           onUpdateZoomLink('');
           onUpdateMeetLink('');
+          onClearMeeting();
         }}
       />
     );
@@ -558,6 +609,7 @@ function DeliveryModeContent({
         platform={connectedPlatform}
         email={connection?.external_email ?? ''}
         disabled={disabled}
+        hasMeeting={hasMeeting}
         onUseManual={() => setManualMode(true)}
         onOpenConnectModal={onOpenConnectModal}
       />
@@ -699,12 +751,14 @@ function ConnectedState({
   platform,
   email,
   disabled,
+  hasMeeting,
   onUseManual,
   onOpenConnectModal,
 }: {
   platform: PlatformMeta;
   email: string;
   disabled?: boolean;
+  hasMeeting: boolean;
   onUseManual: () => void;
   onOpenConnectModal?: () => void;
 }) {
@@ -722,14 +776,19 @@ function ConnectedState({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-base font-semibold text-foreground">
-            Meeting will be created automatically
+            {hasMeeting
+              ? 'Meeting is linked'
+              : 'Meeting will be created automatically'}
           </p>
           <p className="text-sm text-muted-foreground mt-1">
             Using your {platform.label} account{' '}
             {email && (
               <span className="font-medium text-foreground">{email}</span>
             )}
-            . The join link appears here when you publish.
+            .{' '}
+            {hasMeeting
+              ? 'Changes to this session update the Zoom meeting — the join link stays the same.'
+              : 'The join link appears here when you publish.'}
           </p>
         </div>
       </div>
@@ -826,11 +885,11 @@ function NotConnectedState({
           className={cn(
             'cursor-pointer w-full sm:w-auto',
             'border-border bg-background/80 backdrop-blur',
-            'text-primary-500 hover:bg-primary-500 hover:text-primary-50',
+            'text-foreground hover:bg-background',
             'font-semibold',
           )}
         >
-          <Link2 className=" h-4 w-4 mr-2" />
+          <Link2 className="h-4 w-4 mr-2" />
           Paste a link manually
           <ArrowRight className="h-4 w-4 ml-2" />
         </Button>

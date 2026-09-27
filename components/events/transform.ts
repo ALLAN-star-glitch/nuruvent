@@ -34,6 +34,7 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
   if (!usable.length) return undefined;
 
   return usable.map((s) => ({
+    id: s.id || undefined,              // ← the fix
     start_date: s.start_date,
     end_date: s.end_date || undefined,
     start_time: s.start_time,
@@ -43,9 +44,6 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
     is_virtual: s.is_virtual,
-    // zoom_link / meet_link are only sent when the host pasted a link
-    // manually. When they're empty, the backend auto-creates a meeting
-    // on the host's connected account.
     zoom_link: s.zoom_link || undefined,
     meet_link: s.meet_link || undefined,
     max_attendees: s.max_attendees ?? undefined,

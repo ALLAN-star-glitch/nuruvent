@@ -18,6 +18,20 @@
 export interface ScheduleForm {
   /** Client-side stable key for React lists. Never sent to the backend. */
   _key: string;
+  /**
+   * Server-assigned UUID for an existing schedule. `undefined` for a
+   * schedule that hasn't been persisted yet. Sent to the backend on
+   * update so it can match the row and preserve internal fields
+   * (video_meeting_id, provider session links).
+   */
+  id?: string;
+  /**
+   * Zoom's numeric meeting ID, or null when no auto-created meeting
+   * exists. Read-only from the form's perspective — the backend sets
+   * it when it provisions a meeting. The UI uses it to detect whether
+   * the schedule is auto-managed (has a meeting) vs manual (pasted link).
+   */
+  video_meeting_id?: string | null;
   start_date: string;
   end_date: string;
   start_time: string;
@@ -43,6 +57,8 @@ export function makeEmptySchedule(timezone = 'Africa/Nairobi'): ScheduleForm {
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
         : `sched-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: undefined,
+    video_meeting_id: null,
     start_date: '',
     end_date: '',
     start_time: '',

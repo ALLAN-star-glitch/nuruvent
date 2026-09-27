@@ -334,6 +334,66 @@ export const eventsApi = api.injectEndpoints({
       providesTags: ['TrashCount'],
     }),
 
+        // ============================================================
+    // PROTECTED MUTATIONS — meeting management
+    // ============================================================
+
+    /**
+     * POST /events/{id}/meeting
+     *
+     * Creates a Zoom meeting for every virtual schedule that doesn't
+     * already have one. Idempotent — schedules with an existing
+     * meeting are skipped.
+     */
+    createEventMeeting: builder.mutation<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}/meeting`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Events', id },
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
+    /**
+     * DELETE /events/{id}/meeting
+     *
+     * Removes the Zoom meeting for every virtual schedule. The event
+     * itself is untouched.
+     */
+    deleteEventMeeting: builder.mutation<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}/meeting`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Events', id },
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
+    /**
+     * POST /events/{id}/meeting/regenerate
+     *
+     * Deletes the current Zoom meeting and creates a fresh one with
+     * a new join link. Used for recovery when the meeting is broken
+     * or the link has leaked.
+     */
+    regenerateEventMeeting: builder.mutation<BaseResponse<Event>, string>({
+      query: (id) => ({
+        url: `/events/${id}/meeting/regenerate`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_result, _error, id) => [
+        { type: 'Events', id },
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
     // ============================================================
     // PROTECTED MUTATIONS — create
     // ============================================================
@@ -825,6 +885,14 @@ export const {
   useBulkCompleteEventsMutation,
   useBulkDuplicateEventsMutation,
   useBulkDeleteEventMediaMutation,
+} = eventsApi;
+
+
+// ---- Protected mutations — meeting management ----
+export const {
+  useCreateEventMeetingMutation,
+  useDeleteEventMeetingMutation,
+  useRegenerateEventMeetingMutation,
 } = eventsApi;
 
 // ============================================================

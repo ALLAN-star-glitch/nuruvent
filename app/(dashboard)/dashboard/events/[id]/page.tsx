@@ -19,6 +19,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  Plug,
   Send,
   Star,
   Trash2,
@@ -49,8 +50,12 @@ import {
   useDeleteEventMutation,
   useGetEventByIdQuery,
   usePublishEventMutation,
+  useCreateEventMeetingMutation,
+  useDeleteEventMeetingMutation,
+  useRegenerateEventMeetingMutation,
+  useUpdateEventMutation,
 } from '@/lib/store/api/eventsApi';
-import type { Event, Schedule } from '@/lib/types/events';
+import type { Event, Schedule, VideoPlatform } from '@/lib/types/events';
 import {
   formatPrice,
   getEventDuration,
@@ -63,6 +68,17 @@ import {
   isEventPublished,
   isHostInstitution,
 } from '@/lib/utils/eventDisplay';
+
+import { PlatformPickerModal } from '@/components/events/video/PlatformPickerModal';
+import { useVideoConnection } from '@/components/events/video/useVideoConnection';
+
+import {
+  EditMeetingDialog,
+  type EditMeetingFormValues,
+} from '@/components/meeting/EditMeetingDialog';
+import { ShareMeetingDialog } from '@/components/meeting/ShareMeetingDialog';
+import { DeleteMeetingDialog } from '@/components/meeting/DeleteMeetingDialog';
+import { MeetingActions } from '@/components/meeting/MeetingActions';
 
 // ============================================================
 // HELPERS
@@ -113,14 +129,6 @@ function getStatusConfig(statusName: string) {
   return map[statusName] ?? map.Draft;
 }
 
-/**
- * Resolves the primary join link for an event. Preference:
- *   1. First virtual schedule's zoom_link
- *   2. First virtual schedule's meet_link
- *   3. Event-level zoom_link (derived mirror of #1)
- *   4. Event-level meet_link
- *   5. undefined for in-person events
- */
 function getPrimaryMeetingLink(event: Event): string | undefined {
   const virtualSchedule = event.schedules?.find(
     (s) => s.is_virtual && (s.zoom_link || s.meet_link),
@@ -131,9 +139,6 @@ function getPrimaryMeetingLink(event: Event): string | undefined {
   return event.zoom_link || event.meet_link || undefined;
 }
 
-/**
- * Returns the platform label for the primary meeting link.
- */
 function getMeetingPlatformLabel(event: Event): string {
   if (!event.is_virtual) return 'In-Person';
   if (event.zoom_link) return 'Zoom';
@@ -141,10 +146,6 @@ function getMeetingPlatformLabel(event: Event): string {
   return 'Virtual';
 }
 
-/**
- * Copies text to the clipboard. Uses the async Clipboard API when
- * available; falls back to a hidden textarea for older browsers.
- */
 async function copyToClipboard(text: string): Promise<boolean> {
   if (!text) return false;
   try {
@@ -211,19 +212,59 @@ export default function EventDetailPage({
   } | null>(null);
   const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] = useState(false);
 
+  // ---- Meeting management state ----
+  const [isMeetingActionRunning, setIsMeetingActionRunning] = useState(false);
+  const [isDeleteMeetingDialogOpen, setIsDeleteMeetingDialogOpen] =
+    useState(false);
+  const [isEditMeetingDialogOpen, setIsEditMeetingDialogOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isSavingMeeting, setIsSavingMeeting] = useState(false);
+
+  // ---- Video connection + platform picker ----
+  const video = useVideoConnection();
+  const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
+  const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
+    null,
+  );
+
   const { data: response, isLoading, error, refetch } = useGetEventByIdQuery(
     eventId,
     { skip: !eventId },
   );
   const [publishEvent] = usePublishEventMutation();
   const [deleteEvent] = useDeleteEventMutation();
+  const [createEventMeeting] = useCreateEventMeetingMutation();
+  const [deleteEventMeeting] = useDeleteEventMeetingMutation();
+  const [regenerateEventMeeting] = useRegenerateEventMeetingMutation();
+  const [updateEvent] = useUpdateEventMutation();
 
   const event: Event | undefined = response?.data;
+
+  const publishErrorIsConnectionIssue = !!(
+    publishError?.message
+      ?.toLowerCase()
+      .includes('zoom connection is no longer valid') ||
+    publishError?.details?.some((d) =>
+      d.toLowerCase().includes('zoom connection is no longer valid'),
+    )
+  );
 
   const statusName = event ? getEventStatusName(event) : 'Draft';
   const statusConfig = getStatusConfig(statusName);
   const isDraft = event ? isEventDraft(event) : false;
   const isPublished = event ? isEventPublished(event) : false;
+
+  const zoomConnection = video.getConnection('zoom');
+  const hasZoomConnection = !!zoomConnection;
+
+  const openZoomPicker = () => {
+    setPickedPlatform('zoom');
+    setIsPlatformPickerOpen(true);
+  };
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
 
   const handlePublish = async () => {
     if (!event) return;
@@ -344,6 +385,123 @@ export default function EventDetailPage({
     }
   };
 
+  const handleCreateMeeting = async () => {
+    if (!event) return;
+    setIsMeetingActionRunning(true);
+    const t = toast.loading('Creating Zoom meeting…');
+    try {
+      await createEventMeeting(event.id).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting created successfully');
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to create meeting';
+      toast.error(msg);
+    } finally {
+      setIsMeetingActionRunning(false);
+    }
+  };
+
+  const handleRegenerateMeeting = async () => {
+    if (!event) return;
+    setIsMeetingActionRunning(true);
+    const t = toast.loading('Regenerating Zoom meeting…');
+    try {
+      await regenerateEventMeeting(event.id).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting regenerated — share the new link');
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to regenerate meeting';
+      toast.error(msg);
+    } finally {
+      setIsMeetingActionRunning(false);
+    }
+  };
+
+  const handleDeleteMeeting = async () => {
+    if (!event) return;
+    setIsMeetingActionRunning(true);
+    const t = toast.loading('Deleting Zoom meeting…');
+    try {
+      await deleteEventMeeting(event.id).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting deleted');
+      setIsDeleteMeetingDialogOpen(false);
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to delete meeting';
+      toast.error(msg);
+    } finally {
+      setIsMeetingActionRunning(false);
+    }
+  };
+
+  const handleSaveMeeting = async (values: EditMeetingFormValues) => {
+    if (!event) return;
+    const primary = event.schedules?.[0];
+    if (!primary) return;
+
+    setIsSavingMeeting(true);
+    const t = toast.loading('Updating meeting…');
+    try {
+      await updateEvent({
+        id: event.id,
+        data: {
+          schedules: [
+            {
+              id: primary.id,
+              session_name: values.session_name,
+              start_date: values.start_date,
+              start_time: values.start_time + ':00',
+              end_time: values.end_time + ':00',
+              timezone: values.timezone,
+              is_virtual: true,
+            },
+          ],
+        },
+      }).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting updated');
+      setIsEditMeetingDialogOpen(false);
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to update meeting';
+      toast.error(msg);
+    } finally {
+      setIsSavingMeeting(false);
+    }
+  };
+
+  const handleShareCopy = async () => {
+    if (!event) return;
+    const link = getPrimaryMeetingLink(event);
+    const text = `Join "${event.display_name || event.name}" on Zoom: ${link ?? ''}`;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      toast.success('Join link copied');
+      setIsShareDialogOpen(false);
+    } else {
+      toast.error('Could not copy the link');
+    }
+  };
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+
   if (isLoading || !eventId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -391,6 +549,9 @@ export default function EventDetailPage({
   const virtualSchedules = (event.schedules ?? []).filter(
     isScheduleVirtualWithMeeting,
   );
+  const primaryMeetingId = event.schedules?.[0]?.video_meeting_id;
+
+  const shareText = `Join "${event.display_name || event.name}" on Zoom: ${meetingLink ?? ''}`;
 
   return (
     <div className="w-full">
@@ -439,10 +600,7 @@ export default function EventDetailPage({
         {/* Actions */}
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <Link href={`/dashboard/events/${event.id}/edit`}>
-            <Button
-              variant="outline"
-              className="cursor-pointer"
-            >
+            <Button variant="outline" className="cursor-pointer">
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -470,10 +628,7 @@ export default function EventDetailPage({
 
           {isPublished && (
             <Link href={`/events/${event.slug}`} target="_blank">
-              <Button
-                variant="outline"
-                className="cursor-pointer"
-              >
+              <Button variant="outline" className="cursor-pointer">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Public
               </Button>
@@ -511,7 +666,7 @@ export default function EventDetailPage({
             )}
           </div>
 
-          {/* Meeting card — primary CTA for hosts */}
+          {/* Meeting card */}
           {event.is_virtual && (
             <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
               <CardContent className="p-6">
@@ -530,6 +685,15 @@ export default function EventDetailPage({
                       >
                         {meetingPlatform}
                       </Badge>
+                      {hasZoomConnection && (
+                        <Badge
+                          variant="outline"
+                          className="text-primary border-primary/30 bg-primary/10 text-xs"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Zoom connected
+                        </Badge>
+                      )}
                     </div>
 
                     {meetingLink ? (
@@ -541,17 +705,18 @@ export default function EventDetailPage({
                         <p className="text-xs font-mono text-foreground/70 mt-2 truncate bg-background/60 rounded px-2 py-1.5 border border-border">
                           {meetingLink}
                         </p>
+
                         <div className="flex flex-wrap items-center gap-2 mt-3">
                           <Button
                             size="sm"
                             className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                            onClick={() => {
+                            onClick={() =>
                               window.open(
                                 meetingLink,
                                 '_blank',
                                 'noopener,noreferrer',
-                              );
-                            }}
+                              )
+                            }
                           >
                             <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                             Join Meeting
@@ -570,28 +735,104 @@ export default function EventDetailPage({
                             ) : (
                               <>
                                 <Copy className="h-3.5 w-3.5 mr-1.5" />
-                                Copy link
+                                Copy Link
                               </>
                             )}
                           </Button>
+                          {primaryMeetingId && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="cursor-pointer"
+                              onClick={() =>
+                                window.open(
+                                  `https://zoom.us/meeting/${primaryMeetingId}`,
+                                  '_blank',
+                                  'noopener,noreferrer',
+                                )
+                              }
+                            >
+                              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                              View in Zoom
+                            </Button>
+                          )}
                         </div>
+
+                        {primaryMeetingId && (
+                          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                                Meeting ID
+                              </p>
+                              <p className="font-mono text-sm text-foreground">
+                                {primaryMeetingId}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                                Platform
+                              </p>
+                              <p className="text-sm text-foreground">
+                                {meetingPlatform}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <MeetingActions
+                          running={isMeetingActionRunning}
+                          onEdit={() => setIsEditMeetingDialogOpen(true)}
+                          onShare={() => setIsShareDialogOpen(true)}
+                          onRegenerate={handleRegenerateMeeting}
+                          onDelete={() => setIsDeleteMeetingDialogOpen(true)}
+                        />
                       </>
                     ) : (
                       <>
                         <p className="text-sm text-muted-foreground mt-1">
                           {isDraft
-                            ? 'A meeting link will be created when you publish this event.'
-                            : 'No meeting link yet. Connect Zoom in the event editor to create one automatically, or paste a link manually.'}
+                            ? 'A meeting link will be created automatically when you publish this event.'
+                            : 'No meeting link yet. Create one automatically with your connected Zoom account, or paste a link manually in the editor.'}
                         </p>
-                        <div className="flex items-center gap-2 mt-3">
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          {hasZoomConnection ? (
+                            <Button
+                              size="sm"
+                              className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                              onClick={handleCreateMeeting}
+                              disabled={isMeetingActionRunning}
+                            >
+                              {isMeetingActionRunning ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                  Creating…
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="h-3.5 w-3.5 mr-1.5" />
+                                  Create Meeting
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                              onClick={openZoomPicker}
+                            >
+                              <Plug className="h-3.5 w-3.5 mr-1.5" />
+                              Manage Connection
+                            </Button>
+                          )}
+
                           <Link href={`/dashboard/events/${event.id}/edit`}>
                             <Button
                               size="sm"
                               variant="outline"
                               className="cursor-pointer"
                             >
-                              <Edit className="h-3.5 w-3.5 mr-1.5" />
-                              Configure meeting
+                              <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                              Paste a link manually
                             </Button>
                           </Link>
                         </div>
@@ -600,7 +841,7 @@ export default function EventDetailPage({
                   </div>
                 </div>
 
-                {/* All virtual schedules — shown when there's more than one */}
+                {/* All virtual schedules */}
                 {virtualSchedules.length > 1 && (
                   <>
                     <Separator className="my-4" />
@@ -741,7 +982,8 @@ export default function EventDetailPage({
                 <div>
                   <p className="text-muted-foreground">Certificate</p>
                   <p className="font-medium text-foreground">
-                    {event.certificate_enabled && (event.certificate_price ?? 0) > 0
+                    {event.certificate_enabled &&
+                    (event.certificate_price ?? 0) > 0
                       ? formatPrice(event.certificate_price ?? 0)
                       : 'Not available'}
                   </p>
@@ -814,7 +1056,9 @@ export default function EventDetailPage({
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {hostIsInstitution ? 'Institution Account' : 'Individual Account'}
+                    {hostIsInstitution
+                      ? 'Institution Account'
+                      : 'Individual Account'}
                   </p>
                 </div>
               </div>
@@ -828,7 +1072,10 @@ export default function EventDetailPage({
                 Quick Actions
               </h3>
 
-              <Link href={`/dashboard/events/${event.id}/edit`} className="block">
+              <Link
+                href={`/dashboard/events/${event.id}/edit`}
+                className="block"
+              >
                 <Button
                   variant="outline"
                   className="w-full justify-start cursor-pointer"
@@ -837,6 +1084,16 @@ export default function EventDetailPage({
                   Edit Event
                 </Button>
               </Link>
+
+              {event.is_virtual && !meetingLink && !hasZoomConnection && (
+                <Button
+                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                  onClick={openZoomPicker}
+                >
+                  <Plug className="h-4 w-4 mr-2" />
+                  Manage Connection
+                </Button>
+              )}
 
               {isDraft && (
                 <Button
@@ -854,7 +1111,11 @@ export default function EventDetailPage({
               )}
 
               {isPublished && (
-                <Link href={`/events/${event.slug}`} target="_blank" className="block">
+                <Link
+                  href={`/events/${event.slug}`}
+                  target="_blank"
+                  className="block"
+                >
                   <Button
                     variant="outline"
                     className="w-full justify-start cursor-pointer"
@@ -1031,7 +1292,9 @@ export default function EventDetailPage({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
-              Cannot Publish Event
+              {publishErrorIsConnectionIssue
+                ? 'Zoom Connection Required'
+                : 'Cannot Publish Event'}
             </DialogTitle>
             <DialogDescription className="text-destructive">
               {publishError?.message || 'Failed to publish event'}
@@ -1065,19 +1328,65 @@ export default function EventDetailPage({
             >
               Close
             </Button>
-            <Button
-              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-              onClick={() => {
-                setIsPublishErrorDialogOpen(false);
-                router.push(`/dashboard/events/${event.id}/edit`);
-              }}
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Event
-            </Button>
+
+            {publishErrorIsConnectionIssue ? (
+              <Button
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                onClick={() => {
+                  setIsPublishErrorDialogOpen(false);
+                  openZoomPicker();
+                }}
+              >
+                <Plug className="h-4 w-4 mr-2" />
+                Manage Connection
+              </Button>
+            ) : (
+              <Button
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                onClick={() => {
+                  setIsPublishErrorDialogOpen(false);
+                  router.push(`/dashboard/events/${event.id}/edit`);
+                }}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Event
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Meeting management dialogs */}
+      <EditMeetingDialog
+        open={isEditMeetingDialogOpen}
+        onOpenChange={setIsEditMeetingDialogOpen}
+        schedule={event.schedules?.[0]}
+        saving={isSavingMeeting}
+        onSave={handleSaveMeeting}
+      />
+
+      <ShareMeetingDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        meetingLink={meetingLink}
+        shareText={shareText}
+        onCopy={handleShareCopy}
+      />
+
+      <DeleteMeetingDialog
+        open={isDeleteMeetingDialogOpen}
+        onOpenChange={setIsDeleteMeetingDialogOpen}
+        deleting={isMeetingActionRunning}
+        onConfirm={handleDeleteMeeting}
+      />
+
+      {/* Platform picker */}
+      <PlatformPickerModal
+        open={isPlatformPickerOpen}
+        onOpenChange={setIsPlatformPickerOpen}
+        returnUrl={`/dashboard/events/${event.id}`}
+        initialPlatform={pickedPlatform}
+      />
     </div>
   );
 }
