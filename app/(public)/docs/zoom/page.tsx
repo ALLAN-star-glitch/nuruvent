@@ -38,6 +38,21 @@ export default function ZoomDocsPage() {
         </p>
       </header>
 
+      {/* About Nuruvent */}
+      <section className="mb-14 rounded-xl border border-border bg-muted/30 p-6">
+        <h2 className="text-xl font-semibold text-foreground mb-2">
+          About Nuruvent
+        </h2>
+        <p className="text-base text-muted-foreground leading-relaxed">
+          Nuruvent is a training events and courses platform. Organizers use it
+          to create, sell, and host virtual and in-person events and courses.
+          Hosts connect their own Zoom account so Nuruvent can create Zoom
+          meetings for their scheduled sessions, share the join link with
+          attendees, and record attendance. This page describes how the Zoom
+          integration works from the host&apos;s perspective.
+        </p>
+      </section>
+
       {/* Where you'll find it */}
       <section className="mb-14">
         <h2 className="text-2xl font-semibold text-foreground mb-2">
@@ -112,17 +127,9 @@ export default function ZoomDocsPage() {
             </>,
             <>You will be redirected to Zoom. Log in if prompted.</>,
             <>
-              Review the permissions Nuruvent is requesting:
-              <ul className="mt-2 list-disc pl-6 space-y-1.5 text-muted-foreground">
-                <li>
-                  <Bold>Create and manage meetings</Bold> — used to create
-                  meetings for your virtual sessions.
-                </li>
-                <li>
-                  <Bold>View your Zoom user information</Bold> — used to display
-                  the connected account email in your dashboard.
-                </li>
-              </ul>
+              Review the permissions Nuruvent is requesting. These are the
+              same permissions listed in the{' '}
+              <Bold>What Nuruvent does with Zoom access</Bold> section below.
             </>,
             <>
               Click <Bold>Allow</Bold> to authorize Nuruvent.
@@ -136,9 +143,47 @@ export default function ZoomDocsPage() {
         />
       </Section>
 
-      {/* Using */}
+      {/* What Nuruvent does with Zoom access */}
       <Section
         number="3"
+        title="What Nuruvent does with Zoom access"
+        icon={<Video className="h-5 w-5" />}
+      >
+        <p className="text-base text-muted-foreground mb-4">
+          When you connect your Zoom account, Nuruvent requests only the
+          permissions it needs. Each one is used for a specific, visible
+          purpose:
+        </p>
+
+        <div className="space-y-4">
+          <CapabilityRow
+            title="Create and manage Zoom meetings"
+            description="Nuruvent creates a Zoom meeting for each virtual session you schedule, so you do not have to create meetings by hand. The same permission lets Nuruvent update a meeting when you change a session's title or time, and delete it when you cancel the session."
+          />
+          <CapabilityRow
+            title="Retrieve meeting details"
+            description="After a meeting is created, Nuruvent reads its join link and passcode so they can be shown to your attendees on the event page and in confirmation emails."
+          />
+          <CapabilityRow
+            title="View participant attendance"
+            description="Zoom sends Nuruvent events as participants join and leave the meeting. Nuruvent records this so you can see who attended, and use it to issue certificates and award CPD credits."
+          />
+          <CapabilityRow
+            title="View your Zoom user information"
+            description="Nuruvent reads the email address associated with your Zoom account so we can display which account is connected in your dashboard. This is the only personal detail Nuruvent stores from Zoom."
+          />
+        </div>
+
+        <Callout icon={<ShieldCheck className="h-4 w-4" />}>
+          Nuruvent does not access your Zoom contacts, recordings, chat, or
+          any data outside the specific items above. Each capability
+          corresponds to a scope you approve on Zoom&apos;s consent screen.
+        </Callout>
+      </Section>
+
+      {/* Using */}
+      <Section
+        number="4"
         title="Using the App"
         icon={<Video className="h-5 w-5" />}
       >
@@ -206,7 +251,7 @@ export default function ZoomDocsPage() {
 
       {/* Managing */}
       <Section
-        number="4"
+        number="5"
         title="Managing the Connection"
         icon={<Settings className="h-5 w-5" />}
       >
@@ -232,7 +277,7 @@ export default function ZoomDocsPage() {
 
       {/* Removing */}
       <Section
-        number="5"
+        number="6"
         title="Removing the App (Disconnecting Zoom)"
         icon={<ShieldCheck className="h-5 w-5" />}
       >
@@ -284,11 +329,11 @@ export default function ZoomDocsPage() {
 
       {/* Data handling */}
       <Section
-        number="6"
+        number="7"
         title="Data Handling"
         icon={<ShieldCheck className="h-5 w-5" />}
       >
-        <p className="text-base text-muted-foreground">
+        <p className="text-base text-muted-foreground mb-3">
           For details on what data Nuruvent collects through the Zoom
           integration, how it is protected, and how it is deleted, see our{' '}
           <a href="/privacy" className="text-primary hover:underline font-medium">
@@ -296,11 +341,18 @@ export default function ZoomDocsPage() {
           </a>
           .
         </p>
+        <p className="text-base text-muted-foreground">
+          In short: Nuruvent stores your Zoom access and refresh tokens
+          encrypted at rest using AES-256-GCM. It never shares your credentials
+          with third parties. Disconnecting your Zoom account from Nuruvent, or
+          uninstalling Nuruvent from the Zoom App Marketplace, deletes all
+          stored tokens and connection records.
+        </p>
       </Section>
 
       {/* Support */}
       <Section
-        number="7"
+        number="8"
         title="Support"
         icon={<Plug className="h-5 w-5" />}
       >
@@ -410,6 +462,28 @@ function EntryCard({
       <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
         {description}
       </p>
+    </div>
+  );
+}
+
+function CapabilityRow({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+            {description}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

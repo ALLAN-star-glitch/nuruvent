@@ -1,62 +1,65 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { InstallPrompt } from "@/components/PWA/InstallPrompt";
-import { PushNotificationManager } from "@/components/PWA/PushNotificationManager";
-import Script from "next/script";
-import StoreProvider from "./StoreProvider";
-import { THEME_INIT_SCRIPT } from "@/lib/theme";
+// app/layout.tsx
+
+import type { Metadata, Viewport } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import './globals.css';
+import { InstallPrompt } from '@/components/PWA/InstallPrompt';
+import { PushNotificationManager } from '@/components/PWA/PushNotificationManager';
+import Script from 'next/script';
+import StoreProvider from './StoreProvider';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const viewport: Viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
-  themeColor: "#1A73E8",
+  themeColor: '#1A73E8',
 };
 
 export const metadata: Metadata = {
   title: {
-    default: "Nuruvent",
-    template: "%s | Nuruvent",
+    default: 'Nuruvent',
+    template: '%s | Nuruvent',
   },
-  description: "Light Your Training Events. Illuminate Your Growth.",
+  description: 'Light Your Training Events. Illuminate Your Growth.',
   keywords: [
-    "training events",
-    "professional development",
-    "workshops",
-    "webinars",
-    "bootcamps",
-    "meetups",
-    "CPD events",
-    "professional training",
-    "Nuruvent",
-    "global training platform",
-  ].join(", "),
-  robots: "index, follow",
+    'training events',
+    'professional development',
+    'workshops',
+    'webinars',
+    'bootcamps',
+    'meetups',
+    'CPD events',
+    'professional training',
+    'Nuruvent',
+    'global training platform',
+  ].join(', '),
+  robots: 'index, follow',
   alternates: {
-    canonical: "https://nuruvent.com/",
+    canonical: 'https://nuruvent.com/',
   },
-  manifest: "/manifest.webmanifest",
+  manifest: '/manifest.webmanifest',
   icons: {
-    apple: "/icon-192.png",
+    apple: '/icon-192.png',
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: 'black-translucent',
   },
   other: {
-    "msvalidate.01": "7F9BEC1255ABF3C4802D7356DC131BE7",
+    'msvalidate.01': '7F9BEC1255ABF3C4802D7356DC131BE7',
   },
 };
+
 
 export default function RootLayout({
   children,
@@ -68,18 +71,42 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Anti-flash: apply `.dark` to <html> before first paint.
-            Must be a raw inline <script> (not next/script) so it runs
-            synchronously in <head>, ahead of the framework boot. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        {/* Zoom Meeting SDK — Component View */}
+        <Script
+          src="https://source.zoom.us/6.2.0/lib/vendor/react.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="https://source.zoom.us/6.2.0/lib/vendor/react-dom.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="https://source.zoom.us/6.2.0/lib/vendor/redux.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="https://source.zoom.us/6.2.0/lib/vendor/redux-thunk.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="https://source.zoom.us/6.2.0/lib/vendor/lodash.min.js"
+          strategy="beforeInteractive"
+        />
+        <Script
+          src="https://source.zoom.us/zoom-meeting-embedded-6.2.0.min.js"
+          strategy="beforeInteractive"
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        {/* Render child layout route groups: (public) or (dashboard) */}
+        {/* Theme init — runs during HTML parsing, before React hydrates.
+            Rendered as a raw inline script at the top of <body>, not
+            inside a React component, so React does not neuter it. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
+
         <StoreProvider>{children}</StoreProvider>
 
-        {/* Global Analytics */}
         {GA_MEASUREMENT_ID && (
           <>
             <Script
@@ -97,7 +124,6 @@ export default function RootLayout({
           </>
         )}
 
-        {/* Global PWA Utilities */}
         <InstallPrompt />
         <PushNotificationManager />
       </body>

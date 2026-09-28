@@ -5,8 +5,6 @@ const nextConfig: NextConfig = {
   compress: true,
 
   images: {
-    // Remove the deprecated 'domains' array
-    // domains: [...], // ← DELETE THIS ENTIRE SECTION
     remotePatterns: [
       {
         protocol: 'https',
@@ -67,14 +65,12 @@ const nextConfig: NextConfig = {
   },
 
   poweredByHeader: false,
-
   async rewrites() {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL
-          ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
-          : 'http://localhost:8080/api/:path*',
+        destination: `${apiBase}/api/:path*`,
       },
       {
         source: '/manifest.json',
@@ -100,9 +96,12 @@ const nextConfig: NextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
+          // camera and microphone are allowed for same-origin.
+          // The Zoom Meeting SDK runs on your origin and needs
+          // both to capture the user's audio and video.
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+            value: 'camera=(self), microphone=(self), geolocation=(), interest-cohort=()',
           },
         ],
       },
@@ -145,16 +144,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // REMOVE this section - it causes the warning
-      // {
-      //   source: '/_next/static/(.*)',
-      //   headers: [
-      //     {
-      //       key: 'Cache-Control',
-      //       value: 'public, max-age=31536000, immutable',
-      //     },
-      //   ],
-      // },
       {
         source: '/images/(.*)',
         headers: [
@@ -171,6 +160,17 @@ const nextConfig: NextConfig = {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, immutable',
           },
+        ],
+      },
+      // Zoom Meeting SDK requires cross-origin isolation to
+      // enable SharedArrayBuffer, which powers 720p video and
+      // virtual backgrounds. Scoped to the meeting route so the
+      // rest of the app is unaffected.
+      {
+        source: '/meeting/:id',   // matches /meeting/75753256581
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'require-corp' },
         ],
       },
     ];

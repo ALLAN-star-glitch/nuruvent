@@ -399,6 +399,80 @@ export const eventsApi = api.injectEndpoints({
       ],
     }),
 
+
+
+        /**
+     * POST /video/meetings/signature
+     *
+     * Issues a signed JWT that authorizes the browser to join a Zoom
+     * meeting via the embedded Meeting SDK. role 1 = host, 0 = attendee.
+     *
+     * The response includes the signature and the SDK key. Both are
+     * passed to the Meeting SDK's join() call on the frontend.
+     */
+    generateMeetingSignature: builder.mutation<
+      BaseResponse<{ signature: string; sdk_key: string }>,
+      { platform: VideoPlatform; meeting_number: string; role: 0 | 1 }
+    >({
+      query: (body) => ({
+        url: '/video/meetings/signature',
+        method: 'POST',
+        body,
+      }),
+      // No invalidation — the signature is stateless.
+    }),
+
+    /**
+     * GET /video/meetings/zak
+     *
+     * Returns a Zoom Access Key token for the authenticated user's
+     * active Zoom connection. Used only when the user is the host.
+     */
+    fetchMeetingZAK: builder.mutation<
+      BaseResponse<{ zak: string }>,
+      { platform: VideoPlatform }
+    >({
+      query: ({ platform }) => ({
+        url: '/video/meetings/zak',
+        method: 'GET',
+        params: { platform },
+      }),
+      // No invalidation.
+    }),
+
+
+        /**
+     * GET /video/meetings/:id/join-info
+     *
+     * Returns everything the browser needs to join a meeting via the
+     * embedded Meeting SDK: meeting number, signature, SDK key, and
+     * (for hosts) a ZAK. Role is decided server-side from the meeting
+     * owner.
+     */
+  getMeetingJoinInfo: builder.query<
+  BaseResponse<{
+    meeting_number: string;
+    signature: string;
+    sdk_key: string;
+    password: string;
+    web_endpoint: string;
+    zak?: string;
+    role: number;
+  }>,
+  { meetingId: string; platform: VideoPlatform }
+>({
+  query: (args) => {
+    console.log('[join-info] query args →', args);
+    const built = {
+      url: `/video/meetings/${args.meetingId}/join-info`,
+      method: 'GET' as const,
+      params: { platform: args.platform },
+    };
+    console.log('[join-info] query built →', built);
+    return built;
+  },
+}),
+
     // ============================================================
     // PROTECTED MUTATIONS — create
     // ============================================================
@@ -898,6 +972,19 @@ export const {
   useCreateEventMeetingMutation,
   useDeleteEventMeetingMutation,
   useRegenerateEventMeetingMutation,
+} = eventsApi;
+
+
+export const {
+  useGetMeetingJoinInfoQuery,
+  useLazyGetMeetingJoinInfoQuery,
+} = eventsApi;
+
+
+// ---- Protected mutations — meeting SDK ----
+export const {
+  useGenerateMeetingSignatureMutation,
+  useFetchMeetingZAKMutation,
 } = eventsApi;
 
 // ============================================================

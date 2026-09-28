@@ -88,6 +88,7 @@ import {
 import { useVideoConnection } from '@/components/events/video/useVideoConnection';
 import { AddMeetingDialog } from '@/components/events/video/AddMeetingDialog';
 
+
 import {
   EditMeetingDialog,
   type EditMeetingFormValues,
@@ -95,9 +96,14 @@ import {
 import { ShareMeetingDialog } from '@/components/meeting/ShareMeetingDialog';
 import { DeleteMeetingDialog } from '@/components/meeting/DeleteMeetingDialog';
 
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectUser } from '@/lib/store/slices/authSlice';
+
+
 // ============================================================
 // HELPERS
 // ============================================================
+
 
 const PUBLIC_SITE_URL =
   process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://nuruvent.com';
@@ -105,6 +111,10 @@ const PUBLIC_SITE_URL =
 function getPublicEventUrl(slug: string): string {
   return `${PUBLIC_SITE_URL}/events/${slug}`;
 }
+
+
+
+
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return 'TBD';
@@ -175,6 +185,12 @@ function sessionTimeLabel(s: Schedule): string {
   if (s.start_time && s.end_time) parts.push(`${s.start_time} – ${s.end_time}`);
   else if (s.start_time) parts.push(s.start_time);
   return parts.join(' · ');
+}
+
+function extractZoomMeetingNumber(input: string): string | null {
+  if (!input) return null;
+  const match = input.match(/\/j\/(\d+)/);
+  return match ? match[1] : null;
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -310,6 +326,7 @@ interface SessionRowProps {
   onShare: (sessionId: string) => void;
   onRegenerate: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
+  onStart?: (session: Schedule) => void;
 }
 
 function SessionRow({
@@ -325,6 +342,7 @@ function SessionRow({
   onShare,
   onRegenerate,
   onDelete,
+  onStart,
 }: SessionRowProps) {
   const label = sessionLabel(session, index);
   const time = sessionTimeLabel(session);
@@ -398,6 +416,19 @@ function SessionRow({
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
               Join
             </Button>
+
+            {meta?.platform === 'zoom' && onStart && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer h-8 text-xs border-primary/40 text-primary hover:bg-primary/5"
+                onClick={() => onStart(session)}
+                disabled={running}
+              >
+                <Video className="h-3.5 w-3.5 mr-1.5" />
+                Start in Nuruvent
+              </Button>
+            )}
 
             <Button
               size="sm"
@@ -552,6 +583,7 @@ export default function EventDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const router = useRouter();
+  const user = useAppSelector(selectUser);
 
   const [eventId, setEventId] = useState<string>('');
 
@@ -584,6 +616,7 @@ export default function EventDetailPage({
     'create' | 'edit' | 'share' | 'regenerate' | 'delete' | 'add' | null
   >(null);
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
 
   // ---- Video connection + platform pickers ----
   const video = useVideoConnection();
@@ -1034,6 +1067,24 @@ export default function EventDetailPage({
     }
   };
 
+  // ------------------------------------------------------------
+  // START MEETING (embedded)
+  // ------------------------------------------------------------
+
+const handleStartMeeting = (session: Schedule) => {
+  if (!session.video_meeting_id) {
+    toast.error('This session has no meeting yet.');
+    return;
+  }
+
+  // Pass the display name through the URL so the meeting header
+  // can render it immediately without an extra fetch.
+  const name = sessionLabel(session, 0);   // or a longer label if you prefer
+  const url = `/meeting/${session.video_meeting_id}?name=${encodeURIComponent(name)}`;
+
+  window.open(url, '_blank', 'noopener');
+};
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -1407,6 +1458,7 @@ export default function EventDetailPage({
                         onShare={handleShareSession}
                         onRegenerate={handleRegenerateSession}
                         onDelete={handleDeleteSession}
+                        onStart={handleStartMeeting}
                       />
                     ))}
                   </div>
