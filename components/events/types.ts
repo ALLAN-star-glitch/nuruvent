@@ -1,5 +1,7 @@
 // components/events/types.ts
 
+import type { VideoPlatform } from '@/lib/types/events';
+
 // ============================================================
 // FORM SHAPE — flat scalars + nested structured slices
 // ============================================================
@@ -42,6 +44,16 @@ export interface ScheduleForm {
   location: string;
   is_virtual: boolean;
   /**
+   * Video provider chosen for this schedule. `null` when the host has
+   * not picked one yet, or when the schedule is manual (pasted link).
+   *
+   * Populated by the platform picker in the delivery-mode section.
+   * Sent to the backend on create and update so the backend can route
+   * to the correct provider or preserve the existing meeting's
+   * platform.
+   */
+  platform: VideoPlatform | null;
+  /**
    * Manual override. When empty and is_virtual is true, the backend
    * auto-creates a meeting on the host's connected account. When set,
    * the backend uses the pasted link and skips auto-creation.
@@ -68,6 +80,7 @@ export function makeEmptySchedule(timezone = 'Africa/Nairobi'): ScheduleForm {
     session_number: null,
     location: '',
     is_virtual: true,
+    platform: null,
     zoom_link: '',
     meet_link: '',
     max_attendees: null,
@@ -496,8 +509,16 @@ export function deriveInPersonLocation(schedules: ScheduleForm[]): string {
   return '';
 }
 
-/** First virtual platform implied by a schedule link, or ''. */
+/**
+ * First virtual platform implied by a schedule.
+ *
+ * Prefers the explicit `platform` field when set; falls back to link
+ * inspection for schedules created before the field existed.
+ */
 export function deriveVirtualPlatform(schedules: ScheduleForm[]): string {
+  for (const s of schedules) {
+    if (s.platform) return s.platform;
+  }
   for (const s of schedules) {
     if (s.zoom_link) return 'zoom';
     if (s.meet_link) return 'google_meet';

@@ -127,18 +127,22 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const image = useEventImage(formState.setErrors);
   const validation = useEventValidation(formState.formData);
 
-  const hydration = useEventHydration(
-    eventId,
-    (mapped) => {
-      formState.setFormData(mapped);
-    },
-    (mapped) => {
-      // eslint-disable-next-line react-hooks/immutability
-      autoSave.setLastSavedData(mapped);
-      autoSave.setSaveStatus('saved');
-    },
-  );
-
+  // ------------------------------------------------------------------
+  // Auto-save is declared BEFORE hydration on purpose.
+  //
+  // React runs effects in the order their hooks were declared. If
+  // useAutoSave is declared after useEventHydration, the auto-save
+  // effect runs on the same commit as the hydration effect — before
+  // the hydrated state has been applied. It then sees the initial
+  // empty form as "changed" and writes it to the backend, clobbering
+  // the loaded schedules on soft navigation.
+  //
+  // Declaring auto-save first guarantees:
+  //   1. `autoSave.setLastSavedData` in the hydration callback refers
+  //      to an initialized object.
+  //   2. On the commit where hydration runs, the auto-save effect
+  //      fires AFTER and sees the hydrated values.
+  // ------------------------------------------------------------------
   const autoSave = useAutoSave({
     formData: formState.formData,
     draft,
@@ -146,6 +150,17 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
     submitInFlightRef,
     onDraftCreated: setCreatedEventId,
   });
+
+  const hydration = useEventHydration(
+    eventId,
+    (mapped) => {
+      formState.setFormData(mapped);
+    },
+    (mapped) => {
+      autoSave.setLastSavedData(mapped);
+      autoSave.setSaveStatus('saved');
+    },
+  );
 
   const submit = useEventSubmit({
     formData: formState.formData,

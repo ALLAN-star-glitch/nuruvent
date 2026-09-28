@@ -35,6 +35,7 @@ import type {
   BulkIDsRequest,
   GenerateEventDraftResult,
   GenerateEventDraftRequest,
+  VideoPlatform,
 } from '@/lib/types/events';
 
 // ============================================================
@@ -345,17 +346,21 @@ export const eventsApi = api.injectEndpoints({
      * already have one. Idempotent — schedules with an existing
      * meeting are skipped.
      */
-    createEventMeeting: builder.mutation<BaseResponse<Event>, string>({
-      query: (id) => ({
-        url: `/events/${id}/meeting`,
-        method: 'POST',
-      }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: 'Events', id },
-        { type: 'Events', id: 'LIST' },
-        { type: 'Events', id: 'MINE' },
-      ],
-    }),
+  createEventMeeting: builder.mutation<
+  BaseResponse<Event>,
+  { eventId: string; platform: VideoPlatform }
+>({
+  query: ({ eventId, platform }) => ({
+    url: `/events/${eventId}/meeting`,
+    method: 'POST',
+    body: { platform },
+  }),
+  invalidatesTags: (_result, _error, { eventId }) => [
+    { type: 'Events', id: eventId },
+    { type: 'Events', id: 'LIST' },
+    { type: 'Events', id: 'MINE' },
+  ],
+}),
 
     /**
      * DELETE /events/{id}/meeting

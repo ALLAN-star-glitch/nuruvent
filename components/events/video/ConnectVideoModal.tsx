@@ -65,7 +65,7 @@ const PLATFORM_META: Record<
   google_meet: {
     label: 'Google Meet',
     helpText:
-      'Connect your Google account to create Meet links automatically. (Coming soon)',
+      'Connect your Google account to create Meet links automatically for every virtual session.',
   },
   microsoft_teams: {
     label: 'Microsoft Teams',
@@ -104,7 +104,7 @@ export function ConnectVideoModal({
 
   const connection = video.getConnection(platform);
   const meta = PLATFORM_META[platform];
-  const isUnsupported = platform === 'google_meet';
+  const isUnsupported = platform === 'microsoft_teams' || platform === 'webex';
 
   const handleConnect = async () => {
     await video.connect(platform, toAbsoluteUrl(returnUrl));

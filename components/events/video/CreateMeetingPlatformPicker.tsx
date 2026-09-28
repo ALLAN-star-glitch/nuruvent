@@ -57,7 +57,7 @@ export const PLATFORMS: PlatformMeta[] = [
     label: 'Google Meet',
     description:
       'Create Google Meet links automatically for your virtual sessions.',
-    available: true,   // ← changed from false
+    available: true,
     logo: '/platforms/google-meet.png',
   },
   {
@@ -335,8 +335,8 @@ export function PlatformPickerModal({
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
                   <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                   <p className="text-xs text-muted-foreground">
-                    {selectedMeta.label} support is coming soon. Only Zoom is
-                    available today.
+                    {selectedMeta.label} support is coming soon. Zoom and
+                    Google Meet are available today.
                   </p>
                 </div>
               )}

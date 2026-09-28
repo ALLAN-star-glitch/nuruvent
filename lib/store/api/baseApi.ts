@@ -57,6 +57,7 @@ export const api = createApi({
     'Orders',
     'Payments',
     'VideoConnections', 
+    'Event'
       ],
   endpoints: () => ({}),
 });

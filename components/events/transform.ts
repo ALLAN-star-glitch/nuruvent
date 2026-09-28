@@ -34,7 +34,7 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
   if (!usable.length) return undefined;
 
   return usable.map((s) => ({
-    id: s.id || undefined,              // ← the fix
+    id: s.id || undefined,
     start_date: s.start_date,
     end_date: s.end_date || undefined,
     start_time: s.start_time,
@@ -44,6 +44,13 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
     is_virtual: s.is_virtual,
+    // Only send platform when auto-creating. If a manual link is
+    // present, the backend ignores the platform anyway; omitting it
+    // keeps the request clean and unambiguous.
+    platform:
+      s.is_virtual && !s.zoom_link && !s.meet_link && s.platform
+        ? s.platform
+        : undefined,
     zoom_link: s.zoom_link || undefined,
     meet_link: s.meet_link || undefined,
     max_attendees: s.max_attendees ?? undefined,
@@ -391,8 +398,9 @@ export function mapAIDraftToForm(
         session_number: s.session_number ?? null,
         location: s.location ?? '',
         is_virtual: s.is_virtual ?? false,
-        // Left blank on purpose. The backend creates the meeting if
-        // the schedule is virtual and the host is connected.
+        // The AI does not choose a platform; the host does. Leave
+        // it empty so the picker prompts on first edit.
+        platform: null,
         zoom_link: '',
         meet_link: '',
         max_attendees: s.max_attendees ?? null,

@@ -2,28 +2,41 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
   ArrowRight,
   CalendarClock,
+  Check,
+  Copy,
   ExternalLink,
   ChevronDown,
   ChevronRight,
   Link2,
+  Loader2,
   Pencil,
   Plug,
   Plus,
+  RefreshCw,
+  Send,
   Sparkles,
   Trash2,
   Video,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import type { VideoPlatform } from '@/lib/types/events';
+
+import {
+  useCreateEventMeetingMutation,
+  useDeleteEventMeetingMutation,
+  useRegenerateEventMeetingMutation,
+} from '@/lib/store/api/eventsApi';
 
 import {
   DateField,
@@ -40,6 +53,43 @@ import { useVideoConnection } from '../video/useVideoConnection';
 import { PLATFORMS, type PlatformMeta } from '../video/PlatformPickerModal';
 
 // ============================================================
+// HELPERS
+// ============================================================
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
+  try {
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard &&
+      window.isSecureContext
+    ) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function scheduleLink(s: ScheduleForm): string | undefined {
+  return s.zoom_link || s.meet_link || undefined;
+}
+
+// ============================================================
 // SCHEDULE FIELD (events)
 // ============================================================
 
@@ -48,6 +98,16 @@ interface SchedulesFieldProps extends FieldBaseProps {
   onChange: (value: ScheduleForm[]) => void;
   /** Called when the host wants to open the platform picker. */
   onOpenConnectModal?: () => void;
+  /**
+   * The persisted event ID. Undefined for a new event that hasn't been
+   * saved yet. Meeting actions require this.
+   */
+  eventId?: string;
+  /**
+   * Called after a meeting action completes, so the parent refetches
+   * the event and updates the schedule rows.
+   */
+  onMeetingChanged?: () => void;
 }
 
 const MAX_SCHEDULES = 20;
@@ -59,17 +119,64 @@ export function SchedulesField({
   disabled,
   id,
   onOpenConnectModal,
+  eventId,
+  onMeetingChanged,
 }: SchedulesFieldProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [pendingRemoveKey, setPendingRemoveKey] = useState<string | null>(null);
   const [manualMode, setManualMode] = useState<Record<string, boolean>>({});
 
+  const [runningSessionKey, setRunningSessionKey] = useState<string | null>(
+    null,
+  );
+  const [copiedSessionKey, setCopiedSessionKey] = useState<string | null>(null);
+
   const video = useVideoConnection();
 
-  const schedules = useMemo(
+  const [createEventMeeting] = useCreateEventMeetingMutation();
+  const [deleteEventMeeting] = useDeleteEventMeetingMutation();
+  const [regenerateEventMeeting] = useRegenerateEventMeetingMutation();
+
+  const schedules: ScheduleForm[] = useMemo(
     () => (value.length > 0 ? value : [makeEmptySchedule()]),
     [value],
   );
+
+  // ------------------------------------------------------------------
+  // Default the platform for every virtual schedule without one.
+  //
+  // Guarded against running before the parent has hydrated the real
+  // event. A schedule from the API always carries an `id`; the empty
+  // fallback (makeEmptySchedule) has `id: undefined`. Without this
+  // check, the effect fires on mount with the empty fallback and
+  // pushes a state change into the parent, which races with hydration
+  // and can clobber the loaded schedules via the auto-save engine.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (value.length === 0) return;
+
+    const hasRealSchedule = value.some((s) => !!s.id);
+    if (!hasRealSchedule) return;
+
+    const firstConnected = PLATFORMS.find(
+      (p) => p.available && !!video.getConnection(p.platform),
+    );
+    if (!firstConnected) return;
+
+    let changed = false;
+    const next = value.map((s) => {
+      if (s.is_virtual && !s.platform && !s.zoom_link && !s.meet_link) {
+        changed = true;
+        return { ...s, platform: firstConnected.platform };
+      }
+      return s;
+    });
+
+    if (changed) {
+      onChange(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, video]);
 
   const update = <K extends keyof ScheduleForm>(
     key: string,
@@ -109,6 +216,90 @@ export function SchedulesField({
     setOpenKey((current) => (current === key ? null : key));
   };
 
+  // ============================================================
+  // MEETING ACTION HANDLERS
+  // ============================================================
+
+  const handleCreateMeetingForSession = async (
+    sessionKey: string,
+    platform: VideoPlatform,
+  ) => {
+    if (!eventId) return;
+    setRunningSessionKey(sessionKey);
+    const label =
+      PLATFORMS.find((p) => p.platform === platform)?.label ?? platform;
+    const t = toast.loading(`Creating ${label} meeting…`);
+    try {
+      await createEventMeeting({ eventId, platform }).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting created');
+      onMeetingChanged?.();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to create meeting';
+      toast.error(msg);
+    } finally {
+      setRunningSessionKey(null);
+    }
+  };
+
+  const handleRegenerateMeetingForSession = async (sessionKey: string) => {
+    if (!eventId) return;
+    setRunningSessionKey(sessionKey);
+    const t = toast.loading('Regenerating meeting…');
+    try {
+      await regenerateEventMeeting(eventId).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting regenerated');
+      onMeetingChanged?.();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to regenerate meeting';
+      toast.error(msg);
+    } finally {
+      setRunningSessionKey(null);
+    }
+  };
+
+  const handleDeleteMeetingForSession = async (sessionKey: string) => {
+    if (!eventId) return;
+    setRunningSessionKey(sessionKey);
+    const t = toast.loading('Deleting meeting…');
+    try {
+      await deleteEventMeeting(eventId).unwrap();
+      toast.dismiss(t);
+      toast.success('Meeting deleted');
+      onMeetingChanged?.();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to delete meeting';
+      toast.error(msg);
+    } finally {
+      setRunningSessionKey(null);
+    }
+  };
+
+  const handleCopySessionLink = async (sessionKey: string, link: string) => {
+    const ok = await copyToClipboard(link);
+    if (ok) {
+      setCopiedSessionKey(sessionKey);
+      toast.success('Join link copied');
+      setTimeout(() => setCopiedSessionKey(null), 2000);
+    } else {
+      toast.error('Could not copy the link');
+    }
+  };
+
+  const sessionsMissingMeeting = value.filter(
+    (s) => s.is_virtual && !s.video_meeting_id,
+  ).length;
+
   return (
     <div id={fieldId('schedules', id)} className="space-y-3">
       {/* Section header */}
@@ -135,6 +326,8 @@ export function SchedulesField({
 
           const displayName =
             schedule.session_name?.trim() || `Session ${index + 1}`;
+
+          const otherSessionsMissing = Math.max(0, sessionsMissingMeeting - 1);
 
           return (
             <div
@@ -175,7 +368,7 @@ export function SchedulesField({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span
                         className={cn(
                           'text-sm truncate',
@@ -351,37 +544,6 @@ export function SchedulesField({
                     disabled={disabled}
                   />
 
-                  {/* Current meeting info — only shown when a meeting exists */}
-                  {schedule.video_meeting_id && (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                            Linked Zoom Meeting
-                          </p>
-                          <p className="font-mono text-sm text-foreground mt-0.5">
-                            {schedule.video_meeting_id}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Changes to the session time or name update this
-                            meeting automatically.
-                          </p>
-                        </div>
-                        {schedule.zoom_link && (
-                          <a
-                            href={schedule.zoom_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                            Open
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   <DeliveryModeSection
                     schedule={schedule}
                     index={index}
@@ -400,11 +562,15 @@ export function SchedulesField({
                         ...(on
                           ? {}
                           : {
+                              platform: null,
                               zoom_link: '',
                               meet_link: '',
                               video_meeting_id: null,
                             }),
                       })
+                    }
+                    onSelectPlatform={(platform) =>
+                      update(schedule._key, 'platform', platform)
                     }
                     onUpdateZoomLink={(v) =>
                       update(schedule._key, 'zoom_link', v)
@@ -420,6 +586,30 @@ export function SchedulesField({
                       })
                     }
                     onOpenConnectModal={onOpenConnectModal}
+                    isPersisted={!!eventId}
+                    isMeetingActionRunning={
+                      runningSessionKey === schedule._key
+                    }
+                    otherSessionsMissingMeeting={otherSessionsMissing}
+                    copied={copiedSessionKey === schedule._key}
+                    onCreateMeeting={() => {
+                      if (schedule.platform) {
+                        handleCreateMeetingForSession(
+                          schedule._key,
+                          schedule.platform,
+                        );
+                      }
+                    }}
+                    onRegenerateMeeting={() =>
+                      handleRegenerateMeetingForSession(schedule._key)
+                    }
+                    onDeleteMeeting={() =>
+                      handleDeleteMeetingForSession(schedule._key)
+                    }
+                    onCopyMeetingLink={() => {
+                      const link = scheduleLink(schedule);
+                      if (link) handleCopySessionLink(schedule._key, link);
+                    }}
                   />
 
                   <TextField
@@ -480,10 +670,20 @@ interface DeliveryModeSectionProps {
   manualMode: boolean;
   setManualMode: (on: boolean) => void;
   onToggleVirtual: (on: boolean) => void;
+  onSelectPlatform: (platform: VideoPlatform) => void;
   onUpdateZoomLink: (v: string) => void;
   onUpdateMeetLink: (v: string) => void;
   onClearMeeting: () => void;
   onOpenConnectModal?: () => void;
+
+  isPersisted: boolean;
+  isMeetingActionRunning: boolean;
+  otherSessionsMissingMeeting: number;
+  copied: boolean;
+  onCreateMeeting: () => void;
+  onRegenerateMeeting: () => void;
+  onDeleteMeeting: () => void;
+  onCopyMeetingLink: () => void;
 }
 
 function DeliveryModeSection({
@@ -494,10 +694,19 @@ function DeliveryModeSection({
   manualMode,
   setManualMode,
   onToggleVirtual,
+  onSelectPlatform,
   onUpdateZoomLink,
   onUpdateMeetLink,
   onClearMeeting,
   onOpenConnectModal,
+  isPersisted,
+  isMeetingActionRunning,
+  otherSessionsMissingMeeting,
+  copied,
+  onCreateMeeting,
+  onRegenerateMeeting,
+  onDeleteMeeting,
+  onCopyMeetingLink,
 }: DeliveryModeSectionProps) {
   return (
     <div className="rounded-xl border border-border overflow-hidden bg-card">
@@ -540,10 +749,19 @@ function DeliveryModeSection({
           video={video}
           manualMode={manualMode}
           setManualMode={setManualMode}
+          onSelectPlatform={onSelectPlatform}
           onUpdateZoomLink={onUpdateZoomLink}
           onUpdateMeetLink={onUpdateMeetLink}
           onClearMeeting={onClearMeeting}
           onOpenConnectModal={onOpenConnectModal}
+          isPersisted={isPersisted}
+          isMeetingActionRunning={isMeetingActionRunning}
+          otherSessionsMissingMeeting={otherSessionsMissingMeeting}
+          copied={copied}
+          onCreateMeeting={onCreateMeeting}
+          onRegenerateMeeting={onRegenerateMeeting}
+          onDeleteMeeting={onDeleteMeeting}
+          onCopyMeetingLink={onCopyMeetingLink}
         />
       )}
     </div>
@@ -557,10 +775,20 @@ interface DeliveryModeContentProps {
   video: ReturnType<typeof useVideoConnection>;
   manualMode: boolean;
   setManualMode: (on: boolean) => void;
+  onSelectPlatform: (platform: VideoPlatform) => void;
   onUpdateZoomLink: (v: string) => void;
   onUpdateMeetLink: (v: string) => void;
   onClearMeeting: () => void;
   onOpenConnectModal?: () => void;
+
+  isPersisted: boolean;
+  isMeetingActionRunning: boolean;
+  otherSessionsMissingMeeting: number;
+  copied: boolean;
+  onCreateMeeting: () => void;
+  onRegenerateMeeting: () => void;
+  onDeleteMeeting: () => void;
+  onCopyMeetingLink: () => void;
 }
 
 function DeliveryModeContent({
@@ -570,19 +798,32 @@ function DeliveryModeContent({
   video,
   manualMode,
   setManualMode,
+  onSelectPlatform,
   onUpdateZoomLink,
   onUpdateMeetLink,
   onClearMeeting,
   onOpenConnectModal,
+  isPersisted,
+  isMeetingActionRunning,
+  otherSessionsMissingMeeting,
+  copied,
+  onCreateMeeting,
+  onRegenerateMeeting,
+  onDeleteMeeting,
+  onCopyMeetingLink,
 }: DeliveryModeContentProps) {
   const hasLink = !!(schedule.zoom_link?.trim() || schedule.meet_link?.trim());
   const hasMeeting = !!schedule.video_meeting_id;
   const showManual = manualMode || (hasLink && !hasMeeting);
 
-  const connectedPlatform: PlatformMeta | undefined = PLATFORMS.find(
+  const connectedPlatforms: PlatformMeta[] = PLATFORMS.filter(
     (p) => p.available && !!video.getConnection(p.platform),
   );
-  const anyConnected = !!connectedPlatform;
+  const anyConnected = connectedPlatforms.length > 0;
+
+  const selectedPlatform: PlatformMeta | undefined = schedule.platform
+    ? connectedPlatforms.find((p) => p.platform === schedule.platform)
+    : connectedPlatforms[0];
 
   if (showManual) {
     return (
@@ -602,16 +843,26 @@ function DeliveryModeContent({
     );
   }
 
-  if (anyConnected && connectedPlatform) {
-    const connection = video.getConnection(connectedPlatform.platform);
+  if (anyConnected) {
     return (
       <ConnectedState
-        platform={connectedPlatform}
-        email={connection?.external_email ?? ''}
+        schedule={schedule}
+        platforms={connectedPlatforms}
+        selected={selectedPlatform}
+        video={video}
         disabled={disabled}
         hasMeeting={hasMeeting}
+        onSelect={onSelectPlatform}
         onUseManual={() => setManualMode(true)}
         onOpenConnectModal={onOpenConnectModal}
+        isPersisted={isPersisted}
+        isMeetingActionRunning={isMeetingActionRunning}
+        otherSessionsMissingMeeting={otherSessionsMissingMeeting}
+        copied={copied}
+        onCreateMeeting={onCreateMeeting}
+        onRegenerateMeeting={onRegenerateMeeting}
+        onDeleteMeeting={onDeleteMeeting}
+        onCopyMeetingLink={onCopyMeetingLink}
       />
     );
   }
@@ -628,10 +879,6 @@ function DeliveryModeContent({
 // ============================================================
 // STATE 1 — Manual link
 // ============================================================
-//
-// Two rows — Zoom and Google Meet — each with the platform logo next
-// to its input. Only these two are persisted by the backend
-// (`ScheduleInput.zoom_link` / `.meet_link`).
 
 function ManualLinkState({
   schedule,
@@ -748,62 +995,152 @@ function ManualLinkState({
 // ============================================================
 
 function ConnectedState({
-  platform,
-  email,
+  schedule,
+  platforms,
+  selected,
+  video,
   disabled,
   hasMeeting,
+  onSelect,
   onUseManual,
   onOpenConnectModal,
+  isPersisted,
+  isMeetingActionRunning,
+  otherSessionsMissingMeeting,
+  copied,
+  onCreateMeeting,
+  onRegenerateMeeting,
+  onDeleteMeeting,
+  onCopyMeetingLink,
 }: {
-  platform: PlatformMeta;
-  email: string;
+  schedule: ScheduleForm;
+  platforms: PlatformMeta[];
+  selected: PlatformMeta | undefined;
+  video: ReturnType<typeof useVideoConnection>;
   disabled?: boolean;
   hasMeeting: boolean;
+  onSelect: (platform: VideoPlatform) => void;
   onUseManual: () => void;
   onOpenConnectModal?: () => void;
+  isPersisted: boolean;
+  isMeetingActionRunning: boolean;
+  otherSessionsMissingMeeting: number;
+  copied: boolean;
+  onCreateMeeting: () => void;
+  onRegenerateMeeting: () => void;
+  onDeleteMeeting: () => void;
+  onCopyMeetingLink: () => void;
 }) {
-  return (
-    <div className="p-4 border-t border-border bg-primary/5">
-      <div className="flex items-start gap-3">
-        <div className="h-10 w-10 rounded-lg bg-background border border-border flex items-center justify-center p-1.5 shrink-0">
-          <Image
-            src={platform.logo}
-            alt={`${platform.label} logo`}
-            width={32}
-            height={32}
-            className="h-full w-full object-contain"
-          />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-base font-semibold text-foreground">
-            {hasMeeting
-              ? 'Meeting is linked'
-              : 'Meeting will be created automatically'}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Using your {platform.label} account{' '}
-            {email && (
-              <span className="font-medium text-foreground">{email}</span>
-            )}
-            .{' '}
-            {hasMeeting
-              ? 'Changes to this session update the Zoom meeting — the join link stays the same.'
-              : 'The join link appears here when you publish.'}
-          </p>
-        </div>
-      </div>
+  const onlyOne = platforms.length === 1;
+  const meetingLink = schedule.zoom_link || schedule.meet_link || undefined;
 
-      <div className="flex flex-wrap items-center gap-2 mt-4">
+  return (
+    <div className="p-4 border-t border-border bg-primary/5 space-y-4">
+      {onlyOne ? (
+        <SinglePlatformHeader
+          platform={platforms[0]}
+          connection={video.getConnection(platforms[0].platform)}
+          hasMeeting={hasMeeting}
+        />
+      ) : (
+        <>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              Create the meeting on
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You have more than one account connected. Choose which one
+              should host this session.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {platforms.map((p) => {
+              const connection = video.getConnection(p.platform);
+              const isActive = selected?.platform === p.platform;
+
+              return (
+                <button
+                  key={p.platform}
+                  type="button"
+                  onClick={() => onSelect(p.platform)}
+                  disabled={disabled}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all cursor-pointer',
+                    isActive
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                      : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5',
+                  )}
+                >
+                  <div className="h-9 w-9 rounded-lg bg-background border border-border flex items-center justify-center p-1.5 shrink-0">
+                    <Image
+                      src={p.logo}
+                      alt={`${p.label} logo`}
+                      width={28}
+                      height={28}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {p.label}
+                    </p>
+                    {connection && (
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {connection.external_email}
+                      </p>
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      'h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center',
+                      isActive
+                        ? 'border-primary bg-primary'
+                        : 'border-border bg-background',
+                    )}
+                  >
+                    {isActive && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selected && (
+            <p className="text-xs text-muted-foreground">
+              {hasMeeting
+                ? `This session will update on ${selected.label}. The join link stays the same.`
+                : `A ${selected.label} meeting will be created when you publish.`}
+            </p>
+          )}
+        </>
+      )}
+
+      <MeetingActionsInline
+        meetingLink={meetingLink}
+        platform={selected}
+        isPersisted={isPersisted}
+        hasMeeting={hasMeeting}
+        isRunning={isMeetingActionRunning}
+        otherSessionsMissingMeeting={otherSessionsMissingMeeting}
+        onCreate={onCreateMeeting}
+        onRegenerate={onRegenerateMeeting}
+        onDelete={onDeleteMeeting}
+        onCopy={onCopyMeetingLink}
+        copied={copied}
+        disabled={disabled}
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={onUseManual}
           disabled={disabled}
-          className={cn(
-            'cursor-pointer font-semibold h-9',
-            'border-border text-muted-foreground hover:text-foreground hover:bg-accent',
-          )}
+          className="cursor-pointer font-semibold h-9 border-border text-muted-foreground hover:text-foreground hover:bg-accent"
         >
           <Pencil className="h-3.5 w-3.5 mr-1.5" />
           Use a different link
@@ -816,15 +1153,229 @@ function ConnectedState({
             size="sm"
             onClick={onOpenConnectModal}
             disabled={disabled}
-            className={cn(
-              'cursor-pointer font-semibold h-9',
-              'border-primary/40 text-primary hover:bg-primary/5 hover:border-primary',
-            )}
+            className="cursor-pointer font-semibold h-9 border-primary/40 text-primary hover:bg-primary/5 hover:border-primary"
           >
             <Plug className="h-3.5 w-3.5 mr-1.5" />
-            Manage connection
+            Manage connections
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MEETING ACTIONS INLINE
+// ============================================================
+
+function MeetingActionsInline({
+  meetingLink,
+  platform,
+  isPersisted,
+  hasMeeting,
+  isRunning,
+  otherSessionsMissingMeeting,
+  onCreate,
+  onRegenerate,
+  onDelete,
+  onCopy,
+  copied,
+  disabled,
+}: {
+  meetingLink?: string;
+  platform?: PlatformMeta;
+  isPersisted: boolean;
+  hasMeeting: boolean;
+  isRunning: boolean;
+  otherSessionsMissingMeeting: number;
+  onCreate: () => void;
+  onRegenerate: () => void;
+  onDelete: () => void;
+  onCopy: () => void;
+  copied: boolean;
+  disabled?: boolean;
+}) {
+  if (!isPersisted) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-background/60 p-3">
+        <p className="text-xs text-muted-foreground">
+          Save the event first, then you can create and manage meetings
+          for each session.
+        </p>
+      </div>
+    );
+  }
+
+  if (hasMeeting && meetingLink) {
+    return (
+      <div className="rounded-lg border border-border bg-background p-3 space-y-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-foreground">
+            Meeting link
+            {platform && (
+              <span className="text-muted-foreground font-normal ml-1">
+                · {platform.label}
+              </span>
+            )}
+          </p>
+          <div className="mt-1 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5">
+            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+            <p className="text-xs font-mono text-foreground/80 truncate flex-1 min-w-0">
+              {meetingLink}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            onClick={() =>
+              window.open(meetingLink, '_blank', 'noopener,noreferrer')
+            }
+            disabled={disabled || isRunning}
+          >
+            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+            Join
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer h-8 text-xs"
+            onClick={onCopy}
+            disabled={disabled || isRunning}
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                Copy
+              </>
+            )}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer h-8 text-xs"
+            onClick={onRegenerate}
+            disabled={disabled || isRunning}
+          >
+            {isRunning ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                Working…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Regenerate
+              </>
+            )}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer h-8 text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={onDelete}
+            disabled={disabled || isRunning}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Delete
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (otherSessionsMissingMeeting > 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-background/60 p-3">
+        <p className="text-xs text-muted-foreground">
+          This session and {otherSessionsMissingMeeting} other
+          {otherSessionsMissingMeeting === 1 ? '' : 's'} have no meeting
+          yet. Create them all from the event page after saving, or open
+          the detail view.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 space-y-2">
+      <p className="text-xs text-muted-foreground">
+        No meeting yet. It will be created automatically when you publish,
+        or you can create it now.
+      </p>
+      <Button
+        size="sm"
+        className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+        onClick={onCreate}
+        disabled={disabled || isRunning}
+      >
+        {isRunning ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            Creating…
+          </>
+        ) : (
+          <>
+            <Send className="h-3.5 w-3.5 mr-1.5" />
+            Create meeting now
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function SinglePlatformHeader({
+  platform,
+  connection,
+  hasMeeting,
+}: {
+  platform: PlatformMeta;
+  connection: { external_email?: string } | undefined | null;
+  hasMeeting: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="h-10 w-10 rounded-lg bg-background border border-border flex items-center justify-center p-1.5 shrink-0">
+        <Image
+          src={platform.logo}
+          alt={`${platform.label} logo`}
+          width={32}
+          height={32}
+          className="h-full w-full object-contain"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-semibold text-foreground">
+          {hasMeeting
+            ? 'Meeting is linked'
+            : 'Meeting will be created automatically'}
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Using your {platform.label} account
+          {connection?.external_email && (
+            <>
+              {' '}
+              <span className="font-medium text-foreground">
+                {connection.external_email}
+              </span>
+            </>
+          )}
+          .{' '}
+          {hasMeeting
+            ? 'Changes to this session update the meeting — the join link stays the same.'
+            : 'The join link appears here when you publish.'}
+        </p>
       </div>
     </div>
   );

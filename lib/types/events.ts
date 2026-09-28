@@ -162,6 +162,15 @@ export interface Schedule {
   timezone: string;
   location?: string;
   is_virtual: boolean;
+
+  /**
+   * Video provider chosen for this schedule. `undefined` when the
+   * schedule is in-person, or when the host pasted a link manually.
+   *
+   * Pre-select this value in the edit form's provider dropdown.
+   */
+  platform?: VideoPlatform;
+
   zoom_link?: string;
   meet_link?: string;
   /** UUID of the auto-created video meeting. Null when manual. */
@@ -405,6 +414,18 @@ export interface ScheduleInput {
   session_number?: number;
   location?: string;
   is_virtual?: boolean;
+
+  /**
+   * Selects the video provider. Required when `is_virtual` is true
+   * and neither `zoom_link` nor `meet_link` is set — the backend
+   * will auto-create a meeting on the host's connected account for
+   * this platform.
+   *
+   * Leave undefined for in-person sessions and for manually-pasted
+   * links.
+   */
+  platform?: VideoPlatform;
+
   zoom_link?: string;
   meet_link?: string;
   max_attendees?: number;

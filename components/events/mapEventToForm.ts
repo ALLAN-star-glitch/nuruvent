@@ -79,8 +79,8 @@ function toTimeInput(value: string | undefined | null): string {
 function mapSchedule(s: ScheduleModel): ScheduleForm {
   return {
     _key: nextKey('sched'),
-    id: s.id,                                       // ← add
-    video_meeting_id: s.video_meeting_id ?? null,   // ← add
+    id: s.id,
+    video_meeting_id: s.video_meeting_id ?? null,
     start_date: toDateInput(s.start_date),
     end_date: toDateInput(s.end_date),
     start_time: toTimeInput(s.start_time),
@@ -90,6 +90,7 @@ function mapSchedule(s: ScheduleModel): ScheduleForm {
     session_number: s.session_number ?? null,
     location: s.location ?? '',
     is_virtual: s.is_virtual ?? true,
+    platform: s.platform ?? null,   // ← add this
     zoom_link: s.zoom_link ?? '',
     meet_link: s.meet_link ?? '',
     max_attendees: s.max_attendees ?? null,

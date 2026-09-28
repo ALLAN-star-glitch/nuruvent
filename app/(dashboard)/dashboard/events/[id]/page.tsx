@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-render */
 // app/(dashboard)/dashboard/events/[id]/page.tsx
 
 'use client';
@@ -19,7 +20,10 @@ import {
   Loader2,
   Lock,
   MapPin,
+  MoreVertical,
+  Plus,
   Plug,
+  RefreshCw,
   Send,
   Star,
   Trash2,
@@ -42,6 +46,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -69,8 +80,13 @@ import {
   isHostInstitution,
 } from '@/lib/utils/eventDisplay';
 
-import { PlatformPickerModal } from '@/components/events/video/PlatformPickerModal';
+import {
+  PlatformPickerModal,
+  PLATFORMS,
+  type PlatformMeta,
+} from '@/components/events/video/PlatformPickerModal';
 import { useVideoConnection } from '@/components/events/video/useVideoConnection';
+import { AddMeetingDialog } from '@/components/events/video/AddMeetingDialog';
 
 import {
   EditMeetingDialog,
@@ -78,7 +94,6 @@ import {
 } from '@/components/meeting/EditMeetingDialog';
 import { ShareMeetingDialog } from '@/components/meeting/ShareMeetingDialog';
 import { DeleteMeetingDialog } from '@/components/meeting/DeleteMeetingDialog';
-import { MeetingActions } from '@/components/meeting/MeetingActions';
 
 // ============================================================
 // HELPERS
@@ -129,21 +144,37 @@ function getStatusConfig(statusName: string) {
   return map[statusName] ?? map.Draft;
 }
 
-function getPrimaryMeetingLink(event: Event): string | undefined {
-  const virtualSchedule = event.schedules?.find(
-    (s) => s.is_virtual && (s.zoom_link || s.meet_link),
-  );
-  if (virtualSchedule) {
-    return virtualSchedule.zoom_link || virtualSchedule.meet_link || undefined;
-  }
-  return event.zoom_link || event.meet_link || undefined;
+function schedulePlatform(s: Schedule): VideoPlatform | undefined {
+  if (s.platform) return s.platform;
+  if (s.zoom_link) return 'zoom';
+  if (s.meet_link) return 'google_meet';
+  return undefined;
 }
 
-function getMeetingPlatformLabel(event: Event): string {
-  if (!event.is_virtual) return 'In-Person';
-  if (event.zoom_link) return 'Zoom';
-  if (event.meet_link) return 'Google Meet';
-  return 'Virtual';
+function schedulePlatformMeta(s: Schedule): PlatformMeta | undefined {
+  const p = schedulePlatform(s);
+  if (!p) return undefined;
+  return PLATFORMS.find((m) => m.platform === p);
+}
+
+function scheduleMeetingLink(s: Schedule): string | undefined {
+  return s.zoom_link || s.meet_link || undefined;
+}
+
+function isSessionWithMeeting(s: Schedule): boolean {
+  return !!(s.is_virtual && (s.platform || scheduleMeetingLink(s)));
+}
+
+function sessionLabel(s: Schedule, index: number): string {
+  return s.session_name?.trim() || `Session ${index + 1}`;
+}
+
+function sessionTimeLabel(s: Schedule): string {
+  const parts: string[] = [];
+  if (s.start_date) parts.push(s.start_date);
+  if (s.start_time && s.end_time) parts.push(`${s.start_time} – ${s.end_time}`);
+  else if (s.start_time) parts.push(s.start_time);
+  return parts.join(' · ');
 }
 
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -158,7 +189,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
       return true;
     }
   } catch {
-    // fall through to legacy path
+    // fall through
   }
   try {
     const ta = document.createElement('textarea');
@@ -175,8 +206,340 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function isScheduleVirtualWithMeeting(s: Schedule): boolean {
-  return !!(s.is_virtual && (s.zoom_link || s.meet_link));
+// ============================================================
+// CREATE MEETING PLATFORM PICKER
+// ============================================================
+
+interface CreateMeetingPlatformPickerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  platforms: PlatformMeta[];
+  onPick: (platform: VideoPlatform) => void;
+  running: boolean;
+}
+
+function CreateMeetingPlatformPicker({
+  open,
+  onOpenChange,
+  platforms,
+  onPick,
+  running,
+}: CreateMeetingPlatformPickerProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md w-[95vw]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Video className="h-4 w-4 text-primary" />
+            Choose a video platform
+          </DialogTitle>
+          <DialogDescription>
+            We&apos;ll create a meeting for every session that doesn&apos;t
+            have one yet.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 py-2">
+          {platforms.map((p) => {
+            const disabled = running;
+            return (
+              <button
+                key={p.platform}
+                type="button"
+                disabled={disabled}
+                onClick={() => onPick(p.platform)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                  'border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer',
+                )}
+              >
+                <div className="shrink-0 h-10 w-10 rounded-lg flex items-center justify-center bg-background border border-border overflow-hidden p-1.5">
+                  <Image
+                    src={p.logo}
+                    alt={`${p.label} logo`}
+                    width={40}
+                    height={40}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {p.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Create on {p.label}
+                  </p>
+                </div>
+                {running && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={running}
+            className="cursor-pointer"
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
+// SESSION ROW
+// ============================================================
+
+interface SessionRowProps {
+  session: Schedule;
+  index: number;
+  meta: PlatformMeta | undefined;
+  link: string | undefined;
+  running: boolean;
+  copied: boolean;
+  onCopy: (sessionId: string, link: string) => void;
+  onJoin: (link: string) => void;
+  onEdit: (sessionId: string) => void;
+  onShare: (sessionId: string) => void;
+  onRegenerate: (sessionId: string) => void;
+  onDelete: (sessionId: string) => void;
+}
+
+function SessionRow({
+  session,
+  index,
+  meta,
+  link,
+  running,
+  copied,
+  onCopy,
+  onJoin,
+  onEdit,
+  onShare,
+  onRegenerate,
+  onDelete,
+}: SessionRowProps) {
+  const label = sessionLabel(session, index);
+  const time = sessionTimeLabel(session);
+
+  return (
+    <div className="rounded-lg border border-border bg-background/70 overflow-hidden">
+      <div className="p-3 sm:p-4 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              {index === 0 && (
+                <span className="text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded shrink-0">
+                  Primary
+                </span>
+              )}
+              <p className="text-sm font-semibold text-foreground break-words">
+                {label}
+              </p>
+            </div>
+
+            {time && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                <span className="break-words">{time}</span>
+              </p>
+            )}
+          </div>
+
+          {meta && (
+            <div className="shrink-0 flex items-center gap-1.5 px-2 py-1 rounded-md border border-border bg-background">
+              <div className="h-4 w-4">
+                <Image
+                  src={meta.logo}
+                  alt={`${meta.label} logo`}
+                  width={16}
+                  height={16}
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <span className="text-xs font-medium text-foreground hidden sm:inline">
+                {meta.label}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {link ? (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5">
+            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+            <p className="text-xs font-mono text-foreground/80 truncate flex-1 min-w-0">
+              {link}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5">
+            <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0" />
+            <p className="text-xs text-muted-foreground">No meeting yet</p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border px-3 sm:px-4 py-2 flex items-center gap-1.5 flex-wrap bg-muted/20">
+        {link ? (
+          <>
+            <Button
+              size="sm"
+              className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={() => onJoin(link)}
+              disabled={running}
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Join
+            </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer h-8 text-xs"
+              onClick={() => onCopy(session.id, link)}
+              disabled={running}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copy
+                </>
+              )}
+            </Button>
+
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer h-8 text-xs"
+                onClick={() => onEdit(session.id)}
+                disabled={running}
+              >
+                <Edit className="h-3.5 w-3.5 mr-1.5" />
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer h-8 text-xs"
+                onClick={() => onShare(session.id)}
+                disabled={running}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Share
+              </Button>
+            </div>
+
+            <div className="sm:hidden ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer h-8 w-8 p-0"
+                    disabled={running}
+                    aria-label="More actions"
+                  >
+                    <MoreVertical className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => onEdit(session.id)}
+                  >
+                    <Edit className="h-3.5 w-3.5 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => onShare(session.id)}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
+                    Share
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => onRegenerate(session.id)}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                    Regenerate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => onDelete(session.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="hidden sm:block ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="cursor-pointer h-8 w-8 p-0"
+                    disabled={running}
+                    aria-label="More actions"
+                  >
+                    <MoreVertical className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => onRegenerate(session.id)}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                    Regenerate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => onDelete(session.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="cursor-pointer h-8 text-xs"
+            onClick={() => onEdit(session.id)}
+            disabled={running}
+          >
+            <Edit className="h-3.5 w-3.5 mr-1.5" />
+            Edit session
+          </Button>
+        )}
+
+        {running && (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-2" />
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ============================================================
@@ -205,27 +568,31 @@ export default function EventDetailPage({
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedEvent, setCopiedEvent] = useState(false);
-  const [copiedJoin, setCopiedJoin] = useState(false);
   const [publishError, setPublishError] = useState<{
     message: string;
     details: string[];
   } | null>(null);
-  const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] = useState(false);
-
-  // ---- Meeting management state ----
-  const [isMeetingActionRunning, setIsMeetingActionRunning] = useState(false);
-  const [isDeleteMeetingDialogOpen, setIsDeleteMeetingDialogOpen] =
+  const [isPublishErrorDialogOpen, setIsPublishErrorDialogOpen] =
     useState(false);
-  const [isEditMeetingDialogOpen, setIsEditMeetingDialogOpen] = useState(false);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isSavingMeeting, setIsSavingMeeting] = useState(false);
 
-  // ---- Video connection + platform picker ----
+  // ---- Session-scoped state ----
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [sharingSessionId, setSharingSessionId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [runningSessionId, setRunningSessionId] = useState<string | null>(null);
+  const [runningAction, setRunningAction] = useState<
+    'create' | 'edit' | 'share' | 'regenerate' | 'delete' | 'add' | null
+  >(null);
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+
+  // ---- Video connection + platform pickers ----
   const video = useVideoConnection();
   const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
   const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
     null,
   );
+  const [isCreatePickerOpen, setIsCreatePickerOpen] = useState(false);
+  const [isAddMeetingDialogOpen, setIsAddMeetingDialogOpen] = useState(false);
 
   const { data: response, isLoading, error, refetch } = useGetEventByIdQuery(
     eventId,
@@ -240,27 +607,45 @@ export default function EventDetailPage({
 
   const event: Event | undefined = response?.data;
 
-  const publishErrorIsConnectionIssue = !!(
-    publishError?.message
-      ?.toLowerCase()
-      .includes('zoom connection is no longer valid') ||
-    publishError?.details?.some((d) =>
-      d.toLowerCase().includes('zoom connection is no longer valid'),
-    )
-  );
-
   const statusName = event ? getEventStatusName(event) : 'Draft';
   const statusConfig = getStatusConfig(statusName);
   const isDraft = event ? isEventDraft(event) : false;
   const isPublished = event ? isEventPublished(event) : false;
 
-  const zoomConnection = video.getConnection('zoom');
-  const hasZoomConnection = !!zoomConnection;
+  const hasZoomConnection = !!video.getConnection('zoom');
+  const hasMeetConnection = !!video.getConnection('google_meet');
+  const hasAnyConnection = hasZoomConnection || hasMeetConnection;
 
-  const openZoomPicker = () => {
-    setPickedPlatform('zoom');
+  const connectedPlatformMetas: PlatformMeta[] = PLATFORMS.filter(
+    (p) => p.available && !!video.getConnection(p.platform),
+  );
+
+  const editingSession = event?.schedules?.find(
+    (s) => s.id === editingSessionId,
+  );
+  const sharingSession = event?.schedules?.find(
+    (s) => s.id === sharingSessionId,
+  );
+
+  const openPlatformPicker = () => {
+    setPickedPlatform(null);
     setIsPlatformPickerOpen(true);
   };
+
+  const publishErrorIsConnectionIssue = (() => {
+    const patterns = [
+      'connection is no longer valid',
+      'not connected',
+      'reconnect',
+    ];
+    const haystack = [
+      publishError?.message ?? '',
+      ...(publishError?.details ?? []),
+    ]
+      .join(' ')
+      .toLowerCase();
+    return patterns.some((p) => haystack.includes(p));
+  })();
 
   // ============================================================
   // HANDLERS
@@ -277,20 +662,17 @@ export default function EventDetailPage({
 
     try {
       await publishEvent(event.id).unwrap();
-
       toast.dismiss(loadingToast);
       toast.success(
         `"${event.display_name || event.name}" published successfully!`,
         { duration: 4000, position: 'top-right' },
       );
-
       refetch();
     } catch (err: unknown) {
       console.error('Failed to publish event:', err);
       toast.dismiss(loadingToast);
 
       const errData = (err as { data?: unknown })?.data;
-
       let errorMessage = 'Failed to publish event';
       let errorDetails: string[] = [];
 
@@ -368,47 +750,34 @@ export default function EventDetailPage({
     }
   };
 
-  const handleCopyJoinLink = async () => {
-    if (!event) return;
-    const link = getPrimaryMeetingLink(event);
-    if (!link) {
-      toast.error('No meeting link yet');
-      return;
-    }
+  const handleCopySessionLink = async (sessionId: string, link: string) => {
     const ok = await copyToClipboard(link);
     if (ok) {
-      setCopiedJoin(true);
-      toast.success('Join link copied to clipboard');
-      setTimeout(() => setCopiedJoin(false), 2000);
+      setCopiedSessionId(sessionId);
+      toast.success('Join link copied');
+      setTimeout(() => setCopiedSessionId(null), 2000);
     } else {
       toast.error('Could not copy the link');
     }
   };
 
-  const handleCreateMeeting = async () => {
-    if (!event) return;
-    setIsMeetingActionRunning(true);
-    const t = toast.loading('Creating Zoom meeting…');
-    try {
-      await createEventMeeting(event.id).unwrap();
-      toast.dismiss(t);
-      toast.success('Meeting created successfully');
-      refetch();
-    } catch (err: unknown) {
-      toast.dismiss(t);
-      const msg =
-        (err as { data?: { message?: string } })?.data?.message ??
-        'Failed to create meeting';
-      toast.error(msg);
-    } finally {
-      setIsMeetingActionRunning(false);
-    }
+  const handleJoinLink = (link: string) => {
+    window.open(link, '_blank', 'noopener,noreferrer');
   };
 
-  const handleRegenerateMeeting = async () => {
+  const handleEditSession = (sessionId: string) => {
+    setEditingSessionId(sessionId);
+  };
+
+  const handleShareSession = (sessionId: string) => {
+    setSharingSessionId(sessionId);
+  };
+
+  const handleRegenerateSession = async (sessionId: string) => {
     if (!event) return;
-    setIsMeetingActionRunning(true);
-    const t = toast.loading('Regenerating Zoom meeting…');
+    setRunningSessionId(sessionId);
+    setRunningAction('regenerate');
+    const t = toast.loading('Regenerating meeting…');
     try {
       await regenerateEventMeeting(event.id).unwrap();
       toast.dismiss(t);
@@ -421,19 +790,25 @@ export default function EventDetailPage({
         'Failed to regenerate meeting';
       toast.error(msg);
     } finally {
-      setIsMeetingActionRunning(false);
+      setRunningSessionId(null);
+      setRunningAction(null);
     }
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    setDeletingSessionId(sessionId);
   };
 
   const handleDeleteMeeting = async () => {
     if (!event) return;
-    setIsMeetingActionRunning(true);
-    const t = toast.loading('Deleting Zoom meeting…');
+    setRunningSessionId(deletingSessionId);
+    setRunningAction('delete');
+    const t = toast.loading('Deleting meeting…');
     try {
       await deleteEventMeeting(event.id).unwrap();
       toast.dismiss(t);
       toast.success('Meeting deleted');
-      setIsDeleteMeetingDialogOpen(false);
+      setDeletingSessionId(null);
       refetch();
     } catch (err: unknown) {
       toast.dismiss(t);
@@ -442,16 +817,16 @@ export default function EventDetailPage({
         'Failed to delete meeting';
       toast.error(msg);
     } finally {
-      setIsMeetingActionRunning(false);
+      setRunningAction(null);
+      setRunningSessionId(null);
     }
   };
 
   const handleSaveMeeting = async (values: EditMeetingFormValues) => {
-    if (!event) return;
-    const primary = event.schedules?.[0];
-    if (!primary) return;
+    if (!event || !editingSession) return;
 
-    setIsSavingMeeting(true);
+    setRunningSessionId(editingSession.id);
+    setRunningAction('edit');
     const t = toast.loading('Updating meeting…');
     try {
       await updateEvent({
@@ -459,7 +834,7 @@ export default function EventDetailPage({
         data: {
           schedules: [
             {
-              id: primary.id,
+              id: editingSession.id,
               session_name: values.session_name,
               start_date: values.start_date,
               start_time: values.start_time + ':00',
@@ -472,7 +847,7 @@ export default function EventDetailPage({
       }).unwrap();
       toast.dismiss(t);
       toast.success('Meeting updated');
-      setIsEditMeetingDialogOpen(false);
+      setEditingSessionId(null);
       refetch();
     } catch (err: unknown) {
       toast.dismiss(t);
@@ -481,20 +856,181 @@ export default function EventDetailPage({
         'Failed to update meeting';
       toast.error(msg);
     } finally {
-      setIsSavingMeeting(false);
+      setRunningSessionId(null);
+      setRunningAction(null);
     }
   };
 
   const handleShareCopy = async () => {
-    if (!event) return;
-    const link = getPrimaryMeetingLink(event);
-    const text = `Join "${event.display_name || event.name}" on Zoom: ${link ?? ''}`;
+    if (!event || !sharingSession) return;
+    const link = scheduleMeetingLink(sharingSession);
+    const platformLabel = schedulePlatformMeta(sharingSession)?.label ?? 'video';
+    const label = sessionLabel(sharingSession, 0);
+    const text = `Join "${label}" on ${platformLabel}: ${link ?? ''}`;
     const ok = await copyToClipboard(text);
     if (ok) {
       toast.success('Join link copied');
-      setIsShareDialogOpen(false);
+      setSharingSessionId(null);
     } else {
       toast.error('Could not copy the link');
+    }
+  };
+
+  const handleRegenerateAll = async () => {
+    if (!event) return;
+    setRunningAction('regenerate');
+    const t = toast.loading('Regenerating all meetings…');
+    try {
+      await regenerateEventMeeting(event.id).unwrap();
+      toast.dismiss(t);
+      toast.success('Meetings regenerated');
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to regenerate meetings';
+      toast.error(msg);
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!event) return;
+    setRunningAction('delete');
+    const t = toast.loading('Deleting all meetings…');
+    try {
+      await deleteEventMeeting(event.id).unwrap();
+      toast.dismiss(t);
+      toast.success('Meetings deleted');
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to delete meetings';
+      toast.error(msg);
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  const handleCreateMeetings = async () => {
+    if (!event) return;
+    if (connectedPlatformMetas.length === 1) {
+      await createMeetingOnPlatform(connectedPlatformMetas[0].platform);
+      return;
+    }
+    setIsCreatePickerOpen(true);
+  };
+
+  const createMeetingOnPlatform = async (platform: VideoPlatform) => {
+    if (!event) return;
+    setRunningAction('create');
+    const label =
+      PLATFORMS.find((p) => p.platform === platform)?.label ?? platform;
+    const t = toast.loading(`Creating ${label} meetings…`);
+    try {
+      await createEventMeeting({
+        eventId: event.id,
+        platform,
+      }).unwrap();
+      toast.dismiss(t);
+      toast.success('Meetings created successfully');
+      setIsCreatePickerOpen(false);
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to create meetings';
+      toast.error(msg);
+    } finally {
+      setRunningAction(null);
+    }
+  };
+
+  // ------------------------------------------------------------
+  // ADD MEETING
+  // ------------------------------------------------------------
+
+  const handleAddMeeting = async (values: {
+    session_name: string;
+    start_date: string;
+    start_time: string;
+    end_time: string;
+    timezone: string;
+    platform: VideoPlatform;
+  }) => {
+    if (!event) return;
+
+    setRunningAction('add');
+    const platformLabel =
+      PLATFORMS.find((p) => p.platform === values.platform)?.label ??
+      values.platform;
+    const t = toast.loading(`Adding meeting on ${platformLabel}…`);
+
+    try {
+      const existingSchedules = event.schedules ?? [];
+      const nextSessionNumber = existingSchedules.length + 1;
+
+      const nextSchedules = [
+        ...existingSchedules.map((s) => ({
+          id: s.id,
+          session_name: s.session_name,
+          session_number: s.session_number,
+          start_date: s.start_date,
+          end_date: s.end_date,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          timezone: s.timezone,
+          location: s.location,
+          is_virtual: s.is_virtual,
+          platform: s.platform,
+          zoom_link: s.zoom_link,
+          meet_link: s.meet_link,
+          max_attendees: s.max_attendees,
+        })),
+        {
+          session_name: values.session_name,
+          session_number: nextSessionNumber,
+          start_date: values.start_date,
+          end_date: undefined,
+          start_time: values.start_time + ':00',
+          end_time: values.end_time + ':00',
+          timezone: values.timezone,
+          location: '',
+          is_virtual: true,
+          platform: values.platform,
+          zoom_link: '',
+          meet_link: '',
+          max_attendees: undefined,
+        },
+      ];
+
+      await updateEvent({
+        id: event.id,
+        data: { schedules: nextSchedules },
+      }).unwrap();
+
+      await createEventMeeting({
+        eventId: event.id,
+        platform: values.platform,
+      }).unwrap();
+
+      toast.dismiss(t);
+      toast.success('Meeting added');
+      setIsAddMeetingDialogOpen(false);
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to add meeting';
+      toast.error(msg);
+    } finally {
+      setRunningAction(null);
     }
   };
 
@@ -507,7 +1043,9 @@ export default function EventDetailPage({
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading event details...</p>
+          <p className="text-sm text-muted-foreground">
+            Loading event details...
+          </p>
         </div>
       </div>
     );
@@ -516,7 +1054,7 @@ export default function EventDetailPage({
   if (error || !event) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md px-4">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-foreground mb-2">
             Event Not Found
@@ -544,32 +1082,59 @@ export default function EventDetailPage({
   const location = getEventLocation(event);
   const price = getEventMinPrice(event);
 
-  const meetingLink = getPrimaryMeetingLink(event);
-  const meetingPlatform = getMeetingPlatformLabel(event);
-  const virtualSchedules = (event.schedules ?? []).filter(
-    isScheduleVirtualWithMeeting,
+  const virtualSchedulesWithMeeting = (event.schedules ?? []).filter(
+    isSessionWithMeeting,
   );
-  const primaryMeetingId = event.schedules?.[0]?.video_meeting_id;
+  const virtualSchedulesMissingMeeting = (event.schedules ?? []).filter(
+    (s) => s.is_virtual && !isSessionWithMeeting(s),
+  );
+  const hasAnyMeeting = virtualSchedulesWithMeeting.length > 0;
+  const allSessionsHaveMeetings =
+    virtualSchedulesMissingMeeting.length === 0 &&
+    virtualSchedulesWithMeeting.length > 0;
 
-  const shareText = `Join "${event.display_name || event.name}" on Zoom: ${meetingLink ?? ''}`;
+  const platformsUsed = new Set(
+    virtualSchedulesWithMeeting
+      .map((s) => schedulePlatform(s))
+      .filter(Boolean),
+  );
+
+  const meetingSummary = (() => {
+    const totalVirtual = (event.schedules ?? []).filter(
+      (s) => s.is_virtual,
+    ).length;
+    if (totalVirtual === 0) return 'No virtual sessions.';
+    if (!hasAnyMeeting) return 'No meetings created yet.';
+    if (platformsUsed.size === 1) {
+      const p = Array.from(platformsUsed)[0];
+      const label = PLATFORMS.find((m) => m.platform === p)?.label ?? 'video';
+      return `${virtualSchedulesWithMeeting.length} ${
+        virtualSchedulesWithMeeting.length === 1 ? 'session' : 'sessions'
+      } on ${label}.`;
+    }
+    return `${virtualSchedulesWithMeeting.length} sessions on mixed platforms.`;
+  })();
 
   return (
     <div className="w-full">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-accent rounded-lg transition-colors cursor-pointer"
+            className="p-2 hover:bg-accent rounded-lg transition-colors cursor-pointer shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground break-words">
                 {event.display_name || event.name}
               </h1>
-              <Badge variant="outline" className={`${statusConfig.color} border`}>
+              <Badge
+                variant="outline"
+                className={`${statusConfig.color} border`}
+              >
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1 inline-block`}
                 />
@@ -597,7 +1162,6 @@ export default function EventDetailPage({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <Link href={`/dashboard/events/${event.id}/edit`}>
             <Button variant="outline" className="cursor-pointer">
@@ -669,162 +1233,147 @@ export default function EventDetailPage({
           {/* Meeting card */}
           {event.is_virtual && (
             <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
-                    <Video className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-semibold text-foreground">
-                        Meeting
-                      </h3>
-                      <Badge
-                        variant="outline"
-                        className="text-primary border-primary/30 bg-primary/10 text-xs"
-                      >
-                        {meetingPlatform}
-                      </Badge>
-                      {hasZoomConnection && (
-                        <Badge
-                          variant="outline"
-                          className="text-primary border-primary/30 bg-primary/10 text-xs"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Zoom connected
-                        </Badge>
-                      )}
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className="p-2.5 sm:p-3 rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
+                      <Video className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
 
-                    {meetingLink ? (
-                      <>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Share this link with your attendees. They can join
-                          from any browser.
-                        </p>
-                        <p className="text-xs font-mono text-foreground/70 mt-2 truncate bg-background/60 rounded px-2 py-1.5 border border-border">
-                          {meetingLink}
-                        </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold text-foreground">
+                          Meeting
+                        </h3>
 
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                          <Button
-                            size="sm"
-                            className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                            onClick={() =>
-                              window.open(
-                                meetingLink,
-                                '_blank',
-                                'noopener,noreferrer',
-                              )
-                            }
-                          >
-                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                            Join Meeting
-                          </Button>
-                          <Button
-                            size="sm"
+                        {hasZoomConnection && (
+                          <Badge
                             variant="outline"
-                            className="cursor-pointer"
-                            onClick={handleCopyJoinLink}
+                            className="text-primary border-primary/30 bg-primary/10 text-xs"
                           >
-                            {copiedJoin ? (
-                              <>
-                                <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                                Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="h-3.5 w-3.5 mr-1.5" />
-                                Copy Link
-                              </>
-                            )}
-                          </Button>
-                          {primaryMeetingId && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="cursor-pointer"
-                              onClick={() =>
-                                window.open(
-                                  `https://zoom.us/meeting/${primaryMeetingId}`,
-                                  '_blank',
-                                  'noopener,noreferrer',
-                                )
-                              }
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                              View in Zoom
-                            </Button>
-                          )}
-                        </div>
-
-                        {primaryMeetingId && (
-                          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border">
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                                Meeting ID
-                              </p>
-                              <p className="font-mono text-sm text-foreground">
-                                {primaryMeetingId}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                                Platform
-                              </p>
-                              <p className="text-sm text-foreground">
-                                {meetingPlatform}
-                              </p>
-                            </div>
-                          </div>
+                            <Check className="h-3 w-3 mr-1" />
+                            Zoom
+                          </Badge>
                         )}
+                        {hasMeetConnection && (
+                          <Badge
+                            variant="outline"
+                            className="text-primary border-primary/30 bg-primary/10 text-xs"
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Google Meet
+                          </Badge>
+                        )}
+                      </div>
 
-                        <MeetingActions
-                          running={isMeetingActionRunning}
-                          onEdit={() => setIsEditMeetingDialogOpen(true)}
-                          onShare={() => setIsShareDialogOpen(true)}
-                          onRegenerate={handleRegenerateMeeting}
-                          onDelete={() => setIsDeleteMeetingDialogOpen(true)}
-                        />
-                      </>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {meetingSummary}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 w-full sm:w-auto">
+                    {hasAnyConnection ? (
+                      <Button
+                        size="sm"
+                        className="cursor-pointer w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={() => setIsAddMeetingDialogOpen(true)}
+                        disabled={runningAction === 'add'}
+                      >
+                        {runningAction === 'add' ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Adding…
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Add meeting
+                          </>
+                        )}
+                      </Button>
                     ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {isDraft
-                            ? 'A meeting link will be created automatically when you publish this event.'
-                            : 'No meeting link yet. Create one automatically with your connected Zoom account, or paste a link manually in the editor.'}
-                        </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer w-full sm:w-auto"
+                        onClick={openPlatformPicker}
+                      >
+                        <Plug className="h-3.5 w-3.5 mr-1.5" />
+                        Connect platform
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Empty state */}
+                {!hasAnyMeeting &&
+                  (event.schedules ?? []).filter((s) => s.is_virtual).length >
+                    0 && (
+                    <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+                      <div className="flex items-start gap-3">
+                        <Plug className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">
+                            No meetings created yet
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {isDraft
+                              ? 'A meeting will be created automatically for each virtual session when you publish.'
+                              : hasAnyConnection
+                                ? `Create meetings for all ${
+                                    (event.schedules ?? []).filter(
+                                      (s) => s.is_virtual,
+                                    ).length
+                                  } virtual sessions with one click, add a new session with a meeting, or paste links in the editor.`
+                                : 'Connect a video platform to create meetings automatically, or paste links in the editor.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!isDraft && (
                         <div className="flex flex-wrap items-center gap-2 mt-3">
-                          {hasZoomConnection ? (
-                            <Button
-                              size="sm"
-                              className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                              onClick={handleCreateMeeting}
-                              disabled={isMeetingActionRunning}
-                            >
-                              {isMeetingActionRunning ? (
-                                <>
-                                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                  Creating…
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="h-3.5 w-3.5 mr-1.5" />
-                                  Create Meeting
-                                </>
-                              )}
-                            </Button>
+                          {hasAnyConnection ? (
+                            <>
+                              <Button
+                                size="sm"
+                                className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                                onClick={handleCreateMeetings}
+                                disabled={runningAction === 'create'}
+                              >
+                                {runningAction === 'create' ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    Creating…
+                                  </>
+                                ) : (
+                                  <>
+                                    <Send className="h-3.5 w-3.5 mr-1.5" />
+                                    Create meetings
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="cursor-pointer"
+                                onClick={() => setIsAddMeetingDialogOpen(true)}
+                                disabled={runningAction === 'add'}
+                              >
+                                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                Add meeting
+                              </Button>
+                            </>
                           ) : (
                             <Button
                               size="sm"
                               className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                              onClick={openZoomPicker}
+                              onClick={openPlatformPicker}
                             >
                               <Plug className="h-3.5 w-3.5 mr-1.5" />
-                              Manage Connection
+                              Connect a platform
                             </Button>
                           )}
-
                           <Link href={`/dashboard/events/${event.id}/edit`}>
                             <Button
                               size="sm"
@@ -832,61 +1381,149 @@ export default function EventDetailPage({
                               className="cursor-pointer"
                             >
                               <Link2 className="h-3.5 w-3.5 mr-1.5" />
-                              Paste a link manually
+                              Paste links manually
                             </Button>
                           </Link>
                         </div>
-                      </>
-                    )}
-                  </div>
-                </div>
+                      )}
+                    </div>
+                  )}
 
-                {/* All virtual schedules */}
-                {virtualSchedules.length > 1 && (
+                {/* Session list */}
+                {hasAnyMeeting && (
+                  <div className="mt-4 space-y-3">
+                    {virtualSchedulesWithMeeting.map((s, i) => (
+                      <SessionRow
+                        key={s.id}
+                        session={s}
+                        index={i}
+                        meta={schedulePlatformMeta(s)}
+                        link={scheduleMeetingLink(s)}
+                        running={runningSessionId === s.id}
+                        copied={copiedSessionId === s.id}
+                        onCopy={handleCopySessionLink}
+                        onJoin={handleJoinLink}
+                        onEdit={handleEditSession}
+                        onShare={handleShareSession}
+                        onRegenerate={handleRegenerateSession}
+                        onDelete={handleDeleteSession}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Partial state */}
+                {hasAnyMeeting && virtualSchedulesMissingMeeting.length > 0 && (
                   <>
                     <Separator className="my-4" />
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                        All sessions ({virtualSchedules.length})
-                      </p>
-                      <div className="space-y-2">
-                        {virtualSchedules.map((s) => {
-                          const link = s.zoom_link || s.meet_link;
-                          const label =
-                            s.session_name ||
-                            `Session ${s.session_number ?? ''}`.trim();
-                          return (
-                            <div
-                              key={s.id}
-                              className="flex items-center justify-between gap-3 p-2 rounded-lg bg-background/60 border border-border"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">
-                                  {label}
-                                </p>
-                                {s.start_time && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {s.start_time}
-                                    {s.end_time && ` – ${s.end_time}`}
-                                  </p>
-                                )}
-                              </div>
-                              <a
-                                href={link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline shrink-0"
-                              >
-                                <Link2 className="h-3 w-3" />
-                                Join
-                              </a>
-                            </div>
-                          );
-                        })}
+                    <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 sm:p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground">
+                            {virtualSchedulesMissingMeeting.length}{' '}
+                            {virtualSchedulesMissingMeeting.length === 1
+                              ? 'session has no meeting yet'
+                              : 'sessions have no meeting yet'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Create them automatically or paste links in the
+                            editor.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-3">
+                        {hasAnyConnection ? (
+                          <Button
+                            size="sm"
+                            className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                            onClick={handleCreateMeetings}
+                            disabled={runningAction === 'create'}
+                          >
+                            {runningAction === 'create' ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                Creating…
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-3.5 w-3.5 mr-1.5" />
+                                Create meetings
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                            onClick={openPlatformPicker}
+                          >
+                            <Plug className="h-3.5 w-3.5 mr-1.5" />
+                            Connect a platform
+                          </Button>
+                        )}
+                        <Link href={`/dashboard/events/${event.id}/edit`}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="cursor-pointer"
+                          >
+                            <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                            Paste links manually
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   </>
                 )}
+
+                {/* Bulk actions */}
+                {allSessionsHaveMeetings &&
+                  virtualSchedulesWithMeeting.length > 1 && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cursor-pointer"
+                          onClick={handleRegenerateAll}
+                          disabled={runningAction === 'regenerate'}
+                        >
+                          {runningAction === 'regenerate' ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              Regenerating all…
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                              Regenerate all
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={handleDeleteAll}
+                          disabled={runningAction === 'delete'}
+                        >
+                          {runningAction === 'delete' ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              Deleting all…
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                              Delete all
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
               </CardContent>
             </Card>
           )}
@@ -914,11 +1551,11 @@ export default function EventDetailPage({
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <Calendar className="h-4 w-4 text-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Date
                     </p>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-sm font-semibold text-foreground break-words">
                       {formatDate(startDate)}
                     </p>
                   </div>
@@ -932,7 +1569,7 @@ export default function EventDetailPage({
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <Clock className="h-4 w-4 text-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Time
                     </p>
@@ -944,17 +1581,17 @@ export default function EventDetailPage({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="col-span-2 sm:col-span-1">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
                     <MapPin className="h-4 w-4 text-primary" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                       Location
                     </p>
-                    <p className="text-sm font-semibold text-foreground">
+                    <p className="text-sm font-semibold text-foreground break-words">
                       {location}
                     </p>
                   </div>
@@ -1034,7 +1671,6 @@ export default function EventDetailPage({
 
         {/* Right column */}
         <div className="lg:col-span-1 space-y-4">
-          {/* Host card */}
           <Card>
             <CardContent className="p-6">
               <h3 className="text-sm font-semibold text-foreground mb-3">
@@ -1048,11 +1684,11 @@ export default function EventDetailPage({
                     <User className="h-5 w-5 text-primary" />
                   )}
                 </div>
-                <div>
-                  <p className="font-medium text-foreground flex items-center gap-1.5">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
                     {hostName}
                     {hostIsInstitution && (
-                      <BadgeCheck className="h-4 w-4 text-primary" />
+                      <BadgeCheck className="h-4 w-4 text-primary shrink-0" />
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -1065,7 +1701,6 @@ export default function EventDetailPage({
             </CardContent>
           </Card>
 
-          {/* Quick actions */}
           <Card>
             <CardContent className="p-6 space-y-3">
               <h3 className="text-sm font-semibold text-foreground">
@@ -1085,10 +1720,10 @@ export default function EventDetailPage({
                 </Button>
               </Link>
 
-              {event.is_virtual && !meetingLink && !hasZoomConnection && (
+              {event.is_virtual && !hasAnyMeeting && !hasAnyConnection && (
                 <Button
                   className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-                  onClick={openZoomPicker}
+                  onClick={openPlatformPicker}
                 >
                   <Plug className="h-4 w-4 mr-2" />
                   Manage Connection
@@ -1144,26 +1779,6 @@ export default function EventDetailPage({
                 )}
               </Button>
 
-              {event.is_virtual && meetingLink && (
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer"
-                  onClick={handleCopyJoinLink}
-                >
-                  {copiedJoin ? (
-                    <>
-                      <Check className="h-4 w-4 mr-2 text-primary" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Link2 className="h-4 w-4 mr-2" />
-                      Copy Join Link
-                    </>
-                  )}
-                </Button>
-              )}
-
               <Button
                 variant="destructive"
                 className="w-full justify-start cursor-pointer"
@@ -1176,7 +1791,6 @@ export default function EventDetailPage({
             </CardContent>
           </Card>
 
-          {/* Stats */}
           <Card>
             <CardContent className="p-6 space-y-3">
               <h3 className="text-sm font-semibold text-foreground">
@@ -1236,24 +1850,24 @@ export default function EventDetailPage({
 
       {/* Move to trash dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[95vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Trash2 className="h-5 w-5" />
               Move to Trash
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to move this event to trash? You can restore
-              it later from the trash section.
+              Are you sure you want to move this event to trash? You can
+              restore it later from the trash section.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-100 dark:border-amber-900/50">
-              <div className="p-2 bg-amber-100 dark:bg-amber-950/40 rounded-full">
+              <div className="p-2 bg-amber-100 dark:bg-amber-950/40 rounded-full shrink-0">
                 <Trash2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <div>
-                <p className="font-medium text-foreground">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground break-words">
                   {event.display_name || event.name}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -1262,17 +1876,17 @@ export default function EventDetailPage({
               </div>
             </div>
           </div>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-col-reverse sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
-              className="cursor-pointer"
+              className="cursor-pointer w-full sm:w-auto"
             >
               Cancel
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+              className="cursor-pointer w-full sm:w-auto text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -1288,12 +1902,12 @@ export default function EventDetailPage({
         open={isPublishErrorDialogOpen}
         onOpenChange={setIsPublishErrorDialogOpen}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[95vw]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
               {publishErrorIsConnectionIssue
-                ? 'Zoom Connection Required'
+                ? 'Video Connection Required'
                 : 'Cannot Publish Event'}
             </DialogTitle>
             <DialogDescription className="text-destructive">
@@ -1313,7 +1927,7 @@ export default function EventDetailPage({
                     className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded-lg"
                   >
                     <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-destructive" />
-                    <span>{detail}</span>
+                    <span className="break-words">{detail}</span>
                   </li>
                 ))}
               </ul>
@@ -1334,7 +1948,7 @@ export default function EventDetailPage({
                 className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
                 onClick={() => {
                   setIsPublishErrorDialogOpen(false);
-                  openZoomPicker();
+                  openPlatformPicker();
                 }}
               >
                 <Plug className="h-4 w-4 mr-2" />
@@ -1356,27 +1970,35 @@ export default function EventDetailPage({
         </DialogContent>
       </Dialog>
 
-      {/* Meeting management dialogs */}
+      {/* Session-scoped dialogs */}
       <EditMeetingDialog
-        open={isEditMeetingDialogOpen}
-        onOpenChange={setIsEditMeetingDialogOpen}
-        schedule={event.schedules?.[0]}
-        saving={isSavingMeeting}
+        open={editingSessionId !== null}
+        onOpenChange={(open) => !open && setEditingSessionId(null)}
+        schedule={editingSession}
+        saving={runningAction === 'edit'}
         onSave={handleSaveMeeting}
       />
 
       <ShareMeetingDialog
-        open={isShareDialogOpen}
-        onOpenChange={setIsShareDialogOpen}
-        meetingLink={meetingLink}
-        shareText={shareText}
+        open={sharingSessionId !== null}
+        onOpenChange={(open) => !open && setSharingSessionId(null)}
+        meetingLink={
+          sharingSession ? scheduleMeetingLink(sharingSession) : undefined
+        }
+        shareText={
+          sharingSession
+            ? `Join "${sessionLabel(sharingSession, 0)}" on ${
+                schedulePlatformMeta(sharingSession)?.label ?? 'video'
+              }: ${scheduleMeetingLink(sharingSession) ?? ''}`
+            : ''
+        }
         onCopy={handleShareCopy}
       />
 
       <DeleteMeetingDialog
-        open={isDeleteMeetingDialogOpen}
-        onOpenChange={setIsDeleteMeetingDialogOpen}
-        deleting={isMeetingActionRunning}
+        open={deletingSessionId !== null}
+        onOpenChange={(open) => !open && setDeletingSessionId(null)}
+        deleting={runningAction === 'delete'}
         onConfirm={handleDeleteMeeting}
       />
 
@@ -1386,6 +2008,24 @@ export default function EventDetailPage({
         onOpenChange={setIsPlatformPickerOpen}
         returnUrl={`/dashboard/events/${event.id}`}
         initialPlatform={pickedPlatform}
+      />
+
+      {/* Create-meeting platform picker */}
+      <CreateMeetingPlatformPicker
+        open={isCreatePickerOpen}
+        onOpenChange={setIsCreatePickerOpen}
+        platforms={connectedPlatformMetas}
+        onPick={createMeetingOnPlatform}
+        running={runningAction === 'create'}
+      />
+
+      {/* Add-meeting dialog — imported, platform-first layout */}
+      <AddMeetingDialog
+        open={isAddMeetingDialogOpen}
+        onOpenChange={setIsAddMeetingDialogOpen}
+        platforms={connectedPlatformMetas}
+        saving={runningAction === 'add'}
+        onSave={handleAddMeeting}
       />
     </div>
   );
