@@ -139,11 +139,9 @@ function nuruventMeetingUrl(
   const platform = schedulePlatform(schedule);
   if (!platform) return undefined;
 
-  // Prefer the platform meeting number stored on the schedule.
   let meetingNumber = (schedule as { video_meeting_id?: string })
     .video_meeting_id;
 
-  // Fall back: extract from the raw provider link.
   if (!meetingNumber) {
     const raw = rawProviderLink(schedule);
     if (!raw) return undefined;
@@ -164,17 +162,16 @@ function nuruventMeetingUrl(
       : 'https://www.nuruvent.com';
 
   const hostName =
-    (event as { host_name?: string; display_name?: string }).host_name ||
-    (event as { host_name?: string; display_name?: string }).display_name ||
-    '';
+    (event as { host_name?: string }).host_name || '';
 
   const params = new URLSearchParams({
     name: event.display_name || event.name,
     return: `/dashboard/events/${event.id}`,
+    platform,
   });
   if (hostName) params.set('host', hostName);
 
-  return `${origin}/meeting/${meetingNumber}?${params.toString()}`;
+  return `${origin}/meeting/${encodeURIComponent(meetingNumber)}?${params.toString()}`;
 }
 
 // ============================================================

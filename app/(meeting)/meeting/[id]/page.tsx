@@ -1,6 +1,8 @@
 // app/(meeting)/meeting/[id]/page.tsx
 
+import { GoogleMeetRedirect } from './GoogleMeetRedirect';
 import { ZoomMeetingClient } from './ZoomMeetingClient';
+
 
 export default async function MeetingPage({
   params,
@@ -17,10 +19,22 @@ export default async function MeetingPage({
     return Array.isArray(v) ? v[0] : (v ?? '');
   };
 
-  return (
-    <ZoomMeetingClient
-      meetingId={id}
-      returnHref={get('return') || '/dashboard/events'}
-    />
-  );
+  const platform = get('platform');
+  const meetingName = get('name');
+  const hostName = get('host');
+  const returnHref = get('return') || '/dashboard/events';
+
+  if (platform === 'google_meet') {
+    return (
+      <GoogleMeetRedirect
+        meetingId={id}
+        meetingName={meetingName}
+        hostName={hostName}
+        returnHref={returnHref}
+      />
+    );
+  }
+
+  // Zoom (or unknown) → embedded Zoom client
+  return <ZoomMeetingClient meetingId={id} returnHref={returnHref} />;
 }

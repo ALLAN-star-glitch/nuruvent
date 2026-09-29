@@ -221,10 +221,11 @@ function nuruventMeetingUrl(
   const params = new URLSearchParams({
     name: event.display_name || event.name,
     return: `/dashboard/events/${event.id}`,
+    platform,
   });
   if (hostName) params.set('host', hostName);
 
-  return `${origin}/meeting/${meetingNumber}?${params.toString()}`;
+  return `${origin}/meeting/${encodeURIComponent(meetingNumber)}?${params.toString()}`;
 }
 
 function extractZoomMeetingNumber(input: string): string | null {
@@ -1113,23 +1114,25 @@ export default function EventDetailPage({
   // ------------------------------------------------------------
 
   const handleStartMeeting = (session: Schedule) => {
-    if (!event) return;
-    if (!session.video_meeting_id) {
-      toast.error('This session has no meeting yet.');
-      return;
-    }
+  if (!event) return;
+  if (!session.video_meeting_id) {
+    toast.error('This session has no meeting yet.');
+    return;
+  }
 
-    const label = event.display_name || event.name;
-    const hostName = getEventHostName(event);
+  const platform = schedulePlatform(session);       // ← add
+  const label = event.display_name || event.name;
+  const hostName = getEventHostName(event);
 
-    const params = new URLSearchParams({
-      name: label,
-      host: hostName,
-      return: `/dashboard/events/${event.id}`,
-    });
+  const params = new URLSearchParams({
+    name: label,
+    host: hostName,
+    return: `/dashboard/events/${event.id}`,
+  });
+  if (platform) params.set('platform', platform);   // ← add conditionally
 
-    router.push(`/meeting/${session.video_meeting_id}?${params.toString()}`);
-  };
+  router.push(`/meeting/${session.video_meeting_id}?${params.toString()}`);
+};
 
   // ============================================================
   // RENDER
