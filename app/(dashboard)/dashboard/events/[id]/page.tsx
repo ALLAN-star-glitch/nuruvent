@@ -88,7 +88,6 @@ import {
 import { useVideoConnection } from '@/components/events/video/useVideoConnection';
 import { AddMeetingDialog } from '@/components/events/video/AddMeetingDialog';
 
-
 import {
   EditMeetingDialog,
   type EditMeetingFormValues,
@@ -99,11 +98,9 @@ import { DeleteMeetingDialog } from '@/components/meeting/DeleteMeetingDialog';
 import { useAppSelector } from '@/lib/store/hooks';
 import { selectUser } from '@/lib/store/slices/authSlice';
 
-
 // ============================================================
 // HELPERS
 // ============================================================
-
 
 const PUBLIC_SITE_URL =
   process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://nuruvent.com';
@@ -111,10 +108,6 @@ const PUBLIC_SITE_URL =
 function getPublicEventUrl(slug: string): string {
   return `${PUBLIC_SITE_URL}/events/${slug}`;
 }
-
-
-
-
 
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return 'TBD';
@@ -167,12 +160,13 @@ function schedulePlatformMeta(s: Schedule): PlatformMeta | undefined {
   return PLATFORMS.find((m) => m.platform === p);
 }
 
-function scheduleMeetingLink(s: Schedule): string | undefined {
+/** Raw provider link (Zoom/Meet). Internal only — never displayed. */
+function rawProviderLink(s: Schedule): string | undefined {
   return s.zoom_link || s.meet_link || undefined;
 }
 
 function isSessionWithMeeting(s: Schedule): boolean {
-  return !!(s.is_virtual && (s.platform || scheduleMeetingLink(s)));
+  return !!(s.is_virtual && (s.platform || rawProviderLink(s)));
 }
 
 function sessionLabel(s: Schedule, index: number): string {
@@ -185,6 +179,52 @@ function sessionTimeLabel(s: Schedule): string {
   if (s.start_time && s.end_time) parts.push(`${s.start_time} – ${s.end_time}`);
   else if (s.start_time) parts.push(s.start_time);
   return parts.join(' · ');
+}
+
+/**
+ * Build the Nuruvent-hosted meeting URL for a schedule.
+ *
+ * Prefers `video_meeting_id`. Falls back to parsing the raw provider
+ * link. This is what the user sees, copies, shares, and joins.
+ */
+function nuruventMeetingUrl(
+  schedule: Schedule,
+  event: Event,
+): string | undefined {
+  const platform = schedulePlatform(schedule);
+  if (!platform) return undefined;
+
+  let meetingNumber = (schedule as { video_meeting_id?: string })
+    .video_meeting_id;
+
+  if (!meetingNumber) {
+    const raw = rawProviderLink(schedule);
+    if (!raw) return undefined;
+    if (platform === 'zoom') {
+      const m = raw.match(/\/j\/(\d+)/);
+      if (m) meetingNumber = m[1];
+    } else if (platform === 'google_meet') {
+      const m = raw.match(/meet\.google\.com\/([a-z-]+)/i);
+      if (m) meetingNumber = m[1];
+    }
+  }
+
+  if (!meetingNumber) return undefined;
+
+  const origin =
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://www.nuruvent.com';
+
+  const hostName = getEventHostName(event);
+
+  const params = new URLSearchParams({
+    name: event.display_name || event.name,
+    return: `/dashboard/events/${event.id}`,
+  });
+  if (hostName) params.set('host', hostName);
+
+  return `${origin}/meeting/${meetingNumber}?${params.toString()}`;
 }
 
 function extractZoomMeetingNumber(input: string): string | null {
@@ -619,7 +659,6 @@ export default function EventDetailPage({
   >(null);
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
 
-
   // ---- Video connection + platform pickers ----
   const video = useVideoConnection();
   const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
@@ -898,10 +937,10 @@ export default function EventDetailPage({
 
   const handleShareCopy = async () => {
     if (!event || !sharingSession) return;
-    const link = scheduleMeetingLink(sharingSession);
+    const link = nuruventMeetingUrl(sharingSession, event) ?? '';
     const platformLabel = schedulePlatformMeta(sharingSession)?.label ?? 'video';
     const label = sessionLabel(sharingSession, 0);
-    const text = `Join "${label}" on ${platformLabel}: ${link ?? ''}`;
+    const text = `Join "${label}" on ${platformLabel}: ${link}`;
     const ok = await copyToClipboard(text);
     if (ok) {
       toast.success('Join link copied');
@@ -1073,24 +1112,24 @@ export default function EventDetailPage({
   // START MEETING (embedded)
   // ------------------------------------------------------------
 
-const handleStartMeeting = (session: Schedule) => {
-  if (!event) return;                          // ← add this line
-  if (!session.video_meeting_id) {
-    toast.error('This session has no meeting yet.');
-    return;
-  }
+  const handleStartMeeting = (session: Schedule) => {
+    if (!event) return;
+    if (!session.video_meeting_id) {
+      toast.error('This session has no meeting yet.');
+      return;
+    }
 
-  const label = event.display_name || event.name;
-  const hostName = getEventHostName(event);
+    const label = event.display_name || event.name;
+    const hostName = getEventHostName(event);
 
-  const params = new URLSearchParams({
-    name: label,
-    host: hostName,
-    return: `/dashboard/events/${event.id}`,
-  });
+    const params = new URLSearchParams({
+      name: label,
+      host: hostName,
+      return: `/dashboard/events/${event.id}`,
+    });
 
-  router.push(`/meeting/${session.video_meeting_id}?${params.toString()}`);
-};
+    router.push(`/meeting/${session.video_meeting_id}?${params.toString()}`);
+  };
 
   // ============================================================
   // RENDER
@@ -1141,10 +1180,10 @@ const handleStartMeeting = (session: Schedule) => {
   const price = getEventMinPrice(event);
 
   const virtualSchedulesWithMeeting = (event.schedules ?? []).filter(
-    isSessionWithMeeting,
+    (s) => isSessionWithMeeting(s) && nuruventMeetingUrl(s, event),
   );
   const virtualSchedulesMissingMeeting = (event.schedules ?? []).filter(
-    (s) => s.is_virtual && !isSessionWithMeeting(s),
+    (s) => s.is_virtual && !(isSessionWithMeeting(s) && nuruventMeetingUrl(s, event)),
   );
   const hasAnyMeeting = virtualSchedulesWithMeeting.length > 0;
   const allSessionsHaveMeetings =
@@ -1457,7 +1496,7 @@ const handleStartMeeting = (session: Schedule) => {
                         session={s}
                         index={i}
                         meta={schedulePlatformMeta(s)}
-                        link={scheduleMeetingLink(s)}
+                        link={nuruventMeetingUrl(s, event)}
                         running={runningSessionId === s.id}
                         copied={copiedSessionId === s.id}
                         onCopy={handleCopySessionLink}
@@ -2043,13 +2082,15 @@ const handleStartMeeting = (session: Schedule) => {
         open={sharingSessionId !== null}
         onOpenChange={(open) => !open && setSharingSessionId(null)}
         meetingLink={
-          sharingSession ? scheduleMeetingLink(sharingSession) : undefined
+          sharingSession && event
+            ? nuruventMeetingUrl(sharingSession, event)
+            : undefined
         }
         shareText={
-          sharingSession
+          sharingSession && event
             ? `Join "${sessionLabel(sharingSession, 0)}" on ${
                 schedulePlatformMeta(sharingSession)?.label ?? 'video'
-              }: ${scheduleMeetingLink(sharingSession) ?? ''}`
+              }: ${nuruventMeetingUrl(sharingSession, event) ?? ''}`
             : ''
         }
         onCopy={handleShareCopy}

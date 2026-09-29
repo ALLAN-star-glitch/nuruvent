@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
-  title: 'Meeting | Nuruvent',
+  title: 'Meeting',
   robots: 'noindex, nofollow',
 };
 

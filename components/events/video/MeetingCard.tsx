@@ -45,15 +45,12 @@ export interface MeetingCardProps {
   event: Event;
   isDraft: boolean;
 
-  /** Per-platform connection flags. */
   hasZoomConnection: boolean;
   hasMeetConnection: boolean;
   hasAnyConnection: boolean;
 
-  /** Which platforms the user has connected, in display order. */
   connectedPlatforms: PlatformMeta[];
 
-  /** Currently running action, if any. Used to disable buttons. */
   runningSessionId: string | null;
   runningAction:
     | 'create'
@@ -64,19 +61,12 @@ export interface MeetingCardProps {
     | 'add'
     | null;
 
-  /** Which session the user just copied a link for. */
   copiedSessionId: string | null;
 
-  /** Called when the user wants to create meetings for sessions without one. */
   onCreateMeetings: () => void;
-
-  /** Opens the platform picker for connection management. */
   onOpenPlatformPicker: () => void;
-
-  /** Opens the "Add meeting" dialog to create a new schedule + meeting. */
   onAddMeeting: () => void;
 
-  /** Per-session actions. */
   onCopyLink: (sessionId: string, link: string) => void;
   onJoinLink: (link: string) => void;
   onEditSession: (sessionId: string) => void;
@@ -84,11 +74,9 @@ export interface MeetingCardProps {
   onRegenerateSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 
-  /** Bulk actions. */
   onRegenerateAll: () => void;
   onDeleteAll: () => void;
 
-  /** Navigate to the editor for manual link entry. */
   editEventHref: string;
 }
 
@@ -109,12 +97,14 @@ function scheduleMeta(s: Schedule): PlatformMeta | undefined {
   return PLATFORMS.find((m) => m.platform === p);
 }
 
-function scheduleLink(s: Schedule): string | undefined {
+/** Raw provider link (Zoom/Meet). Kept for internal parsing only —
+ *  never displayed to the user. */
+function rawProviderLink(s: Schedule): string | undefined {
   return s.zoom_link || s.meet_link || undefined;
 }
 
 function isSessionWithMeeting(s: Schedule): boolean {
-  return !!(s.is_virtual && (s.platform || scheduleLink(s)));
+  return !!(s.is_virtual && (s.platform || rawProviderLink(s)));
 }
 
 function sessionLabel(s: Schedule, index: number): string {
@@ -127,6 +117,64 @@ function sessionTimeLabel(s: Schedule): string {
   if (s.start_time && s.end_time) parts.push(`${s.start_time} – ${s.end_time}`);
   else if (s.start_time) parts.push(s.start_time);
   return parts.join(' · ');
+}
+
+/**
+ * Build the Nuruvent-hosted meeting URL for a schedule.
+ *
+ * Prefers the platform meeting number stored on the schedule
+ * (`video_meeting_id`). Falls back to extracting it from the raw
+ * provider link (zoom_link / meet_link).
+ *
+ * The URL looks like:
+ *   https://www.nuruvent.com/meeting/{number}?name=...&host=...&return=...
+ *
+ * This is what the user sees, copies, and shares — the raw Zoom
+ * link is never surfaced.
+ */
+function nuruventMeetingUrl(
+  schedule: Schedule,
+  event: Event,
+): string | undefined {
+  const platform = schedulePlatform(schedule);
+  if (!platform) return undefined;
+
+  // Prefer the platform meeting number stored on the schedule.
+  let meetingNumber = (schedule as { video_meeting_id?: string })
+    .video_meeting_id;
+
+  // Fall back: extract from the raw provider link.
+  if (!meetingNumber) {
+    const raw = rawProviderLink(schedule);
+    if (!raw) return undefined;
+    if (platform === 'zoom') {
+      const m = raw.match(/\/j\/(\d+)/);
+      if (m) meetingNumber = m[1];
+    } else if (platform === 'google_meet') {
+      const m = raw.match(/meet\.google\.com\/([a-z-]+)/i);
+      if (m) meetingNumber = m[1];
+    }
+  }
+
+  if (!meetingNumber) return undefined;
+
+  const origin =
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://www.nuruvent.com';
+
+  const hostName =
+    (event as { host_name?: string; display_name?: string }).host_name ||
+    (event as { host_name?: string; display_name?: string }).display_name ||
+    '';
+
+  const params = new URLSearchParams({
+    name: event.display_name || event.name,
+    return: `/dashboard/events/${event.id}`,
+  });
+  if (hostName) params.set('host', hostName);
+
+  return `${origin}/meeting/${meetingNumber}?${params.toString()}`;
 }
 
 // ============================================================
@@ -156,9 +204,14 @@ export function MeetingCard({
   onDeleteAll,
   editEventHref,
 }: MeetingCardProps) {
-  const sessions = (event.schedules ?? []).filter(isSessionWithMeeting);
+  // Sessions that have a meeting AND can be represented as a Nuruvent URL.
+  const sessions = (event.schedules ?? []).filter(
+    (s) => isSessionWithMeeting(s) && nuruventMeetingUrl(s, event),
+  );
   const scheduledVirtual = (event.schedules ?? []).filter((s) => s.is_virtual);
-  const missingMeeting = scheduledVirtual.filter((s) => !isSessionWithMeeting(s));
+  const missingMeeting = scheduledVirtual.filter(
+    (s) => !(isSessionWithMeeting(s) && nuruventMeetingUrl(s, event)),
+  );
 
   const hasAnyMeeting = sessions.length > 0;
   const allScheduledHaveMeetings =
@@ -184,9 +237,7 @@ export function MeetingCard({
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
       <CardContent className="p-4 sm:p-6">
-        {/* ============================================================
-            HEADER
-            ============================================================ */}
+        {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
             <div className="p-2.5 sm:p-3 rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
@@ -223,7 +274,6 @@ export function MeetingCard({
             </div>
           </div>
 
-          {/* Add meeting button — top-right on desktop, full width on mobile */}
           <div className="shrink-0 w-full sm:w-auto">
             {hasAnyConnection ? (
               <Button
@@ -258,9 +308,7 @@ export function MeetingCard({
           </div>
         </div>
 
-        {/* ============================================================
-            EMPTY STATE
-            ============================================================ */}
+        {/* EMPTY STATE */}
         {!hasAnyMeeting && scheduledVirtual.length > 0 && (
           <EmptyMeetingState
             isDraft={isDraft}
@@ -274,34 +322,33 @@ export function MeetingCard({
           />
         )}
 
-        {/* ============================================================
-            SESSION LIST
-            ============================================================ */}
+        {/* SESSION LIST */}
         {hasAnyMeeting && (
           <div className="mt-4 space-y-3">
-            {sessions.map((s, i) => (
-              <SessionRow
-                key={s.id}
-                session={s}
-                index={i}
-                meta={scheduleMeta(s)}
-                link={scheduleLink(s)}
-                running={runningSessionId === s.id ? runningAction : null}
-                copied={copiedSessionId === s.id}
-                onCopy={onCopyLink}
-                onJoin={onJoinLink}
-                onEdit={onEditSession}
-                onShare={onShareSession}
-                onRegenerate={onRegenerateSession}
-                onDelete={onDeleteSession}
-              />
-            ))}
+            {sessions.map((s, i) => {
+              const nuLink = nuruventMeetingUrl(s, event);
+              return (
+                <SessionRow
+                  key={s.id}
+                  session={s}
+                  index={i}
+                  meta={scheduleMeta(s)}
+                  link={nuLink}
+                  running={runningSessionId === s.id ? runningAction : null}
+                  copied={copiedSessionId === s.id}
+                  onCopy={onCopyLink}
+                  onJoin={onJoinLink}
+                  onEdit={onEditSession}
+                  onShare={onShareSession}
+                  onRegenerate={onRegenerateSession}
+                  onDelete={onDeleteSession}
+                />
+              );
+            })}
           </div>
         )}
 
-        {/* ============================================================
-            PARTIAL STATE
-            ============================================================ */}
+        {/* PARTIAL STATE */}
         {hasAnyMeeting && missingMeeting.length > 0 && (
           <>
             <Separator className="my-4" />
@@ -366,9 +413,7 @@ export function MeetingCard({
           </>
         )}
 
-        {/* ============================================================
-            BULK ACTIONS
-            ============================================================ */}
+        {/* BULK ACTIONS */}
         {allScheduledHaveMeetings && sessions.length > 1 && (
           <>
             <Separator className="my-4" />
@@ -559,7 +604,6 @@ function SessionRow({
 
   return (
     <div className="rounded-lg border border-border bg-background/70 overflow-hidden">
-      {/* Top: name, time, platform */}
       <div className="p-3 sm:p-4 space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -615,7 +659,6 @@ function SessionRow({
         )}
       </div>
 
-      {/* Actions */}
       <div className="border-t border-border px-3 sm:px-4 py-2 flex items-center gap-1.5 flex-wrap bg-muted/20">
         {link ? (
           <>
