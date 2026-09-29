@@ -8,16 +8,10 @@ import { PushNotificationManager } from '@/components/PWA/PushNotificationManage
 import Script from 'next/script';
 import StoreProvider from './StoreProvider';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
+import { Toaster } from 'sonner';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -26,52 +20,26 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: {
-    default: 'Nuruvent',
-    template: '%s | Nuruvent',
-  },
+  title: { default: 'Nuruvent', template: '%s | Nuruvent' },
   description: 'Light Your Training Events. Illuminate Your Growth.',
-  keywords: [
-    'training events',
-    'professional development',
-    'workshops',
-    'webinars',
-    'bootcamps',
-    'meetups',
-    'CPD events',
-    'professional training',
-    'Nuruvent',
-    'global training platform',
-  ].join(', '),
   robots: 'index, follow',
-  alternates: {
-    canonical: 'https://nuruvent.com/',
-  },
+  alternates: { canonical: 'https://nuruvent.com/' },
   manifest: '/manifest.webmanifest',
-  icons: {
-    apple: '/icon-192.png',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-  },
-  other: {
-    'msvalidate.01': '7F9BEC1255ABF3C4802D7356DC131BE7',
-  },
+  icons: { apple: '/icon-192.png' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent' },
+  other: { 'msvalidate.01': '7F9BEC1255ABF3C4802D7356DC131BE7' },
 };
-
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Zoom Meeting SDK — Component View */}
+        {/* Zoom Meeting SDK — Client View.
+            Vendor scripts must load before the client bundle. */}
         <Script
           src="https://source.zoom.us/6.2.0/lib/vendor/react.min.js"
           strategy="beforeInteractive"
@@ -92,18 +60,16 @@ export default function RootLayout({
           src="https://source.zoom.us/6.2.0/lib/vendor/lodash.min.js"
           strategy="beforeInteractive"
         />
+        {/* Client View bundle (not the "embedded" bundle) */}
         <Script
-          src="https://source.zoom.us/zoom-meeting-embedded-6.2.0.min.js"
+          src="https://source.zoom.us/6.2.0/zoom-meeting-6.2.0.min.js"
           strategy="beforeInteractive"
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
-        {/* Theme init — runs during HTML parsing, before React hydrates.
-            Rendered as a raw inline script at the top of <body>, not
-            inside a React component, so React does not neuter it. */}
-        <script
-          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
-        />
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+      >
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 
         <StoreProvider>{children}</StoreProvider>
 
@@ -126,6 +92,17 @@ export default function RootLayout({
 
         <InstallPrompt />
         <PushNotificationManager />
+
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          expand={false}
+          duration={4000}
+          visibleToasts={3}
+          theme="system"
+          toastOptions={{ classNames: { toast: 'font-sans' } }}
+        />
       </body>
     </html>
   );

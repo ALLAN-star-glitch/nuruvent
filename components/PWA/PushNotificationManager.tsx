@@ -37,8 +37,34 @@ export function PushNotificationManager() {
 
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       setIsSupported(true)
-      // eslint-disable-next-line react-hooks/immutability
-      registerServiceWorker()
+
+      // ───────────────────────────────────────────────────────
+      // Development: do NOT register the service worker.
+      //
+      // The SW caches Next.js build output and user-scoped
+      // routes in ways that break the dev loop (stale CSS,
+      // stripped query strings, 400s from /_next/image,
+      // user data leaking between logins). None of that
+      // affects production, where we've already verified it
+      // works via GitHub.
+      //
+      // Unregister any lingering SW from a previous session
+      // so it stops intercepting requests immediately.
+      // ───────────────────────────────────────────────────────
+      if (process.env.NODE_ENV !== 'production') {
+        void (async () => {
+          try {
+            const registrations = await navigator.serviceWorker.getRegistrations()
+            await Promise.all(registrations.map((reg) => reg.unregister()))
+          } catch (error) {
+            console.warn('[dev] Failed to unregister SW:', error)
+          }
+        })()
+      } else {
+        // Production: register normally for push notifications.
+        // eslint-disable-next-line react-hooks/immutability
+        registerServiceWorker()
+      }
     }
 
     // Handle resize
@@ -63,7 +89,7 @@ export function PushNotificationManager() {
         updateViaCache: 'none',
       })
 
-      // Proactively ask Vercel if sw.js has changed on app launch
+      // Proactively ask the server if sw.js has changed on app launch
       await registration.update()
 
       const sub = await registration.pushManager.getSubscription()

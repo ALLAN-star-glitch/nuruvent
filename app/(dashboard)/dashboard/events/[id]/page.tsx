@@ -274,6 +274,7 @@ function CreateMeetingPlatformPicker({
                     src={p.logo}
                     alt={`${p.label} logo`}
                     width={40}
+                    unoptimized
                     height={40}
                     className="h-full w-full object-contain"
                   />
@@ -379,6 +380,7 @@ function SessionRow({
                   alt={`${meta.label} logo`}
                   width={16}
                   height={16}
+                  unoptimized
                   className="h-full w-full object-contain"
                 />
               </div>
@@ -1072,17 +1074,22 @@ export default function EventDetailPage({
   // ------------------------------------------------------------
 
 const handleStartMeeting = (session: Schedule) => {
+  if (!event) return;                          // ← add this line
   if (!session.video_meeting_id) {
     toast.error('This session has no meeting yet.');
     return;
   }
 
-  // Pass the display name through the URL so the meeting header
-  // can render it immediately without an extra fetch.
-  const name = sessionLabel(session, 0);   // or a longer label if you prefer
-  const url = `/meeting/${session.video_meeting_id}?name=${encodeURIComponent(name)}`;
+  const label = event.display_name || event.name;
+  const hostName = getEventHostName(event);
 
-  window.open(url, '_blank', 'noopener');
+  const params = new URLSearchParams({
+    name: label,
+    host: hostName,
+    return: `/dashboard/events/${event.id}`,
+  });
+
+  router.push(`/meeting/${session.video_meeting_id}?${params.toString()}`);
 };
 
   // ============================================================
@@ -1272,6 +1279,7 @@ const handleStartMeeting = (session: Schedule) => {
                 src={event.image_url}
                 alt={event.display_name || event.name}
                 fill
+                unoptimized
                 className="object-cover"
               />
             ) : (

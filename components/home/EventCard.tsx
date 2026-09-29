@@ -223,6 +223,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               src={event.image_url}
               alt={event.display_name || event.name}
               fill
+              unoptimized
               className={cn(
                 'object-cover transition-all duration-700 ease-out',
                 isHovered ? 'scale-105' : 'scale-100',

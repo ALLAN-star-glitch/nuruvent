@@ -12,6 +12,7 @@ export function Logo() {
     <Link
       href="/"
       className="inline-flex items-center shrink-0 w-max h-auto pointer-events-auto"
+      aria-label="Nuruvent home"
     >
       <Image
         src={isDark ? '/dark-theme-logo.png' : '/logo.png'}
@@ -19,6 +20,7 @@ export function Logo() {
         width={120}
         height={28}
         priority
+        loading="eager"
       />
     </Link>
   );

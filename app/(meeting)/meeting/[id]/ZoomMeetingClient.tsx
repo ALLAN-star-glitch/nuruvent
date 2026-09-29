@@ -1,145 +1,206 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 // app/(meeting)/meeting/[id]/ZoomMeetingClient.tsx
 
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLazyGetMeetingJoinInfoQuery } from '@/lib/store/api/eventsApi';
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectUser } from '@/lib/store/slices/authSlice';
 
 interface ZoomMeetingClientProps {
   meetingId: string;
+  returnHref: string;
 }
 
-export function ZoomMeetingClient({ meetingId }: ZoomMeetingClientProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const clientRef = useRef<ReturnType<
-    typeof window.ZoomMtgEmbedded.createClient
-  > | null>(null);
-  const startedRef = useRef(false);
+type ZoomMtgGlobal = {
+  setZoomJSLib: (path: string, dir: string) => void;
+  preLoadWasm: () => void;
+  prepareWebSDK: () => void;
+  i18n: {
+    load: (lang: string) => void;
+    reload: (lang: string) => void;
+  };
+  init: (opts: {
+    leaveUrl: string;
+    patchJsMedia?: boolean;
+    success: () => void;
+    error: (err: unknown) => void;
+  }) => void;
+  join: (opts: {
+    signature: string;
+    meetingNumber: string;
+    passWord: string;
+    userName: string;
+    userEmail?: string;
+    zak?: string;
+    tk?: string;
+    success: () => void;
+    error: (err: unknown) => void;
+  }) => void;
+};
 
+export function ZoomMeetingClient({
+  meetingId,
+  returnHref,
+}: ZoomMeetingClientProps) {
+  const user = useAppSelector(selectUser);
+  const startedRef = useRef(false);
+  const didInitRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [joined, setJoined] = useState(false);
-  const [status, setStatus] = useState<string>('Preparing the meeting…');
+  const [status, setStatus] = useState('Preparing meeting…');
 
   const [fetchJoinInfo] = useLazyGetMeetingJoinInfoQuery();
 
-  const start = useCallback(async () => {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      if (!didInitRef.current) {
+        didInitRef.current = true;
+        return;
+      }
+    }
     if (startedRef.current) return;
-    if (!containerRef.current) return;
     startedRef.current = true;
 
-    const ZoomMtgEmbedded = window.ZoomMtgEmbedded;
-    if (!ZoomMtgEmbedded) {
-      setError(
-        'Zoom SDK did not load. The script tags in the meeting layout may be blocked or missing.',
-      );
+    const ZoomMtg = (window as unknown as { ZoomMtg?: ZoomMtgGlobal }).ZoomMtg;
+    if (!ZoomMtg) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError('Zoom SDK did not load.');
       return;
     }
 
-    try {
-      setStatus('Fetching meeting credentials…');
+    let cancelled = false;
 
-      const res = await fetchJoinInfo({ meetingId, platform: 'zoom' }).unwrap();
-      const { meeting_number, signature, sdk_key, zak, password , web_endpoint} = res.data;
+    // Per the docs, leaveUrl must be an absolute URL.
+    const leaveUrl =
+      typeof window !== 'undefined'
+        ? new URL(returnHref, window.location.origin).toString()
+        : returnHref;
 
-      // Temporary diagnostic — remove once the meeting joins cleanly.
-      console.log('[zoom] join params:', {
-        meetingNumber: meeting_number,
-        hasSignature: !!signature,
-        hasSdkKey: !!sdk_key,
-        hasZak: !!zak,
-        password,
-      });
+    (async () => {
+      try {
+        setStatus('Fetching meeting credentials…');
+        const res = await fetchJoinInfo({ meetingId, platform: 'zoom' }).unwrap();
+        if (cancelled) return;
 
-      setStatus('Connecting to Zoom…');
+        const payload = res?.data ?? res;
+        if (!payload) throw new Error('Invalid response received from backend.');
 
-      const client = ZoomMtgEmbedded.createClient();
-      clientRef.current = client;
+        const { meeting_number, signature, password, zak } = payload as Record<
+          string,
+          unknown
+        >;
 
-      await client.init({
-        zoomAppRoot: containerRef.current!,
-        language: 'en-US',
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
-        ...(web_endpoint ? { webEndpoint: web_endpoint } : {}),
-      });
+        if (!signature || !meeting_number) {
+          throw new Error('Backend did not return meeting credentials.');
+        }
 
-      // NOTE: `sdkKey` was removed from JoinOptions in SDK v4.0.0.
-      // The app key is derived from the `appKey` claim inside the
-      // signature JWT, which the backend already sets. Passing it
-      // causes a console warning and is otherwise ignored, so we
-      // omit it here.
-      await client.join({
-        signature,
-        meetingNumber: meeting_number,
-        userName: 'Host',
-        password,                    // ← the passcode (mkLZh1)
-        ...(zak ? { zak } : {}),
-      });
+        const displayName =
+          (user as { name?: string } | null)?.name ||
+          (user as { display_name?: string } | null)?.display_name ||
+          (user as { full_name?: string } | null)?.full_name ||
+          (user as { email?: string } | null)?.email?.split('@')[0] ||
+          'Guest';
 
-      setJoined(true);
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      console.error('Zoom join failed:', err);
-      setError(message);
-    }
-  }, [meetingId, fetchJoinInfo]);
+        // Required setup, in order (per docs):
+        ZoomMtg.setZoomJSLib('https://source.zoom.us/6.2.0/lib', '/av');
+        ZoomMtg.preLoadWasm();
+        ZoomMtg.prepareWebSDK();
+        ZoomMtg.i18n.load('en-US');
+        ZoomMtg.i18n.reload('en-US');
 
-  // Kick off the flow once the container is mounted.
-  useEffect(() => {
-    void start();
+        setStatus('Connecting to Zoom…');
+
+        ZoomMtg.init({
+          leaveUrl,
+          patchJsMedia: true,
+          success: () => {
+            if (cancelled) return;
+
+            ZoomMtg.join({
+              signature: String(signature),
+              meetingNumber: String(meeting_number),
+              passWord: String(password ?? ''),   // ← capital W per docs
+              userName: displayName,
+              ...(zak && typeof zak === 'string' ? { zak } : {}),
+              success: () => {
+                if (!cancelled) setStatus('Joined');
+              },
+              error: (err: unknown) => {
+                console.error('[zoom] join failed', err);
+                setError('Could not join the meeting.');
+              },
+            });
+          },
+          error: (err: unknown) => {
+            console.error('[zoom] init failed', err);
+            setError('Could not initialize the meeting.');
+          },
+        });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[zoom] failed', err);
+        setError(err instanceof Error ? err.message : 'Could not load meeting.');
+      }
+    })();
 
     return () => {
-      if (clientRef.current) {
-        clientRef.current.leaveMeeting().catch(() => {
-          // Best effort — the page is unmounting.
-        });
-        clientRef.current = null;
-      }
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [meetingId, fetchJoinInfo, user, returnHref]);
 
   if (error) {
     return (
-      <div className="meeting-error">
-        <h2>Could not join the meeting</h2>
-        <p>{error}</p>
-        <button type="button" onClick={() => window.close()}>
-          Close tab
-        </button>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#0b0d12',
+          color: '#fff',
+          fontFamily: 'system-ui, sans-serif',
+          padding: 24,
+          textAlign: 'center',
+        }}
+      >
+        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+          Could not join the meeting
+        </h2>
+        <p style={{ color: '#9aa0a6', marginTop: 8 }}>{error}</p>
+        <a
+          href={returnHref}
+          style={{
+            marginTop: 16,
+            padding: '8px 16px',
+            background: '#1A73E8',
+            color: '#fff',
+            borderRadius: 8,
+            textDecoration: 'none',
+            fontSize: 14,
+          }}
+        >
+          Return to event
+        </a>
       </div>
     );
   }
 
   return (
-    <>
-      {!joined && <div className="meeting-loading">{status}</div>}
-      <div
-        id="meetingSDKElement"
-        ref={containerRef}
-        style={{ width: '100%', height: '100%' }}
-      />
-    </>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#000',
+        color: '#fff',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
+      {status}
+    </div>
   );
-}
-
-// Pull a readable message out of whatever RTK Query threw. The
-// shape is either a FetchBaseQueryError (status + data.message) or
-// a SerializedError (message). Fall back to a generic string.
-function extractErrorMessage(err: unknown): string {
-  if (typeof err === 'string') return err;
-  if (err instanceof Error) return err.message;
-
-  if (err && typeof err === 'object') {
-    const data = (err as { data?: unknown }).data;
-    if (data && typeof data === 'object' && 'message' in data) {
-      const msg = (data as { message?: unknown }).message;
-      if (typeof msg === 'string') return msg;
-    }
-    const message = (err as { message?: unknown }).message;
-    if (typeof message === 'string') return message;
-  }
-
-  return 'Could not join the meeting.';
 }

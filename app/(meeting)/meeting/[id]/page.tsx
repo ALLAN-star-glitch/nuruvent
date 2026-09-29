@@ -4,10 +4,23 @@ import { ZoomMeetingClient } from './ZoomMeetingClient';
 
 export default async function MeetingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
 
-  return <ZoomMeetingClient meetingId={id} />;
+  const get = (k: string) => {
+    const v = sp[k];
+    return Array.isArray(v) ? v[0] : (v ?? '');
+  };
+
+  return (
+    <ZoomMeetingClient
+      meetingId={id}
+      returnHref={get('return') || '/dashboard/events'}
+    />
+  );
 }

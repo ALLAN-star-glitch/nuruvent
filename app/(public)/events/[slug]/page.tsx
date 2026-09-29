@@ -499,6 +499,7 @@ export default function EventDetailPage() {
                 <Image
                   src={event.image_url}
                   alt={event.display_name || event.name}
+                  unoptimized
                   fill
                   className="object-cover"
                   priority
