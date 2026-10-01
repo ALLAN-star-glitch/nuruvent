@@ -20,12 +20,13 @@ import {
   CreditCard,
   Copy,
   Check,
-  ExternalLink,
   CalendarPlus,
   Info,
   ChevronRight,
   Loader2,
   AlertCircle,
+  Sparkles,
+  PartyPopper,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -126,6 +127,8 @@ export default function BookingConfirmationPage() {
     ? 'Virtual Event'
     : event.in_person_location || event.venue?.city || 'Location TBD';
 
+  const eventTitle = event.display_name || event.name;
+
   // ---- Handlers ----
   const handlePrint = () => window.print();
 
@@ -139,8 +142,8 @@ export default function BookingConfirmationPage() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Booking Confirmation - ${event.display_name || event.name}`,
-          text: `I've registered for ${event.display_name || event.name}!`,
+          title: `Booking Confirmation - ${eventTitle}`,
+          text: `I've registered for ${eventTitle}!`,
           url: window.location.href,
         });
       } catch {
@@ -160,7 +163,7 @@ export default function BookingConfirmationPage() {
       endDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
     const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-      event.display_name || event.name,
+      eventTitle,
     )}&dates=${startDate}/${endDateStr}&details=${encodeURIComponent(
       event.description || 'Event',
     )}&location=${encodeURIComponent(eventLocation)}`;
@@ -175,276 +178,307 @@ export default function BookingConfirmationPage() {
   return (
     <div
       ref={printRef}
-      className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 py-8 px-4 sm:px-6"
+      className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background py-10 px-4 sm:px-6"
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Top nav */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <Link
             href={`/events/${event.slug}`}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer group"
           >
             <ChevronRight className="h-4 w-4 rotate-180 transition-transform group-hover:-translate-x-0.5" />
-            Back to Event
+            Back to event
           </Link>
           <Badge
             variant="outline"
-            className="text-xs border-primary/30 bg-primary/10 text-primary"
+            className="text-xs border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-400"
           >
             <CheckCircle className="h-3 w-3 mr-1" />
             Confirmed
           </Badge>
         </div>
 
-        <Card className="border-border/60 shadow-xl overflow-hidden bg-card">
+        <Card className="border-border/60 shadow-2xl overflow-hidden bg-card">
           {/* Header banner */}
-          <div className="px-6 py-8 sm:py-10 text-center relative bg-gradient-to-r from-primary to-primary/80">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-background/20 backdrop-blur-sm mb-4">
-              <CheckCircle className="h-10 w-10 text-primary-foreground" />
+          <div className="relative px-6 pt-10 pb-16 text-center overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-primary/80" />
+            <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(circle_at_20%_20%,white_1px,transparent_1px),radial-gradient(circle_at_80%_60%,white_1px,transparent_1px)] [background-size:32px_32px]" />
+
+            <div className="relative">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-background/25 backdrop-blur-sm ring-4 ring-background/10 mb-5 shadow-lg">
+                {isFree ? (
+                  <PartyPopper className="h-10 w-10 text-primary-foreground" />
+                ) : (
+                  <CheckCircle className="h-10 w-10 text-primary-foreground" />
+                )}
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-primary-foreground tracking-tight">
+                {isFree ? "You're in!" : 'Payment confirmed'}
+              </h1>
+              <p className="mt-2 text-primary-foreground/85 text-sm sm:text-base max-w-md mx-auto">
+                {isFree
+                  ? "Your spot is reserved. We can't wait to see you there."
+                  : 'Your ticket is locked in — see you at the event.'}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-primary-foreground">
-              {isFree ? 'Booking Confirmed!' : 'Payment Successful!'}
-            </h1>
-            <p className="mt-1 text-primary-foreground/80">
-              {isFree
-                ? "You're all set for the event"
-                : 'Your ticket has been confirmed'}
-            </p>
-            <div className="absolute bottom-0 left-0 right-0 h-6 bg-card rounded-t-3xl" />
+          </div>
+
+          {/* Ticket stub — the address block overlapping the banner */}
+          <div className="relative -mt-10 px-4 sm:px-6">
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                    Booking reference
+                  </p>
+                  <p className="font-mono font-semibold text-foreground text-sm sm:text-base mt-0.5 truncate">
+                    #{registration.registration_number}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                    Status
+                  </p>
+                  <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                    Confirmed
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <CardContent className="p-6 sm:p-8 space-y-6">
             {/* Quick actions */}
-            <div className="flex flex-wrap items-center justify-center gap-2 pb-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrint}
-                className="h-9 text-xs rounded-full cursor-pointer"
-              >
-                <Printer className="h-3.5 w-3.5 mr-1.5" />
-                Print
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddToCalendar}
-                className="h-9 text-xs rounded-full cursor-pointer"
-              >
-                <CalendarPlus className="h-3.5 w-3.5 mr-1.5" />
-                Add to Calendar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadTicket}
-                className="h-9 text-xs rounded-full cursor-pointer"
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download Ticket
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShare}
-                className="h-9 text-xs rounded-full cursor-pointer"
-              >
-                <Share2 className="h-3.5 w-3.5 mr-1.5" />
-                Share
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <ActionPill onClick={handlePrint} icon={<Printer className="h-3.5 w-3.5" />} label="Print" />
+              <ActionPill onClick={handleAddToCalendar} icon={<CalendarPlus className="h-3.5 w-3.5" />} label="Add to calendar" />
+              <ActionPill onClick={handleDownloadTicket} icon={<Download className="h-3.5 w-3.5" />} label="Download" />
+              <ActionPill onClick={handleShare} icon={<Share2 className="h-3.5 w-3.5" />} label="Share" />
+              <ActionPill
                 onClick={handleCopyLink}
-                className="h-9 text-xs rounded-full cursor-pointer"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy Link
-                  </>
-                )}
-              </Button>
+                icon={copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                label={copied ? 'Copied' : 'Copy link'}
+              />
             </div>
 
             <Separator />
 
-            {/* Success message */}
+            {/* Event title — centred, prominent */}
             <div className="text-center">
-              <p className="text-muted-foreground text-sm sm:text-base">
-                You have successfully registered for{' '}
-                <span className="font-semibold text-foreground">
-                  {event.display_name || event.name}
-                </span>
+              <p className="text-xs uppercase tracking-widest font-semibold text-primary mb-2">
+                You&apos;re attending
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                A confirmation email has been sent to{' '}
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight">
+                {eventTitle}
+              </h2>
+              <p className="mt-3 text-sm text-muted-foreground max-w-lg mx-auto">
+                A confirmation email is on its way to{' '}
                 <span className="font-medium text-foreground">
                   {attendeeEmail || 'your registered email'}
                 </span>
-                .
+                . Your session join links will be included.
               </p>
-              <div className="flex items-center justify-center gap-1 mt-2 text-xs text-muted-foreground">
-                <Info className="h-3 w-3" />
-                <span>
-                  Booking Reference: #{registration.registration_number}
-                </span>
-              </div>
             </div>
 
             <Separator />
 
             {/* Event + Attendee */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-primary/5 border border-primary/10 rounded-xl p-4 space-y-2">
-                <h3 className="font-semibold text-primary text-sm flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Event Details
-                </h3>
-                <div className="space-y-1.5">
-                  {eventDate && (
-                    <div className="flex items-start gap-2 text-sm text-foreground/80">
-                      <Calendar className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
-                      <span>
-                        {new Date(eventDate).toLocaleDateString('en-US', {
+              <InfoPanel
+                icon={<Calendar className="h-4 w-4" />}
+                title="Event details"
+                items={[
+                  {
+                    icon: <Calendar className="h-3.5 w-3.5" />,
+                    label: eventDate
+                      ? new Date(eventDate).toLocaleDateString('en-US', {
                           weekday: 'long',
-                          year: 'numeric',
                           month: 'long',
                           day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  )}
-                  {event.is_virtual ? (
-                    <div className="flex items-start gap-2 text-sm text-foreground/80">
-                      <Video className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
-                      <span>Virtual Event</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-2 text-sm text-foreground/80">
-                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
-                      <span>{eventLocation}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                          year: 'numeric',
+                        })
+                      : 'Date to be confirmed',
+                  },
+                  {
+                    icon: event.is_virtual ? (
+                      <Video className="h-3.5 w-3.5" />
+                    ) : (
+                      <MapPin className="h-3.5 w-3.5" />
+                    ),
+                    label: event.is_virtual ? 'Virtual event' : eventLocation,
+                  },
+                ]}
+              />
 
-              <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-2">
-                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Ticket Holder
-                </h3>
-                <div className="space-y-1.5">
-                  <div className="flex items-start gap-2 text-sm text-foreground/80">
-                    <User className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                    <span>{attendeeName}</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-sm text-foreground/80">
-                    <Mail className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                    <span>{attendeeEmail || '—'}</span>
-                  </div>
-                  {!isFree && (
-                    <div className="flex items-start gap-2 text-sm text-foreground/80">
-                      <Ticket className="h-4 w-4 mt-0.5 flex-shrink-0 text-muted-foreground" />
-                      <span>Paid: {formatPrice(total)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <InfoPanel
+                icon={<User className="h-4 w-4" />}
+                title="Ticket holder"
+                variant="muted"
+                items={[
+                  {
+                    icon: <User className="h-3.5 w-3.5" />,
+                    label: attendeeName,
+                  },
+                  {
+                    icon: <Mail className="h-3.5 w-3.5" />,
+                    label: attendeeEmail || '—',
+                  },
+                  ...(!isFree
+                    ? [
+                        {
+                          icon: <Ticket className="h-3.5 w-3.5" />,
+                          label: `Paid ${formatPrice(total)}`,
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
 
             {/* Payment summary */}
             {!isFree && (
-              <>
-                <Separator />
-                <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
-                    <CreditCard className="h-4 w-4" />
-                    Payment Summary
-                  </h3>
-                  <div className="space-y-2">
-                    {registration.selections.map((sel, i) => (
-                      <div
-                        key={`${sel.ticket_type_id}-${i}`}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span className="text-muted-foreground">
-                          {sel.quantity} × ticket
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {formatPrice(sel.line_total)}
-                        </span>
-                      </div>
-                    ))}
-                    {discount > 0 && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Discount</span>
-                        <span className="font-medium text-primary">
-                          −{formatPrice(discount)}
-                        </span>
-                      </div>
-                    )}
-                    <div className="border-t border-border pt-2 flex items-center justify-between">
-                      <span className="font-semibold text-foreground">
-                        Total Paid
+              <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Payment summary
+                </h3>
+                <div className="space-y-2">
+                  {registration.selections.map((sel, i) => (
+                    <div
+                      key={`${sel.ticket_type_id}-${i}`}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground">
+                        {sel.quantity} × ticket
                       </span>
-                      <span className="font-bold text-primary">
-                        {formatPrice(total)}
+                      <span className="font-medium text-foreground tabular-nums">
+                        {formatPrice(sel.line_total)}
                       </span>
                     </div>
+                  ))}
+                  {discount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Discount</span>
+                      <span className="font-medium text-primary tabular-nums">
+                        −{formatPrice(discount)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t border-border pt-2 flex items-center justify-between">
+                    <span className="font-semibold text-foreground">
+                      Total paid
+                    </span>
+                    <span className="font-bold text-primary tabular-nums">
+                      {formatPrice(total)}
+                    </span>
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
-            <Separator />
-
-            {/* Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* Primary CTA */}
+            <div className="pt-2">
               <Button
                 asChild
-                variant="outline"
-                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
+                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
               >
-                <Link href={`/events/${event.slug}`}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Event Details
-                </Link>
-              </Button>
-              <Button
-                asChild
-                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer"
-              >
-                <Link href="/events">
-                  Browse More Events
+                <Link href="/dashboard/my-registrations">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Go to My Registrations
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
+              <p className="text-xs text-center text-muted-foreground mt-3 flex items-center justify-center gap-1.5">
+                <Info className="h-3 w-3" />
+                Find your session join links on the registrations page
+              </p>
             </div>
 
-            {/* Encouragement (non-intrusive) */}
-            <p className="text-xs text-center text-muted-foreground">
-              Want to find more events like this?{' '}
-              <Link
-                href="/events"
-                className="text-primary hover:underline cursor-pointer"
-              >
-                Browse all events
-              </Link>
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs text-muted-foreground border-t border-border">
-              <span>Secure Booking</span>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-4 text-xs text-muted-foreground border-t border-border">
+              <span>Secure booking</span>
               <span className="w-px h-3 bg-border" />
               <span>Powered by Nuruvent</span>
             </div>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SUBCOMPONENTS
+// ============================================================
+
+function ActionPill({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      className="h-9 text-xs rounded-full cursor-pointer hover:bg-accent"
+    >
+      <span className="mr-1.5">{icon}</span>
+      {label}
+    </Button>
+  );
+}
+
+function InfoPanel({
+  icon,
+  title,
+  items,
+  variant = 'primary',
+}: {
+  icon: React.ReactNode;
+  title: string;
+  items: Array<{ icon: React.ReactNode; label: string }>;
+  variant?: 'primary' | 'muted';
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl p-4 space-y-3 border',
+        variant === 'primary'
+          ? 'bg-primary/5 border-primary/10'
+          : 'bg-muted/40 border-border',
+      )}
+    >
+      <h3
+        className={cn(
+          'font-semibold text-sm flex items-center gap-2',
+          variant === 'primary' ? 'text-primary' : 'text-foreground',
+        )}
+      >
+        {icon}
+        {title}
+      </h3>
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div
+            key={i}
+            className="flex items-start gap-2 text-sm text-foreground/85"
+          >
+            <span
+              className={cn(
+                'mt-0.5 flex-shrink-0',
+                variant === 'primary' ? 'text-primary' : 'text-muted-foreground',
+              )}
+            >
+              {item.icon}
+            </span>
+            <span className="break-words">{item.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -462,7 +496,7 @@ function ErrorState({ title, message }: { title: string; message: string }) {
         <h2 className="text-xl font-semibold mb-2">{title}</h2>
         <p className="text-sm text-muted-foreground mb-6">{message}</p>
         <Button asChild className="cursor-pointer">
-          <Link href="/events">Browse Events</Link>
+          <Link href="/events">Browse events</Link>
         </Button>
       </div>
     </div>

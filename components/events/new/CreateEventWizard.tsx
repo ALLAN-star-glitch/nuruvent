@@ -490,8 +490,15 @@ export function CreateEventWizard() {
                     onFieldChange={handleFieldChange}
                     onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
+                    eventId={createdEventId ?? undefined}
                     onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
-                  />
+                                    onSchedulesCommitted={(next) => {
+                    autoSave.setLastSavedData({
+                      ...formState.formData,
+                      schedules: next,
+                    });
+                  }}
+                                  />
                 )}
                 {currentStep === 2 && (
                   <TicketStep

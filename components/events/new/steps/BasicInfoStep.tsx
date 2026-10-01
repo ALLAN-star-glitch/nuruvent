@@ -53,6 +53,8 @@ interface BasicInfoStepProps {
   onAIDraft: (draft: GeneratedEventDraft) => void;
   onEventTypeTouched: () => void;
   onOpenConnectModal?: () => void;
+  eventId?: string; 
+  onSchedulesCommitted?: (next: ScheduleForm[]) => void;
 }
 
 export function BasicInfoStep({
@@ -62,6 +64,8 @@ export function BasicInfoStep({
   onFieldChange,
   onEventTypeTouched,
   onOpenConnectModal,
+  eventId,
+  onSchedulesCommitted,
 }: BasicInfoStepProps) {
   return (
     <div className="space-y-5">
@@ -104,6 +108,8 @@ export function BasicInfoStep({
         onChange={(v: ScheduleForm[]) => onFieldChange('schedules', v)}
         error={validationErrors.schedules}
         onOpenConnectModal={onOpenConnectModal}
+        eventId={eventId} 
+        onSchedulesCommitted={onSchedulesCommitted}
       />
 
       {/* ---- Short Description ---- */}

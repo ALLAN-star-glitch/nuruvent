@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import Link from 'next/link';
@@ -13,14 +14,18 @@ import {
   LogOut,
   PlusCircle,
   DollarSign,
-  Video,
   User,
   LucideIcon,
-  Zap,
   Trash2,
   FilePlus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Ticket,
+  CalendarDays,
+  BadgeCheck,
+  Wallet,
+  Clapperboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +48,7 @@ interface NavGroup {
   label: string;
   icon?: LucideIcon;
   items: NavItem[];
+  collapsible?: boolean;
 }
 
 const navGroups: NavGroup[] = [
@@ -51,22 +57,53 @@ const navGroups: NavGroup[] = [
     label: '',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/dashboard/events', label: 'Events', icon: Calendar },
-      { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
-      { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
-      { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-      { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
-      { href: '/dashboard/replays', label: 'Replays', icon: Video },
-      { href: '/dashboard/trash', label: 'Trash', icon: Trash2, isTrash: true },
     ],
   },
   {
-    id: 'quick-actions',
-    label: 'Quick Actions',
-    icon: Zap,
+    id: 'events',
+    label: 'EVENTS',
+    icon: CalendarDays,
+    collapsible: true,
     items: [
       { href: '/dashboard/events/new', label: 'Create Event', icon: PlusCircle },
+      { href: '/dashboard/events', label: "Events I'm Hosting", icon: Calendar },
+      { href: '/dashboard/my-registrations', label: "Events I'm Attending", icon: Ticket },
+    ],
+  },
+  {
+    id: 'certificates',
+    label: 'Certificates',
+    icon: Award,
+    collapsible: true,
+    items: [
       { href: '/dashboard/certificates/create', label: 'Generate Certificate', icon: FilePlus },
+      { href: '/dashboard/certificates/issued', label: 'Issued', icon: BadgeCheck },
+      { href: '/dashboard/certificates/received', label: 'Received', icon: Award },
+    ],
+  },
+  {
+    id: 'people',
+    label: '',
+    items: [
+      { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
+    ],
+  },
+  {
+    id: 'money',
+    label: 'Payments',
+    icon: CreditCard,
+    collapsible: true,
+    items: [
+      { href: '/dashboard/payments/received', label: 'Received', icon: Wallet },
+      { href: '/dashboard/payments/made', label: 'Made', icon: CreditCard },
+      { href: '/dashboard/revenue', label: 'Revenue', icon: DollarSign },
+    ],
+  },
+  {
+    id: 'media',
+    label: '',
+    items: [
+      { href: '/dashboard/replays', label: 'Replays', icon: Clapperboard },
     ],
   },
   {
@@ -76,18 +113,17 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/dashboard/account', label: 'Account', icon: User },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+      { href: '/dashboard/trash', label: 'Trash', icon: Trash2, isTrash: true },
     ],
   },
 ];
 
 interface DashboardSidebarProps {
-  role?: 'host' | 'attendee' | 'admin';
   onCollapseChange?: (collapsed: boolean) => void;
   collapsed?: boolean;
 }
 
 export function DashboardSidebar({
-  role = 'host',
   onCollapseChange,
   collapsed: externalCollapsed,
 }: DashboardSidebarProps) {
@@ -98,10 +134,10 @@ export function DashboardSidebar({
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const [internalCollapsed, setInternalCollapsed] = useState(true);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     if (externalCollapsed !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInternalCollapsed(externalCollapsed);
     }
   }, [externalCollapsed]);
@@ -133,14 +169,35 @@ export function DashboardSidebar({
   };
 
   const isActiveLink = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
+    // Exact match for dashboard root and index collection pages
+    if (href === '/dashboard' || href === '/dashboard/events') {
+      return pathname === href;
     }
-    return pathname === href;
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   const isGroupActive = (items: NavItem[]) => {
     return items.some((item) => isActiveLink(item.href));
+  };
+
+  const toggleGroup = (id: string) => {
+    setOpenGroupId((prev) => (prev === id ? null : id));
+  };
+
+  useEffect(() => {
+    for (const group of navGroups) {
+      if (!group.collapsible) continue;
+      if (group.items.some((item) => isActiveLink(item.href))) {
+        setOpenGroupId(group.id);
+        break;
+      }
+    }
+  }, [pathname]);
+
+  const isGroupOpen = (group: NavGroup) => {
+    if (!group.collapsible) return true;
+    if (collapsed) return true;
+    return openGroupId === group.id;
   };
 
   return (
@@ -148,193 +205,190 @@ export function DashboardSidebar({
       <aside
         onClick={(e: MouseEvent<HTMLElement>) => e.stopPropagation()}
         className={cn(
-          'hidden md:flex md:flex-col bg-card/90 backdrop-blur-xl shadow-2xl transition-all duration-300 select-none shrink-0',
+          'hidden md:flex md:flex-col bg-card/95 backdrop-blur-md transition-all duration-300 ease-in-out select-none shrink-0',
           'fixed left-6 z-30 overflow-hidden',
-          'rounded-3xl border border-border/60',
+          'rounded-2xl border border-border/70 shadow-xl shadow-black/5',
           collapsed ? 'w-[72px]' : 'w-[260px]',
-          'top-[140px] h-[calc(100vh-200px)]',
-          'before:absolute before:inset-0 before:pointer-events-none before:rounded-3xl before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.6)] dark:before:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
-          'after:absolute after:inset-0 after:pointer-events-none after:rounded-3xl after:bg-gradient-to-br after:from-white/5 after:via-transparent after:to-white/5 dark:after:from-white/[0.02] dark:after:to-white/[0.02]',
+          'top-[140px] h-[calc(100vh-200px)]'
         )}
       >
-        {/* Sidebar toggle header */}
+        {/* Toggle Header */}
         <div
           onClick={toggleSidebar}
           className={cn(
-            'flex items-center justify-between p-4 flex-shrink-0 cursor-pointer relative',
-            'border-b border-border/40',
-            collapsed ? 'justify-center px-2' : 'px-4',
+            'flex items-center h-12 flex-shrink-0 cursor-pointer border-b border-border/50 transition-colors hover:bg-accent/40',
+            collapsed ? 'justify-center px-2' : 'justify-between px-4'
           )}
         >
           {!collapsed ? (
             <>
-              <span className="text-xs font-medium text-muted-foreground">
-                Close Sidebar
+              <span className="text-xs font-semibold tracking-wider uppercase text-foreground/70 cursor-pointer">
+                Collapse Menu
               </span>
-              <ChevronLeft className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+              <ChevronLeft className="h-4 w-4 text-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
             </>
           ) : (
-            <ChevronRight className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+            <ChevronRight className="h-4 w-4 text-foreground/70 hover:text-foreground transition-colors cursor-pointer" />
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-          <div className="space-y-3">
-            {navGroups.map((group) => {
-              const groupActive = isGroupActive(group.items);
-              const GroupIcon = group.icon;
+        {/* Navigation List */}
+        <nav className="flex-1 px-3 py-3.5 overflow-y-auto overflow-x-hidden scrollbar-none space-y-4">
+          {navGroups.map((group) => {
+            const groupActive = isGroupActive(group.items);
+            const GroupIcon = group.icon;
+            const groupOpen = isGroupOpen(group);
 
-              if (group.items.length === 0) return null;
+            if (group.items.length === 0) return null;
 
-              return (
-                <div key={group.id} className="space-y-1">
-                  {group.label &&
-                    (!collapsed ? (
+            return (
+              <div key={group.id} className="space-y-1">
+                {/* Group Header Label */}
+                {group.label &&
+                  (!collapsed ? (
+                    group.collapsible ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.id)}
+                        className={cn(
+                          'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs font-bold tracking-wider uppercase transition-colors rounded-md hover:bg-accent/50 cursor-pointer',
+                          groupActive
+                            ? 'text-primary'
+                            : 'text-foreground/70 hover:text-foreground'
+                        )}
+                        aria-expanded={groupOpen}
+                      >
+                        <div className="flex items-center gap-2">
+                          {GroupIcon && <GroupIcon className="h-4 w-4 shrink-0" />}
+                          <span>{group.label}</span>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 transition-transform duration-200 text-foreground/60',
+                            groupOpen && 'rotate-180'
+                          )}
+                        />
+                      </button>
+                    ) : (
                       <div
                         className={cn(
-                          'flex items-center gap-2 px-2 py-1 text-xs font-medium transition-colors',
-                          groupActive ? 'text-primary' : 'text-muted-foreground',
+                          'flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold tracking-wider uppercase',
+                          groupActive
+                            ? 'text-primary'
+                            : 'text-foreground/70'
                         )}
                       >
-                        {GroupIcon && <GroupIcon className="h-3.5 w-3.5" />}
+                        {GroupIcon && <GroupIcon className="h-4 w-4 shrink-0" />}
                         <span>{group.label}</span>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center px-2 py-1">
-                        {GroupIcon && (
-                          <GroupIcon className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    ))}
+                    )
+                  ) : (
+                    <div className="flex items-center justify-center py-1">
+                      {GroupIcon && (
+                        <GroupIcon className="h-4 w-4 text-foreground/60" />
+                      )}
+                    </div>
+                  ))}
 
-                  <div
-                    className={cn(
-                      'space-y-0.5',
-                      !collapsed && group.label && 'pl-1',
-                    )}
-                  >
-                    {group.items.map((item) => {
-                      const isActive = isActiveLink(item.href);
-                      const Icon = item.icon;
-                      const isTrash = item.isTrash;
+                {/* Nav Items Container */}
+                <div
+                  className={cn(
+                    'transition-all duration-300 ease-in-out overflow-hidden',
+                    groupOpen
+                      ? 'max-h-96 opacity-100 space-y-1'
+                      : 'max-h-0 opacity-0 pointer-events-none'
+                  )}
+                >
+                  {group.items.map((item) => {
+                    const isActive = isActiveLink(item.href);
+                    const Icon = item.icon;
+                    const isTrash = item.isTrash;
 
-                      if (collapsed) {
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              'flex items-center justify-center px-2 py-2.5 rounded-xl transition-all duration-200 group relative',
-                              isActive
-                                ? isTrash
-                                  ? 'bg-destructive/10 text-destructive'
-                                  : 'bg-primary/10 text-primary'
-                                : isTrash
-                                  ? 'text-destructive hover:bg-destructive/10'
-                                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                            )}
-                          >
-                            <Icon
-                              className={cn(
-                                'h-5 w-5 flex-shrink-0 transition-colors',
-                                isTrash
-                                  ? 'text-destructive'
-                                  : isActive
-                                    ? 'text-primary'
-                                    : 'text-muted-foreground group-hover:text-foreground',
-                              )}
-                            />
-                            <div className="absolute left-14 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-lg">
-                              {item.label}
-                            </div>
-                          </Link>
-                        );
-                      }
-
+                    if (collapsed) {
                       return (
                         <Link
                           key={item.href}
                           href={item.href}
                           className={cn(
-                            'flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 group relative',
+                            'flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-all duration-150 group relative cursor-pointer',
                             isActive
                               ? isTrash
-                                ? 'bg-destructive/10 text-destructive shadow-sm'
-                                : 'bg-primary/10 text-primary shadow-sm'
+                                ? 'bg-destructive/15 text-destructive font-semibold'
+                                : 'bg-primary/15 text-primary font-semibold'
                               : isTrash
                                 ? 'text-destructive hover:bg-destructive/10'
-                                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                                : 'text-foreground/80 hover:bg-accent hover:text-foreground'
                           )}
                         >
-                          <Icon
-                            className={cn(
-                              'h-5 w-5 flex-shrink-0 transition-colors',
-                              isTrash
-                                ? 'text-destructive'
-                                : isActive
-                                  ? 'text-primary'
-                                  : 'text-muted-foreground group-hover:text-foreground',
-                            )}
-                          />
-                          <span
-                            className={cn(
-                              'text-sm font-medium whitespace-nowrap',
-                              isTrash
-                                ? 'text-destructive'
-                                : isActive
-                                  ? 'text-primary'
-                                  : 'text-foreground',
-                            )}
-                          >
+                          <Icon className="h-5 w-5 shrink-0" />
+                          <div className="absolute left-14 ml-2 px-3 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-md font-medium">
                             {item.label}
-                          </span>
-                          {isActive && (
-                            <div
-                              className={cn(
-                                'ml-auto w-1 h-6 rounded-full shadow-sm',
-                                isTrash
-                                  ? 'bg-destructive shadow-destructive/30'
-                                  : 'bg-primary shadow-primary/30',
-                              )}
-                            />
-                          )}
+                          </div>
                         </Link>
                       );
-                    })}
-                  </div>
+                    }
 
-                  {!collapsed &&
-                    group.id !== navGroups[navGroups.length - 1].id && (
-                      <div className="relative my-2 mx-2">
-                        <div className="w-full border-t border-border/40" />
-                      </div>
-                    )}
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150 group relative cursor-pointer',
+                          isActive
+                            ? isTrash
+                              ? 'bg-destructive/15 text-destructive font-bold'
+                              : 'bg-primary/15 text-primary font-bold'
+                            : isTrash
+                              ? 'text-destructive hover:bg-destructive/10'
+                              : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground'
+                        )}
+                      >
+                        {isActive && (
+                          <div
+                            className={cn(
+                              'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full',
+                              isTrash ? 'bg-destructive' : 'bg-primary'
+                            )}
+                          />
+                        )}
+                        <Icon
+                          className={cn(
+                            'h-4 w-4 shrink-0 transition-colors',
+                            isTrash
+                              ? 'text-destructive'
+                              : isActive
+                                ? 'text-primary'
+                                : 'text-foreground/70 group-hover:text-foreground'
+                          )}
+                        />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </nav>
 
-        {/* User & Logout */}
+        {/* Footer Actions */}
         <div
           className={cn(
-            'relative flex flex-col gap-2',
-            'border-t border-border/40',
-            collapsed ? 'px-2 py-3' : 'px-3 py-3',
+            'p-2.5 border-t border-border/50',
+            collapsed ? 'flex justify-center' : 'px-3'
           )}
         >
           <button
             type="button"
             onClick={openLogoutDialog}
             className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-200 w-full',
-              'text-destructive hover:bg-destructive/10 active:scale-95',
-              collapsed && 'justify-center px-0',
+              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-bold transition-all duration-150 w-full cursor-pointer',
+              'text-destructive hover:bg-destructive/10 active:scale-[0.98]',
+              collapsed && 'justify-center w-10 h-10 p-0'
             )}
           >
-            <LogOut className="h-4 w-4 flex-shrink-0 text-destructive" />
-            {!collapsed && <span className="text-sm font-medium">Sign out</span>}
+            <LogOut className="h-4 w-4 shrink-0 text-destructive" />
+            {!collapsed && <span>Sign out</span>}
           </button>
         </div>
       </aside>

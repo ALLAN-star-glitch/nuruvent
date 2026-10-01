@@ -173,9 +173,24 @@ export interface Schedule {
 
   zoom_link?: string;
   meet_link?: string;
-  /** UUID of the auto-created video meeting. Null when manual. */
-  video_meeting_id?: string;
+/**
+   * Platform-side meeting code. "spaces/abc-defg-hij" for Google
+   * Meet, numeric string for Zoom. Matches video_meetings.external_id.
+   * Use this — not video_meeting_id — to build join URLs.
+   */
+  video_meeting_external_id?: string | null;
+
+  /**
+   * Nuruvent UUID of the video meeting (FK to video_meetings.id).
+   * Do NOT use this as a platform code — Google and Zoom cannot
+   * resolve it. Used only by server-side endpoints keyed by meeting
+   * UUID (e.g. fetch-attendance).
+   */
+  video_meeting_id?: string | null;
   max_attendees?: number;
+
+
+  
 }
 
 export interface Ticket {

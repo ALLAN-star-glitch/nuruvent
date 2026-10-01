@@ -196,7 +196,9 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
   const event = hydration.event;
   const isPublishedStatus =
-    !!event?.published_at || event?.event_status?.slug === 'published';
+    !!event?.published_at ||
+  event?.event_status?.slug === 'event-status-published' ||
+  event?.event_status?.name === 'event_status_published';
 
   const statusLabel =
     event?.event_status?.display_name ||
@@ -602,6 +604,16 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                     onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
                     onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
+                     eventId={eventId}
+                     onSchedulesCommitted={(next) => {
+                    // Sync autosave's diff baseline to the reordered list so it
+                    // doesn't fire a duplicate PUT with the same session numbers.
+                    autoSave.setLastSavedData({
+                      ...formState.formData,
+                      schedules: next,
+                    });
+                  }}
+                    
                   />
                 )}
                 {currentStep === 2 && (
@@ -681,36 +693,36 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => submit.submit('draft')}
+                disabled={isLoadingFlow}
+                className="w-full sm:w-auto cursor-pointer"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft
+              </Button>
+              {!isPublishedStatus && (
                 <Button
-                  variant="outline"
-                  onClick={() => submit.submit('draft')}
-                  disabled={isLoadingFlow}
-                  className="w-full sm:w-auto cursor-pointer"
+                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
+                  onClick={() => submit.submit('published')}
+                  disabled={!validation.isPublishReady || isLoadingFlow}
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Draft
+                  {isLoadingFlow ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Publish
+                    </>
+                  )}
                 </Button>
-                {!isPublishedStatus && (
-                  <Button
-                    className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
-                    onClick={() => submit.submit('published')}
-                    disabled={!validation.isPublishReady || isLoadingFlow}
-                  >
-                    {isLoadingFlow ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Publishing...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Publish
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+              )}
+            </div>
             )}
           </div>
         </div>

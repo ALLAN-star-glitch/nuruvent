@@ -530,3 +530,6 @@ export function deriveVirtualPlatform(schedules: ScheduleForm[]): string {
 export function derivePrimaryLocation(schedules: ScheduleForm[]): string {
   return schedules[0]?.location ?? '';
 }
+
+
+

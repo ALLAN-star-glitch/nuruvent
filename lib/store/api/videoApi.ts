@@ -8,6 +8,39 @@ import type {
   VideoPlatform,
 } from '@/lib/types/events';
 
+// ============================================================
+// TYPES
+// ============================================================
+
+/**
+ * UnmatchedParticipant is a Meet participant that couldn't be
+ * resolved to a registered attendee on the last poll.
+ *
+ * Returned by the video module's unmatched-participants endpoint,
+ * used by the roster dialog's "link participant" flow.
+ */
+export interface UnmatchedParticipant {
+  google_meet_user_id: string;
+  display_name: string;
+  joined_at: string;
+  left_at?: string;
+}
+
+/**
+ * Response shape for the link-participant endpoint. Summarizes the
+ * re-poll that runs after the identity is persisted.
+ */
+export interface LinkParticipantResult {
+  meeting_number: string;
+  conference_records: number;
+  participants: number;
+  events_dispatched: number;
+}
+
+// ============================================================
+// API
+// ============================================================
+
 export const videoApi = api.injectEndpoints({
   overrideExisting: true,
   endpoints: (builder) => ({
@@ -82,6 +115,95 @@ export const videoApi = api.injectEndpoints({
         { type: 'VideoConnections', id: 'LIST' },
       ],
     }),
+
+    // ============================================================
+    // ATTENDANCE POLLING (Google Meet)
+    // ============================================================
+
+    /**
+     * POST /video/meetings/:id/fetch-attendance
+     *
+     * Polls Google Meet for conference records + participants and
+     * hands each event to the attendance module, which matches them
+     * to registered attendees and records joins/leaves.
+     *
+     * Only supported for `google_meet` meetings. Zoom attendance
+     * arrives via webhook; calling this on a Zoom meeting returns
+     * a domain error.
+     *
+     * The mutation writes to `attendance_records` and
+     * `attendee_session_statuses`, then recomputes the session
+     * rollup. We invalidate both the specific session's attendance
+     * tag and the parent event's summary tag so the Attendance pane
+     * refreshes without a manual refetch.
+     */
+    fetchAttendance: builder.mutation<
+      BaseResponse<unknown>,
+      { meetingId: string; sessionId: string; eventId: string }
+    >({
+      query: ({ meetingId }) => ({
+        url: `/video/meetings/${meetingId}/fetch-attendance`,
+        method: 'POST',
+      }),
+      invalidatesTags: (_r, _e, { sessionId, eventId }) => [
+        { type: 'Attendance', id: `SESSION-${sessionId}` },
+        { type: 'Attendance', id: `EVENT-${eventId}` },
+      ],
+    }),
+
+    // ============================================================
+    // PARTICIPANT LINKING (Google Meet)
+    // ============================================================
+
+    /**
+     * GET /video/meetings/:id/unmatched-participants
+     *
+     * Polls Google Meet and returns the participants that couldn't be
+     * resolved to a registered attendee. Used by the roster dialog
+     * to surface a "link to attendee" UI.
+     *
+     * Because the poll also records matched joins/leaves as a side
+     * effect, this query doubles as a refresh of the session's
+     * attendance state.
+     */
+    getUnmatchedParticipants: builder.query<
+      BaseResponse<UnmatchedParticipant[]>,
+      string
+    >({
+      query: (meetingId) => ({
+        url: `/video/meetings/${meetingId}/unmatched-participants`,
+        method: 'GET',
+      }),
+      providesTags: (_result, _error, meetingId) => [
+        { type: 'VideoMeeting', id: meetingId },
+      ],
+    }),
+
+    /**
+     * POST /video/meetings/:id/link-participant
+     *
+     * Binds a Meet participant's Google user id to a registered
+     * attendee, then re-polls the meeting so the join is recorded.
+     * After success, both the meeting's unmatched-participants list
+     * and the session's roster are refetched.
+     */
+    linkParticipant: builder.mutation<
+      BaseResponse<LinkParticipantResult>,
+      { meetingId: string; attendeeId: string; googleMeetUserId: string }
+    >({
+      query: ({ meetingId, attendeeId, googleMeetUserId }) => ({
+        url: `/video/meetings/${meetingId}/link-participant`,
+        method: 'POST',
+        body: {
+          attendee_id: attendeeId,
+          google_meet_user_id: googleMeetUserId,
+        },
+      }),
+      invalidatesTags: (_result, _error, { meetingId }) => [
+        { type: 'VideoMeeting', id: meetingId },
+        'SessionRoster',
+      ],
+    }),
   }),
 });
 
@@ -93,4 +215,7 @@ export const {
   useListConnectionsQuery,
   useLazyBeginConnectQuery,
   useDisconnectMutation,
+  useFetchAttendanceMutation,
+  useGetUnmatchedParticipantsQuery,
+  useLinkParticipantMutation,
 } = videoApi;

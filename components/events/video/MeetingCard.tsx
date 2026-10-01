@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Link2,
   Loader2,
+  MapPin,
   MoreVertical,
   Plus,
   Plug,
@@ -34,6 +35,10 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import type { Event, Schedule, VideoPlatform } from '@/lib/types/events';
+import {
+  nuruventMeetingUrl,
+  schedulePlatform,
+} from '@/lib/utils/meetingUrl';
 
 import { PLATFORMS, type PlatformMeta } from './PlatformPickerModal';
 
@@ -74,6 +79,8 @@ export interface MeetingCardProps {
   onRegenerateSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 
+  onStartMeeting?: (session: Schedule) => void;
+
   onRegenerateAll: () => void;
   onDeleteAll: () => void;
 
@@ -84,27 +91,30 @@ export interface MeetingCardProps {
 // HELPERS
 // ============================================================
 
-function schedulePlatform(s: Schedule): VideoPlatform | undefined {
-  if (s.platform) return s.platform;
-  if (s.zoom_link) return 'zoom';
-  if (s.meet_link) return 'google_meet';
-  return undefined;
-}
-
 function scheduleMeta(s: Schedule): PlatformMeta | undefined {
   const p = schedulePlatform(s);
   if (!p) return undefined;
   return PLATFORMS.find((m) => m.platform === p);
 }
 
-/** Raw provider link (Zoom/Meet). Kept for internal parsing only —
- *  never displayed to the user. */
 function rawProviderLink(s: Schedule): string | undefined {
   return s.zoom_link || s.meet_link || undefined;
 }
 
-function isSessionWithMeeting(s: Schedule): boolean {
-  return !!(s.is_virtual && (s.platform || rawProviderLink(s)));
+/** Virtual schedule that has a meeting attached. */
+function hasMeeting(s: Schedule): boolean {
+  if (!s.is_virtual) return false;
+  return !!(s.platform || s.video_meeting_id || rawProviderLink(s));
+}
+
+/**
+ * Best display link for a virtual session. Prefers the Nuruvent
+ * wrapper URL so join flows route through us and attendance tracking
+ * works. Falls back to the raw provider link so the row still renders
+ * something clickable when the wrapper can't be built.
+ */
+function displayLink(s: Schedule, event: Event): string | undefined {
+  return nuruventMeetingUrl(s, event) ?? rawProviderLink(s);
 }
 
 function sessionLabel(s: Schedule, index: number): string {
@@ -117,61 +127,6 @@ function sessionTimeLabel(s: Schedule): string {
   if (s.start_time && s.end_time) parts.push(`${s.start_time} – ${s.end_time}`);
   else if (s.start_time) parts.push(s.start_time);
   return parts.join(' · ');
-}
-
-/**
- * Build the Nuruvent-hosted meeting URL for a schedule.
- *
- * Prefers the platform meeting number stored on the schedule
- * (`video_meeting_id`). Falls back to extracting it from the raw
- * provider link (zoom_link / meet_link).
- *
- * The URL looks like:
- *   https://www.nuruvent.com/meeting/{number}?name=...&host=...&return=...
- *
- * This is what the user sees, copies, and shares — the raw Zoom
- * link is never surfaced.
- */
-function nuruventMeetingUrl(
-  schedule: Schedule,
-  event: Event,
-): string | undefined {
-  const platform = schedulePlatform(schedule);
-  if (!platform) return undefined;
-
-  let meetingNumber = (schedule as { video_meeting_id?: string })
-    .video_meeting_id;
-
-  if (!meetingNumber) {
-    const raw = rawProviderLink(schedule);
-    if (!raw) return undefined;
-    if (platform === 'zoom') {
-      const m = raw.match(/\/j\/(\d+)/);
-      if (m) meetingNumber = m[1];
-    } else if (platform === 'google_meet') {
-      const m = raw.match(/meet\.google\.com\/([a-z-]+)/i);
-      if (m) meetingNumber = m[1];
-    }
-  }
-
-  if (!meetingNumber) return undefined;
-
-  const origin =
-    typeof window !== 'undefined'
-      ? window.location.origin
-      : 'https://www.nuruvent.com';
-
-  const hostName =
-    (event as { host_name?: string }).host_name || '';
-
-  const params = new URLSearchParams({
-    name: event.display_name || event.name,
-    return: `/dashboard/events/${event.id}`,
-    platform,
-  });
-  if (hostName) params.set('host', hostName);
-
-  return `${origin}/meeting/${encodeURIComponent(meetingNumber)}?${params.toString()}`;
 }
 
 // ============================================================
@@ -197,38 +152,64 @@ export function MeetingCard({
   onShareSession,
   onRegenerateSession,
   onDeleteSession,
+  onStartMeeting,
   onRegenerateAll,
   onDeleteAll,
   editEventHref,
 }: MeetingCardProps) {
-  // Sessions that have a meeting AND can be represented as a Nuruvent URL.
-  const sessions = (event.schedules ?? []).filter(
-    (s) => isSessionWithMeeting(s) && nuruventMeetingUrl(s, event),
-  );
-  const scheduledVirtual = (event.schedules ?? []).filter((s) => s.is_virtual);
-  const missingMeeting = scheduledVirtual.filter(
-    (s) => !(isSessionWithMeeting(s) && nuruventMeetingUrl(s, event)),
-  );
+  // All schedules, in the order the server returned them (session_number ASC).
+  const allSchedules = event.schedules ?? [];
 
-  const hasAnyMeeting = sessions.length > 0;
-  const allScheduledHaveMeetings =
-    scheduledVirtual.length > 0 && missingMeeting.length === 0;
+  // Split for the three render groups.
+  const virtualWithMeeting = allSchedules.filter(hasMeeting);
+  const virtualMissingMeeting = allSchedules.filter(
+    (s) => s.is_virtual && !hasMeeting(s),
+  );
+  const inPersonSchedules = allSchedules.filter((s) => !s.is_virtual);
+
+  const hasAnyMeeting = virtualWithMeeting.length > 0;
+  const hasAnyVirtual = allSchedules.some((s) => s.is_virtual);
 
   const platformsUsed = new Set(
-    sessions.map((s) => schedulePlatform(s)).filter(Boolean),
+    virtualWithMeeting.map((s) => schedulePlatform(s)).filter(Boolean),
   );
 
   const summary = (() => {
-    if (scheduledVirtual.length === 0) return 'No virtual sessions.';
-    if (!hasAnyMeeting) return 'No meetings created yet.';
+    const virtualCount = virtualWithMeeting.length + virtualMissingMeeting.length;
+
+    if (virtualCount === 0 && inPersonSchedules.length === 0) {
+      return 'No sessions.';
+    }
+
+    if (virtualCount === 0) {
+      return `${inPersonSchedules.length} in-person ${
+        inPersonSchedules.length === 1 ? 'session' : 'sessions'
+      }.`;
+    }
+
+    if (!hasAnyMeeting) {
+      return 'No meetings created yet.';
+    }
+
+    let base: string;
     if (platformsUsed.size === 1) {
       const p = Array.from(platformsUsed)[0];
       const label = PLATFORMS.find((m) => m.platform === p)?.label ?? 'video';
-      return `${sessions.length} ${
-        sessions.length === 1 ? 'session' : 'sessions'
-      } on ${label}.`;
+      base = `${virtualWithMeeting.length} ${
+        virtualWithMeeting.length === 1 ? 'session' : 'sessions'
+      } on ${label}`;
+    } else if (platformsUsed.size === 0) {
+      base = `${virtualWithMeeting.length} ${
+        virtualWithMeeting.length === 1 ? 'session' : 'sessions'
+      }`;
+    } else {
+      base = `${virtualWithMeeting.length} sessions on mixed platforms`;
     }
-    return `${sessions.length} sessions on mixed platforms.`;
+
+    if (inPersonSchedules.length > 0) {
+      base += `, ${inPersonSchedules.length} in-person`;
+    }
+    return `${base}.`;
   })();
 
   return (
@@ -244,7 +225,7 @@ export function MeetingCard({
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-base font-semibold text-foreground">
-                  Meeting
+                  Sessions &amp; Meetings
                 </h3>
 
                 {hasZoomConnection && (
@@ -305,48 +286,65 @@ export function MeetingCard({
           </div>
         </div>
 
-        {/* EMPTY STATE */}
-        {!hasAnyMeeting && scheduledVirtual.length > 0 && (
-          <EmptyMeetingState
-            isDraft={isDraft}
-            hasAnyConnection={hasAnyConnection}
-            sessionCount={scheduledVirtual.length}
-            runningAction={runningAction}
-            onCreateMeetings={onCreateMeetings}
-            onOpenPlatformPicker={onOpenPlatformPicker}
-            onAddMeeting={onAddMeeting}
-            editEventHref={editEventHref}
+        {/* SESSION LIST —*/}
+       {(hasAnyMeeting || virtualMissingMeeting.length > 0 || inPersonSchedules.length > 0) && (
+  <div className="mt-4 space-y-3">
+    {allSchedules.map((s, idx) => {
+      if (!s.is_virtual) {
+        return (
+          <InPersonRow
+            key={s.id}
+            session={s}
+            index={idx}
+            running={runningSessionId === s.id ? runningAction : null}
+            onEdit={onEditSession}
           />
-        )}
+        );
+      }
 
-        {/* SESSION LIST */}
-        {hasAnyMeeting && (
-          <div className="mt-4 space-y-3">
-            {sessions.map((s, i) => {
-              const nuLink = nuruventMeetingUrl(s, event);
-              return (
-                <SessionRow
-                  key={s.id}
-                  session={s}
-                  index={i}
-                  meta={scheduleMeta(s)}
-                  link={nuLink}
-                  running={runningSessionId === s.id ? runningAction : null}
-                  copied={copiedSessionId === s.id}
-                  onCopy={onCopyLink}
-                  onJoin={onJoinLink}
-                  onEdit={onEditSession}
-                  onShare={onShareSession}
-                  onRegenerate={onRegenerateSession}
-                  onDelete={onDeleteSession}
-                />
-              );
-            })}
-          </div>
-        )}
+      const link = displayLink(s, event);
+      const meta = scheduleMeta(s);
 
-        {/* PARTIAL STATE */}
-        {hasAnyMeeting && missingMeeting.length > 0 && (
+      return (
+        <SessionRow
+          key={s.id}
+          session={s}
+          index={idx}
+          meta={meta}
+          link={link}
+          running={runningSessionId === s.id ? runningAction : null}
+          copied={copiedSessionId === s.id}
+          onCopy={onCopyLink}
+          onJoin={onJoinLink}
+          onEdit={onEditSession}
+          onShare={onShareSession}
+          onRegenerate={onRegenerateSession}
+          onDelete={onDeleteSession}
+          onStart={onStartMeeting}
+        />
+      );
+    })}
+  </div>
+)}
+
+        {/* EMPTY STATE — no virtual meetings AND no in-person sessions yet */}
+        {!hasAnyMeeting &&
+          virtualMissingMeeting.length > 0 &&
+          hasAnyVirtual && (
+            <EmptyMeetingState
+              isDraft={isDraft}
+              hasAnyConnection={hasAnyConnection}
+              sessionCount={virtualMissingMeeting.length}
+              runningAction={runningAction}
+              onCreateMeetings={onCreateMeetings}
+              onOpenPlatformPicker={onOpenPlatformPicker}
+              onAddMeeting={onAddMeeting}
+              editEventHref={editEventHref}
+            />
+          )}
+
+        {/* PARTIAL STATE — some virtual sessions still missing a meeting */}
+        {hasAnyMeeting && virtualMissingMeeting.length > 0 && (
           <>
             <Separator className="my-4" />
             <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 sm:p-4">
@@ -354,8 +352,8 @@ export function MeetingCard({
                 <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">
-                    {missingMeeting.length}{' '}
-                    {missingMeeting.length === 1
+                    {virtualMissingMeeting.length}{' '}
+                    {virtualMissingMeeting.length === 1
                       ? 'session has no meeting yet'
                       : 'sessions have no meeting yet'}
                   </p>
@@ -411,51 +409,53 @@ export function MeetingCard({
         )}
 
         {/* BULK ACTIONS */}
-        {allScheduledHaveMeetings && sessions.length > 1 && (
-          <>
-            <Separator className="my-4" />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer"
-                onClick={onRegenerateAll}
-                disabled={runningAction === 'regenerate'}
-              >
-                {runningAction === 'regenerate' ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    Regenerating all…
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                    Regenerate all
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={onDeleteAll}
-                disabled={runningAction === 'delete'}
-              >
-                {runningAction === 'delete' ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    Deleting all…
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                    Delete all
-                  </>
-                )}
-              </Button>
-            </div>
-          </>
-        )}
+        {hasAnyMeeting &&
+          virtualMissingMeeting.length === 0 &&
+          virtualWithMeeting.length > 1 && (
+            <>
+              <Separator className="my-4" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={onRegenerateAll}
+                  disabled={runningAction === 'regenerate'}
+                >
+                  {runningAction === 'regenerate' ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Regenerating all…
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Regenerate all
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={onDeleteAll}
+                  disabled={runningAction === 'delete'}
+                >
+                  {runningAction === 'delete' ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Deleting all…
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                      Delete all
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
       </CardContent>
     </Card>
   );
@@ -563,7 +563,74 @@ function EmptyMeetingState({
 }
 
 // ============================================================
-// SESSION ROW
+// IN-PERSON ROW
+// ============================================================
+
+interface InPersonRowProps {
+  session: Schedule;
+  index: number;
+  running: MeetingCardProps['runningAction'];
+  onEdit: (sessionId: string) => void;
+}
+
+function InPersonRow({ session, index, running, onEdit }: InPersonRowProps) {
+  const label = sessionLabel(session, index);
+  const time = sessionTimeLabel(session);
+  const isRunning = running !== null;
+
+  return (
+    <div className="rounded-lg border border-border bg-background/70 overflow-hidden">
+      <div className="p-3 sm:p-4 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wider">
+                In-person
+              </span>
+              <p className="text-sm font-semibold text-foreground break-words">
+                {label}
+              </p>
+            </div>
+
+            {time && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <CalendarDays className="h-3 w-3 shrink-0" />
+                <span className="break-words">{time}</span>
+              </p>
+            )}
+
+            {session.location && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="break-words">{session.location}</span>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-border px-3 sm:px-4 py-2 flex items-center gap-1.5 flex-wrap bg-muted/20">
+        <Button
+          size="sm"
+          variant="outline"
+          className="cursor-pointer h-8 text-xs"
+          onClick={() => onEdit(session.id)}
+          disabled={isRunning}
+        >
+          <Edit className="h-3.5 w-3.5 mr-1.5" />
+          Edit session
+        </Button>
+
+        {isRunning && (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-2" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SESSION ROW (virtual)
 // ============================================================
 
 interface SessionRowProps {
@@ -579,6 +646,7 @@ interface SessionRowProps {
   onShare: (sessionId: string) => void;
   onRegenerate: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
+  onStart?: (session: Schedule) => void;
 }
 
 function SessionRow({
@@ -594,6 +662,7 @@ function SessionRow({
   onShare,
   onRegenerate,
   onDelete,
+  onStart,
 }: SessionRowProps) {
   const label = sessionLabel(session, index);
   const time = sessionTimeLabel(session);
@@ -651,7 +720,11 @@ function SessionRow({
         ) : (
           <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5">
             <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0" />
-            <p className="text-xs text-muted-foreground">No meeting yet</p>
+            <p className="text-xs text-muted-foreground">
+              {session.platform || session.video_meeting_id
+                ? 'Meeting configured but no link available'
+                : 'No meeting yet'}
+            </p>
           </div>
         )}
       </div>
@@ -668,6 +741,19 @@ function SessionRow({
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
               Join
             </Button>
+
+            {meta?.platform === 'zoom' && onStart && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer h-8 text-xs border-primary/40 text-primary hover:bg-primary/5"
+                onClick={() => onStart(session)}
+                disabled={isRunning}
+              >
+                <Video className="h-3.5 w-3.5 mr-1.5" />
+                Start in Nuruvent
+              </Button>
+            )}
 
             <Button
               size="sm"

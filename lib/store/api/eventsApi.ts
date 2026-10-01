@@ -532,6 +532,33 @@ export const eventsApi = api.injectEndpoints({
       ],
     }),
 
+
+    /**
+     * POST /events/{id}/schedules/reorder
+     *
+     * Assigns session_number = 1..N to the schedules listed in
+     * `orderedIds`, in the order supplied. The list MUST contain every
+     * schedule that belongs to the event — partial reorders are
+     * rejected by the backend so the numbering stays gapless.
+     *
+     * Called by the drag-to-reorder UI in ScheduleField.tsx.
+     */
+    reorderSchedules: builder.mutation<
+      BaseResponse<Event>,
+      { eventId: string; orderedIds: string[] }
+    >({
+      query: ({ eventId, orderedIds }) => ({
+        url: `/events/${eventId}/schedules/reorder`,
+        method: 'POST',
+        body: { ordered_ids: orderedIds },
+      }),
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
+
     /** DELETE /events/{id} — soft delete (move to trash). */
     deleteEvent: builder.mutation<void, string>({
       query: (id) => ({
@@ -930,6 +957,7 @@ export const {
   useDeleteEventMutation,
   usePermanentlyDeleteEventMutation,
   useRestoreEventMutation,
+  useReorderSchedulesMutation
 } = eventsApi;
 
 // ---- Protected mutations — status ----
@@ -986,6 +1014,9 @@ export const {
   useGenerateMeetingSignatureMutation,
   useFetchMeetingZAKMutation,
 } = eventsApi;
+
+
+
 
 // ============================================================
 // CONVENIENCE RE-EXPORTS
