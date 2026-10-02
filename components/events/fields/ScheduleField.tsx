@@ -1097,14 +1097,37 @@ function DeliveryModeContent({
   const hasMeeting = !!schedule.video_meeting_id;
   const showManual = manualMode || (hasLink && !hasMeeting);
 
-  const connectedPlatforms: PlatformMeta[] = PLATFORMS.filter(
-    (p) => p.available && !!video.getConnection(p.platform),
+  const connectedPlatforms: PlatformMeta[] = useMemo(
+    () => PLATFORMS.filter((p) => p.available && !!video.getConnection(p.platform)),
+    [video],
   );
   const anyConnected = connectedPlatforms.length > 0;
+  const onlyOneConnected = connectedPlatforms.length === 1;
+
+  // Auto-select the platform when exactly one is connected and the
+  // schedule doesn't have one yet. Runs once per (schedule, connection)
+  // pair — safe because onSelectPlatform is a no-op when the value
+  // doesn't change.
+  useEffect(() => {
+    if (!onlyOneConnected) return;
+    if (showManual) return;
+    if (schedule.platform) return; // already chosen
+    const sole = connectedPlatforms[0];
+    if (!sole) return;
+    onSelectPlatform(sole.platform);
+  }, [
+    onlyOneConnected,
+    showManual,
+    schedule.platform,
+    connectedPlatforms,
+    onSelectPlatform,
+  ]);
 
   const selectedPlatform: PlatformMeta | undefined = schedule.platform
     ? connectedPlatforms.find((p) => p.platform === schedule.platform)
-    : undefined;
+    : onlyOneConnected
+      ? connectedPlatforms[0]
+      : undefined;
 
   if (showManual) {
     return (
