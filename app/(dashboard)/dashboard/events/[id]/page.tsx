@@ -1063,7 +1063,8 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
           )}
 
           {/* Attendance */}
-          <AttendanceCard
+         <AttendanceCard
+            eventId={event.id}
             summary={attendanceSummary}
             loading={isAttendanceLoading}
             error={attendanceErrorMessage}

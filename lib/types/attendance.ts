@@ -90,8 +90,9 @@ export interface SessionRosterPayload {
   attendees: SessionRosterEntry[];
 }
 
-
-// lib/types/attendance.ts
+// ============================================================
+// MY SESSION LINKS
+// ============================================================
 
 export interface SessionLink {
   session_id: string;
@@ -114,4 +115,124 @@ export interface SessionLinkGroup {
 
 export interface MySessionLinksResponse {
   groups: SessionLinkGroup[];
+}
+
+// ============================================================
+// EVENT ATTENDEE DIRECTORY
+// (mirrors Go EventAttendeeResponse + EventAttendeeDetailResponse)
+// ============================================================
+
+/**
+ * One row in the event attendee list. Backed by
+ * attendee_rollup_statuses — one per (attendee, event).
+ *
+ * `effective_status` uses the same vocabulary as AttendanceStatus.
+ * The backend emits it as a derived value:
+ *   confirmed > full > partial > joined > no-show > registered
+ */
+export interface EventAttendeeRow {
+  attendee_id: string;
+  display_name: string;
+  email: string;
+  effective_status: AttendanceStatus;
+  sessions_total: number;
+  sessions_attended: number;
+  sessions_confirmed: number;
+  total_duration_seconds: number;
+  registered_at: string;    // ISO 8601
+  last_activity_at: string; // ISO 8601
+}
+
+/**
+ * Response body of GET /events/:eventId/attendees.
+ */
+export interface EventAttendeesPayload {
+  attendees: EventAttendeeRow[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+/**
+ * Query params accepted by GET /events/:eventId/attendees.
+ * All optional; the backend applies defaults.
+ */
+export interface ListAttendeesParams {
+  /** Free-text search across display_name and email. */
+  search?: string;
+  /** Comma-separated AttendanceStatus values. */
+  status?: string;
+  /** Sort field. Defaults to "name". */
+  sort_by?: 'name' | 'registered_at' | 'status' | 'duration';
+  /** Sort direction. Defaults to "asc". */
+  sort_order?: 'asc' | 'desc';
+  /** 1-indexed page number. Defaults to 1. */
+  page?: number;
+  /** Rows per page. Defaults to 20, capped at 100. */
+  page_size?: number;
+}
+
+/**
+ * Per-session detail for one attendee, returned by
+ * GET /events/:eventId/attendees/:attendeeId.
+ */
+export interface EventAttendeeSessionDetail {
+  session_id: string;
+  title: string;
+  provider: AttendanceProvider;
+  scheduled_start: string; // ISO 8601
+  scheduled_end: string;   // ISO 8601
+  derived_status: AttendanceStatus;
+  host_confirmed: boolean;
+  total_duration_seconds: number;
+  last_derived_at: string;
+}
+
+/**
+ * Full detail for one attendee in one event: rollup fields plus
+ * the per-session breakdown.
+ */
+export interface EventAttendeeDetail extends EventAttendeeRow {
+  sessions: EventAttendeeSessionDetail[];
+}
+
+
+
+// ============================================================
+// CROSS-EVENT ATTENDEE DIRECTORY
+// (mirrors Go CrossEventAttendeeResponse)
+// ============================================================
+
+export interface CrossEventAttendee {
+  attendee_id: string;
+  display_name: string;
+  email: string;
+  event_id: string;
+  event_name: string;
+  event_slug: string;
+  event_start_date: string; // ISO 8601
+  effective_status: AttendanceStatus;
+  sessions_total: number;
+  sessions_attended: number;
+  sessions_confirmed: number;
+  total_duration_seconds: number;
+  registered_at: string;    // ISO 8601
+  last_activity_at: string; // ISO 8601
+}
+
+export interface CrossEventAttendeesPayload {
+  attendees: CrossEventAttendee[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ListAllAttendeesParams {
+  event_id?: string;
+  search?: string;
+  status?: string; // comma-separated
+  sort_by?: 'name' | 'event' | 'registered_at' | 'status' | 'duration';
+  sort_order?: 'asc' | 'desc';
+  page?: number;
+  page_size?: number;
 }

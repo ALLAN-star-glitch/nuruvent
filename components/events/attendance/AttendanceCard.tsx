@@ -4,6 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   BarChart3,
   CalendarDays,
@@ -69,6 +70,9 @@ function canFetchAttendance(s: SessionAttendanceSummary): boolean {
 // ============================================================
 
 export interface AttendanceCardProps {
+  /** Event this card belongs to. Used to link to the full attendees page. */
+  eventId: string;
+
   summary: EventAttendanceSummary | null;
   loading?: boolean;
   error?: string | null;
@@ -93,6 +97,7 @@ export interface AttendanceCardProps {
 // ============================================================
 
 export function AttendanceCard({
+  eventId,
   summary,
   loading = false,
   error = null,
@@ -239,31 +244,41 @@ export function AttendanceCard({
           )}
 
           {/* FOOTER */}
-          {!loading && !error && sessions.length > 0 && anyAttendance && (
+          {!loading && !error && sessions.length > 0 && (
             <>
               <Separator className="my-4" />
-              <div className="flex justify-end">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={onExportAll}
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  href={`/dashboard/events/${eventId}/attendees`}
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
-                  Export all as CSV
-                </Button>
+                  View all attendees
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+
+                {anyAttendance && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer"
+                    onClick={onExportAll}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Export all as CSV
+                  </Button>
+                )}
               </div>
             </>
           )}
         </CardContent>
       </Card>
 
-        <SessionRosterDialog
-            open={openSessionId !== null}
-            onOpenChange={(open) => !open && setOpenSessionId(null)}
-            session={openSession}
-            videoMeetingId={openSession?.video_meeting_id ?? undefined}
-         />
+      <SessionRosterDialog
+        open={openSessionId !== null}
+        onOpenChange={(open) => !open && setOpenSessionId(null)}
+        session={openSession}
+        videoMeetingId={openSession?.video_meeting_id ?? undefined}
+      />
     </>
   );
 }

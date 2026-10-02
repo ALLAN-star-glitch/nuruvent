@@ -1,10 +1,11 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-// app/(dashboard)/dashboard/attendees/page.tsx
+// app/(dashboard)/dashboard/events/[id]/attendees/page.tsx
 
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Search,
   Users,
@@ -25,6 +26,7 @@ import {
   X,
   Filter,
   ArrowRight,
+  ArrowLeft,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
@@ -76,11 +78,15 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
-import { useGetAttendeesQuery } from '@/lib/store/api/attendanceApi';
+import {
+  useGetEventAttendeeDetailQuery,
+  useGetEventAttendeesQuery,
+} from '@/lib/store/api/attendanceApi';
 import type {
   AttendanceStatus,
-  CrossEventAttendee,
-  ListAllAttendeesParams,
+  EventAttendeeDetail,
+  EventAttendeeRow,
+  ListAttendeesParams,
 } from '@/lib/types/attendance';
 
 // ============================================================
@@ -171,7 +177,20 @@ function formatDate(iso: string | undefined): string {
   });
 }
 
-type SortField = 'name' | 'event' | 'registered_at' | 'status' | 'duration';
+function formatDateTime(iso: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+type SortField = 'name' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 
@@ -179,8 +198,10 @@ type ViewMode = 'table' | 'grid';
 // PAGE
 // ============================================================
 
-export default function AttendeesPage() {
+export default function EventAttendeesPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const eventId = params?.id ?? '';
 
   // ---- Filter / sort / pagination ----
   const [searchInput, setSearchInput] = useState('');
@@ -194,14 +215,12 @@ export default function AttendeesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  // ---- Selection (visual only — no bulk actions exist) ----
+  // ---- Selection (visual only) ----
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
   // ---- Detail dialog ----
-  const [selectedAttendee, setSelectedAttendee] =
-    useState<CrossEventAttendee | null>(null);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [openAttendeeId, setOpenAttendeeId] = useState<string | null>(null);
 
   // ---- Mobile ----
   const [isMobile, setIsMobile] = useState(false);
@@ -214,7 +233,6 @@ export default function AttendeesPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchQuery(searchInput.trim());
@@ -223,18 +241,16 @@ export default function AttendeesPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus, sortField, sortDirection, itemsPerPage]);
 
-  // Clear selection when page changes
   useEffect(() => {
     setSelectedIds([]);
     setSelectAll(false);
   }, [currentPage]);
 
-  const queryParams: ListAllAttendeesParams = useMemo(
+  const queryParams: ListAttendeesParams = useMemo(
     () => ({
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
@@ -258,12 +274,23 @@ export default function AttendeesPage() {
     isLoading,
     isFetching,
     error,
-  } = useGetAttendeesQuery(queryParams);
+  } = useGetEventAttendeesQuery(
+    { eventId, params: queryParams },
+    { skip: !eventId },
+  );
 
   const payload = response?.data;
-  const attendees: CrossEventAttendee[] = payload?.attendees ?? [];
+  const attendees: EventAttendeeRow[] = payload?.attendees ?? [];
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+
+  // ---- Detail query ----
+  const { data: detailResponse, isFetching: isDetailLoading } =
+    useGetEventAttendeeDetailQuery(
+      { eventId, attendeeId: openAttendeeId ?? '' },
+      { skip: !eventId || !openAttendeeId },
+    );
+  const detail: EventAttendeeDetail | undefined = detailResponse?.data;
 
   // ---- Stats (page-scoped) ----
   const stats = useMemo(() => {
@@ -279,7 +306,6 @@ export default function AttendeesPage() {
     return { attended, registered, noShow };
   }, [attendees]);
 
-  // ---- Error message ----
   const errorMessage = error
     ? (error as { data?: { message?: string } })?.data?.message ??
       'Failed to load attendees'
@@ -324,10 +350,7 @@ export default function AttendeesPage() {
     );
   };
 
-  const handleView = (attendee: CrossEventAttendee) => {
-    setSelectedAttendee(attendee);
-    setIsViewDialogOpen(true);
-  };
+  const handleView = (id: string) => setOpenAttendeeId(id);
 
   const getActiveFilterCount = () => {
     let n = 0;
@@ -348,7 +371,6 @@ export default function AttendeesPage() {
   const getSortLabel = () => {
     const labels: Record<SortField, string> = {
       name: 'Name',
-      event: 'Event',
       registered_at: 'Registered',
       status: 'Status',
       duration: 'Duration',
@@ -356,15 +378,34 @@ export default function AttendeesPage() {
     return labels[sortField];
   };
 
+  if (!eventId) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">Event ID is missing.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Attendees</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage and track attendees across your events.
-          </p>
+        <div className="flex items-center gap-3 min-w-0">
+          <Link
+            href={`/dashboard/events/${eventId}`}
+            className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground">Attendees</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Everyone registered for this event, with their attendance.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -528,9 +569,6 @@ export default function AttendeesPage() {
                         <SelectItem value="name" className="text-sm">
                           Name
                         </SelectItem>
-                        <SelectItem value="event" className="text-sm">
-                          Event
-                        </SelectItem>
                         <SelectItem value="registered_at" className="text-sm">
                           Registered
                         </SelectItem>
@@ -580,7 +618,6 @@ export default function AttendeesPage() {
               </div>
             </div>
 
-            {/* Bulk selection bar — visual only */}
             {selectedIds.length > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">
@@ -604,7 +641,7 @@ export default function AttendeesPage() {
         </Card>
       )}
 
-      {/* Loading / Error / Empty / Table / Grid */}
+      {/* Content */}
       {isLoading ? (
         <Card>
           <CardContent className="p-12 flex items-center justify-center">
@@ -642,15 +679,6 @@ export default function AttendeesPage() {
                     </TableHead>
                     <TableHead
                       className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => toggleSort('event')}
-                    >
-                      <div className="flex items-center">
-                        Event
-                        {getSortIcon('event')}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
                       onClick={() => toggleSort('status')}
                     >
                       <div className="flex items-center">
@@ -682,7 +710,7 @@ export default function AttendeesPage() {
 
                       return (
                         <TableRow
-                          key={`${a.attendee_id}-${a.event_id}`}
+                          key={a.attendee_id}
                           className={`hover:bg-muted/40 transition-colors ${
                             isSelected ? 'bg-primary/5' : ''
                           }`}
@@ -714,17 +742,6 @@ export default function AttendeesPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {a.event_name}
-                              </p>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="h-3 w-3 shrink-0" />
-                                <span>{formatDate(a.event_start_date)}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-4 px-4">
                             <Badge variant="outline" className={`${s.color} border`}>
                               <StatusIcon className="h-3 w-3 mr-1" />
                               {s.label}
@@ -750,18 +767,18 @@ export default function AttendeesPage() {
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleView(a)}>
+                                <DropdownMenuItem
+                                  onClick={() => handleView(a.attendee_id)}
+                                >
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() =>
-                                    router.push(
-                                      `/dashboard/events/${a.event_id}`,
-                                    )
+                                    router.push(`/dashboard/events/${eventId}`)
                                   }
                                 >
                                   <ArrowRight className="h-4 w-4 mr-2" />
@@ -776,7 +793,7 @@ export default function AttendeesPage() {
                   ) : (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={6}
                         className="py-12 text-center text-muted-foreground"
                       >
                         <div className="flex flex-col items-center gap-2">
@@ -859,12 +876,14 @@ export default function AttendeesPage() {
 
                 return (
                   <Card
-                    key={`${a.attendee_id}-${a.event_id}`}
+                    key={a.attendee_id}
                     className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
                       isSelected ? 'border-primary/50 bg-primary/5' : ''
                     }`}
                     onClick={() =>
-                      isMobile ? handleView(a) : handleSelectOne(a.attendee_id)
+                      isMobile
+                        ? handleView(a.attendee_id)
+                        : handleSelectOne(a.attendee_id)
                     }
                   >
                     <CardContent className="p-4 space-y-3">
@@ -901,18 +920,6 @@ export default function AttendeesPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-1 text-xs">
-                        <p className="font-medium text-foreground truncate">
-                          {a.event_name}
-                        </p>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-3 w-3 shrink-0" />
-                          <span className="truncate">
-                            {formatDate(a.event_start_date)}
-                          </span>
-                        </div>
-                      </div>
-
                       <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
                         <span className="text-muted-foreground">
                           Sessions:{' '}
@@ -945,16 +952,18 @@ export default function AttendeesPage() {
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent align="end" className="w-48">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleView(a)}>
+                              <DropdownMenuItem
+                                onClick={() => handleView(a.attendee_id)}
+                              >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() =>
-                                  router.push(`/dashboard/events/${a.event_id}`)
+                                  router.push(`/dashboard/events/${eventId}`)
                                 }
                               >
                                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -1158,7 +1167,6 @@ export default function AttendeesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
                     <SelectItem value="registered_at">Registered</SelectItem>
                     <SelectItem value="status">Status</SelectItem>
                     <SelectItem value="duration">Duration</SelectItem>
@@ -1211,30 +1219,37 @@ export default function AttendeesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Detail dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+      {/* Detail dialog — per-session breakdown */}
+      <Dialog
+        open={openAttendeeId !== null}
+        onOpenChange={(open) => !open && setOpenAttendeeId(null)}
+      >
         <DialogContent className="max-w-[95vw] sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Attendee Details</DialogTitle>
             <DialogDescription>
-              Attendance for one event.
+              Rollup and per-session breakdown.
             </DialogDescription>
           </DialogHeader>
 
-          {selectedAttendee && (
+          {isDetailLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : detail ? (
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center gap-3 sm:gap-4">
                 <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg">
-                    {initials(selectedAttendee.display_name)}
+                    {initials(detail.display_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <h3 className="text-base sm:text-lg font-semibold truncate">
-                    {selectedAttendee.display_name}
+                    {detail.display_name}
                   </h3>
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {selectedAttendee.email}
+                    {detail.email}
                   </p>
                 </div>
               </div>
@@ -1242,17 +1257,6 @@ export default function AttendeesPage() {
               <Separator />
 
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1 min-w-0">
-                  <Label className="text-xs text-muted-foreground">
-                    Event
-                  </Label>
-                  <p className="text-sm sm:text-base font-medium truncate">
-                    {selectedAttendee.event_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatDate(selectedAttendee.event_start_date)}
-                  </p>
-                </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
                     Status
@@ -1260,93 +1264,119 @@ export default function AttendeesPage() {
                   <Badge
                     variant="outline"
                     className={`${
-                      statusConfig[selectedAttendee.effective_status].color
+                      statusConfig[detail.effective_status].color
                     } border mt-1`}
                   >
-                    {statusConfig[selectedAttendee.effective_status].label}
+                    {statusConfig[detail.effective_status].label}
                   </Badge>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Sessions
+                  </Label>
+                  <p className="text-sm sm:text-base font-medium">
+                    {detail.sessions_attended} / {detail.sessions_total}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Sessions attended
-                  </Label>
-                  <p className="text-sm sm:text-base font-medium">
-                    {selectedAttendee.sessions_attended} /{' '}
-                    {selectedAttendee.sessions_total}
-                  </p>
-                </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
                     Total duration
                   </Label>
                   <p className="text-sm sm:text-base font-medium">
-                    {formatDuration(selectedAttendee.total_duration_seconds)}
+                    {formatDuration(detail.total_duration_seconds)}
                   </p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
                     Registered
                   </Label>
                   <p className="text-sm">
-                    {formatDate(selectedAttendee.registered_at)}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Last activity
-                  </Label>
-                  <p className="text-sm">
-                    {formatDate(selectedAttendee.last_activity_at)}
+                    {formatDate(detail.registered_at)}
                   </p>
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-sm"
-                  onClick={() => {
-                    setIsViewDialogOpen(false);
-                    router.push(
-                      `/dashboard/events/${selectedAttendee.event_id}/attendees`,
-                    );
-                  }}
-                >
-                  <ArrowRight className="h-4 w-4 mr-2 shrink-0" />
-                  <span className="truncate">View Event Attendees</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-sm"
-                  onClick={() => {
-                    setIsViewDialogOpen(false);
-                    router.push(
-                      `/dashboard/events/${selectedAttendee.event_id}`,
-                    );
-                  }}
-                >
-                  <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                  <span className="truncate">Go to Event</span>
-                </Button>
-              </div>
+              {detail.sessions.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Sessions
+                    </Label>
+                    <div className="space-y-2">
+                      {detail.sessions.map((sess) => {
+                        const s = statusConfig[sess.derived_status];
+                        const StatusIcon = s.icon;
+                        return (
+                          <div
+                            key={sess.session_id}
+                            className="rounded-lg border border-border bg-card p-3 flex flex-col sm:flex-row sm:items-center gap-2"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {sess.title || 'Untitled session'}
+                              </p>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                <Calendar className="h-3 w-3 shrink-0" />
+                                {formatDateTime(sess.scheduled_start)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                {formatDuration(sess.total_duration_seconds)}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`${s.color} border text-xs`}
+                              >
+                                <StatusIcon className="h-3 w-3 mr-1" />
+                                {s.label}
+                              </Badge>
+                              {sess.host_confirmed && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-primary border-primary/30 bg-primary/10"
+                                >
+                                  Confirmed
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <DialogFooter className="gap-2 flex-col sm:flex-row">
                 <Button
                   variant="outline"
-                  onClick={() => setIsViewDialogOpen(false)}
+                  onClick={() => setOpenAttendeeId(null)}
                   className="w-full sm:w-auto"
                 >
                   Close
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setOpenAttendeeId(null);
+                    router.push(`/dashboard/events/${eventId}`);
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Go to Event
+                </Button>
               </DialogFooter>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <AlertCircle className="h-5 w-5 mx-auto mb-2" />
+              Could not load attendee details.
             </div>
           )}
         </DialogContent>
