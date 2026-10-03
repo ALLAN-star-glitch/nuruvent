@@ -76,6 +76,7 @@ export interface SessionRosterEntry {
   last_derived_at: string;
   display_name?: string;
   email?: string;
+  phone?: string; 
   /** True when this row is the event host rather than a registered attendee. */
   is_host?: boolean;
 }
@@ -126,10 +127,13 @@ export interface MySessionLinksResponse {
  * The backend emits it as a derived value:
  *   confirmed > full > partial > joined > no-show > registered
  */
+// lib/types/attendance.ts
+
 export interface EventAttendeeRow {
   attendee_id: string;
   display_name: string;
   email: string;
+  phone: string;
   effective_status: AttendanceStatus;
   sessions_total: number;
   sessions_attended: number;
@@ -137,6 +141,7 @@ export interface EventAttendeeRow {
   total_duration_seconds: number;
   registered_at: string;    // ISO 8601
   last_activity_at: string; // ISO 8601
+  is_host: boolean;      
 }
 
 /**
@@ -203,17 +208,21 @@ export interface CrossEventAttendee {
   attendee_id: string;
   display_name: string;
   email: string;
+  phone: string;
   event_id: string;
   event_name: string;
   event_slug: string;
-  event_start_date: string; // ISO 8601
+  event_start_date: string;
   effective_status: AttendanceStatus;
   sessions_total: number;
   sessions_attended: number;
   sessions_confirmed: number;
   total_duration_seconds: number;
-  registered_at: string;    // ISO 8601
-  last_activity_at: string; // ISO 8601
+  registered_at: string;
+  last_activity_at: string;
+
+  /** True when the row represents the host of the event rather than a registered attendee. */
+  is_host?: boolean;
 }
 
 export interface CrossEventAttendeesPayload {

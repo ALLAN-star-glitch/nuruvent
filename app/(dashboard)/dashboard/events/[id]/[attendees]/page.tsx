@@ -10,6 +10,7 @@ import {
   Search,
   Users,
   Mail,
+  Phone,
   Calendar,
   Clock as ClockIcon,
   MoreVertical,
@@ -29,6 +30,11 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  Crown,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -82,12 +88,21 @@ import {
   useGetEventAttendeeDetailQuery,
   useGetEventAttendeesQuery,
 } from '@/lib/store/api/attendanceApi';
+import { useGetEventByIdQuery } from '@/lib/store/api/eventsApi';
+import { getEventHostName } from '@/lib/utils/eventDisplay';
 import type {
   AttendanceStatus,
   EventAttendeeDetail,
   EventAttendeeRow,
   ListAttendeesParams,
 } from '@/lib/types/attendance';
+
+import {
+  exportToCSV,
+  exportToExcel,
+  exportToJSON,
+  exportToPDF,
+} from '@/lib/utils/exportAttendees';
 
 // ============================================================
 // STATUS DISPLAY
@@ -193,6 +208,7 @@ function formatDateTime(iso: string | undefined): string {
 type SortField = 'name' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
+type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'json';
 
 // ============================================================
 // PAGE
@@ -225,6 +241,9 @@ export default function EventAttendeesPage() {
   // ---- Mobile ----
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+  // ---- Export ----
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -284,6 +303,15 @@ export default function EventAttendeesPage() {
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
+  // ---- Event info (name + date + host) ----
+  const { data: eventResponse } = useGetEventByIdQuery(eventId, {
+    skip: !eventId,
+  });
+  const event = eventResponse?.data;
+  const eventName = event?.display_name ?? event?.name ?? 'Event';
+  const eventStartDate = event?.start_date;
+  const eventHostName = event ? getEventHostName(event) : '';
+
   // ---- Detail query ----
   const { data: detailResponse, isFetching: isDetailLoading } =
     useGetEventAttendeeDetailQuery(
@@ -295,7 +323,8 @@ export default function EventAttendeesPage() {
   // ---- Stats (page-scoped) ----
   const stats = useMemo(() => {
     const attended = attendees.filter(
-      (a) => a.effective_status === 'full' || a.effective_status === 'confirmed',
+      (a) =>
+        a.effective_status === 'full' || a.effective_status === 'confirmed',
     ).length;
     const registered = attendees.filter(
       (a) => a.effective_status === 'registered',
@@ -303,13 +332,22 @@ export default function EventAttendeesPage() {
     const noShow = attendees.filter(
       (a) => a.effective_status === 'no-show',
     ).length;
-    return { attended, registered, noShow };
+    const hosts = attendees.filter((a) => a.is_host).length;
+    return { attended, registered, noShow, hosts };
   }, [attendees]);
 
   const errorMessage = error
     ? (error as { data?: { message?: string } })?.data?.message ??
       'Failed to load attendees'
     : null;
+
+  // ---- Selection helpers ----
+  const isRowSelected = (id: string) => selectedIds.includes(id);
+
+  const selectedAttendees = useMemo(
+    () => attendees.filter((a) => selectedIds.includes(a.attendee_id)),
+    [attendees, selectedIds],
+  );
 
   // ---- Handlers ----
   const toggleSort = (field: SortField) => {
@@ -352,6 +390,17 @@ export default function EventAttendeesPage() {
 
   const handleView = (id: string) => setOpenAttendeeId(id);
 
+  const handleViewFirstSelected = () => {
+    if (selectedAttendees.length === 1) {
+      handleView(selectedAttendees[0].attendee_id);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSelectAll(false);
+  };
+
   const getActiveFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
@@ -378,6 +427,52 @@ export default function EventAttendeesPage() {
     return labels[sortField];
   };
 
+  // ---- Export handler ----
+  const handleExport = async (format: ExportFormat) => {
+    if (attendees.length === 0) return;
+    setIsExporting(true);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const slug = eventName.replace(/\s+/g, '-').toLowerCase();
+
+      const filtersSummary =
+        [
+          searchQuery ? `Search: "${searchQuery}"` : null,
+          selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+        ]
+          .filter(Boolean)
+          .join('  ·  ') || undefined;
+
+      // EventAttendeeRow doesn't carry event-level fields, so we attach
+      // them here so the shared export helpers can read them.
+      const rows = attendees.map((a) => ({
+        ...a,
+        event_name: eventName,
+        event_slug: '',
+        event_start_date: eventStartDate ?? '',
+        event_id: eventId,
+      })) as unknown as Parameters<typeof exportToCSV>[0];
+
+      if (format === 'csv') {
+        exportToCSV(rows, `${slug}-attendees-${stamp}.csv`);
+      } else if (format === 'json') {
+        exportToJSON(rows, `${slug}-attendees-${stamp}.json`);
+      } else if (format === 'xlsx') {
+        await exportToExcel(rows, `${slug}-attendees-${stamp}.xlsx`);
+      } else if (format === 'pdf') {
+        await exportToPDF(rows, {
+          title: `${eventName} Attendees`,
+          subtitle: 'Event attendee directory',
+          hostName: eventHostName,
+          filtersSummary,
+          filename: `${slug}-attendees-${stamp}.pdf`,
+        });
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!eventId) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -396,17 +491,79 @@ export default function EventAttendeesPage() {
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href={`/dashboard/events/${eventId}`}
-            className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
+            className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0 cursor-pointer"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-foreground">Attendees</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Everyone registered for this event, with their attendance.
-            </p>
+            <h1 className="text-2xl font-bold text-foreground truncate">
+              {eventName} Attendees
+            </h1>
+            <div className="flex items-center gap-2 mt-1 min-w-0">
+              <p className="text-sm text-muted-foreground truncate">
+                Everyone registered for this event, with their attendance.
+              </p>
+              {eventStartDate && (
+                <>
+                  <span className="text-muted-foreground shrink-0">·</span>
+                  <span className="text-sm text-muted-foreground flex items-center gap-1 shrink-0">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(eventStartDate)}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="cursor-pointer w-full sm:w-auto"
+              disabled={isExporting || attendees.length === 0}
+            >
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>Export as</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('pdf')}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('xlsx')}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('csv')}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('json')}
+            >
+              <FileJson className="h-4 w-4 mr-2" />
+              JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stats */}
@@ -452,14 +609,14 @@ export default function EventAttendeesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Registered (page)
+                  Hosts (page)
                 </p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.registered}
+                <p className="text-2xl font-bold text-amber-600 mt-1">
+                  {stats.hosts}
                 </p>
               </div>
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-lg dark:bg-blue-950/30">
-                <ClockIcon className="h-5 w-5" />
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg dark:bg-amber-950/30">
+                <Crown className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
@@ -506,13 +663,15 @@ export default function EventAttendeesPage() {
                     setSelectedStatus(v as 'all' | AttendanceStatus)
                   }
                 >
-                  <SelectTrigger className="w-full md:w-[170px]">
+                  <SelectTrigger className="w-full md:w-[170px] cursor-pointer">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
+                      <SelectItem key={s} value={s} className="cursor-pointer">
                         {statusConfig[s].label}
                       </SelectItem>
                     ))}
@@ -525,7 +684,7 @@ export default function EventAttendeesPage() {
                   <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-md transition-colors ${
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                         viewMode === 'table'
                           ? 'bg-background text-primary shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -536,7 +695,7 @@ export default function EventAttendeesPage() {
                     </button>
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded-md transition-colors ${
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                         viewMode === 'grid'
                           ? 'bg-background text-primary shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -562,20 +721,32 @@ export default function EventAttendeesPage() {
                         setSortDirection('asc');
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0">
+                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="name" className="text-sm">
+                        <SelectItem
+                          value="name"
+                          className="text-sm cursor-pointer"
+                        >
                           Name
                         </SelectItem>
-                        <SelectItem value="registered_at" className="text-sm">
+                        <SelectItem
+                          value="registered_at"
+                          className="text-sm cursor-pointer"
+                        >
                           Registered
                         </SelectItem>
-                        <SelectItem value="status" className="text-sm">
+                        <SelectItem
+                          value="status"
+                          className="text-sm cursor-pointer"
+                        >
                           Status
                         </SelectItem>
-                        <SelectItem value="duration" className="text-sm">
+                        <SelectItem
+                          value="duration"
+                          className="text-sm cursor-pointer"
+                        >
                           Duration
                         </SelectItem>
                       </SelectContent>
@@ -585,7 +756,7 @@ export default function EventAttendeesPage() {
                       onClick={() =>
                         setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
                       }
-                      className="p-1 hover:bg-muted rounded-md transition-colors"
+                      className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
                       title={
                         sortDirection === 'asc' ? 'Ascending' : 'Descending'
                       }
@@ -609,7 +780,7 @@ export default function EventAttendeesPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs"
+                    className="h-8 text-xs cursor-pointer"
                     onClick={resetFilters}
                   >
                     Reset
@@ -618,23 +789,35 @@ export default function EventAttendeesPage() {
               </div>
             </div>
 
+            {/* Bulk selection bar */}
             {selectedIds.length > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">
                   {selectedIds.length} attendee
                   {selectedIds.length > 1 ? 's' : ''} selected
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setSelectedIds([]);
-                    setSelectAll(false);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                <div className="flex items-center gap-2">
+                  {selectedAttendees.length === 1 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={handleViewFirstSelected}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View details
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="cursor-pointer"
+                    onClick={clearSelection}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
@@ -666,10 +849,11 @@ export default function EventAttendeesPage() {
                       <Checkbox
                         checked={selectAll}
                         onCheckedChange={handleSelectAll}
+                        className="cursor-pointer"
                       />
                     </TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('name')}
                     >
                       <div className="flex items-center">
@@ -678,7 +862,7 @@ export default function EventAttendeesPage() {
                       </div>
                     </TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('status')}
                     >
                       <div className="flex items-center">
@@ -688,7 +872,7 @@ export default function EventAttendeesPage() {
                     </TableHead>
                     <TableHead className="py-3 px-4">Sessions</TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('duration')}
                     >
                       <div className="flex items-center">
@@ -706,21 +890,26 @@ export default function EventAttendeesPage() {
                     attendees.map((a) => {
                       const s = statusConfig[a.effective_status];
                       const StatusIcon = s.icon;
-                      const isSelected = selectedIds.includes(a.attendee_id);
+                      const isSelected = isRowSelected(a.attendee_id);
 
                       return (
                         <TableRow
                           key={a.attendee_id}
-                          className={`hover:bg-muted/40 transition-colors ${
+                          className={`hover:bg-muted/40 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
                           }`}
+                          onClick={() => handleSelectOne(a.attendee_id)}
                         >
-                          <TableCell className="py-4 px-4">
+                          <TableCell
+                            className="py-4 px-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() =>
                                 handleSelectOne(a.attendee_id)
                               }
+                              className="cursor-pointer"
                             />
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -731,18 +920,46 @@ export default function EventAttendeesPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">
-                                  {a.display_name}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Mail className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{a.email}</span>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-foreground truncate">
+                                    {a.display_name}
+                                  </p>
+                                  {a.is_host && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 shrink-0"
+                                    >
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      Host
+                                    </Badge>
+                                  )}
                                 </div>
+
+                                {a.email ? (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Mail className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{a.email}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground italic">
+                                    No email on file
+                                  </div>
+                                )}
+
+                                {a.phone && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Phone className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{a.phone}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${s.color} border`}>
+                            <Badge
+                              variant="outline"
+                              className={`${s.color} border`}
+                            >
                               <StatusIcon className="h-3 w-3 mr-1" />
                               {s.label}
                             </Badge>
@@ -752,31 +969,44 @@ export default function EventAttendeesPage() {
                               {a.sessions_attended}
                             </span>{' '}
                             / {a.sessions_total}
+                            {a.sessions_confirmed > 0 && (
+                              <span className="ml-2 text-xs text-primary">
+                                · {a.sessions_confirmed} confirmed
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="py-4 px-4 text-sm text-muted-foreground">
                             {formatDuration(a.total_duration_seconds)}
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
+                          <TableCell
+                            className="py-4 px-4 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 cursor-pointer"
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-48"
+                              >
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
+                                  className="cursor-pointer"
                                   onClick={() => handleView(a.attendee_id)}
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  className="cursor-pointer"
                                   onClick={() =>
                                     router.push(`/dashboard/events/${eventId}`)
                                   }
@@ -820,14 +1050,22 @@ export default function EventAttendeesPage() {
                     value={itemsPerPage.toString()}
                     onValueChange={(v) => setItemsPerPage(Number(v))}
                   >
-                    <SelectTrigger className="h-8 w-[70px]">
+                    <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="5" className="cursor-pointer">
+                        5
+                      </SelectItem>
+                      <SelectItem value="10" className="cursor-pointer">
+                        10
+                      </SelectItem>
+                      <SelectItem value="20" className="cursor-pointer">
+                        20
+                      </SelectItem>
+                      <SelectItem value="50" className="cursor-pointer">
+                        50
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -840,7 +1078,7 @@ export default function EventAttendeesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 cursor-pointer"
                       onClick={() =>
                         setCurrentPage((p) => Math.max(p - 1, 1))
                       }
@@ -851,7 +1089,7 @@ export default function EventAttendeesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 cursor-pointer"
                       onClick={() =>
                         setCurrentPage((p) => Math.min(p + 1, totalPages))
                       }
@@ -872,7 +1110,7 @@ export default function EventAttendeesPage() {
               attendees.map((a) => {
                 const s = statusConfig[a.effective_status];
                 const StatusIcon = s.icon;
-                const isSelected = selectedIds.includes(a.attendee_id);
+                const isSelected = isRowSelected(a.attendee_id);
 
                 return (
                   <Card
@@ -880,11 +1118,7 @@ export default function EventAttendeesPage() {
                     className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
                       isSelected ? 'border-primary/50 bg-primary/5' : ''
                     }`}
-                    onClick={() =>
-                      isMobile
-                        ? handleView(a.attendee_id)
-                        : handleSelectOne(a.attendee_id)
-                    }
+                    onClick={() => handleSelectOne(a.attendee_id)}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
@@ -896,6 +1130,7 @@ export default function EventAttendeesPage() {
                                 handleSelectOne(a.attendee_id)
                               }
                               onClick={(e) => e.stopPropagation()}
+                              className="cursor-pointer"
                             />
                           )}
                           <Avatar className="h-10 w-10">
@@ -904,20 +1139,48 @@ export default function EventAttendeesPage() {
                             </AvatarFallback>
                           </Avatar>
                         </div>
-                        <Badge variant="outline" className={`${s.color} border`}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {s.label}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {a.is_host && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                            >
+                              <Crown className="h-3 w-3 mr-1" />
+                              Host
+                            </Badge>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={`${s.color} border`}
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {s.label}
+                          </Badge>
+                        </div>
                       </div>
 
                       <div className="min-w-0">
                         <h3 className="font-semibold text-foreground truncate">
                           {a.display_name}
                         </h3>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Mail className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{a.email}</span>
-                        </div>
+
+                        {a.email ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{a.email}</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground italic">
+                            No email on file
+                          </div>
+                        )}
+
+                        {a.phone && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{a.phone}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
@@ -932,36 +1195,45 @@ export default function EventAttendeesPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-border">
-                        {isMobile ? (
-                          <div className="flex items-center gap-1 text-xs text-primary font-medium">
-                            View Details
-                            <ArrowRight className="h-3 w-3" />
-                          </div>
-                        ) : (
+                      <div
+                        className="flex items-center justify-between pt-2 border-t border-border"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="cursor-pointer h-7 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
+                          onClick={() => handleView(a.attendee_id)}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          View details
+                        </Button>
+                        {!isMobile && (
                           <DropdownMenu>
-                            <DropdownMenuTrigger
-                              asChild
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 p-0"
+                                className="h-7 w-7 p-0 cursor-pointer"
                               >
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-48"
+                            >
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
+                                className="cursor-pointer"
                                 onClick={() => handleView(a.attendee_id)}
                               >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
+                                className="cursor-pointer"
                                 onClick={() =>
                                   router.push(`/dashboard/events/${eventId}`)
                                 }
@@ -1000,14 +1272,22 @@ export default function EventAttendeesPage() {
                   value={itemsPerPage.toString()}
                   onValueChange={(v) => setItemsPerPage(Number(v))}
                 >
-                  <SelectTrigger className="h-8 w-[70px]">
+                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="5" className="cursor-pointer">
+                      5
+                    </SelectItem>
+                    <SelectItem value="10" className="cursor-pointer">
+                      10
+                    </SelectItem>
+                    <SelectItem value="20" className="cursor-pointer">
+                      20
+                    </SelectItem>
+                    <SelectItem value="50" className="cursor-pointer">
+                      50
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1020,7 +1300,7 @@ export default function EventAttendeesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 cursor-pointer"
                     onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
                   >
@@ -1029,7 +1309,7 @@ export default function EventAttendeesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 cursor-pointer"
                     onClick={() =>
                       setCurrentPage((p) => Math.min(p + 1, totalPages))
                     }
@@ -1051,7 +1331,7 @@ export default function EventAttendeesPage() {
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
               >
                 <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm text-foreground truncate">
@@ -1063,7 +1343,7 @@ export default function EventAttendeesPage() {
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative"
+                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative cursor-pointer"
               >
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground">Filters</span>
@@ -1078,7 +1358,7 @@ export default function EventAttendeesPage() {
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
               >
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground truncate max-w-[60px]">
@@ -1110,7 +1390,7 @@ export default function EventAttendeesPage() {
                 </SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5 text-muted-foreground" />
                 </button>
@@ -1142,13 +1422,15 @@ export default function EventAttendeesPage() {
                     setSelectedStatus(v as 'all' | AttendanceStatus)
                   }
                 >
-                  <SelectTrigger className="h-11 rounded-xl w-full">
+                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
+                      <SelectItem key={s} value={s} className="cursor-pointer">
                         {statusConfig[s].label}
                       </SelectItem>
                     ))}
@@ -1162,14 +1444,25 @@ export default function EventAttendeesPage() {
                   value={sortField}
                   onValueChange={(v) => setSortField(v as SortField)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl">
+                  <SelectTrigger className="h-11 rounded-xl cursor-pointer">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="registered_at">Registered</SelectItem>
-                    <SelectItem value="status">Status</SelectItem>
-                    <SelectItem value="duration">Duration</SelectItem>
+                    <SelectItem value="name" className="cursor-pointer">
+                      Name
+                    </SelectItem>
+                    <SelectItem
+                      value="registered_at"
+                      className="cursor-pointer"
+                    >
+                      Registered
+                    </SelectItem>
+                    <SelectItem value="status" className="cursor-pointer">
+                      Status
+                    </SelectItem>
+                    <SelectItem value="duration" className="cursor-pointer">
+                      Duration
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1179,7 +1472,7 @@ export default function EventAttendeesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl cursor-pointer"
                     onClick={() => setSortDirection('asc')}
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
@@ -1187,7 +1480,7 @@ export default function EventAttendeesPage() {
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl cursor-pointer"
                     onClick={() => setSortDirection('desc')}
                   >
                     <ArrowDown className="h-4 w-4 mr-2" />
@@ -1200,7 +1493,7 @@ export default function EventAttendeesPage() {
             <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl"
+                className="flex-1 h-11 rounded-xl cursor-pointer"
                 onClick={() => {
                   resetFilters();
                   setIsFilterSheetOpen(false);
@@ -1209,7 +1502,7 @@ export default function EventAttendeesPage() {
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl"
+                className="flex-1 h-11 rounded-xl cursor-pointer"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
@@ -1245,12 +1538,31 @@ export default function EventAttendeesPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold truncate">
-                    {detail.display_name}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-semibold truncate">
+                      {detail.display_name}
+                    </h3>
+                    {detail.is_host && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                      >
+                        <Crown className="h-3 w-3 mr-1" />
+                        Host
+                      </Badge>
+                    )}
+                  </div>
+
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {detail.email}
+                    {detail.email || 'No email on file'}
                   </p>
+
+                  {detail.phone && (
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate flex items-center gap-1.5">
+                      <Phone className="h-3 w-3 shrink-0" />
+                      {detail.phone}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1324,7 +1636,7 @@ export default function EventAttendeesPage() {
                                 {formatDateTime(sess.scheduled_start)}
                               </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
                               <span className="text-xs text-muted-foreground tabular-nums">
                                 {formatDuration(sess.total_duration_seconds)}
                               </span>
@@ -1356,7 +1668,7 @@ export default function EventAttendeesPage() {
                 <Button
                   variant="outline"
                   onClick={() => setOpenAttendeeId(null)}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto cursor-pointer"
                 >
                   Close
                 </Button>
@@ -1366,7 +1678,7 @@ export default function EventAttendeesPage() {
                     setOpenAttendeeId(null);
                     router.push(`/dashboard/events/${eventId}`);
                   }}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto cursor-pointer"
                 >
                   <ArrowRight className="h-4 w-4 mr-2" />
                   Go to Event

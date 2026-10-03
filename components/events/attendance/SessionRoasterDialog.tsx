@@ -9,6 +9,7 @@ import {
   Link2,
   Loader2,
   Mail,
+  Phone,
   RefreshCw,
   User,
 } from 'lucide-react';
@@ -458,10 +459,22 @@ export function SessionRosterDialog({
                       <p className="text-sm font-medium text-foreground truncate">
                         {r.display_name || 'Unknown attendee'}
                       </p>
-                      {r.email && (
+
+                      {r.email ? (
                         <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                           <Mail className="h-3 w-3 shrink-0" />
                           {r.email}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic truncate">
+                          No email on file
+                        </p>
+                      )}
+
+                      {r.phone && (
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          <Phone className="h-3 w-3 shrink-0" />
+                          {r.phone}
                         </p>
                       )}
                     </div>

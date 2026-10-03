@@ -9,6 +9,7 @@ import {
   Search,
   Users,
   Mail,
+  Phone,
   Calendar,
   Clock as ClockIcon,
   MoreVertical,
@@ -27,6 +28,11 @@ import {
   ArrowRight,
   Loader2,
   AlertCircle,
+  Crown,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -82,6 +88,13 @@ import type {
   CrossEventAttendee,
   ListAllAttendeesParams,
 } from '@/lib/types/attendance';
+
+import {
+  exportToCSV,
+  exportToExcel,
+  exportToJSON,
+  exportToPDF,
+} from '@/lib/utils/exportAttendees';
 
 // ============================================================
 // STATUS DISPLAY
@@ -174,6 +187,7 @@ function formatDate(iso: string | undefined): string {
 type SortField = 'name' | 'event' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
+type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'json';
 
 // ============================================================
 // PAGE
@@ -194,7 +208,7 @@ export default function AttendeesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  // ---- Selection (visual only — no bulk actions exist) ----
+  // ---- Selection ----
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
@@ -207,6 +221,9 @@ export default function AttendeesPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
+  // ---- Export ----
+  const [isExporting, setIsExporting] = useState(false);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -214,7 +231,6 @@ export default function AttendeesPage() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => {
       setSearchQuery(searchInput.trim());
@@ -223,12 +239,10 @@ export default function AttendeesPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus, sortField, sortDirection, itemsPerPage]);
 
-  // Clear selection when page changes
   useEffect(() => {
     setSelectedIds([]);
     setSelectAll(false);
@@ -265,10 +279,11 @@ export default function AttendeesPage() {
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
-  // ---- Stats (page-scoped) ----
+  // ---- Stats ----
   const stats = useMemo(() => {
     const attended = attendees.filter(
-      (a) => a.effective_status === 'full' || a.effective_status === 'confirmed',
+      (a) =>
+        a.effective_status === 'full' || a.effective_status === 'confirmed',
     ).length;
     const registered = attendees.filter(
       (a) => a.effective_status === 'registered',
@@ -276,14 +291,25 @@ export default function AttendeesPage() {
     const noShow = attendees.filter(
       (a) => a.effective_status === 'no-show',
     ).length;
-    return { attended, registered, noShow };
+    const hosts = attendees.filter((a) => a.is_host).length;
+    return { attended, registered, noShow, hosts };
   }, [attendees]);
 
-  // ---- Error message ----
   const errorMessage = error
     ? (error as { data?: { message?: string } })?.data?.message ??
       'Failed to load attendees'
     : null;
+
+  // ---- Selection helpers ----
+  const rowKey = (a: CrossEventAttendee) => `${a.attendee_id}-${a.event_id}`;
+
+  const isRowSelected = (a: CrossEventAttendee) =>
+    selectedIds.includes(rowKey(a));
+
+  const selectedAttendees = useMemo(
+    () => attendees.filter((a) => selectedIds.includes(rowKey(a))),
+    [attendees, selectedIds],
+  );
 
   // ---- Handlers ----
   const toggleSort = (field: SortField) => {
@@ -313,20 +339,32 @@ export default function AttendeesPage() {
       setSelectedIds([]);
       setSelectAll(false);
     } else {
-      setSelectedIds(attendees.map((a) => a.attendee_id));
+      setSelectedIds(attendees.map(rowKey));
       setSelectAll(true);
     }
   };
 
-  const handleSelectOne = (id: string) => {
+  const handleSelectOne = (a: CrossEventAttendee) => {
+    const key = rowKey(a);
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key],
     );
   };
 
   const handleView = (attendee: CrossEventAttendee) => {
     setSelectedAttendee(attendee);
     setIsViewDialogOpen(true);
+  };
+
+  const handleViewFirstSelected = () => {
+    if (selectedAttendees.length === 1) {
+      handleView(selectedAttendees[0]);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+    setSelectAll(false);
   };
 
   const getActiveFilterCount = () => {
@@ -356,16 +394,101 @@ export default function AttendeesPage() {
     return labels[sortField];
   };
 
+  // ---- Export handler ----
+  const handleExport = async (format: ExportFormat) => {
+    if (attendees.length === 0) return;
+    setIsExporting(true);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+
+      const filtersSummary =
+        [
+          searchQuery ? `Search: "${searchQuery}"` : null,
+          selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+        ]
+          .filter(Boolean)
+          .join('  ·  ') || undefined;
+
+      if (format === 'csv') {
+        exportToCSV(attendees, `attendees-${stamp}.csv`);
+      } else if (format === 'json') {
+        exportToJSON(attendees, `attendees-${stamp}.json`);
+      } else if (format === 'xlsx') {
+        await exportToExcel(attendees, `attendees-${stamp}.xlsx`);
+      } else if (format === 'pdf') {
+        await exportToPDF(attendees, {
+          title: 'All Events Attendees',
+          subtitle: 'Cross-event attendee directory',
+          filtersSummary,
+          filename: `attendees-${stamp}.pdf`,
+        });
+      }
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Attendees</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-foreground">
+            All Events Attendees
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage and track attendees across your events.
           </p>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="cursor-pointer w-full sm:w-auto"
+              disabled={isExporting || attendees.length === 0}
+            >
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>Export as</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('pdf')}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('xlsx')}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('csv')}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleExport('json')}
+            >
+              <FileJson className="h-4 w-4 mr-2" />
+              JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Stats */}
@@ -411,14 +534,14 @@ export default function AttendeesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Registered (page)
+                  Hosts (page)
                 </p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">
-                  {stats.registered}
+                <p className="text-2xl font-bold text-amber-600 mt-1">
+                  {stats.hosts}
                 </p>
               </div>
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-lg dark:bg-blue-950/30">
-                <ClockIcon className="h-5 w-5" />
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg dark:bg-amber-950/30">
+                <Crown className="h-5 w-5" />
               </div>
             </div>
           </CardContent>
@@ -465,13 +588,15 @@ export default function AttendeesPage() {
                     setSelectedStatus(v as 'all' | AttendanceStatus)
                   }
                 >
-                  <SelectTrigger className="w-full md:w-[170px]">
+                  <SelectTrigger className="w-full md:w-[170px] cursor-pointer">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
+                      <SelectItem key={s} value={s} className="cursor-pointer">
                         {statusConfig[s].label}
                       </SelectItem>
                     ))}
@@ -484,7 +609,7 @@ export default function AttendeesPage() {
                   <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
                     <button
                       onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-md transition-colors ${
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                         viewMode === 'table'
                           ? 'bg-background text-primary shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -495,7 +620,7 @@ export default function AttendeesPage() {
                     </button>
                     <button
                       onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded-md transition-colors ${
+                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
                         viewMode === 'grid'
                           ? 'bg-background text-primary shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -521,23 +646,38 @@ export default function AttendeesPage() {
                         setSortDirection('asc');
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0">
+                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="name" className="text-sm">
+                        <SelectItem
+                          value="name"
+                          className="text-sm cursor-pointer"
+                        >
                           Name
                         </SelectItem>
-                        <SelectItem value="event" className="text-sm">
+                        <SelectItem
+                          value="event"
+                          className="text-sm cursor-pointer"
+                        >
                           Event
                         </SelectItem>
-                        <SelectItem value="registered_at" className="text-sm">
+                        <SelectItem
+                          value="registered_at"
+                          className="text-sm cursor-pointer"
+                        >
                           Registered
                         </SelectItem>
-                        <SelectItem value="status" className="text-sm">
+                        <SelectItem
+                          value="status"
+                          className="text-sm cursor-pointer"
+                        >
                           Status
                         </SelectItem>
-                        <SelectItem value="duration" className="text-sm">
+                        <SelectItem
+                          value="duration"
+                          className="text-sm cursor-pointer"
+                        >
                           Duration
                         </SelectItem>
                       </SelectContent>
@@ -547,7 +687,7 @@ export default function AttendeesPage() {
                       onClick={() =>
                         setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
                       }
-                      className="p-1 hover:bg-muted rounded-md transition-colors"
+                      className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
                       title={
                         sortDirection === 'asc' ? 'Ascending' : 'Descending'
                       }
@@ -571,7 +711,7 @@ export default function AttendeesPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs"
+                    className="h-8 text-xs cursor-pointer"
                     onClick={resetFilters}
                   >
                     Reset
@@ -580,31 +720,42 @@ export default function AttendeesPage() {
               </div>
             </div>
 
-            {/* Bulk selection bar — visual only */}
+            {/* Bulk selection bar */}
             {selectedIds.length > 0 && (
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">
                   {selectedIds.length} attendee
                   {selectedIds.length > 1 ? 's' : ''} selected
                 </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setSelectedIds([]);
-                    setSelectAll(false);
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear
-                </Button>
+                <div className="flex items-center gap-2">
+                  {selectedAttendees.length === 1 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={handleViewFirstSelected}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View details
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="cursor-pointer"
+                    onClick={clearSelection}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Loading / Error / Empty / Table / Grid */}
+      {/* Loading / Error / Table / Grid */}
       {isLoading ? (
         <Card>
           <CardContent className="p-12 flex items-center justify-center">
@@ -629,10 +780,11 @@ export default function AttendeesPage() {
                       <Checkbox
                         checked={selectAll}
                         onCheckedChange={handleSelectAll}
+                        className="cursor-pointer"
                       />
                     </TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('name')}
                     >
                       <div className="flex items-center">
@@ -641,7 +793,7 @@ export default function AttendeesPage() {
                       </div>
                     </TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('event')}
                     >
                       <div className="flex items-center">
@@ -650,7 +802,7 @@ export default function AttendeesPage() {
                       </div>
                     </TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('status')}
                     >
                       <div className="flex items-center">
@@ -660,7 +812,7 @@ export default function AttendeesPage() {
                     </TableHead>
                     <TableHead className="py-3 px-4">Sessions</TableHead>
                     <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors"
+                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
                       onClick={() => toggleSort('duration')}
                     >
                       <div className="flex items-center">
@@ -678,21 +830,24 @@ export default function AttendeesPage() {
                     attendees.map((a) => {
                       const s = statusConfig[a.effective_status];
                       const StatusIcon = s.icon;
-                      const isSelected = selectedIds.includes(a.attendee_id);
+                      const isSelected = isRowSelected(a);
 
                       return (
                         <TableRow
-                          key={`${a.attendee_id}-${a.event_id}`}
-                          className={`hover:bg-muted/40 transition-colors ${
+                          key={rowKey(a)}
+                          className={`hover:bg-muted/40 transition-colors cursor-pointer ${
                             isSelected ? 'bg-primary/5' : ''
                           }`}
+                          onClick={() => handleSelectOne(a)}
                         >
-                          <TableCell className="py-4 px-4">
+                          <TableCell
+                            className="py-4 px-4"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Checkbox
                               checked={isSelected}
-                              onCheckedChange={() =>
-                                handleSelectOne(a.attendee_id)
-                              }
+                              onCheckedChange={() => handleSelectOne(a)}
+                              className="cursor-pointer"
                             />
                           </TableCell>
                           <TableCell className="py-4 px-4">
@@ -703,13 +858,38 @@ export default function AttendeesPage() {
                                 </AvatarFallback>
                               </Avatar>
                               <div className="min-w-0">
-                                <p className="font-semibold text-foreground truncate">
-                                  {a.display_name}
-                                </p>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <Mail className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{a.email}</span>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-foreground truncate">
+                                    {a.display_name}
+                                  </p>
+                                  {a.is_host && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 shrink-0"
+                                    >
+                                      <Crown className="h-3 w-3 mr-1" />
+                                      Host
+                                    </Badge>
+                                  )}
                                 </div>
+
+                                {a.email ? (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Mail className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{a.email}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-xs text-muted-foreground italic">
+                                    No email on file
+                                  </div>
+                                )}
+
+                                {a.phone && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Phone className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{a.phone}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -725,7 +905,10 @@ export default function AttendeesPage() {
                             </div>
                           </TableCell>
                           <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${s.color} border`}>
+                            <Badge
+                              variant="outline"
+                              className={`${s.color} border`}
+                            >
                               <StatusIcon className="h-3 w-3 mr-1" />
                               {s.label}
                             </Badge>
@@ -739,25 +922,35 @@ export default function AttendeesPage() {
                           <TableCell className="py-4 px-4 text-sm text-muted-foreground">
                             {formatDuration(a.total_duration_seconds)}
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
+                          <TableCell
+                            className="py-4 px-4 text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 cursor-pointer"
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-44"
+                              >
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleView(a)}>
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => handleView(a)}
+                                >
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  className="cursor-pointer"
                                   onClick={() =>
                                     router.push(
                                       `/dashboard/events/${a.event_id}`,
@@ -803,14 +996,22 @@ export default function AttendeesPage() {
                     value={itemsPerPage.toString()}
                     onValueChange={(v) => setItemsPerPage(Number(v))}
                   >
-                    <SelectTrigger className="h-8 w-[70px]">
+                    <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="5" className="cursor-pointer">
+                        5
+                      </SelectItem>
+                      <SelectItem value="10" className="cursor-pointer">
+                        10
+                      </SelectItem>
+                      <SelectItem value="20" className="cursor-pointer">
+                        20
+                      </SelectItem>
+                      <SelectItem value="50" className="cursor-pointer">
+                        50
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -823,7 +1024,7 @@ export default function AttendeesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 cursor-pointer"
                       onClick={() =>
                         setCurrentPage((p) => Math.max(p - 1, 1))
                       }
@@ -834,7 +1035,7 @@ export default function AttendeesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 cursor-pointer"
                       onClick={() =>
                         setCurrentPage((p) => Math.min(p + 1, totalPages))
                       }
@@ -855,17 +1056,15 @@ export default function AttendeesPage() {
               attendees.map((a) => {
                 const s = statusConfig[a.effective_status];
                 const StatusIcon = s.icon;
-                const isSelected = selectedIds.includes(a.attendee_id);
+                const isSelected = isRowSelected(a);
 
                 return (
                   <Card
-                    key={`${a.attendee_id}-${a.event_id}`}
+                    key={rowKey(a)}
                     className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
                       isSelected ? 'border-primary/50 bg-primary/5' : ''
                     }`}
-                    onClick={() =>
-                      isMobile ? handleView(a) : handleSelectOne(a.attendee_id)
-                    }
+                    onClick={() => handleSelectOne(a)}
                   >
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between">
@@ -873,10 +1072,9 @@ export default function AttendeesPage() {
                           {!isMobile && (
                             <Checkbox
                               checked={isSelected}
-                              onCheckedChange={() =>
-                                handleSelectOne(a.attendee_id)
-                              }
+                              onCheckedChange={() => handleSelectOne(a)}
                               onClick={(e) => e.stopPropagation()}
+                              className="cursor-pointer"
                             />
                           )}
                           <Avatar className="h-10 w-10">
@@ -885,20 +1083,48 @@ export default function AttendeesPage() {
                             </AvatarFallback>
                           </Avatar>
                         </div>
-                        <Badge variant="outline" className={`${s.color} border`}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {s.label}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {a.is_host && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                            >
+                              <Crown className="h-3 w-3 mr-1" />
+                              Host
+                            </Badge>
+                          )}
+                          <Badge
+                            variant="outline"
+                            className={`${s.color} border`}
+                          >
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {s.label}
+                          </Badge>
+                        </div>
                       </div>
 
                       <div className="min-w-0">
                         <h3 className="font-semibold text-foreground truncate">
                           {a.display_name}
                         </h3>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Mail className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{a.email}</span>
-                        </div>
+
+                        {a.email ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Mail className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{a.email}</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground italic">
+                            No email on file
+                          </div>
+                        )}
+
+                        {a.phone && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{a.phone}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-1 text-xs">
@@ -925,36 +1151,49 @@ export default function AttendeesPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-border">
-                        {isMobile ? (
-                          <div className="flex items-center gap-1 text-xs text-primary font-medium">
-                            View Details
-                            <ArrowRight className="h-3 w-3" />
-                          </div>
-                        ) : (
+                      <div
+                        className="flex items-center justify-between pt-2 border-t border-border"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="cursor-pointer h-7 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
+                          onClick={() => handleView(a)}
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          View details
+                        </Button>
+                        {!isMobile && (
                           <DropdownMenu>
-                            <DropdownMenuTrigger
-                              asChild
-                              onClick={(e) => e.stopPropagation()}
-                            >
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 p-0"
+                                className="h-7 w-7 p-0 cursor-pointer"
                               >
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-44"
+                            >
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleView(a)}>
+                              <DropdownMenuItem
+                                className="cursor-pointer"
+                                onClick={() => handleView(a)}
+                              >
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem
+                                className="cursor-pointer"
                                 onClick={() =>
-                                  router.push(`/dashboard/events/${a.event_id}`)
+                                  router.push(
+                                    `/dashboard/events/${a.event_id}`,
+                                  )
                                 }
                               >
                                 <ArrowRight className="h-4 w-4 mr-2" />
@@ -991,14 +1230,22 @@ export default function AttendeesPage() {
                   value={itemsPerPage.toString()}
                   onValueChange={(v) => setItemsPerPage(Number(v))}
                 >
-                  <SelectTrigger className="h-8 w-[70px]">
+                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="5" className="cursor-pointer">
+                      5
+                    </SelectItem>
+                    <SelectItem value="10" className="cursor-pointer">
+                      10
+                    </SelectItem>
+                    <SelectItem value="20" className="cursor-pointer">
+                      20
+                    </SelectItem>
+                    <SelectItem value="50" className="cursor-pointer">
+                      50
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1011,7 +1258,7 @@ export default function AttendeesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 cursor-pointer"
                     onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                     disabled={currentPage === 1}
                   >
@@ -1020,7 +1267,7 @@ export default function AttendeesPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 cursor-pointer"
                     onClick={() =>
                       setCurrentPage((p) => Math.min(p + 1, totalPages))
                     }
@@ -1042,7 +1289,7 @@ export default function AttendeesPage() {
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
               >
                 <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm text-foreground truncate">
@@ -1054,7 +1301,7 @@ export default function AttendeesPage() {
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative"
+                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative cursor-pointer"
               >
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground">Filters</span>
@@ -1069,7 +1316,7 @@ export default function AttendeesPage() {
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
               >
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground truncate max-w-[60px]">
@@ -1101,7 +1348,7 @@ export default function AttendeesPage() {
                 </SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5 text-muted-foreground" />
                 </button>
@@ -1133,13 +1380,15 @@ export default function AttendeesPage() {
                     setSelectedStatus(v as 'all' | AttendanceStatus)
                   }
                 >
-                  <SelectTrigger className="h-11 rounded-xl w-full">
+                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>
+                      <SelectItem key={s} value={s} className="cursor-pointer">
                         {statusConfig[s].label}
                       </SelectItem>
                     ))}
@@ -1153,15 +1402,28 @@ export default function AttendeesPage() {
                   value={sortField}
                   onValueChange={(v) => setSortField(v as SortField)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl">
+                  <SelectTrigger className="h-11 rounded-xl cursor-pointer">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
-                    <SelectItem value="registered_at">Registered</SelectItem>
-                    <SelectItem value="status">Status</SelectItem>
-                    <SelectItem value="duration">Duration</SelectItem>
+                    <SelectItem value="name" className="cursor-pointer">
+                      Name
+                    </SelectItem>
+                    <SelectItem value="event" className="cursor-pointer">
+                      Event
+                    </SelectItem>
+                    <SelectItem
+                      value="registered_at"
+                      className="cursor-pointer"
+                    >
+                      Registered
+                    </SelectItem>
+                    <SelectItem value="status" className="cursor-pointer">
+                      Status
+                    </SelectItem>
+                    <SelectItem value="duration" className="cursor-pointer">
+                      Duration
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1171,7 +1433,7 @@ export default function AttendeesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl cursor-pointer"
                     onClick={() => setSortDirection('asc')}
                   >
                     <ArrowUp className="h-4 w-4 mr-2" />
@@ -1179,7 +1441,7 @@ export default function AttendeesPage() {
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl"
+                    className="h-11 rounded-xl cursor-pointer"
                     onClick={() => setSortDirection('desc')}
                   >
                     <ArrowDown className="h-4 w-4 mr-2" />
@@ -1192,7 +1454,7 @@ export default function AttendeesPage() {
             <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl"
+                className="flex-1 h-11 rounded-xl cursor-pointer"
                 onClick={() => {
                   resetFilters();
                   setIsFilterSheetOpen(false);
@@ -1201,7 +1463,7 @@ export default function AttendeesPage() {
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl"
+                className="flex-1 h-11 rounded-xl cursor-pointer"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
@@ -1216,9 +1478,7 @@ export default function AttendeesPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Attendee Details</DialogTitle>
-            <DialogDescription>
-              Attendance for one event.
-            </DialogDescription>
+            <DialogDescription>Attendance for one event.</DialogDescription>
           </DialogHeader>
 
           {selectedAttendee && (
@@ -1230,12 +1490,29 @@ export default function AttendeesPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold truncate">
-                    {selectedAttendee.display_name}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-semibold truncate">
+                      {selectedAttendee.display_name}
+                    </h3>
+                    {selectedAttendee.is_host && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                      >
+                        <Crown className="h-3 w-3 mr-1" />
+                        Host
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {selectedAttendee.email}
+                    {selectedAttendee.email || 'No email on file'}
                   </p>
+                  {selectedAttendee.phone && (
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate flex items-center gap-1.5">
+                      <Phone className="h-3 w-3 shrink-0" />
+                      {selectedAttendee.phone}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1312,7 +1589,7 @@ export default function AttendeesPage() {
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-sm"
+                  className="w-full justify-start text-sm cursor-pointer"
                   onClick={() => {
                     setIsViewDialogOpen(false);
                     router.push(
@@ -1325,7 +1602,7 @@ export default function AttendeesPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-sm"
+                  className="w-full justify-start text-sm cursor-pointer"
                   onClick={() => {
                     setIsViewDialogOpen(false);
                     router.push(
@@ -1342,7 +1619,7 @@ export default function AttendeesPage() {
                 <Button
                   variant="outline"
                   onClick={() => setIsViewDialogOpen(false)}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto cursor-pointer"
                 >
                   Close
                 </Button>
