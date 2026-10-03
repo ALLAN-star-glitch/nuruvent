@@ -8,11 +8,12 @@ import Link from 'next/link';
 import {
   BarChart3,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
   Download,
   Loader2,
   AlertCircle,
   Users,
-  ChevronRight,
   RefreshCw,
 } from 'lucide-react';
 
@@ -89,6 +90,12 @@ export interface AttendanceCardProps {
   /** Called when "Export all as CSV" is clicked. */
   onExportAll?: () => void;
 
+  /**
+   * Whether the card body starts expanded. Defaults to false so the
+   * event page isn't dominated by attendance on first load.
+   */
+  defaultExpanded?: boolean;
+
   className?: string;
 }
 
@@ -104,9 +111,11 @@ export function AttendanceCard({
   fetchingSessionIds = [],
   onFetchAttendance,
   onExportAll,
+  defaultExpanded = false,
   className,
 }: AttendanceCardProps) {
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   const sessions = summary?.sessions ?? [];
   const totals = summary?.totals;
@@ -123,152 +132,174 @@ export function AttendanceCard({
     [sessions],
   );
 
+  const collapsedSummary = (() => {
+    if (loading) return 'Loading attendance…';
+    if (error) return error;
+    if (!totals || totals.sessions_with_attendance === 0) {
+      return 'No attendance recorded yet.';
+    }
+    const sessionsLabel =
+      totals.sessions_with_attendance === 1 ? 'session' : 'sessions';
+    const attendeesLabel =
+      totals.unique_attendees === 1 ? 'attendee' : 'attendees';
+    return `${totals.sessions_with_attendance} ${sessionsLabel} with attendance · ${totals.unique_attendees} ${attendeesLabel} overall`;
+  })();
+
   return (
     <>
       <Card className={cn('border-border', className)}>
         <CardContent className="p-4 sm:p-6">
-          {/* HEADER */}
-          <div className="flex items-start gap-3 sm:gap-4 mb-4">
-            <div className="p-2.5 sm:p-3 rounded-xl bg-primary/10 text-primary shrink-0">
-              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">
-                  Attendance
-                </h3>
-
-                {providersUsed.map((p) => {
-                  const meta = platformMeta(p);
-                  if (!meta) return null;
-                  return (
-                    <Badge
-                      key={p}
-                      variant="outline"
-                      className="text-xs border-border bg-background gap-1 pl-1 pr-2 py-0.5"
-                    >
-                      <span className="h-3.5 w-3.5 shrink-0">
-                        <Image
-                          src={meta.logo}
-                          alt={`${meta.label} logo`}
-                          width={14}
-                          height={14}
-                          className="h-full w-full object-contain"
-                        />
-                      </span>
-                      {meta.label}
-                    </Badge>
-                  );
-                })}
+          {/* HEADER — always visible */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1 text-left cursor-pointer group"
+              aria-expanded={expanded}
+              aria-controls="attendance-card-body"
+            >
+              <div className="p-2.5 sm:p-3 rounded-xl bg-primary/10 text-primary shrink-0">
+                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
 
-              {loading && (
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Loading attendance…
-                </p>
-              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-semibold text-foreground">
+                    Attendance
+                  </h3>
 
-              {!loading && error && (
-                <p className="text-sm text-destructive mt-1 flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  {error}
-                </p>
-              )}
+                  {providersUsed.map((p) => {
+                    const meta = platformMeta(p);
+                    if (!meta) return null;
+                    return (
+                      <Badge
+                        key={p}
+                        variant="outline"
+                        className="text-xs border-border bg-background gap-1 pl-1 pr-2 py-0.5"
+                      >
+                        <span className="h-3.5 w-3.5 shrink-0">
+                          <Image
+                            src={meta.logo}
+                            alt={`${meta.label} logo`}
+                            width={14}
+                            height={14}
+                            className="h-full w-full object-contain"
+                          />
+                        </span>
+                        {meta.label}
+                      </Badge>
+                    );
+                  })}
+                </div>
 
-              {!loading && !error && totals && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {totals.sessions_with_attendance === 0 ? (
-                    'No attendance recorded yet.'
-                  ) : (
-                    <>
-                      <span className="font-medium text-foreground">
-                        {totals.sessions_with_attendance}
-                      </span>{' '}
-                      {totals.sessions_with_attendance === 1
-                        ? 'session'
-                        : 'sessions'}{' '}
-                      with attendance ·{' '}
-                      <span className="font-medium text-foreground">
-                        {totals.unique_attendees}
-                      </span>{' '}
-                      {totals.unique_attendees === 1
-                        ? 'attendee'
-                        : 'attendees'}{' '}
-                      overall
-                    </>
+                <p
+                  className={cn(
+                    'text-sm mt-1',
+                    error ? 'text-destructive' : 'text-muted-foreground',
                   )}
+                >
+                  {loading && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin inline mr-1.5 align-middle" />
+                  )}
+                  {error && (
+                    <AlertCircle className="h-3.5 w-3.5 inline mr-1.5 align-middle" />
+                  )}
+                  {collapsedSummary}
                 </p>
-              )}
+              </div>
+            </button>
+
+            {/* Right-hand control — outside the toggle so clicks don't fold the card */}
+            <div className="shrink-0 w-full sm:w-auto">
+              <Button
+                size="sm"
+                variant="outline"
+                className="cursor-pointer w-full sm:w-auto"
+                onClick={() => setExpanded((v) => !v)}
+                aria-expanded={expanded}
+                aria-controls="attendance-card-body"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-3.5 w-3.5 mr-1.5 transition-transform',
+                    expanded && 'rotate-180',
+                  )}
+                />
+                {expanded ? 'Hide details' : 'Show details'}
+              </Button>
             </div>
           </div>
 
-          {/* EMPTY STATE */}
-          {!loading && !error && sessions.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center">
-              <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">
-                No sessions yet
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Sessions appear here once they&apos;re scheduled.
-              </p>
+          {/* BODY — collapsible */}
+          {expanded && (
+            <div id="attendance-card-body">
+              {/* EMPTY STATE */}
+              {!loading && !error && sessions.length === 0 && (
+                <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm font-medium text-foreground">
+                    No sessions yet
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sessions appear here once they&apos;re scheduled.
+                  </p>
+                </div>
+              )}
+
+              {/* SESSION LIST */}
+              {!loading && !error && sessions.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="space-y-3">
+                    {sessions.map((s) => (
+                      <SessionAttendanceRow
+                        key={s.session_id}
+                        session={s}
+                        fetching={fetchingSessionIds.includes(s.session_id)}
+                        onViewRoster={() => setOpenSessionId(s.session_id)}
+                        onFetch={
+                          onFetchAttendance && canFetchAttendance(s)
+                            ? () =>
+                                onFetchAttendance(
+                                  s.video_meeting_id as string,
+                                  s.session_id,
+                                )
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* FOOTER */}
+              {!loading && !error && sessions.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="flex items-center justify-between gap-2">
+                    <Link
+                      href={`/dashboard/events/${eventId}/attendees`}
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      View all attendees
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+
+                    {anyAttendance && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer"
+                        onClick={onExportAll}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                        Export all as CSV
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-          )}
-
-          {/* SESSION LIST */}
-          {!loading && !error && sessions.length > 0 && (
-            <>
-              <Separator className="my-4" />
-              <div className="space-y-3">
-                {sessions.map((s) => (
-                  <SessionAttendanceRow
-                    key={s.session_id}
-                    session={s}
-                    fetching={fetchingSessionIds.includes(s.session_id)}
-                    onViewRoster={() => setOpenSessionId(s.session_id)}
-                    onFetch={
-                      onFetchAttendance && canFetchAttendance(s)
-                        ? () =>
-                            onFetchAttendance(
-                              s.video_meeting_id as string,
-                              s.session_id,
-                            )
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          {/* FOOTER */}
-          {!loading && !error && sessions.length > 0 && (
-            <>
-              <Separator className="my-4" />
-              <div className="flex items-center justify-between gap-2">
-                <Link
-                  href={`/dashboard/events/${eventId}/attendees`}
-                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                >
-                  View all attendees
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-
-                {anyAttendance && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer"
-                    onClick={onExportAll}
-                  >
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Export all as CSV
-                  </Button>
-                )}
-              </div>
-            </>
           )}
         </CardContent>
       </Card>
@@ -377,7 +408,6 @@ function SessionAttendanceRow({
           variant="ghost"
           className="cursor-pointer h-8 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
           onClick={onViewRoster}
-          disabled={!hasData}
         >
           View roster
           <ChevronRight className="h-3.5 w-3.5 ml-1" />

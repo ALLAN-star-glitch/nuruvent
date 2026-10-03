@@ -32,6 +32,7 @@ type ZoomMtgGlobal = {
     passWord: string;
     userName: string;
     userEmail?: string;
+    customerKey?: string;
     zak?: string;
     tk?: string;
     success: () => void;
@@ -94,12 +95,19 @@ export function ZoomMeetingClient({
           throw new Error('Backend did not return meeting credentials.');
         }
 
+        // Visible name for the video tile. Falls back through display
+        // name → name → email local part → generic.
         const displayName =
+          (user as { displayName?: string } | null)?.displayName ||
           (user as { name?: string } | null)?.name ||
-          (user as { display_name?: string } | null)?.display_name ||
-          (user as { full_name?: string } | null)?.full_name ||
           (user as { email?: string } | null)?.email?.split('@')[0] ||
-          'Guest';
+          'Attendee';
+
+        // Deterministic matching key. Sent to Zoom as customerKey,
+        // echoed back in webhooks as participant.customer_key. Not
+        // shown to other participants.
+        const customerKey =
+          (user as { username?: string } | null)?.username || undefined;
 
         // Required setup, in order (per docs):
         ZoomMtg.setZoomJSLib('https://source.zoom.us/6.2.0/lib', '/av');
@@ -121,6 +129,8 @@ export function ZoomMeetingClient({
               meetingNumber: String(meeting_number),
               passWord: String(password ?? ''),   // ← capital W per docs
               userName: displayName,
+              userEmail: (user as { email?: string } | null)?.email,
+              ...(customerKey ? { customerKey } : {}),
               ...(zak && typeof zak === 'string' ? { zak } : {}),
               success: () => {
                 if (!cancelled) setStatus('Joined');

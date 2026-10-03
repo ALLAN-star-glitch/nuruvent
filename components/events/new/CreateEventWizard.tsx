@@ -446,6 +446,21 @@ export function CreateEventWizard() {
                 </>
               )}
             </Button>
+
+      {createdEventId && (
+        <Link
+          href={`/dashboard/events/${createdEventId}`}
+          className="col-span-2 sm:col-span-1"
+        >
+          <Button
+            variant="outline"
+            className="w-full cursor-pointer text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+          >
+            <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 shrink-0" />
+            View
+          </Button>
+        </Link>
+      )}
           </div>
         </div>
       </div>

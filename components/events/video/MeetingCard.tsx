@@ -2,11 +2,13 @@
 
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import {
   AlertCircle,
   CalendarDays,
   Check,
+  ChevronDown,
   Copy,
   Edit,
   ExternalLink,
@@ -85,6 +87,12 @@ export interface MeetingCardProps {
   onDeleteAll: () => void;
 
   editEventHref: string;
+
+  /**
+   * Whether the card body starts expanded. Defaults to false so the
+   * event page isn't dominated by sessions on first load.
+   */
+  defaultExpanded?: boolean;
 }
 
 // ============================================================
@@ -156,11 +164,12 @@ export function MeetingCard({
   onRegenerateAll,
   onDeleteAll,
   editEventHref,
+  defaultExpanded = false,
 }: MeetingCardProps) {
-  // All schedules, in the order the server returned them (session_number ASC).
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
   const allSchedules = event.schedules ?? [];
 
-  // Split for the three render groups.
   const virtualWithMeeting = allSchedules.filter(hasMeeting);
   const virtualMissingMeeting = allSchedules.filter(
     (s) => s.is_virtual && !hasMeeting(s),
@@ -215,9 +224,15 @@ export function MeetingCard({
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
       <CardContent className="p-4 sm:p-6">
-        {/* HEADER */}
+        {/* HEADER — always visible */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-          <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1 text-left cursor-pointer group"
+            aria-expanded={expanded}
+            aria-controls="meeting-card-body"
+          >
             <div className="p-2.5 sm:p-3 rounded-xl bg-primary text-primary-foreground shrink-0 shadow-sm">
               <Video className="h-5 w-5 sm:h-6 sm:w-6" />
             </div>
@@ -250,9 +265,27 @@ export function MeetingCard({
 
               <p className="text-sm text-muted-foreground mt-1">{summary}</p>
             </div>
-          </div>
+          </button>
 
-          <div className="shrink-0 w-full sm:w-auto">
+          {/* Right-hand controls — outside the toggle so clicks don't fold the card */}
+          <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer w-full sm:w-auto"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              aria-controls="meeting-card-body"
+            >
+              <ChevronDown
+                className={cn(
+                  'h-3.5 w-3.5 mr-1.5 transition-transform',
+                  expanded && 'rotate-180',
+                )}
+              />
+              {expanded ? 'Hide details' : 'Show details'}
+            </Button>
+
             {hasAnyConnection ? (
               <Button
                 size="sm"
@@ -286,176 +319,179 @@ export function MeetingCard({
           </div>
         </div>
 
-        {/* SESSION LIST —*/}
-       {(hasAnyMeeting || virtualMissingMeeting.length > 0 || inPersonSchedules.length > 0) && (
-  <div className="mt-4 space-y-3">
-    {allSchedules.map((s, idx) => {
-      if (!s.is_virtual) {
-        return (
-          <InPersonRow
-            key={s.id}
-            session={s}
-            index={idx}
-            running={runningSessionId === s.id ? runningAction : null}
-            onEdit={onEditSession}
-          />
-        );
-      }
+        {/* BODY — collapsible */}
+        {expanded && (
+          <div id="meeting-card-body">
+            {(hasAnyMeeting ||
+              virtualMissingMeeting.length > 0 ||
+              inPersonSchedules.length > 0) && (
+              <div className="mt-4 space-y-3">
+                {allSchedules.map((s, idx) => {
+                  if (!s.is_virtual) {
+                    return (
+                      <InPersonRow
+                        key={s.id}
+                        session={s}
+                        index={idx}
+                        running={runningSessionId === s.id ? runningAction : null}
+                        onEdit={onEditSession}
+                      />
+                    );
+                  }
 
-      const link = displayLink(s, event);
-      const meta = scheduleMeta(s);
+                  const link = displayLink(s, event);
+                  const meta = scheduleMeta(s);
 
-      return (
-        <SessionRow
-          key={s.id}
-          session={s}
-          index={idx}
-          meta={meta}
-          link={link}
-          running={runningSessionId === s.id ? runningAction : null}
-          copied={copiedSessionId === s.id}
-          onCopy={onCopyLink}
-          onJoin={onJoinLink}
-          onEdit={onEditSession}
-          onShare={onShareSession}
-          onRegenerate={onRegenerateSession}
-          onDelete={onDeleteSession}
-          onStart={onStartMeeting}
-        />
-      );
-    })}
-  </div>
-)}
-
-        {/* EMPTY STATE — no virtual meetings AND no in-person sessions yet */}
-        {!hasAnyMeeting &&
-          virtualMissingMeeting.length > 0 &&
-          hasAnyVirtual && (
-            <EmptyMeetingState
-              isDraft={isDraft}
-              hasAnyConnection={hasAnyConnection}
-              sessionCount={virtualMissingMeeting.length}
-              runningAction={runningAction}
-              onCreateMeetings={onCreateMeetings}
-              onOpenPlatformPicker={onOpenPlatformPicker}
-              onAddMeeting={onAddMeeting}
-              editEventHref={editEventHref}
-            />
-          )}
-
-        {/* PARTIAL STATE — some virtual sessions still missing a meeting */}
-        {hasAnyMeeting && virtualMissingMeeting.length > 0 && (
-          <>
-            <Separator className="my-4" />
-            <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 sm:p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {virtualMissingMeeting.length}{' '}
-                    {virtualMissingMeeting.length === 1
-                      ? 'session has no meeting yet'
-                      : 'sessions have no meeting yet'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Create them automatically or paste links in the editor.
-                  </p>
-                </div>
+                  return (
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      index={idx}
+                      meta={meta}
+                      link={link}
+                      running={runningSessionId === s.id ? runningAction : null}
+                      copied={copiedSessionId === s.id}
+                      onCopy={onCopyLink}
+                      onJoin={onJoinLink}
+                      onEdit={onEditSession}
+                      onShare={onShareSession}
+                      onRegenerate={onRegenerateSession}
+                      onDelete={onDeleteSession}
+                      onStart={onStartMeeting}
+                    />
+                  );
+                })}
               </div>
-              <div className="flex flex-wrap items-center gap-2 mt-3">
-                {hasAnyConnection ? (
-                  <Button
-                    size="sm"
-                    className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                    onClick={onCreateMeetings}
-                    disabled={runningAction === 'create'}
-                  >
-                    {runningAction === 'create' ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                        Creating…
-                      </>
+            )}
+
+            {!hasAnyMeeting &&
+              virtualMissingMeeting.length > 0 &&
+              hasAnyVirtual && (
+                <EmptyMeetingState
+                  isDraft={isDraft}
+                  hasAnyConnection={hasAnyConnection}
+                  sessionCount={virtualMissingMeeting.length}
+                  runningAction={runningAction}
+                  onCreateMeetings={onCreateMeetings}
+                  onOpenPlatformPicker={onOpenPlatformPicker}
+                  onAddMeeting={onAddMeeting}
+                  editEventHref={editEventHref}
+                />
+              )}
+
+            {hasAnyMeeting && virtualMissingMeeting.length > 0 && (
+              <>
+                <Separator className="my-4" />
+                <div className="rounded-lg border border-dashed border-border bg-background/60 p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {virtualMissingMeeting.length}{' '}
+                        {virtualMissingMeeting.length === 1
+                          ? 'session has no meeting yet'
+                          : 'sessions have no meeting yet'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Create them automatically or paste links in the editor.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    {hasAnyConnection ? (
+                      <Button
+                        size="sm"
+                        className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={onCreateMeetings}
+                        disabled={runningAction === 'create'}
+                      >
+                        {runningAction === 'create' ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                            Creating…
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-3.5 w-3.5 mr-1.5" />
+                            Create meetings
+                          </>
+                        )}
+                      </Button>
                     ) : (
-                      <>
-                        <Send className="h-3.5 w-3.5 mr-1.5" />
-                        Create meetings
-                      </>
+                      <Button
+                        size="sm"
+                        className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={onOpenPlatformPicker}
+                      >
+                        <Plug className="h-3.5 w-3.5 mr-1.5" />
+                        Connect a platform
+                      </Button>
                     )}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                    onClick={onOpenPlatformPicker}
-                  >
-                    <Plug className="h-3.5 w-3.5 mr-1.5" />
-                    Connect a platform
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => {
-                    window.location.href = editEventHref;
-                  }}
-                >
-                  <Link2 className="h-3.5 w-3.5 mr-1.5" />
-                  Paste links manually
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => {
+                        window.location.href = editEventHref;
+                      }}
+                    >
+                      <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                      Paste links manually
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
 
-        {/* BULK ACTIONS */}
-        {hasAnyMeeting &&
-          virtualMissingMeeting.length === 0 &&
-          virtualWithMeeting.length > 1 && (
-            <>
-              <Separator className="my-4" />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={onRegenerateAll}
-                  disabled={runningAction === 'regenerate'}
-                >
-                  {runningAction === 'regenerate' ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Regenerating all…
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                      Regenerate all
-                    </>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={onDeleteAll}
-                  disabled={runningAction === 'delete'}
-                >
-                  {runningAction === 'delete' ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Deleting all…
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                      Delete all
-                    </>
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
+            {hasAnyMeeting &&
+              virtualMissingMeeting.length === 0 &&
+              virtualWithMeeting.length > 1 && (
+                <>
+                  <Separator className="my-4" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={onRegenerateAll}
+                      disabled={runningAction === 'regenerate'}
+                    >
+                      {runningAction === 'regenerate' ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Regenerating all…
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          Regenerate all
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={onDeleteAll}
+                      disabled={runningAction === 'delete'}
+                    >
+                      {runningAction === 'delete' ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          Deleting all…
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          Delete all
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -735,7 +771,11 @@ function SessionRow({
             <Button
               size="sm"
               className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-              onClick={() => onJoin(link)}
+              onClick={() => {
+                if (link) {
+                  window.open(link, '_blank', 'noopener,noreferrer');
+                }
+              }}
               disabled={isRunning}
             >
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />

@@ -173,6 +173,7 @@ export interface UserResponse {
   slug: string;
   name: string;
   display_name?: string;
+  username: string;
   email: string;
   phone: string;
   account_type: AccountType;
@@ -302,6 +303,7 @@ export interface AuthUser {
   slug: string;
   name: string;
   displayName: string;
+  username: string;
   email: string;
   phone: string;
   accountType: AccountType;

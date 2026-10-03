@@ -74,14 +74,10 @@ export interface SessionRosterEntry {
   confirm_reason?: string;
   cert_eligible: boolean;
   last_derived_at: string;
-
-  /**
-   * Backend TODO: add to SessionStatusResponse by joining `attendees`
-   * in ListSessionAttendance. Without these, the roster dialog shows
-   * "Unknown attendee".
-   */
   display_name?: string;
   email?: string;
+  /** True when this row is the event host rather than a registered attendee. */
+  is_host?: boolean;
 }
 
 export interface SessionRosterPayload {

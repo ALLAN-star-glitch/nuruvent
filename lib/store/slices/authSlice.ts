@@ -91,6 +91,7 @@ function toAuthUser(u: UserResponse): AuthUser {
     slug: u.slug,
     name: u.name,
     displayName: u.display_name || u.name,
+     username: u.username,
     email: u.email,
     phone: u.phone,
     accountType: u.account_type,
