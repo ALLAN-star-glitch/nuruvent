@@ -25,8 +25,13 @@ const BRAND = {
 const LOGO_SRC = '/logo.png';
 
 // ============================================================
-// COLUMNS — full set (CSV / Excel / JSON)
+// COLUMNS — canonical set (CSV / Excel / JSON)
 // ============================================================
+//
+// Every column the system knows about. Machine-readable formats
+// get the full set — there is no cost to more columns in a
+// spreadsheet, and consumers often want to filter/aggregate by
+// fields the human reader never looks at.
 
 export interface ExportColumn {
   key: string;
@@ -44,7 +49,11 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
     label: 'Event Date',
     get: (a) => a.event_start_date ?? '',
   },
-  { key: 'effective_status', label: 'Status', get: (a) => a.effective_status },
+  {
+    key: 'effective_status',
+    label: 'Attendance Status',
+    get: (a) => a.effective_status,
+  },
   { key: 'is_host', label: 'Host', get: (a) => (a.is_host ? 'Yes' : 'No') },
   {
     key: 'sessions_attended',
@@ -63,7 +72,7 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
   },
   {
     key: 'registered_at',
-    label: 'Registered',
+    label: 'Registered At',
     get: (a) => a.registered_at ?? '',
   },
   {
@@ -74,8 +83,15 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
 ];
 
 // ============================================================
-// COLUMNS — trimmed set (PDF only)
+// COLUMNS — human set (PDF only)
 // ============================================================
+//
+// Same information as the canonical set, but:
+//   - Host is rendered inline as a badge (not a column).
+//   - Sessions Attended/Total are merged into "3 / 4".
+//   - Duration is human-readable ("2h 15m" not 8100).
+//   - Audit-only timestamps (Last Activity) are dropped.
+//   - Dates use the compact "Oct 3, 26" format.
 
 export const PDF_COLUMNS: ExportColumn[] = [
   { key: 'display_name', label: 'Name', get: (a) => a.display_name },
@@ -88,8 +104,7 @@ export const PDF_COLUMNS: ExportColumn[] = [
     get: (a) =>
       a.event_start_date ? formatShortDate(a.event_start_date) : '—',
   },
-  { key: 'effective_status', label: 'Status', get: (a) => a.effective_status },
-  { key: 'is_host', label: 'Host', get: (a) => (a.is_host ? 'Yes' : '—') },
+  { key: 'effective_status', label: 'Attendance', get: (a) => a.effective_status },
   {
     key: 'sessions',
     label: 'Sessions',
@@ -99,6 +114,11 @@ export const PDF_COLUMNS: ExportColumn[] = [
     key: 'duration',
     label: 'Duration',
     get: (a) => formatDurationHuman(a.total_duration_seconds),
+  },
+  {
+    key: 'registered_at',
+    label: 'Registered',
+    get: (a) => (a.registered_at ? formatShortDate(a.registered_at) : '—'),
   },
 ];
 
@@ -284,8 +304,7 @@ export async function exportToPDF(
   const filtersSummary = options.filtersSummary ?? '';
   const filename = options.filename ?? `attendees-${todayStamp()}.pdf`;
 
-  // A4 landscape, points. Narrower margins than before to give the
-  // table more horizontal room.
+  // A4 landscape, points. Narrow margins to give the table more room.
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -303,7 +322,7 @@ export async function exportToPDF(
   doc.rect(0, 2, pageWidth, 1, 'F');
 
   // ------------------------------------------------------------
-  // LOGO — bigger, top-left.
+  // LOGO — top-left.
   // ------------------------------------------------------------
   const logo = await loadLogoDataUrl();
   let textLeft = margin;
@@ -327,7 +346,7 @@ export async function exportToPDF(
   }
 
   // ------------------------------------------------------------
-  // TITLE + META — dark text on white, right of the logo.
+  // TITLE + META
   // ------------------------------------------------------------
   doc.setTextColor(...BRAND.neutralDark);
   doc.setFont('helvetica', 'bold');
@@ -364,7 +383,7 @@ export async function exportToPDF(
   doc.line(margin, headerHeight - 8, pageWidth - margin, headerHeight - 8);
 
   // ------------------------------------------------------------
-  // TABLE — 9-column trimmed set, auto widths, ellipsize overflow.
+  // TABLE
   // ------------------------------------------------------------
   const head = [PDF_COLUMNS.map((c) => c.label)];
   const body = rows.map((r) =>
@@ -403,15 +422,15 @@ export async function exportToPDF(
       lineWidth: 0.5,
     },
     columnStyles: {
-      0: { cellWidth: 110 }, // Name
+      0: { cellWidth: 100 }, // Name
       1: { cellWidth: 'auto' }, // Email
       2: { cellWidth: 85 }, // Phone
       3: { cellWidth: 'auto' }, // Event
       4: { cellWidth: 72 }, // Event Date
-      5: { cellWidth: 68 }, // Status
-      6: { cellWidth: 40 }, // Host
-      7: { cellWidth: 60 }, // Sessions
-      8: { cellWidth: 60 }, // Duration
+      5: { cellWidth: 68 }, // Attendance
+      6: { cellWidth: 60 }, // Sessions
+      7: { cellWidth: 60 }, // Duration
+      8: { cellWidth: 72 }, // Registered
     },
   });
 
