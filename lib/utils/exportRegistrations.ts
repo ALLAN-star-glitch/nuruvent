@@ -1,11 +1,10 @@
-// lib/utils/exportAttendees.ts
-import type { CrossEventAttendee } from '@/lib/types/attendance';
+// lib/utils/exportRegistrations.ts
+import type { CrossEventRegistration } from '@/lib/types/registration';
 
 // ============================================================
-// BRAND
+// BRAND — keep in sync with globals.css
 // ============================================================
 
-/** Nuruvent brand palette — keep in sync with globals.css. */
 const BRAND = {
   primary:     [26, 115, 232]  as [number, number, number], // #1A73E8
   secondary:   [251, 188, 4]   as [number, number, number], // #FBBC04
@@ -22,20 +21,12 @@ const BRAND = {
 // ASSETS
 // ============================================================
 
-/**
- * Path to the Nuruvent logo. Adjust to wherever your logo lives
- * in /public. A transparent PNG works best.
- */
 const LOGO_SRC = '/logo.png';
 
 /**
- * Platform logos and display labels. Paths are relative to /public.
- *
- * Keys must match the platform values your API returns on
- * event.schedules[].platform — e.g. "google_meet", "zoom".
- *
- * If you add a new platform (Teams, Webex), add the key here and
- * drop the matching .png in public/platforms/.
+ * If you render platform badges on the PDF header for virtual
+ * events, these keys must match the platform slugs your API
+ * returns. Same map as exportAttendees.ts.
  */
 const PLATFORM_LOGOS: Record<string, { label: string; src: string }> = {
   google_meet: { label: 'Google Meet', src: '/platforms/google-meet.png' },
@@ -51,50 +42,26 @@ const PLATFORM_LOGOS: Record<string, { label: string; src: string }> = {
 export interface ExportColumn {
   key: string;
   label: string;
-  get: (a: CrossEventAttendee) => string | number;
+  get: (r: CrossEventRegistration) => string | number;
 }
 
-export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
-  { key: 'display_name', label: 'Name', get: (a) => a.display_name },
-  { key: 'email', label: 'Email', get: (a) => a.email || '—' },
-  { key: 'phone', label: 'Phone', get: (a) => a.phone || '—' },
-  { key: 'event_name', label: 'Event', get: (a) => a.event_name },
+export const REGISTRATION_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: 'registration_number', label: 'Reg #',        get: (r) => r.registration_number },
+  { key: 'attendee_name',       label: 'Name',         get: (r) => r.attendee_name || '—' },
+  { key: 'email',               label: 'Email',        get: (r) => r.email || '—' },
+  { key: 'phone',               label: 'Phone',        get: (r) => r.phone || '—' },
+  { key: 'event_name',          label: 'Event',        get: (r) => r.event_name || '—' },
   {
     key: 'event_start_date',
     label: 'Event Date',
-    get: (a) => a.event_start_date ?? '',
+    get: (r) => (r.event_start_date ? formatShortDate(r.event_start_date) : '—'),
   },
-  {
-    key: 'effective_status',
-    label: 'Attendance Status',
-    get: (a) => a.effective_status,
-  },
-  { key: 'is_host', label: 'Host', get: (a) => (a.is_host ? 'Yes' : 'No') },
-  {
-    key: 'sessions_attended',
-    label: 'Sessions Attended',
-    get: (a) => a.sessions_attended,
-  },
-  {
-    key: 'sessions_total',
-    label: 'Sessions Total',
-    get: (a) => a.sessions_total,
-  },
-  {
-    key: 'total_duration_seconds',
-    label: 'Duration (s)',
-    get: (a) => a.total_duration_seconds,
-  },
-  {
-    key: 'registered_at',
-    label: 'Registered At',
-    get: (a) => a.registered_at ?? '',
-  },
-  {
-    key: 'last_activity_at',
-    label: 'Last Activity',
-    get: (a) => a.last_activity_at ?? '',
-  },
+  { key: 'status_label',        label: 'Status',       get: (r) => r.status_label || r.status || '—' },
+  { key: 'ticket_name',         label: 'Ticket',       get: (r) => r.ticket_name || '—' },
+  { key: 'is_guest',            label: 'Type',         get: (r) => (r.is_guest ? 'Guest' : 'Account') },
+  { key: 'format',              label: 'Format',       get: (r) => eventFormat(r) },
+  { key: 'location',            label: 'Location',     get: (r) => eventLocation(r) },
+  { key: 'created_at',          label: 'Registered At', get: (r) => r.created_at || '' },
 ];
 
 // ============================================================
@@ -102,31 +69,22 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
 // ============================================================
 
 export const PDF_COLUMNS: ExportColumn[] = [
-  { key: 'display_name', label: 'Name', get: (a) => a.display_name },
-  { key: 'email', label: 'Email', get: (a) => a.email || '—' },
-  { key: 'phone', label: 'Phone', get: (a) => a.phone || '—' },
-  { key: 'event_name', label: 'Event', get: (a) => a.event_name },
+  { key: 'registration_number', label: 'Reg #',   get: (r) => r.registration_number },
+  { key: 'attendee_name',       label: 'Name',    get: (r) => r.attendee_name || '—' },
+  { key: 'email',               label: 'Email',   get: (r) => r.email || '—' },
+  { key: 'event_name',          label: 'Event',   get: (r) => r.event_name || '—' },
   {
     key: 'event_start_date',
     label: 'Event Date',
-    get: (a) =>
-      a.event_start_date ? formatShortDate(a.event_start_date) : '—',
+    get: (r) => (r.event_start_date ? formatShortDate(r.event_start_date) : '—'),
   },
-  { key: 'effective_status', label: 'Attendance', get: (a) => a.effective_status },
+  { key: 'status_label',        label: 'Status',  get: (r) => r.status_label || r.status || '—' },
+  { key: 'ticket_name',         label: 'Ticket',  get: (r) => r.ticket_name || '—' },
+  { key: 'format',              label: 'Format',  get: (r) => eventFormat(r) },
   {
-    key: 'sessions',
-    label: 'Sessions',
-    get: (a) => `${a.sessions_attended} / ${a.sessions_total}`,
-  },
-  {
-    key: 'duration',
-    label: 'Duration',
-    get: (a) => formatDurationHuman(a.total_duration_seconds),
-  },
-  {
-    key: 'registered_at',
+    key: 'created_at',
     label: 'Registered',
-    get: (a) => (a.registered_at ? formatShortDate(a.registered_at) : '—'),
+    get: (r) => (r.created_at ? formatShortDate(r.created_at) : '—'),
   },
 ];
 
@@ -159,7 +117,6 @@ function todayPretty(): string {
   });
 }
 
-/** "Oct 3, 26" — compact date for the PDF table. */
 function formatShortDate(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -171,24 +128,21 @@ function formatShortDate(iso: string | undefined): string {
   });
 }
 
-/**
- * Human-readable duration: "45m", "2h", "2h 15m".
- * Returns "—" for zero, negative, or missing values.
- */
-function formatDurationHuman(seconds: number | undefined): string {
-  if (!seconds || seconds <= 0) return '—';
-  const totalMinutes = Math.round(seconds / 60);
-  if (totalMinutes < 60) return `${totalMinutes}m`;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+/** Human-readable event format. */
+function eventFormat(r: CrossEventRegistration): string {
+  if (r.is_hybrid) return 'Hybrid';
+  if (r.is_virtual) return 'Virtual';
+  return 'In person';
 }
 
-/**
- * Fetches an image URL and returns it as a data URL so jsPDF can
- * embed it without needing a server. Returns null on any failure
- * so the PDF still renders without the image.
- */
+/** Human-readable event location. */
+function eventLocation(r: CrossEventRegistration): string {
+  if (r.is_virtual && !r.is_hybrid) return 'Online';
+  if (r.in_person_location) return r.in_person_location;
+  const parts = [r.venue_name, r.venue_city, r.venue_country].filter(Boolean);
+  return parts.length ? parts.join(', ') : '—';
+}
+
 async function loadImageDataUrl(
   src: string,
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
@@ -224,11 +178,11 @@ async function loadImageDataUrl(
 // CSV
 // ============================================================
 
-export function exportToCSV(
-  rows: CrossEventAttendee[],
-  filename = `attendees-${todayStamp()}.csv`,
+export function exportRegistrationsToCSV(
+  rows: CrossEventRegistration[],
+  filename = `registrations-${todayStamp()}.csv`,
 ) {
-  const headers = ATTENDEE_EXPORT_COLUMNS.map((c) => c.label);
+  const headers = REGISTRATION_EXPORT_COLUMNS.map((c) => c.label);
   const escape = (v: string | number) => {
     const s = String(v ?? '');
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -236,7 +190,7 @@ export function exportToCSV(
   const lines = [
     headers.join(','),
     ...rows.map((r) =>
-      ATTENDEE_EXPORT_COLUMNS.map((c) => escape(c.get(r))).join(','),
+      REGISTRATION_EXPORT_COLUMNS.map((c) => escape(c.get(r))).join(','),
     ),
   ];
   const blob = new Blob([lines.join('\n')], {
@@ -249,12 +203,12 @@ export function exportToCSV(
 // JSON
 // ============================================================
 
-export function exportToJSON(
-  rows: CrossEventAttendee[],
-  filename = `attendees-${todayStamp()}.json`,
+export function exportRegistrationsToJSON(
+  rows: CrossEventRegistration[],
+  filename = `registrations-${todayStamp()}.json`,
 ) {
   const data = rows.map((r) =>
-    Object.fromEntries(ATTENDEE_EXPORT_COLUMNS.map((c) => [c.key, c.get(r)])),
+    Object.fromEntries(REGISTRATION_EXPORT_COLUMNS.map((c) => [c.key, c.get(r)])),
   );
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: 'application/json;charset=utf-8;',
@@ -266,17 +220,17 @@ export function exportToJSON(
 // EXCEL
 // ============================================================
 
-export async function exportToExcel(
-  rows: CrossEventAttendee[],
-  filename = `attendees-${todayStamp()}.xlsx`,
+export async function exportRegistrationsToExcel(
+  rows: CrossEventRegistration[],
+  filename = `registrations-${todayStamp()}.xlsx`,
 ) {
   const XLSX = await import('xlsx');
   const data = rows.map((r) =>
-    Object.fromEntries(ATTENDEE_EXPORT_COLUMNS.map((c) => [c.label, c.get(r)])),
+    Object.fromEntries(REGISTRATION_EXPORT_COLUMNS.map((c) => [c.label, c.get(r)])),
   );
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Attendees');
+  XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
   XLSX.writeFile(wb, filename);
 }
 
@@ -284,40 +238,38 @@ export async function exportToExcel(
 // PDF
 // ============================================================
 
-export interface ExportPDFOptions {
-  /** Main heading, e.g. "Computer Science Workshop Attendees". */
+export interface ExportRegistrationsPDFOptions {
+  /** Main heading, e.g. "Computer Science Workshop Registrations". */
   title?: string;
-  /** Optional sub-heading under the title. */
+  /** Optional sub-heading under the title, e.g. the event name. */
   subtitle?: string;
   /** Optional host name shown in the header. */
   hostName?: string;
   /**
    * Video platforms used by the event, e.g. ["google_meet", "zoom"].
-   * Rendered as a row of small badges under the host line. Pass an
-   * empty array or omit for in-person-only or cross-event exports.
-   *
-   * Keys must match PLATFORM_LOGOS above.
+   * Rendered as a row of small badges under the host line.
+   * Omit or pass [] for cross-event exports.
    */
   platforms?: string[];
-  /** Optional filter summary, e.g. "Status: Registered · Search: anna". */
+  /** Optional filter summary, e.g. "Status: Confirmed · Search: anna". */
   filtersSummary?: string;
   /** Output filename (without path). */
   filename?: string;
 }
 
-export async function exportToPDF(
-  rows: CrossEventAttendee[],
-  options: ExportPDFOptions = {},
+export async function exportRegistrationsToPDF(
+  rows: CrossEventRegistration[],
+  options: ExportRegistrationsPDFOptions = {},
 ) {
   const { jsPDF } = await import('jspdf');
   const autoTable = (await import('jspdf-autotable')).default;
 
-  const title = options.title ?? 'Attendees';
+  const title = options.title ?? 'Registrations';
   const subtitle = options.subtitle ?? '';
   const hostName = options.hostName ?? '';
   const platforms = options.platforms ?? [];
   const filtersSummary = options.filtersSummary ?? '';
-  const filename = options.filename ?? `attendees-${todayStamp()}.pdf`;
+  const filename = options.filename ?? `registrations-${todayStamp()}.pdf`;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -325,7 +277,7 @@ export async function exportToPDF(
   const margin = 24;
 
   // ------------------------------------------------------------
-  // HEADER — white, minimal.
+  // HEADER
   // ------------------------------------------------------------
   const headerHeight = 130;
 
@@ -336,7 +288,7 @@ export async function exportToPDF(
   doc.rect(0, 2, pageWidth, 1, 'F');
 
   // ------------------------------------------------------------
-  // LOGO — top-left.
+  // LOGO
   // ------------------------------------------------------------
   const logo = await loadImageDataUrl(LOGO_SRC);
   let textLeft = margin;
@@ -368,7 +320,7 @@ export async function exportToPDF(
   doc.text(title, textLeft, 52);
 
   // ------------------------------------------------------------
-  // HOST LINE
+  // HOST
   // ------------------------------------------------------------
   let metaY = 72;
   if (hostName) {
@@ -423,7 +375,7 @@ export async function exportToPDF(
   }
 
   // ------------------------------------------------------------
-  // META LINE
+  // META
   // ------------------------------------------------------------
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
@@ -437,14 +389,13 @@ export async function exportToPDF(
   metaY += 14;
 
   // ------------------------------------------------------------
-  // FILTERS SUMMARY
+  // FILTERS
   // ------------------------------------------------------------
   if (filtersSummary) {
     doc.setFontSize(9);
     doc.text(filtersSummary, textLeft, metaY);
   }
 
-  // Divider under header
   doc.setDrawColor(...BRAND.border);
   doc.setLineWidth(0.5);
   doc.line(margin, headerHeight - 8, pageWidth - margin, headerHeight - 8);
@@ -453,75 +404,51 @@ export async function exportToPDF(
   // TABLE
   // ------------------------------------------------------------
   const head = [PDF_COLUMNS.map((c) => c.label)];
-  const body = rows.map((r) =>
-    PDF_COLUMNS.map((c) => String(c.get(r) ?? '')),
-  );
+  const body = rows.map((r) => PDF_COLUMNS.map((c) => String(c.get(r) ?? '')));
 
-  autoTable(doc, {
-    head,
-    body,
-    startY: headerHeight + 8,
-    margin: {
-      left: margin,
-      right: margin,
-      top: headerHeight + 8,
-      bottom: 50,
-    },
-    tableWidth: 'auto',
-    styles: {
-      font: 'helvetica',
-      fontSize: 9,
-      cellPadding: { top: 6, right: 8, bottom: 6, left: 8 },
-      textColor: BRAND.neutralDark,
-      lineColor: BRAND.border,
-      lineWidth: 0.5,
-      overflow: 'linebreak',
-      cellWidth: 'wrap',
-      valign: 'middle',
-    },
-    headStyles: {
-      fillColor: BRAND.primary,
-      textColor: BRAND.white,
-      fontStyle: 'bold',
-      fontSize: 9,
-      halign: 'left',
-      cellPadding: { top: 8, right: 8, bottom: 8, left: 8 },
-      overflow: 'linebreak',
-    },
-    alternateRowStyles: {
-      fillColor: BRAND.lightGray,
-    },
-    bodyStyles: {
-      lineColor: BRAND.border,
-      lineWidth: 0.5,
-    },
-    columnStyles: {
-      0: { cellWidth: 110, overflow: 'linebreak' },        // Name
-      1: { cellWidth: 190, overflow: 'linebreak' },        // Email
-      2: { cellWidth: 80,  overflow: 'linebreak' },        // Phone
-      3: { cellWidth: 'auto', overflow: 'linebreak' },     // Event
-      4: { cellWidth: 70,  overflow: 'linebreak' },        // Event Date
-      5: { cellWidth: 68,  overflow: 'linebreak' },        // Attendance
-      6: { cellWidth: 60,  overflow: 'linebreak' },        // Sessions
-      7: { cellWidth: 60,  overflow: 'linebreak' },        // Duration
-      8: { cellWidth: 72,  overflow: 'linebreak' },        // Registered
-    },
-    /**
-     * Shrink font for very long, unbroken strings so they don't
-     * dominate the row height. Values are tuned for typical attendee
-     * data — increase the thresholds if you see cells still wrapping
-     * awkwardly.
-     */
-    didParseCell: (data) => {
-      if (data.section !== 'body') return;
-      const text = String(data.cell.raw ?? '');
-      if (text.length > 60) data.cell.styles.fontSize = 8;
-      if (text.length > 90) data.cell.styles.fontSize = 7;
-    },
-  });
+autoTable(doc, {
+  head,
+  body,
+  startY: headerHeight + 8,
+  margin: { left: margin, right: margin, top: headerHeight + 8, bottom: 50 },
+  tableWidth: 'auto',
+  styles: {
+    font: 'helvetica',
+    fontSize: 9,
+    cellPadding: { top: 6, right: 8, bottom: 6, left: 8 },
+    textColor: BRAND.neutralDark,
+    lineColor: BRAND.border,
+    lineWidth: 0.5,
+    overflow: 'linebreak',   // ← was 'ellipsize'
+    valign: 'middle',
+    cellWidth: 'wrap',       // ← lets cells grow with content
+  },
+  headStyles: {
+    fillColor: BRAND.primary,
+    textColor: BRAND.white,
+    fontStyle: 'bold',
+    fontSize: 9,
+    halign: 'left',
+    cellPadding: { top: 8, right: 8, bottom: 8, left: 8 },
+    overflow: 'linebreak',
+  },
+  alternateRowStyles: { fillColor: BRAND.lightGray },
+  bodyStyles: { lineColor: BRAND.border, lineWidth: 0.5 },
+  columnStyles: {
+    0: { cellWidth: 70,  overflow: 'linebreak' }, // Reg #
+    1: { cellWidth: 100, overflow: 'linebreak' }, // Name
+    2: { cellWidth: 'auto', overflow: 'linebreak' }, // Email
+    3: { cellWidth: 'auto', overflow: 'linebreak' }, // Event
+    4: { cellWidth: 72,  overflow: 'linebreak' }, // Event Date
+    5: { cellWidth: 68,  overflow: 'linebreak' }, // Status
+    6: { cellWidth: 80,  overflow: 'linebreak' }, // Ticket
+    7: { cellWidth: 60,  overflow: 'linebreak' }, // Format
+    8: { cellWidth: 72,  overflow: 'linebreak' }, // Registered
+  },
+});
 
   // ------------------------------------------------------------
-  // FOOTER on every page
+  // FOOTER
   // ------------------------------------------------------------
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
@@ -537,7 +464,7 @@ export async function exportToPDF(
 
     doc.text('Nuruvent', margin, pageHeight - 18);
     doc.text(
-      'Attendee report · Confidential',
+      'Registration report · Confidential',
       pageWidth / 2,
       pageHeight - 18,
       { align: 'center' },

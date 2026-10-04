@@ -1,7 +1,7 @@
 // app/layout.tsx
 
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { InstallPrompt } from '@/components/PWA/InstallPrompt';
 import { PushNotificationManager } from '@/components/PWA/PushNotificationManager';
@@ -10,8 +10,17 @@ import StoreProvider from './StoreProvider';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import { Toaster } from 'sonner';
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+const inter = Inter({
+  variable: '--font-sans',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: '--font-mono',
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -38,8 +47,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Zoom Meeting SDK — Client View.
-            Vendor scripts must load before the client bundle. */}
+        {/* Zoom Meeting SDK — Client View. */}
         <Script
           src="https://source.zoom.us/6.2.0/lib/vendor/react.min.js"
           strategy="beforeInteractive"
@@ -60,14 +68,13 @@ export default function RootLayout({
           src="https://source.zoom.us/6.2.0/lib/vendor/lodash.min.js"
           strategy="beforeInteractive"
         />
-        {/* Client View bundle (not the "embedded" bundle) */}
         <Script
           src="https://source.zoom.us/6.2.0/zoom-meeting-6.2.0.min.js"
           strategy="beforeInteractive"
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased min-h-screen flex flex-col`}
       >
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 

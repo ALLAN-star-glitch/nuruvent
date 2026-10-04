@@ -8,6 +8,8 @@ import type {
   RegistrationList,
   JoinWaitlistRequest,
   WaitlistEntry,
+  CrossEventRegistrationList,
+  ListAllRegistrationsParams,
 } from '@/lib/types/registration';
 
 export const registrationsApi = api.injectEndpoints({
@@ -69,18 +71,56 @@ export const registrationsApi = api.injectEndpoints({
       ],
     }),
 
-    /** GET /me/registrations */
-    listMyRegistrations: builder.query<
-      BaseResponse<RegistrationList>,
-      { page?: number; page_size?: number } | void
-    >({
-      query: (params) => ({
-        url: '/me/registrations',
-        method: 'GET',
-        params: { page: params?.page ?? 1, page_size: params?.page_size ?? 20 },
-      }),
-      providesTags: [{ type: 'Registrations', id: 'MINE' }],
-    }),
+  /** GET /me/registrations — current user's own registrations */
+listMyRegistrations: builder.query<
+  BaseResponse<CrossEventRegistrationList>,
+  {
+    page?: number;
+    page_size?: number;
+    event_id?: string;
+    search?: string;
+    status?: string;
+    sort_by?: 'created_at' | 'event_name' | 'status';
+    sort_order?: 'asc' | 'desc';
+  } | void
+>({
+  query: (params) => ({
+    url: '/me/registrations',
+    method: 'GET',
+    params: {
+      page: params?.page ?? 1,
+      page_size: params?.page_size ?? 20,
+      event_id: params?.event_id,
+      search: params?.search,
+      status: params?.status,
+      sort_by: params?.sort_by,
+      sort_order: params?.sort_order,
+    },
+  }),
+  providesTags: [{ type: 'Registrations', id: 'MINE' }],
+}),
+
+
+    /** GET /registrations — cross-event organizer view */
+listAllRegistrations: builder.query<
+  BaseResponse<CrossEventRegistrationList>,
+  ListAllRegistrationsParams | void
+>({
+  query: (params) => ({
+    url: '/registrations',
+    method: 'GET',
+    params: {
+      page: params?.page ?? 1,
+      page_size: params?.page_size ?? 20,
+      event_id: params?.event_id,
+      search: params?.search,
+      status: params?.status,
+      sort_by: params?.sort_by,
+      sort_order: params?.sort_order,
+    },
+  }),
+  providesTags: [{ type: 'Registrations', id: 'LIST_ALL' }],
+}),
 
     /** GET /registrations/:id
      *
@@ -129,4 +169,5 @@ export const {
   useListMyRegistrationsQuery,
   useGetRegistrationQuery,
   useCancelRegistrationMutation,
+  useListAllRegistrationsQuery
 } = registrationsApi;

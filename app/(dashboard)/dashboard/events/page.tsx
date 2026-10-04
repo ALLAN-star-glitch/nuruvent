@@ -723,7 +723,7 @@ export default function EventsDashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Events I&apos;m Hosting</h1>
+          <h1 className="text-2xl font-bold text-foreground">Events Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Create, monitor, and manage your training sessions, workshops, and webinars.
           </p>

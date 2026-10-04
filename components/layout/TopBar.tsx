@@ -35,10 +35,9 @@ const socialIcons: Record<string, any> = {
 /**
  * Ad data.
  *
- * `bgGradient`, `textColor`, `textSecondary`, `accentColor`, `borderColor`
- * only apply in light mode. In dark mode the bar collapses to a single
- * dark surface (see the wrapper) and the ad image + text carry the
- * color, so these values are intentionally light-only.
+ * `bgGradient`, `textColor`, `textSecondary`, `accentColor`,
+ * `borderColor` only apply in light mode. In dark mode the bar
+ * collapses to a single dark surface (see the wrapper).
  */
 const advertisements = [
   {
@@ -52,8 +51,6 @@ const advertisements = [
     textSecondary: 'text-purple-700',
     accentColor: 'text-purple-600',
     borderColor: 'border-purple-200/50',
-    overlayMessage: 'Summer Webinar Series',
-    overlayHighlight: 'Register for Free',
     overlayLinkText: 'Secure Your Spot',
   },
   {
@@ -67,8 +64,6 @@ const advertisements = [
     textSecondary: 'text-amber-700',
     accentColor: 'text-amber-600',
     borderColor: 'border-amber-200/50',
-    overlayMessage: 'Leadership Masterclass',
-    overlayHighlight: 'Limited Seats Available',
     overlayLinkText: 'Reserve Now',
   },
   {
@@ -82,8 +77,6 @@ const advertisements = [
     textSecondary: 'text-indigo-700',
     accentColor: 'text-indigo-600',
     borderColor: 'border-indigo-200/50',
-    overlayMessage: 'AI Workshop',
-    overlayHighlight: 'For Business Leaders',
     overlayLinkText: 'Learn More',
   },
   {
@@ -97,8 +90,6 @@ const advertisements = [
     textSecondary: 'text-rose-700',
     accentColor: 'text-rose-600',
     borderColor: 'border-rose-200/50',
-    overlayMessage: 'Early Bird Special',
-    overlayHighlight: 'Save 30% Today',
     overlayLinkText: 'Register Now',
   },
   {
@@ -112,8 +103,6 @@ const advertisements = [
     textSecondary: 'text-emerald-700',
     accentColor: 'text-emerald-600',
     borderColor: 'border-emerald-200/50',
-    overlayMessage: 'Join 10,000+',
-    overlayHighlight: 'Free Membership',
     overlayLinkText: 'Get Started',
   },
 ];
@@ -166,47 +155,29 @@ export function TopBar() {
         </div>
 
         {!isMobile && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-current/80">
-              {currentAd.overlayMessage}
-              <span
-                className={cn('font-semibold ml-1.5', currentAd.accentColor)}
-              >
-                {currentAd.overlayHighlight}
-              </span>
-            </span>
-            <span
-              className={cn(
-                'group flex items-center gap-0.5 font-medium transition-all duration-300 whitespace-nowrap',
-                currentAd.accentColor,
-                'hover:brightness-110',
-              )}
-            >
-              {currentAd.overlayLinkText}
-              <MdOutlineKeyboardArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </span>
-          </div>
+          <span
+            className={cn(
+              'flex items-center gap-0.5 text-sm font-semibold transition-all duration-300 whitespace-nowrap',
+              currentAd.accentColor,
+              'hover:brightness-110',
+            )}
+          >
+            {currentAd.overlayLinkText}
+            <MdOutlineKeyboardArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          </span>
         )}
 
         {isMobile && (
-          <div className="flex flex-col items-start gap-0 text-xs flex-1 min-w-0">
-            <span className="font-medium text-current/80 truncate w-full text-[11px]">
-              {currentAd.overlayMessage}
-              <span className={cn('font-semibold ml-1', currentAd.accentColor)}>
-                {currentAd.overlayHighlight}
-              </span>
-            </span>
-            <span
-              className={cn(
-                'flex items-center gap-0.5 font-medium transition-all duration-300 whitespace-nowrap',
-                currentAd.accentColor,
-                'hover:brightness-110 text-[10px]',
-              )}
-            >
-              {currentAd.overlayLinkText}
-              <MdArrowForward className="h-2.5 w-2.5 group-hover:translate-x-0.5 transition-transform" />
-            </span>
-          </div>
+          <span
+            className={cn(
+              'flex items-center gap-0.5 text-[11px] font-semibold transition-all duration-300 whitespace-nowrap',
+              currentAd.accentColor,
+              'hover:brightness-110',
+            )}
+          >
+            {currentAd.overlayLinkText}
+            <MdArrowForward className="h-2.5 w-2.5 group-hover:translate-x-0.5 transition-transform" />
+          </span>
         )}
       </Link>
     );

@@ -90,3 +90,56 @@ export interface RegistrationList {
   page: number;
   page_size: number;
 }
+
+
+// Flat shape — used by GET /registrations and GET /me/registrations
+export interface CrossEventRegistrationList {
+  registrations: CrossEventRegistration[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+export interface CrossEventRegistration {
+  id: string;
+  registration_number: string;
+  status: string;
+  status_label: string;
+  attendee_name: string;
+  email: string;
+  phone?: string;
+  is_guest: boolean;
+  user_id?: string;
+  event_id: string;
+  event_name: string;
+  event_start_date?: string;
+  event_image_url?: string;
+
+  // Event format / location
+  is_virtual: boolean;
+  is_hybrid: boolean;
+  venue_name?: string;
+  venue_address?: string;
+  venue_city?: string;
+  venue_country?: string;
+  in_person_location?: string;
+
+  ticket_name?: string;
+  created_at: string;
+}
+
+export interface CrossEventRegistrationList {
+  registrations: CrossEventRegistration[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ListAllRegistrationsParams {
+  page?: number;
+  page_size?: number;
+  event_id?: string;
+  search?: string;
+  status?: string;
+  sort_by?: 'created_at' | 'attendee_name' | 'event_name' | 'status';
+  sort_order?: 'asc' | 'desc';
+}

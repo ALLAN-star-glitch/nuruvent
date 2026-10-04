@@ -383,7 +383,7 @@ export default function BookingConfirmationPage() {
                 asChild
                 className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
               >
-                <Link href="/dashboard/my-registrations">
+                <Link href="/dashboard/registrations?tab=attending">
                   <Sparkles className="h-4 w-4 mr-2" />
                   Go to My Registrations
                   <ArrowRight className="h-4 w-4 ml-2" />
