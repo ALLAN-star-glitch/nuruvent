@@ -303,7 +303,7 @@ export default function EventAttendeesPage() {
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
-  // ---- Event info (name + date + host) ----
+  // ---- Event info (name + date + host + platforms) ----
   const { data: eventResponse } = useGetEventByIdQuery(eventId, {
     skip: !eventId,
   });
@@ -311,6 +311,21 @@ export default function EventAttendeesPage() {
   const eventName = event?.display_name ?? event?.name ?? 'Event';
   const eventStartDate = event?.start_date;
   const eventHostName = event ? getEventHostName(event) : '';
+
+  /**
+   * Distinct video platforms used across the event's schedules.
+   * Events can mix platforms (Session 1 on Meet, Session 2 on Zoom),
+   * so we read them per-schedule rather than trusting the single
+   * event-level `virtual_platform` field.
+   */
+  const eventPlatforms = useMemo(() => {
+    if (!event?.schedules) return [];
+    const seen = new Set<string>();
+    for (const s of event.schedules) {
+      if (s.platform) seen.add(s.platform);
+    }
+    return Array.from(seen);
+  }, [event?.schedules]);
 
   // ---- Detail query ----
   const { data: detailResponse, isFetching: isDetailLoading } =
@@ -464,6 +479,7 @@ export default function EventAttendeesPage() {
           title: `${eventName} Attendees`,
           subtitle: 'Event attendee directory',
           hostName: eventHostName,
+          platforms: eventPlatforms,
           filtersSummary,
           filename: `${slug}-attendees-${stamp}.pdf`,
         });

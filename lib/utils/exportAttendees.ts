@@ -18,20 +18,35 @@ const BRAND = {
   white:       [255, 255, 255] as [number, number, number],
 } as const;
 
+// ============================================================
+// ASSETS
+// ============================================================
+
 /**
- * Path to the logo. Adjust to wherever your logo lives in /public.
- * A transparent PNG works best.
+ * Path to the Nuruvent logo. Adjust to wherever your logo lives
+ * in /public. A transparent PNG works best.
  */
 const LOGO_SRC = '/logo.png';
+
+/**
+ * Platform logos and display labels. Paths are relative to /public.
+ *
+ * Keys must match the platform values your API returns on
+ * event.schedules[].platform — e.g. "google_meet", "zoom".
+ *
+ * If you add a new platform (Teams, Webex), add the key here and
+ * drop the matching .png in public/platforms/.
+ */
+const PLATFORM_LOGOS: Record<string, { label: string; src: string }> = {
+  google_meet: { label: 'Google Meet', src: '/platforms/google-meet.png' },
+  zoom:        { label: 'Zoom',        src: '/platforms/zoom.png' },
+  teams:       { label: 'Microsoft Teams', src: '/platforms/teams.webp' },
+  webex:       { label: 'Webex',       src: '/platforms/webex.png' },
+};
 
 // ============================================================
 // COLUMNS — canonical set (CSV / Excel / JSON)
 // ============================================================
-//
-// Every column the system knows about. Machine-readable formats
-// get the full set — there is no cost to more columns in a
-// spreadsheet, and consumers often want to filter/aggregate by
-// fields the human reader never looks at.
 
 export interface ExportColumn {
   key: string;
@@ -85,13 +100,6 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
 // ============================================================
 // COLUMNS — human set (PDF only)
 // ============================================================
-//
-// Same information as the canonical set, but:
-//   - Host is rendered inline as a badge (not a column).
-//   - Sessions Attended/Total are merged into "3 / 4".
-//   - Duration is human-readable ("2h 15m" not 8100).
-//   - Audit-only timestamps (Last Activity) are dropped.
-//   - Dates use the compact "Oct 3, 26" format.
 
 export const PDF_COLUMNS: ExportColumn[] = [
   { key: 'display_name', label: 'Name', get: (a) => a.display_name },
@@ -177,17 +185,15 @@ function formatDurationHuman(seconds: number | undefined): string {
 }
 
 /**
- * Fetches the logo and returns it as a data URL so jsPDF can embed
- * it without needing a server. Returns null on any failure so the
- * PDF still renders without the logo.
+ * Fetches an image URL and returns it as a data URL so jsPDF can
+ * embed it without needing a server. Returns null on any failure
+ * so the PDF still renders without the image.
  */
-async function loadLogoDataUrl(): Promise<{
-  dataUrl: string;
-  width: number;
-  height: number;
-} | null> {
+async function loadImageDataUrl(
+  src: string,
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
   try {
-    const res = await fetch(LOGO_SRC, { cache: 'force-cache' });
+    const res = await fetch(src, { cache: 'force-cache' });
     if (!res.ok) return null;
     const blob = await res.blob();
 
@@ -285,6 +291,14 @@ export interface ExportPDFOptions {
   subtitle?: string;
   /** Optional host name shown in the header. */
   hostName?: string;
+  /**
+   * Video platforms used by the event, e.g. ["google_meet", "zoom"].
+   * Rendered as a row of small badges under the host line. Pass an
+   * empty array or omit for in-person-only or cross-event exports.
+   *
+   * Keys must match PLATFORM_LOGOS above.
+   */
+  platforms?: string[];
   /** Optional filter summary, e.g. "Status: Registered · Search: anna". */
   filtersSummary?: string;
   /** Output filename (without path). */
@@ -301,19 +315,19 @@ export async function exportToPDF(
   const title = options.title ?? 'Attendees';
   const subtitle = options.subtitle ?? '';
   const hostName = options.hostName ?? '';
+  const platforms = options.platforms ?? [];
   const filtersSummary = options.filtersSummary ?? '';
   const filename = options.filename ?? `attendees-${todayStamp()}.pdf`;
 
-  // A4 landscape, points. Narrow margins to give the table more room.
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 24;
 
   // ------------------------------------------------------------
-  // HEADER — white, minimal. Only thin accent bars use brand color.
+  // HEADER — white, minimal.
   // ------------------------------------------------------------
-  const headerHeight = 110;
+  const headerHeight = 130;
 
   doc.setFillColor(...BRAND.primary);
   doc.rect(0, 0, pageWidth, 2, 'F');
@@ -324,7 +338,7 @@ export async function exportToPDF(
   // ------------------------------------------------------------
   // LOGO — top-left.
   // ------------------------------------------------------------
-  const logo = await loadLogoDataUrl();
+  const logo = await loadImageDataUrl(LOGO_SRC);
   let textLeft = margin;
 
   if (logo) {
@@ -346,22 +360,71 @@ export async function exportToPDF(
   }
 
   // ------------------------------------------------------------
-  // TITLE + META
+  // TITLE
   // ------------------------------------------------------------
   doc.setTextColor(...BRAND.neutralDark);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.text(title, textLeft, 52);
 
+  // ------------------------------------------------------------
+  // HOST LINE
+  // ------------------------------------------------------------
   let metaY = 72;
   if (hostName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.setTextColor(...BRAND.neutralGray);
     doc.text(`Hosted by ${hostName}`, textLeft, metaY);
-    metaY += 16;
+    metaY += 18;
   }
 
+  // ------------------------------------------------------------
+  // PLATFORM BADGES
+  // ------------------------------------------------------------
+  if (platforms.length > 0) {
+    const iconH = 12;
+    let cursorX = textLeft;
+    let rendered = 0;
+
+    for (const platformKey of platforms) {
+      const meta = PLATFORM_LOGOS[platformKey];
+      if (!meta) continue;
+
+      const icon = await loadImageDataUrl(meta.src);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...BRAND.neutralGray);
+
+      if (icon) {
+        const iconW = iconH * (icon.width / icon.height);
+        doc.addImage(
+          icon.dataUrl,
+          'PNG',
+          cursorX,
+          metaY - 9,
+          iconW,
+          iconH,
+          undefined,
+          'FAST',
+        );
+        doc.text(meta.label, cursorX + iconW + 5, metaY);
+        cursorX += iconW + 5 + doc.getTextWidth(meta.label) + 16;
+      } else {
+        doc.text(meta.label, cursorX, metaY);
+        cursorX += doc.getTextWidth(meta.label) + 16;
+      }
+
+      rendered++;
+    }
+
+    if (rendered > 0) metaY += 16;
+  }
+
+  // ------------------------------------------------------------
+  // META LINE
+  // ------------------------------------------------------------
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(...BRAND.neutralGray);
@@ -373,11 +436,15 @@ export async function exportToPDF(
   doc.text(metaParts.join('  ·  '), textLeft, metaY);
   metaY += 14;
 
+  // ------------------------------------------------------------
+  // FILTERS SUMMARY
+  // ------------------------------------------------------------
   if (filtersSummary) {
     doc.setFontSize(9);
     doc.text(filtersSummary, textLeft, metaY);
   }
 
+  // Divider under header
   doc.setDrawColor(...BRAND.border);
   doc.setLineWidth(0.5);
   doc.line(margin, headerHeight - 8, pageWidth - margin, headerHeight - 8);
