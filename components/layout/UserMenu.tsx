@@ -2,9 +2,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,16 +22,14 @@ import {
   Users,
   Award,
   CreditCard,
-  DollarSign,
-  LifeBuoy,
   Settings,
   LogOut,
-  PlusCircle,
   Video,
+  Trash2,
   ChevronDown,
+  ClipboardList,
 } from 'lucide-react';
 
-// Redux imports
 import { useAppDispatch } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
@@ -47,24 +45,32 @@ interface UserMenuProps {
 }
 
 // ============================================================
-// QUICK LINKS — flat list, same for everyone
+// QUICK LINKS
 // ============================================================
 
 const QUICK_LINKS = [
   { label: 'Events', href: '/dashboard/events', icon: Calendar },
-  { label: 'Create Event', href: '/dashboard/events/new', icon: PlusCircle },
+  { label: 'Registrations', href: '/dashboard/registrations', icon: ClipboardList }, // <-- new
   { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
   { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
   { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
-  { label: 'Revenue', href: '/dashboard/revenue', icon: DollarSign },
   { label: 'Replays', href: '/dashboard/replays', icon: Video },
+  { label: 'Trash', href: '/dashboard/trash', icon: Trash2, isTrash: true },
 ];
 
 export function UserMenu({ user }: UserMenuProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Close on any route change (back/forward, programmatic nav, etc.)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(false);
+  }, [pathname]);
 
   const getInitials = () => {
     if (!user?.name) return 'U';
@@ -76,8 +82,9 @@ export function UserMenu({ user }: UserMenuProps) {
       .slice(0, 2);
   };
 
-  const closeDropdown = () => {
-    document.body.click();
+  const navigateTo = (href: string) => {
+    setOpen(false);
+    router.push(href);
   };
 
   const handleLogout = async () => {
@@ -93,13 +100,13 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   const openLogoutDialog = () => {
+    setOpen(false);
     setShowLogoutDialog(true);
-    closeDropdown();
   };
 
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger className="flex items-center gap-2 h-9 px-2 hover:bg-gray-100 rounded-lg cursor-pointer outline-none data-[state=open]:bg-gray-100 transition-colors">
           <Avatar className="h-8 w-8">
             <AvatarImage src={user?.avatar} />
@@ -137,12 +144,11 @@ export function UserMenu({ user }: UserMenuProps) {
           <DropdownMenuSeparator />
 
           {/* Dashboard Link */}
-          <DropdownMenuItem className="bg-primary/5 hover:bg-primary/10 cursor-pointer p-0">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-3 py-2.5 px-2 w-full"
-              onClick={closeDropdown}
-            >
+          <DropdownMenuItem
+            onSelect={() => navigateTo('/dashboard')}
+            className="bg-primary/5 hover:bg-primary/10 cursor-pointer"
+          >
+            <div className="flex items-center gap-3 py-1 px-1 w-full">
               <div className="bg-primary p-1.5 rounded-lg">
                 <LayoutDashboard className="h-4 w-4 text-white" />
               </div>
@@ -165,7 +171,7 @@ export function UserMenu({ user }: UserMenuProps) {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </Link>
+            </div>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -177,18 +183,29 @@ export function UserMenu({ user }: UserMenuProps) {
             </span>
           </div>
           <DropdownMenuGroup>
-            {QUICK_LINKS.map((item) => (
-              <DropdownMenuItem key={item.href} className="p-0 cursor-pointer">
-                <Link
-                  href={item.href}
-                  className="flex items-center gap-2 py-2 px-2 w-full"
-                  onClick={closeDropdown}
+            {QUICK_LINKS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <DropdownMenuItem
+                  key={item.href}
+                  onSelect={() => navigateTo(item.href)}
+                  className={
+                    item.isTrash
+                      ? 'cursor-pointer text-red-600 hover:bg-red-50 focus:text-red-600'
+                      : 'cursor-pointer'
+                  }
                 >
-                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                  <Icon
+                    className={
+                      item.isTrash
+                        ? 'h-4 w-4 text-red-500'
+                        : 'h-4 w-4 text-muted-foreground'
+                    }
+                  />
                   <span>{item.label}</span>
-                </Link>
-              </DropdownMenuItem>
-            ))}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
@@ -200,15 +217,12 @@ export function UserMenu({ user }: UserMenuProps) {
             </span>
           </div>
           <DropdownMenuGroup>
-            <DropdownMenuItem className="p-0 cursor-pointer">
-              <Link
-                href="/dashboard/account"
-                className="flex items-center gap-2 py-2 px-2 w-full"
-                onClick={closeDropdown}
-              >
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span>My Account</span>
-              </Link>
+            <DropdownMenuItem
+              onSelect={() => navigateTo('/dashboard/account')}
+              className="cursor-pointer"
+            >
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span>My Account</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
@@ -221,25 +235,12 @@ export function UserMenu({ user }: UserMenuProps) {
             </span>
           </div>
           <DropdownMenuGroup>
-            <DropdownMenuItem className="p-0 cursor-pointer">
-              <Link
-                href="/dashboard/settings"
-                className="flex items-center gap-2 py-2 px-2 w-full"
-                onClick={closeDropdown}
-              >
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <span>Settings</span>
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="p-0 cursor-pointer">
-              <Link
-                href="/help"
-                className="flex items-center gap-2 py-2 px-2 w-full"
-                onClick={closeDropdown}
-              >
-                <LifeBuoy className="h-4 w-4 text-muted-foreground" />
-                <span>Help &amp; Support</span>
-              </Link>
+            <DropdownMenuItem
+              onSelect={() => navigateTo('/dashboard/settings')}
+              className="cursor-pointer"
+            >
+              <Settings className="h-4 w-4 text-muted-foreground" />
+              <span>Settings</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
@@ -247,7 +248,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
           {/* Sign Out */}
           <DropdownMenuItem
-            onClick={openLogoutDialog}
+            onSelect={openLogoutDialog}
             className="flex items-center gap-2 text-red-600 cursor-pointer hover:bg-red-50"
           >
             <LogOut className="h-4 w-4" />
@@ -256,7 +257,6 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Logout Confirmation Dialog */}
       <LogoutDialog
         open={showLogoutDialog}
         onOpenChange={setShowLogoutDialog}

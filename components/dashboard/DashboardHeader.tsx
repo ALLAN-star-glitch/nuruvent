@@ -14,6 +14,16 @@ import {
   CheckCircle,
   RefreshCw,
   ArrowLeftRight,
+  LayoutDashboard,
+  Calendar,
+  ClipboardList,
+  Users,
+  CreditCard,
+  Award,
+  Clapperboard,
+  Trash2,
+  Settings,
+  type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -25,16 +35,38 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetClose,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { NAV_ITEMS } from '@/lib/constants';
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
 import { useState, useRef, useEffect } from 'react';
+
+// ============================================================
+// SHARED NAV ITEMS (mirror DashboardSidebar)
+// Move to @/lib/constants/dashboardNav.ts to share with the sidebar
+// ============================================================
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  isTrash?: boolean;
+}
+
+const DASHBOARD_NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/events', label: 'Events', icon: Calendar },
+  { href: '/dashboard/registrations', label: 'Registrations', icon: ClipboardList },
+  { href: '/dashboard/attendees', label: 'Attendance', icon: Users },
+  { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
+  { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
+  { href: '/dashboard/replays', label: 'Replays', icon: Clapperboard },
+  { href: '/dashboard/trash', label: 'Trash', icon: Trash2, isTrash: true },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+];
 
 // ============================================================
 // TYPES
@@ -76,11 +108,22 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showTeamSwitcher, setShowTeamSwitcher] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false); // <-- NEW
   const [currentTeam, setCurrentTeam] = useState<Team>(mockTeams[0]);
   const teamSwitcherRef = useRef<HTMLDivElement>(null);
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (teamSwitcherRef.current && !teamSwitcherRef.current.contains(event.target as Node)) {
+        setShowTeamSwitcher(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isAuthenticated) {
     return null;
@@ -89,7 +132,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(word => word[0])
+      .map((word) => word[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -121,26 +164,25 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   };
 
   const getTeamColor = (type: Team['type']) => {
-    return type === 'personal' ? 'text-blue-600 dark:text-blue-400' : 'text-indigo-600 dark:text-indigo-400';
+    return type === 'personal'
+      ? 'text-blue-600 dark:text-blue-400'
+      : 'text-indigo-600 dark:text-indigo-400';
   };
 
   const getTeamBgColor = (type: Team['type']) => {
-    return type === 'personal' ? 'bg-blue-50 dark:bg-blue-950/30' : 'bg-indigo-50 dark:bg-indigo-950/30';
+    return type === 'personal'
+      ? 'bg-blue-50 dark:bg-blue-950/30'
+      : 'bg-indigo-50 dark:bg-indigo-950/30';
   };
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (teamSwitcherRef.current && !teamSwitcherRef.current.contains(event.target as Node)) {
-        setShowTeamSwitcher(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const toggleTeamSwitcher = () => {
     setShowTeamSwitcher(!showTeamSwitcher);
+  };
+
+  // Reusable active-link helper (matches the sidebar)
+  const isActiveLink = (href: string) => {
+    if (href === '/dashboard') return pathname === href;
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   return (
@@ -150,7 +192,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 md:gap-3">
             {/* Left: Mobile/Tablet Drawer Menu + Logo */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              <Sheet>
+              {/* CONTROLLED SHEET */}
+              <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
@@ -162,7 +205,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </Button>
                 </SheetTrigger>
 
-                <SheetContent side="left" className="p-0 w-[280px] sm:w-[320px] md:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]">
+                <SheetContent
+                  side="left"
+                  className="p-0 w-[280px] sm:w-[320px] md:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]"
+                >
                   <SheetHeader className="p-4 border-b border-gray-100 flex-row items-center justify-between space-y-0 text-left shrink-0 dark:border-[#3C4043]">
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="inline-flex items-center">
@@ -176,27 +222,41 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         Menu
                       </p>
                       <nav className="space-y-0.5">
-                        {NAV_ITEMS.map((item) => {
-                          const isActive = pathname === item.href;
+                        {DASHBOARD_NAV_ITEMS.map((item) => {
+                          const isActive = isActiveLink(item.href);
                           const Icon = item.icon;
+                          const isTrash = item.isTrash;
+
                           return (
-                            <SheetClose asChild key={item.href}>
-                              <Link
-                                href={item.href}
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => setIsDrawerOpen(false)} // <-- CLOSE ON CLICK
+                              className={cn(
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                                isActive
+                                  ? isTrash
+                                    ? 'bg-destructive/10 text-destructive dark:bg-destructive/20'
+                                    : 'bg-primary/10 text-primary dark:bg-primary/20'
+                                  : isTrash
+                                    ? 'text-destructive hover:bg-destructive/10'
+                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                              )}
+                            >
+                              <Icon
                                 className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
-                                  isActive
-                                    ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white'
-                                )}
-                              >
-                                <Icon className={cn(
                                   'h-5 w-5 shrink-0',
-                                  isActive ? 'text-primary' : 'text-gray-400 dark:text-gray-500'
-                                )} />
-                                <span>{item.label}</span>
-                              </Link>
-                            </SheetClose>
+                                  isActive
+                                    ? isTrash
+                                      ? 'text-destructive'
+                                      : 'text-primary'
+                                    : isTrash
+                                      ? 'text-destructive'
+                                      : 'text-gray-400 dark:text-gray-500',
+                                )}
+                              />
+                              <span>{item.label}</span>
+                            </Link>
                           );
                         })}
                       </nav>
@@ -207,22 +267,39 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3 dark:border-[#3C4043] dark:bg-[#2D2E32]">
                     <button
                       type="button"
-                      onClick={() => setShowLogoutDialog(true)}
+                      onClick={() => {
+                        setIsDrawerOpen(false);
+                        setShowLogoutDialog(true);
+                      }}
                       disabled={isLoading}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-red-500 hover:bg-red-50/50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950/20 cursor-pointer"
                     >
                       {isLoading ? (
                         <div className="flex items-center gap-3">
                           <svg className="animate-spin h-5 w-5 text-red-400" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
                           </svg>
                           <span className="text-sm font-medium">Logging out...</span>
                         </div>
                       ) : (
                         <>
                           <LogOut className="h-5 w-5 shrink-0 text-red-400 group-hover:text-red-500 transition-colors" />
-                          <span className="text-sm font-medium group-hover:text-red-600 transition-colors">Logout</span>
+                          <span className="text-sm font-medium group-hover:text-red-600 transition-colors">
+                            Logout
+                          </span>
                         </>
                       )}
                     </button>
@@ -232,15 +309,22 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         {getInitials(user.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate dark:text-white">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate dark:text-gray-400">{user.email}</p>
+                        <p className="text-sm font-medium text-gray-900 truncate dark:text-white">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate dark:text-gray-400">
+                          {user.email}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </SheetContent>
               </Sheet>
 
-              <Link href="/dashboard" className="inline-flex items-center shrink-0 hover:opacity-80 transition-opacity cursor-pointer">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center shrink-0 hover:opacity-80 transition-opacity cursor-pointer"
+              >
                 <Logo />
               </Link>
             </div>
@@ -254,13 +338,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
             {/* Right Header Controls */}
             <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
-              {/* Search Toggle Button - visible on tablet & mobile */}
               <Button
                 variant="ghost"
                 size="icon"
                 className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
                 onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-                aria-label={isMobileSearchOpen ? "Close search" : "Open search"}
+                aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
               >
                 {isMobileSearchOpen ? (
                   <X className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -269,7 +352,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              {/* TEAM SWITCHER - Responsive across mobile, tablet, and desktop */}
+              {/* TEAM SWITCHER */}
               <div className="relative" ref={teamSwitcherRef}>
                 <button
                   type="button"
@@ -278,27 +361,26 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   aria-label="Switch team"
                 >
                   <ArrowLeftRight className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-
-                  {/* Text hidden on mobile (<768px), visible on tablets/laptops (md+) */}
                   <span className="hidden md:inline-block text-gray-700 dark:text-gray-300 font-medium">
                     Switch Team
                   </span>
-
-                  {/* Current team name shown on larger tablets/desktops (lg+) */}
                   <span className="hidden lg:inline-block max-w-[90px] xl:max-w-[120px] truncate text-gray-500 dark:text-gray-400">
                     ({currentTeam.name})
                   </span>
-
-                  <ChevronDown className={cn(
-                    "hidden md:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0",
-                    showTeamSwitcher ? "rotate-180" : ""
-                  )} />
+                  <ChevronDown
+                    className={cn(
+                      'hidden md:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0',
+                      showTeamSwitcher ? 'rotate-180' : '',
+                    )}
+                  />
                 </button>
 
                 {showTeamSwitcher && (
                   <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white dark:bg-[#2D2E32] rounded-2xl shadow-2xl border border-gray-200/80 dark:border-[#3C4043] py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="px-3 sm:px-4 py-1.5 sm:py-2">
-                      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Switch Team</p>
+                      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                        Switch Team
+                      </p>
                     </div>
                     <div className="h-px bg-gradient-to-r from-gray-100 to-transparent dark:from-[#3C4043] mx-3 sm:mx-4" />
                     <div className="mt-1">
@@ -311,28 +393,39 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             type="button"
                             onClick={() => handleTeamSwitch(team)}
                             className={cn(
-                              "flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-left transition-colors cursor-pointer",
+                              'flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-left transition-colors cursor-pointer',
                               isActive
-                                ? "bg-blue-50 dark:bg-blue-950/30"
-                                : "hover:bg-gray-50 dark:hover:bg-[#3C4043]/50"
+                                ? 'bg-blue-50 dark:bg-blue-950/30'
+                                : 'hover:bg-gray-50 dark:hover:bg-[#3C4043]/50',
                             )}
                           >
-                            <div className={cn(
-                              "h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                              getTeamBgColor(team.type),
-                              isActive ? "ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#2D2E32]" : ""
-                            )}>
-                              <Icon className={cn("h-4 w-4 sm:h-4.5 sm:w-4.5", getTeamColor(team.type))} />
+                            <div
+                              className={cn(
+                                'h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
+                                getTeamBgColor(team.type),
+                                isActive
+                                  ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#2D2E32]'
+                                  : '',
+                              )}
+                            >
+                              <Icon
+                                className={cn('h-4 w-4 sm:h-4.5 sm:w-4.5', getTeamColor(team.type))}
+                              />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={cn(
-                                "text-sm font-medium truncate",
-                                isActive ? "text-blue-700 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"
-                              )}>
+                              <p
+                                className={cn(
+                                  'text-sm font-medium truncate',
+                                  isActive
+                                    ? 'text-blue-700 dark:text-blue-300'
+                                    : 'text-gray-700 dark:text-gray-300',
+                                )}
+                              >
                                 {team.name}
                               </p>
                               <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 truncate">
-                                {team.type === 'personal' ? 'Personal Team' : 'Institution Team'} • {team.role}
+                                {team.type === 'personal' ? 'Personal Team' : 'Institution Team'} •{' '}
+                                {team.role}
                               </p>
                             </div>
                             {isActive && (
@@ -346,14 +439,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     <div className="px-3 sm:px-4 pt-1.5">
                       <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
                         <RefreshCw className="h-3 w-3" />
-                        Switch to view different team events & permissions
+                        Switch to view different team events &amp; permissions
                       </p>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Create Event Button - Compact text on tablets (sm to lg), Full text on desktops (lg+) */}
+              {/* Create Event Button */}
               <button
                 type="button"
                 onClick={handleCreateEvent}
@@ -364,18 +457,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <span className="hidden lg:inline">Create Event</span>
               </button>
 
-              {/* Theme Toggle — replaces the old stub button */}
               <ThemeToggle />
-
               <UserMenu user={user} onLogout={handleLogout} />
             </div>
           </div>
 
           {/* Mobile/Tablet Search Dropdown */}
-          <div className={cn(
-            "xl:hidden transition-all duration-300 ease-in-out relative z-20",
-            isMobileSearchOpen ? "max-h-16 pb-2 opacity-100" : "max-h-0 opacity-0 overflow-hidden"
-          )}>
+          <div
+            className={cn(
+              'xl:hidden transition-all duration-300 ease-in-out relative z-20',
+              isMobileSearchOpen ? 'max-h-16 pb-2 opacity-100' : 'max-h-0 opacity-0 overflow-hidden',
+            )}
+          >
             <SearchBar />
           </div>
         </div>
