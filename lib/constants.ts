@@ -18,6 +18,7 @@ export const NAV_ITEMS = [
   { label: "How It Works", href: "/how-it-works", icon: BookOpen },
   { label: "Features", href: "/features", icon: Zap },
   { label: "Pricing", href: "/pricing", icon: CreditCard },
+  { label: "Contact", href: "/contact", icon: BookOpen },
 ];
 
 export const FOOTER_LINKS = {
