@@ -32,6 +32,7 @@ import {
   XCircle,
   Video,
   Link2,
+  DollarSign,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -1262,6 +1263,13 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Event
+                </Button>
+              </Link>
+
+              <Link href={`/dashboard/events/${event.id}/payments`} className="block">
+                <Button variant="outline" className="w-full justify-start cursor-pointer">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  View Payments
                 </Button>
               </Link>
 
