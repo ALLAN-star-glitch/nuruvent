@@ -488,7 +488,8 @@ export default function TrashPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex items-center justify-center min-h-[500px]">
+      <div className="flex items-center justify-center min-h-[500px] px-4">
+        {/* ─── RESPONSIVE: added px-4 so card doesn't touch edges on small phones */}
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-6 text-center">
             <div className="flex justify-center mb-4">
@@ -516,7 +517,8 @@ export default function TrashPage() {
 
   if (isLoading && !trashResponse) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px] px-4">
+        {/* ─── RESPONSIVE: added px-4 */}
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading trash...</p>
@@ -530,104 +532,118 @@ export default function TrashPage() {
   // ============================================================
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-4 sm:space-y-6 pb-24 md:pb-20 px-3 sm:px-4 md:px-0">
+      {/* ─── RESPONSIVE: space-y-4 on mobile, px-3/4 for outer padding, more bottom padding on mobile for fixed bar */}
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
           <Link
             href="/dashboard/events"
-            className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer"
+            className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Trash2 className="h-6 w-6 text-amber-500" />
-              Trash
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+              <Trash2 className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 flex-shrink-0" />
+              <span className="truncate">Trash</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
               View and manage your soft-deleted events.
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:flex-shrink-0">
           <Button
             variant="outline"
             size="sm"
-            className="cursor-pointer"
+            className="cursor-pointer w-full sm:w-auto"
             onClick={handleRefresh}
             disabled={isFetching}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            <span className="ml-2 sm:ml-0">Refresh</span>
           </Button>
         </div>
       </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Total in Trash
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
-                  {totalItems}
-                </p>
-              </div>
-              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-lg flex-shrink-0 ml-2">
-                <Trash2 className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Drafts
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
-                  {draftCount}
-                </p>
-              </div>
-              <div className="p-2.5 bg-muted text-muted-foreground rounded-lg flex-shrink-0 ml-2">
-                <Clock className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Published
-                </p>
-                <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
-                  {publishedCount}
-                </p>
-              </div>
-              <div className="p-2.5 bg-tertiary-50 dark:bg-tertiary-950/40 text-tertiary-600 dark:text-tertiary-400 rounded-lg flex-shrink-0 ml-2">
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+{/* Stats */}
+<div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+  <Card className="border-border shadow-sm rounded-2xl">
+    <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+      {/* Top row: label + icon bubble */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+          Total in Trash
+        </p>
+        <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
+          <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+        </span>
       </div>
+
+      {/* Value */}
+      <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+        {totalItems}
+      </p>
+
+      {/* Sub-caption */}
+      <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+        events in trash
+      </p>
+    </CardContent>
+  </Card>
+
+  <Card className="border-border shadow-sm rounded-2xl">
+    <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+          Drafts
+        </p>
+        <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+          <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+        </span>
+      </div>
+
+      <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+        {draftCount}
+      </p>
+
+      <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+        unpublished
+      </p>
+    </CardContent>
+  </Card>
+
+  <Card className="border-border shadow-sm rounded-2xl col-span-2 md:col-span-1">
+    <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+          Published
+        </p>
+        <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-tertiary-50 dark:bg-tertiary-950/40">
+          <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary-600 dark:text-tertiary-400" />
+        </span>
+      </div>
+
+      <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+        {publishedCount}
+      </p>
+
+      <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+        live events
+      </p>
+    </CardContent>
+  </Card>
+</div>
 
       {/* Desktop filters */}
       {!isMobile && (
         <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="relative w-full md:w-72">
+          <CardContent className="p-3 sm:p-4">
+            {/* ─── RESPONSIVE: tighter padding on small tablets */}
+            <div className="flex flex-col gap-3 sm:gap-4">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 sm:gap-4">
+                <div className="relative w-full md:w-72 lg:w-80">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
                     type="text"
@@ -648,9 +664,10 @@ export default function TrashPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-border pt-3">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                  {/* ─── RESPONSIVE: allow wrapping on narrow tablets */}
+                  <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg shrink-0">
                     <button
                       onClick={() => setViewMode('table')}
                       className={`p-1.5 rounded-md cursor-pointer ${
@@ -677,7 +694,7 @@ export default function TrashPage() {
 
                   <span className="text-xs text-muted-foreground hidden sm:inline">|</span>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs text-muted-foreground hidden sm:inline">Sort by:</span>
                     <Select
                       value={sortField}
@@ -686,7 +703,7 @@ export default function TrashPage() {
                         setSortDirection('asc');
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectTrigger className="h-8 w-[110px] sm:w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -707,15 +724,15 @@ export default function TrashPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <span className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end shrink-0">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {isFetching && <Loader2 className="h-3.5 w-3.5 inline animate-spin mr-1" />}
                     {filteredEvents.length} item{filteredEvents.length !== 1 ? 's' : ''} in trash
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs cursor-pointer"
+                    className="h-8 text-xs cursor-pointer shrink-0"
                     onClick={() => {
                       setSearchQuery('');
                       setDebouncedSearchQuery('');
@@ -733,10 +750,11 @@ export default function TrashPage() {
 
             {/* Bulk bar */}
             {selectedEvents.length > 0 && (
-              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground">
+              <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                {/* ─── RESPONSIVE: stack vertically on small screens */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="text-xs sm:text-sm font-medium text-foreground truncate">
                     {selectedEvents.length} item{selectedEvents.length > 1 ? 's' : ''} selected
                   </span>
                 </div>
@@ -744,32 +762,36 @@ export default function TrashPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="cursor-pointer text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30"
+                    className="cursor-pointer text-tertiary-600 dark:text-tertiary-400 border-tertiary-200 dark:border-tertiary-900/50 hover:bg-tertiary-50 dark:hover:bg-tertiary-950/30 flex-1 sm:flex-none text-xs sm:text-sm"
                     onClick={handleRestoreSelected}
                   >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    {selectedEvents.length === 1 ? 'Restore' : 'Restore All'}
+                    <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="ml-1 sm:ml-0">
+                      {selectedEvents.length === 1 ? 'Restore' : 'Restore All'}
+                    </span>
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="cursor-pointer text-destructive border-destructive/30 hover:bg-destructive/10"
+                    className="cursor-pointer text-destructive border-destructive/30 hover:bg-destructive/10 flex-1 sm:flex-none text-xs sm:text-sm"
                     onClick={handlePermanentDeleteSelected}
                   >
-                    <Trash className="h-4 w-4 mr-2" />
-                    {selectedEvents.length === 1 ? 'Delete Permanently' : 'Delete All Permanently'}
+                    <Trash className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="ml-1 sm:ml-0">
+                      {selectedEvents.length === 1 ? 'Delete Permanently' : 'Delete All Permanently'}
+                    </span>
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="cursor-pointer"
+                    className="cursor-pointer text-xs sm:text-sm"
                     onClick={() => {
                       setSelectedEvents([]);
                       setSelectAll(false);
                     }}
                   >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Clear
+                    <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="ml-1 sm:ml-0">Clear</span>
                   </Button>
                 </div>
               </div>
@@ -784,9 +806,10 @@ export default function TrashPage() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
+                {/* ─── RESPONSIVE: table stays horizontally scrollable on tablets, columns get tighter padding */}
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="py-3 px-4 w-10">
+                    <TableHead className="py-3 px-2 lg:px-4 w-10">
                       <Checkbox
                         checked={selectAll}
                         onCheckedChange={handleSelectAll}
@@ -794,19 +817,19 @@ export default function TrashPage() {
                         disabled={filteredEvents.length === 0}
                       />
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
-                      <div className="flex items-center">Event Title {sortIcon('name')}</div>
+                    <TableHead className="py-3 px-2 lg:px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('name')}>
+                      <div className="flex items-center whitespace-nowrap">Event Title {sortIcon('name')}</div>
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('type')}>
-                      <div className="flex items-center">Type {sortIcon('type')}</div>
+                    <TableHead className="py-3 px-2 lg:px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('type')}>
+                      <div className="flex items-center whitespace-nowrap">Type {sortIcon('type')}</div>
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
-                      <div className="flex items-center">Status {sortIcon('status')}</div>
+                    <TableHead className="py-3 px-2 lg:px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('status')}>
+                      <div className="flex items-center whitespace-nowrap">Status {sortIcon('status')}</div>
                     </TableHead>
-                    <TableHead className="py-3 px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('deletedDate')}>
-                      <div className="flex items-center">Deleted At {sortIcon('deletedDate')}</div>
+                    <TableHead className="py-3 px-2 lg:px-4 cursor-pointer hover:text-primary transition-colors" onClick={() => toggleSort('deletedDate')}>
+                      <div className="flex items-center whitespace-nowrap">Deleted At {sortIcon('deletedDate')}</div>
                     </TableHead>
-                    <TableHead className="py-3 px-4 text-right">Actions</TableHead>
+                    <TableHead className="py-3 px-2 lg:px-4 text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -824,15 +847,15 @@ export default function TrashPage() {
                             isSelected ? 'bg-primary/5' : ''
                           }`}
                         >
-                          <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={isSelected}
                               onCheckedChange={() => handleSelectEvent(event.id)}
                               className="cursor-pointer"
                             />
                           </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4 max-w-[280px]">
+                            <div className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                               {event.title}
                               {event.isFeatured && (
                                 <Badge className="ml-2 bg-secondary-500 text-white text-xs">
@@ -847,32 +870,32 @@ export default function TrashPage() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5 lg:gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
                               <span className="text-muted-foreground">{event.platform}</span>
                               <span className="text-border">•</span>
                               <span className="text-primary font-medium">{event.priceDisplay}</span>
                               <span className="text-border">•</span>
-                              <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
+                              <span className="text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">{event.cpdHours} CPD Hrs</span>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={typeClass}>
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4">
+                            <Badge variant="outline" className={`${typeClass} whitespace-nowrap`}>
                               {event.type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <Badge variant="outline" className={`${statusConfig.color} border`}>
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4">
+                            <Badge variant="outline" className={`${statusConfig.color} border whitespace-nowrap`}>
                               <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
                               {event.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-muted-foreground">
-                            <div className="flex flex-col">
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4 text-muted-foreground">
+                            <div className="flex flex-col whitespace-nowrap">
                               <span className="text-sm">{formatDate(event.deletedAt)}</span>
                               <span className="text-xs text-muted-foreground">{formatTime(event.deletedAt)}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4 text-right">
+                          <TableCell className="py-3 lg:py-4 px-2 lg:px-4 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
@@ -936,7 +959,8 @@ export default function TrashPage() {
       {/* Grid view */}
       {!isMobile && viewMode === 'grid' && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+            {/* ─── RESPONSIVE: added xl:grid-cols-4 for wide desktops, tighter gap on mobile */}
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event) => (
                 <TrashGridCard
@@ -971,7 +995,8 @@ export default function TrashPage() {
 
       {/* Mobile list */}
       {isMobile && (
-        <div className="space-y-4 pb-24">
+        <div className="space-y-3 sm:space-y-4 pb-24">
+          {/* ─── RESPONSIVE: tighter spacing on small phones */}
           {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => (
               <TrashGridCard
@@ -1006,12 +1031,13 @@ export default function TrashPage() {
 
       {/* Mobile filter strip */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
+        <div className="fixed bottom-0 left-0 right-0 z-50 px-3 sm:px-4 pb-3 sm:pb-4 pointer-events-none">
+          {/* ─── RESPONSIVE: tighter padding on small phones */}
           <div className="pointer-events-auto mx-auto max-w-md bg-card/95 rounded-full shadow-lg border border-border backdrop-blur-sm">
-            <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 gap-1.5 sm:gap-2">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
+                className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer hover:bg-accent/60 rounded-full px-2.5 sm:px-3 py-1.5"
               >
                 <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <span className="text-sm text-muted-foreground truncate">
@@ -1021,17 +1047,18 @@ export default function TrashPage() {
               <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5 relative"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-2.5 sm:px-3 py-1.5 relative"
               >
                 <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Filters</span>
+                <span className="text-sm text-muted-foreground hidden xs:inline">Filters</span>
+                {/* ─── RESPONSIVE: hide "Filters" label on very small screens */}
               </button>
               <div className="w-px h-6 bg-border flex-shrink-0" />
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-3 py-1.5"
+                className="flex items-center gap-1.5 cursor-pointer hover:bg-accent/60 rounded-full px-2.5 sm:px-3 py-1.5"
               >
-                <span className="text-sm text-muted-foreground truncate max-w-[80px]">
+                <span className="text-sm text-muted-foreground truncate max-w-[60px] sm:max-w-[80px]">
                   {sortLabel()}
                 </span>
               </button>
@@ -1043,10 +1070,11 @@ export default function TrashPage() {
       {/* Mobile filter sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl px-0 pb-0" showCloseButton={false}>
-          <div className="px-6 pt-6 pb-8 h-full flex flex-col">
+          <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-6 sm:pb-8 h-full flex flex-col">
+            {/* ─── RESPONSIVE: tighter padding on mobile */}
             <SheetHeader className="text-left space-y-1">
               <div className="flex items-center justify-between">
-                <SheetTitle className="text-xl font-semibold">Filter & Sort</SheetTitle>
+                <SheetTitle className="text-lg sm:text-xl font-semibold">Filter & Sort</SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
                   className="cursor-pointer h-8 w-8 rounded-full hover:bg-accent flex items-center justify-center"
@@ -1059,8 +1087,8 @@ export default function TrashPage() {
               </SheetDescription>
             </SheetHeader>
 
-            <div className="flex-1 overflow-y-auto mt-6 pb-6">
-              <div className="space-y-1.5 mb-5">
+            <div className="flex-1 overflow-y-auto mt-4 sm:mt-6 pb-6">
+              <div className="space-y-1.5 mb-4 sm:mb-5">
                 <Label className="text-sm font-medium text-foreground">Search</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1073,7 +1101,8 @@ export default function TrashPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-5">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-5">
+                {/* ─── RESPONSIVE: single column on very small phones */}
                 <div className="space-y-1.5 min-w-0">
                   <Label className="text-sm font-medium text-foreground truncate">Sort By</Label>
                   <Select
@@ -1111,7 +1140,7 @@ export default function TrashPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium text-foreground">Sort Direction</Label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
                     className={`h-11 rounded-xl cursor-pointer ${
@@ -1138,7 +1167,7 @@ export default function TrashPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
+            <div className="flex gap-2 sm:gap-3 pt-4 border-t border-border bg-background pb-2">
               <Button
                 variant="outline"
                 className="flex-1 h-11 rounded-xl cursor-pointer border-border hover:bg-accent"
@@ -1159,7 +1188,8 @@ export default function TrashPage() {
 
       {/* Restore dialog */}
       <Dialog open={isRestoreDialogOpen} onOpenChange={setIsRestoreDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-full">
+          {/* ─── RESPONSIVE: prevent dialog touching edges on small phones */}
           <DialogHeader>
             <DialogTitle className="text-tertiary-600 dark:text-tertiary-400">Restore Event</DialogTitle>
             <DialogDescription>
@@ -1169,22 +1199,23 @@ export default function TrashPage() {
           {selectedEvent && (
             <div className="py-4">
               <div className="flex items-center gap-3 p-3 bg-tertiary-50 dark:bg-tertiary-950/30 rounded-lg border border-tertiary-100 dark:border-tertiary-900/50">
-                <div className="p-2 bg-tertiary-100 dark:bg-tertiary-950/50 rounded-full">
+                <div className="p-2 bg-tertiary-100 dark:bg-tertiary-950/50 rounded-full flex-shrink-0">
                   <RotateCcw className="h-5 w-5 text-tertiary-600 dark:text-tertiary-400" />
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground truncate">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
           )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} className="cursor-pointer">
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            {/* ─── RESPONSIVE: stack buttons vertically on mobile */}
+            <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} className="cursor-pointer w-full sm:w-auto">
               Cancel
             </Button>
             <Button
-              className="cursor-pointer bg-tertiary-500 hover:bg-tertiary-600 text-white"
+              className="cursor-pointer bg-tertiary-500 hover:bg-tertiary-600 text-white w-full sm:w-auto"
               onClick={handleConfirmRestore}
             >
               <RotateCcw className="h-4 w-4 mr-2" /> Restore Event
@@ -1195,7 +1226,8 @@ export default function TrashPage() {
 
       {/* Permanent delete dialog */}
       <Dialog open={isPermanentDeleteDialogOpen} onOpenChange={setIsPermanentDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-full">
+          {/* ─── RESPONSIVE */}
           <DialogHeader>
             <DialogTitle className="text-destructive">Permanently Delete Event</DialogTitle>
             <DialogDescription>
@@ -1205,25 +1237,26 @@ export default function TrashPage() {
           {selectedEvent && (
             <div className="py-4">
               <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                <div className="p-2 bg-destructive/20 rounded-full">
+                <div className="p-2 bg-destructive/20 rounded-full flex-shrink-0">
                   <Trash className="h-5 w-5 text-destructive" />
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">{selectedEvent.title}</p>
-                  <p className="text-sm text-muted-foreground">{selectedEvent.date}</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{selectedEvent.title}</p>
+                  <p className="text-sm text-muted-foreground truncate">{selectedEvent.date}</p>
                 </div>
               </div>
             </div>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
+            {/* ─── RESPONSIVE: stack buttons vertically on mobile */}
             <Button
               variant="outline"
               onClick={() => setIsPermanentDeleteDialogOpen(false)}
-              className="cursor-pointer"
+              className="cursor-pointer w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button variant="destructive" className="cursor-pointer" onClick={handleConfirmPermanentDelete}>
+            <Button variant="destructive" className="cursor-pointer w-full sm:w-auto" onClick={handleConfirmPermanentDelete}>
               <Trash className="h-4 w-4 mr-2" /> Delete Permanently
             </Button>
           </DialogFooter>
@@ -1232,7 +1265,8 @@ export default function TrashPage() {
 
       {/* Bulk dialog */}
       <AlertDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:w-full sm:max-w-lg">
+          {/* ─── RESPONSIVE */}
           <AlertDialogHeader>
             <AlertDialogTitle>
               {bulkAction === 'restore' && 'Restore Events'}
@@ -1251,11 +1285,11 @@ export default function TrashPage() {
               {selectedEvents.map((id) => {
                 const event = uiEvents.find((e) => e.id === id);
                 return event ? (
-                  <div key={id} className="flex items-center gap-2 py-1 text-sm">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{event.title}</span>
-                    <span className="text-muted-foreground">—</span>
-                    <Badge variant="outline" className="text-xs">
+                  <div key={id} className="flex items-center gap-2 py-1 text-sm min-w-0">
+                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{event.title}</span>
+                    <span className="text-muted-foreground flex-shrink-0">—</span>
+                    <Badge variant="outline" className="text-xs flex-shrink-0">
                       {event.status}
                     </Badge>
                   </div>
@@ -1263,10 +1297,11 @@ export default function TrashPage() {
               })}
             </ScrollArea>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            {/* ─── RESPONSIVE: stack buttons vertically on mobile */}
+            <AlertDialogCancel className="cursor-pointer w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={`cursor-pointer ${
+              className={`cursor-pointer w-full sm:w-auto ${
                 bulkAction === 'permanentDelete'
                   ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
                   : 'bg-tertiary-500 hover:bg-tertiary-600 text-white'
@@ -1316,9 +1351,10 @@ function TrashGridCard({
         isSelected ? 'border-primary/50 bg-primary/5' : ''
       }`}
     >
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
+      <CardContent className="p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+        {/* ─── RESPONSIVE: tighter padding & spacing on mobile */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
             <Badge variant="outline" className={typeClass}>
               {event.type}
             </Badge>
@@ -1333,51 +1369,51 @@ function TrashGridCard({
               </Badge>
             )}
           </div>
-          <Badge variant="outline" className={`${statusConfig.color} border`}>
+          <Badge variant="outline" className={`${statusConfig.color} border flex-shrink-0`}>
             <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dot} mr-1`} />
             {event.status}
           </Badge>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <h3 className="font-semibold text-foreground line-clamp-2">{event.title}</h3>
-          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
             <span className="text-primary font-medium">{event.priceDisplay}</span>
             <span className="text-border">•</span>
-            <span className="text-amber-600 dark:text-amber-400 font-medium">{event.cpdHours} CPD Hrs</span>
+            <span className="text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">{event.cpdHours} CPD Hrs</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           <div className="flex items-center gap-1">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{event.date}</span>
+            <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{event.date}</span>
           </div>
           <div className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            <span>{event.time}</span>
+            <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{event.time}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
           <span className="text-muted-foreground">Deleted:</span>
           <span>{formatDate(event.deletedAt)}</span>
           <span className="text-muted-foreground">({formatTime(event.deletedAt)})</span>
         </div>
 
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Users className="h-3.5 w-3.5" />
+          <Users className="h-3.5 w-3.5 flex-shrink-0" />
           <span>
             {event.registered} / {event.capacity || '∞'} registered
           </span>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-border">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Globe className="h-3.5 w-3.5" />
-            <span>{event.platform}</span>
+        <div className="flex items-center justify-between pt-2 border-t border-border gap-2">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0">
+            <Globe className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{event.platform}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             {onSelect && (
               <Checkbox
                 checked={isSelected}
@@ -1417,12 +1453,12 @@ function TrashGridCard({
 
 function EmptyTrashState({ searchQuery }: { searchQuery: string }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 px-4">
       <Trash2 className="h-8 w-8 text-muted-foreground/40" />
-      <p className="font-medium">
+      <p className="font-medium text-center">
         {searchQuery ? `No trashed events match "${searchQuery}"` : 'No events in trash'}
       </p>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground text-center max-w-sm">
         {searchQuery
           ? 'Try adjusting your search terms.'
           : 'Deleted events will appear here. You can restore or permanently delete them.'}
@@ -1449,9 +1485,10 @@ function PaginationBar({
   onPageSizeChange,
 }: PaginationBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 p-3 sm:p-4 border-t border-border">
+      {/* ─── RESPONSIVE: stack on mobile, tighter padding */}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Rows per page:</span>
+        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Rows per page:</span>
         <Select value={pageSize.toString()} onValueChange={(v) => onPageSizeChange(Number(v))}>
           <SelectTrigger className="h-8 w-[70px] cursor-pointer">
             <SelectValue />
@@ -1465,7 +1502,7 @@ function PaginationBar({
         </Select>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">
+        <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
           {totalItems > 0
             ? `${(currentPage - 1) * pageSize + 1} - ${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}`
             : '0 of 0'}

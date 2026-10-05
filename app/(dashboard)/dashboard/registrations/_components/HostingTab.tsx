@@ -970,155 +970,139 @@ export function HostingTab() {
                 const isSelected = isRowSelected(r);
 
                 return (
-                  <Card
-                    key={r.id}
-                    className={`group hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden ${
-                      isSelected ? 'border-primary/50 bg-primary/5' : ''
-                    }`}
-                    onClick={() => handleSelectOne(r)}
-                  >
-                    {/* ── Cover image banner ─────────────────────── */}
-                    <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
-                      <EventCoverImage
-                        src={r.event_image_url}
-                        alt={r.event_name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        fallbackSize="lg"
-                      />
+                <Card
+    key={r.id}
+    className={`group hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden ${
+        isSelected ? 'border-primary/50 bg-primary/5' : ''
+    }`}
+    onClick={() => handleSelectOne(r)}
+    >
+    <CardContent className="p-4 space-y-3">
+        {/* ── Status + guest badges (moved up from the removed banner) ── */}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+        {r.is_guest && (
+            <Badge variant="outline" className="text-[10px] shrink-0">
+            Guest
+            </Badge>
+        )}
+        <Badge variant="outline" className={`${s.color} border shrink-0`}>
+            <StatusIcon className="h-3 w-3 mr-1" />
+            {s.label}
+        </Badge>
+        </div>
 
-                      {/* Status / guest badges float over the image */}
-                      <div className="absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end max-w-[calc(100%-1rem)]">
-                        {r.is_guest && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] bg-background/85 backdrop-blur-sm shrink-0"
-                          >
-                            Guest
-                          </Badge>
-                        )}
-                        <Badge
-                          variant="outline"
-                          className={`${s.color} border bg-background/90 backdrop-blur-sm shrink-0`}
-                        >
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {s.label}
-                        </Badge>
-                      </div>
-                    </div>
+        {/* ── Attendee ─────────────────────────── */}
+        <div className="flex items-start gap-3">
+        {!isMobile && (
+            <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => handleSelectOne(r)}
+            onClick={(e) => e.stopPropagation()}
+            className="cursor-pointer mt-0.5 shrink-0"
+            />
+        )}
+        <Avatar className="h-10 w-10 shrink-0">
+            <AvatarFallback className="bg-primary/10 text-primary">
+            {initials(r.attendee_name)}
+            </AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-foreground break-words">
+            {r.attendee_name || '—'}
+            </h3>
+            {r.email ? (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <Mail className="h-3 w-3 shrink-0 mt-0.5" />
+                <span className="break-all">{r.email}</span>
+            </div>
+            ) : (
+            <div className="text-xs text-muted-foreground italic">
+                No email on file
+            </div>
+            )}
+            {r.phone && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Phone className="h-3 w-3 shrink-0" />
+                <span className="break-words">{r.phone}</span>
+            </div>
+            )}
+        </div>
+        </div>
 
-                    <CardContent className="p-4 space-y-3">
-                      {/* ── Attendee ─────────────────────────── */}
-                      <div className="flex items-start gap-3">
-                        {!isMobile && (
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => handleSelectOne(r)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="cursor-pointer mt-0.5 shrink-0"
-                          />
-                        )}
-                        <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarFallback className="bg-primary/10 text-primary">
-                            {initials(r.attendee_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-foreground break-words">
-                            {r.attendee_name || '—'}
-                          </h3>
-                          {r.email ? (
-                            <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                              <Mail className="h-3 w-3 shrink-0 mt-0.5" />
-                              <span className="break-all">{r.email}</span>
-                            </div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground italic">
-                              No email on file
-                            </div>
-                          )}
-                          {r.phone && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Phone className="h-3 w-3 shrink-0" />
-                              <span className="break-words">{r.phone}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+    {/* ── Event ────────────────────────────── */}
+    <div className="space-y-1 text-xs">
+      <p className="font-medium text-foreground break-words">
+        {r.event_name}
+      </p>
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Calendar className="h-3 w-3 shrink-0" />
+        <span>{formatDate(r.event_start_date)}</span>
+      </div>
+    </div>
 
-                      {/* ── Event ────────────────────────────── */}
-                      <div className="space-y-1 text-xs">
-                        <p className="font-medium text-foreground break-words">
-                          {r.event_name}
-                        </p>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-3 w-3 shrink-0" />
-                          <span>{formatDate(r.event_start_date)}</span>
-                        </div>
-                      </div>
+    {/* ── Ticket + date ────────────────────── */}
+    <div className="flex items-start justify-between pt-2 border-t border-border text-xs gap-3">
+      <span className="text-muted-foreground min-w-0">
+        Ticket:{' '}
+        <span className="font-medium text-foreground break-words">
+          {r.ticket_name || '—'}
+        </span>
+      </span>
+      <span className="text-muted-foreground shrink-0">
+        {formatDate(r.created_at)}
+      </span>
+    </div>
 
-                      {/* ── Ticket + date ────────────────────── */}
-                      <div className="flex items-start justify-between pt-2 border-t border-border text-xs gap-3">
-                        <span className="text-muted-foreground min-w-0">
-                          Ticket:{' '}
-                          <span className="font-medium text-foreground break-words">
-                            {r.ticket_name || '—'}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground shrink-0">
-                          {formatDate(r.created_at)}
-                        </span>
-                      </div>
-
-                      {/* ── Actions ──────────────────────────── */}
-                      <div
-                        className="flex items-center justify-between pt-2 border-t border-border"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="cursor-pointer h-7 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
-                          onClick={() => handleView(r)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1.5" />
-                          View details
-                        </Button>
-                        {!isMobile && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 p-0 cursor-pointer"
-                              >
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() => handleView(r)}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() =>
-                                  router.push(`/dashboard/events/${r.event_id}`)
-                                }
-                              >
-                                <ArrowRight className="h-4 w-4 mr-2" />
-                                Go to Event
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+    {/* ── Actions ──────────────────────────── */}
+    <div
+      className="flex items-center justify-between pt-2 border-t border-border"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        className="cursor-pointer h-7 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
+        onClick={() => handleView(r)}
+      >
+        <Eye className="h-3.5 w-3.5 mr-1.5" />
+        View details
+      </Button>
+      {!isMobile && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 p-0 cursor-pointer"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => handleView(r)}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() =>
+                router.push(`/dashboard/events/${r.event_id}`)
+              }
+            >
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Go to Event
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  </CardContent>
+</Card>
                 );
               })
             ) : (
@@ -1385,18 +1369,6 @@ export function HostingTab() {
 
           {selectedReg && (
             <div className="space-y-4 sm:space-y-6">
-              {/* Event cover banner inside the dialog too */}
-              {selectedReg.event_image_url && (
-                <div className="relative -mx-6 -mt-2 aspect-[16/9] overflow-hidden bg-muted">
-                  <EventCoverImage
-                    src={selectedReg.event_image_url}
-                    alt={selectedReg.event_name}
-                    className="h-full w-full object-cover"
-                    fallbackSize="lg"
-                  />
-                </div>
-              )}
-
               <div className="flex items-center gap-3 sm:gap-4">
                 <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
                   <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg">

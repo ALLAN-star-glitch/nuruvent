@@ -582,80 +582,84 @@ export default function EventAttendeesPage() {
         </DropdownMenu>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Total
-                </p>
-                <p className="text-2xl font-bold text-foreground mt-1">
-                  {total}
-                </p>
-              </div>
-              <div className="p-3 bg-primary/10 text-primary rounded-lg">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    {/* Stats */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Total
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {total}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            attendees
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Attended (page)
-                </p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">
-                  {stats.attended}
-                </p>
-              </div>
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg dark:bg-emerald-950/30">
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Attended
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.attended}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Hosts (page)
-                </p>
-                <p className="text-2xl font-bold text-amber-600 mt-1">
-                  {stats.hosts}
-                </p>
-              </div>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg dark:bg-amber-950/30">
-                <Crown className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Hosts
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
+              <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.hosts}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  No Show (page)
-                </p>
-                <p className="text-2xl font-bold text-red-600 mt-1">
-                  {stats.noShow}
-                </p>
-              </div>
-              <div className="p-3 bg-red-50 text-red-600 rounded-lg dark:bg-red-950/30">
-                <XCircle className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              No Show
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
+              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.noShow}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
+    </div>
 
       {/* Desktop Filters */}
       {!isMobile && (
@@ -1528,15 +1532,29 @@ export default function EventAttendeesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Detail dialog — per-session breakdown */}
+     {/* Detail dialog — per-session breakdown */}
       <Dialog
         open={openAttendeeId !== null}
         onOpenChange={(open) => !open && setOpenAttendeeId(null)}
       >
-        <DialogContent className="max-w-[95vw] sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Attendee Details</DialogTitle>
-            <DialogDescription>
+        <DialogContent
+          className={[
+            // Never exceed viewport, never cause horizontal scroll
+            'w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)]',
+            'sm:w-full sm:max-w-lg',
+            // Vertical scroll only
+            'max-h-[90vh] overflow-y-auto overflow-x-hidden',
+            // Tighter padding on small screens so content has room
+            'p-4 sm:p-6',
+            // Kill any inherited min-width behaviour that could force a wider box
+            'min-w-0',
+          ].join(' ')}
+        >
+          <DialogHeader className="min-w-0">
+            <DialogTitle className="text-base sm:text-lg">
+              Attendee Details
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               Rollup and per-session breakdown.
             </DialogDescription>
           </DialogHeader>
@@ -1546,22 +1564,23 @@ export default function EventAttendeesPage() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : detail ? (
-            <div className="space-y-4 sm:space-y-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg">
+            <div className="space-y-4 sm:space-y-6 min-w-0">
+              {/* Identity row */}
+              <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+                <Avatar className="h-12 w-12 sm:h-16 sm:w-16 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm sm:text-lg">
                     {initials(detail.display_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-semibold truncate">
+                    <h3 className="text-sm sm:text-lg font-semibold truncate min-w-0">
                       {detail.display_name}
                     </h3>
                     {detail.is_host && (
                       <Badge
                         variant="outline"
-                        className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                        className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 shrink-0"
                       >
                         <Crown className="h-3 w-3 mr-1" />
                         Host
@@ -1576,7 +1595,7 @@ export default function EventAttendeesPage() {
                   {detail.phone && (
                     <p className="text-xs sm:text-sm text-muted-foreground truncate flex items-center gap-1.5">
                       <Phone className="h-3 w-3 shrink-0" />
-                      {detail.phone}
+                      <span className="truncate">{detail.phone}</span>
                     </p>
                   )}
                 </div>
@@ -1584,32 +1603,29 @@ export default function EventAttendeesPage() {
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Status
-                  </Label>
-                  <Badge
-                    variant="outline"
-                    className={`${
-                      statusConfig[detail.effective_status].color
-                    } border mt-1`}
-                  >
-                    {statusConfig[detail.effective_status].label}
-                  </Badge>
+              {/* Key facts — single column on tiny screens, 2-col otherwise */}
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <div>
+                    <Badge
+                      variant="outline"
+                      className={`${statusConfig[detail.effective_status].color} border mt-1`}
+                    >
+                      {statusConfig[detail.effective_status].label}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Sessions
-                  </Label>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs text-muted-foreground">Sessions</Label>
                   <p className="text-sm sm:text-base font-medium">
                     {detail.sessions_attended} / {detail.sessions_total}
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs text-muted-foreground">
                     Total duration
                   </Label>
@@ -1617,42 +1633,43 @@ export default function EventAttendeesPage() {
                     {formatDuration(detail.total_duration_seconds)}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">
-                    Registered
-                  </Label>
-                  <p className="text-sm">
-                    {formatDate(detail.registered_at)}
-                  </p>
+                <div className="space-y-1 min-w-0">
+                  <Label className="text-xs text-muted-foreground">Registered</Label>
+                  <p className="text-sm">{formatDate(detail.registered_at)}</p>
                 </div>
               </div>
 
               {detail.sessions.length > 0 && (
                 <>
                   <Separator />
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label className="text-xs text-muted-foreground uppercase tracking-wider">
                       Sessions
                     </Label>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       {detail.sessions.map((sess) => {
                         const s = statusConfig[sess.derived_status];
                         const StatusIcon = s.icon;
                         return (
                           <div
                             key={sess.session_id}
-                            className="rounded-lg border border-border bg-card p-3 flex flex-col sm:flex-row sm:items-center gap-2"
+                            className="rounded-lg border border-border bg-card p-3 min-w-0"
                           >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-foreground truncate">
+                            {/* Session title + date — full width, wraps freely */}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground break-words">
                                 {sess.title || 'Untitled session'}
                               </p>
                               <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
                                 <Calendar className="h-3 w-3 shrink-0" />
-                                {formatDateTime(sess.scheduled_start)}
+                                <span className="truncate">
+                                  {formatDateTime(sess.scheduled_start)}
+                                </span>
                               </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+
+                            {/* Badges row — wraps below title, no horizontal overflow */}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-2">
                               <span className="text-xs text-muted-foreground tabular-nums">
                                 {formatDuration(sess.total_duration_seconds)}
                               </span>
@@ -1680,7 +1697,7 @@ export default function EventAttendeesPage() {
                 </>
               )}
 
-              <DialogFooter className="gap-2 flex-col sm:flex-row">
+              <DialogFooter className="gap-2 flex-col-reverse sm:flex-row sm:justify-end mt-2">
                 <Button
                   variant="outline"
                   onClick={() => setOpenAttendeeId(null)}

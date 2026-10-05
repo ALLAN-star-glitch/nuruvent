@@ -491,80 +491,84 @@ export default function AttendeesPage() {
         </DropdownMenu>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Total
-                </p>
-                <p className="text-2xl font-bold text-foreground mt-1">
-                  {total}
-                </p>
-              </div>
-              <div className="p-3 bg-primary/10 text-primary rounded-lg">
-                <Users className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    {/* Stats */}
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Total
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {total}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            attendees
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Attended (page)
-                </p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">
-                  {stats.attended}
-                </p>
-              </div>
-              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg dark:bg-emerald-950/30">
-                <CheckCircle2 className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Attended
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
+              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.attended}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Hosts (page)
-                </p>
-                <p className="text-2xl font-bold text-amber-600 mt-1">
-                  {stats.hosts}
-                </p>
-              </div>
-              <div className="p-3 bg-amber-50 text-amber-600 rounded-lg dark:bg-amber-950/30">
-                <Crown className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              Hosts
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
+              <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.hosts}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  No Show (page)
-                </p>
-                <p className="text-2xl font-bold text-red-600 mt-1">
-                  {stats.noShow}
-                </p>
-              </div>
-              <div className="p-3 bg-red-50 text-red-600 rounded-lg dark:bg-red-950/30">
-                <XCircle className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-border shadow-sm rounded-2xl">
+        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+              No Show
+            </p>
+            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
+              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
+            </span>
+          </div>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+            {stats.noShow}
+          </p>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+            on this page
+          </p>
+        </CardContent>
+      </Card>
+    </div>
 
       {/* Desktop Filters */}
       {!isMobile && (

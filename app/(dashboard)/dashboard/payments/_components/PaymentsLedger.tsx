@@ -836,29 +836,13 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
                           </TableCell>
                           {!isCompact && (
                             <TableCell className="py-4 px-4">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                                  {p.event_image_url ? (
-                                    <img
-                                      src={p.event_image_url}
-                                      alt=""
-                                      className="h-full w-full object-cover"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/10 to-muted">
-                                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-foreground break-words">
-                                    {p.event_title || '—'}
-                                  </p>
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Calendar className="h-3 w-3 shrink-0" />
-                                    <span>{formatDate(p.event_start_date)}</span>
-                                  </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground break-words">
+                                  {p.event_title || '—'}
+                                </p>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Calendar className="h-3 w-3 shrink-0" />
+                                  <span>{formatDate(p.event_start_date)}</span>
                                 </div>
                               </div>
                             </TableCell>
@@ -998,32 +982,18 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
                     className="group hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden border-border/70"
                     onClick={() => handleView(p)}
                   >
-                    {/* Shorter media on phones; 16/9 from sm up */}
-                    <div className="relative aspect-[2/1] sm:aspect-[16/9] w-full overflow-hidden bg-muted">
-                      {p.event_image_url ? (
-                        <img
-                          src={p.event_image_url}
-                          alt={p.event_title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/10 via-muted to-secondary/10">
-                          <Calendar className="h-10 w-10 text-muted-foreground/60" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 flex items-center gap-1.5 flex-wrap justify-end max-w-[calc(100%-1rem)]">
+                    <CardContent className="p-3 sm:p-4 space-y-3">
+                      {/* Status badge (moved up from the removed banner) */}
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         <Badge
                           variant="outline"
-                          className={`${s.color} border bg-background/90 backdrop-blur-sm shrink-0`}
+                          className={`${s.color} border shrink-0`}
                         >
                           <StatusIcon className="h-3 w-3 mr-1" />
                           {s.label}
                         </Badge>
                       </div>
-                    </div>
 
-                    <CardContent className="p-3 sm:p-4 space-y-3">
                       <div className="flex items-start gap-3">
                         <Avatar className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
                           <AvatarFallback className="bg-primary/10 text-primary text-xs sm:text-sm">
@@ -1381,18 +1351,6 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
 
           {selectedPayment && (
             <div className="space-y-4 sm:space-y-6">
-              {/* Only show the banner if we're not compact AND there's room.
-                  Use -mx-4 sm:-mx-6 to match the responsive padding. */}
-              {selectedPayment.event_image_url && !isCompact && (
-                <div className="relative -mx-4 sm:-mx-6 aspect-[2/1] sm:aspect-[16/9] overflow-hidden bg-muted">
-                  <img
-                    src={selectedPayment.event_image_url}
-                    alt={selectedPayment.event_title}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              )}
-
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
                 <div className="min-w-0">
                   <h2 className="text-xl sm:text-2xl font-bold text-foreground break-words">

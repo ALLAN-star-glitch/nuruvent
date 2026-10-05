@@ -50,7 +50,7 @@ interface UserMenuProps {
 
 const QUICK_LINKS = [
   { label: 'Events', href: '/dashboard/events', icon: Calendar },
-  { label: 'Registrations', href: '/dashboard/registrations', icon: ClipboardList }, // <-- new
+  { label: 'Registrations', href: '/dashboard/registrations', icon: ClipboardList },
   { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
   { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
   { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
@@ -120,9 +120,9 @@ export function UserMenu({ user }: UserMenuProps) {
           <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block" />
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent className="w-72" align="end">
+        <DropdownMenuContent className="w-72 p-2" align="end">
           {/* User Info */}
-          <DropdownMenuLabel className="font-normal">
+          <DropdownMenuLabel className="font-normal py-2.5">
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user?.avatar} />
@@ -141,19 +141,21 @@ export function UserMenu({ user }: UserMenuProps) {
             </div>
           </DropdownMenuLabel>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2" />
 
           {/* Dashboard Link */}
           <DropdownMenuItem
             onSelect={() => navigateTo('/dashboard')}
-            className="bg-primary/5 hover:bg-primary/10 cursor-pointer"
+            className="bg-primary/5 hover:bg-primary/10 cursor-pointer py-2.5"
           >
             <div className="flex items-center gap-3 py-1 px-1 w-full">
               <div className="bg-primary p-1.5 rounded-lg">
                 <LayoutDashboard className="h-4 w-4 text-white" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-primary">Dashboard</span>
+                <span className="text-sm font-semibold text-primary">
+                  Dashboard
+                </span>
                 <span className="text-xs text-muted-foreground">
                   Full dashboard with all features
                 </span>
@@ -174,15 +176,15 @@ export function UserMenu({ user }: UserMenuProps) {
             </div>
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2" />
 
           {/* Quick Links */}
-          <div className="px-2 py-1.5">
+          <div className="px-2 pt-2 pb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Quick Actions
             </span>
           </div>
-          <DropdownMenuGroup>
+          <DropdownMenuGroup className="space-y-1">
             {QUICK_LINKS.map((item) => {
               const Icon = item.icon;
               return (
@@ -191,8 +193,8 @@ export function UserMenu({ user }: UserMenuProps) {
                   onSelect={() => navigateTo(item.href)}
                   className={
                     item.isTrash
-                      ? 'cursor-pointer text-red-600 hover:bg-red-50 focus:text-red-600'
-                      : 'cursor-pointer'
+                      ? 'cursor-pointer py-2.5 text-red-600 hover:bg-red-50 focus:text-red-600'
+                      : 'cursor-pointer py-2.5'
                   }
                 >
                   <Icon
@@ -208,48 +210,48 @@ export function UserMenu({ user }: UserMenuProps) {
             })}
           </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2" />
 
           {/* Account */}
-          <div className="px-2 py-1.5">
+          <div className="px-2 pt-2 pb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Account
             </span>
           </div>
-          <DropdownMenuGroup>
+          <DropdownMenuGroup className="space-y-1">
             <DropdownMenuItem
               onSelect={() => navigateTo('/dashboard/account')}
-              className="cursor-pointer"
+              className="cursor-pointer py-2.5"
             >
               <User className="h-4 w-4 text-muted-foreground" />
               <span>My Account</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2" />
 
           {/* Settings */}
-          <div className="px-2 py-1.5">
+          <div className="px-2 pt-2 pb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Preferences
             </span>
           </div>
-          <DropdownMenuGroup>
+          <DropdownMenuGroup className="space-y-1">
             <DropdownMenuItem
               onSelect={() => navigateTo('/dashboard/settings')}
-              className="cursor-pointer"
+              className="cursor-pointer py-2.5"
             >
               <Settings className="h-4 w-4 text-muted-foreground" />
               <span>Settings</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
 
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2" />
 
           {/* Sign Out */}
           <DropdownMenuItem
             onSelect={openLogoutDialog}
-            className="flex items-center gap-2 text-red-600 cursor-pointer hover:bg-red-50"
+            className="flex items-center gap-2 text-red-600 cursor-pointer hover:bg-red-50 py-2.5"
           >
             <LogOut className="h-4 w-4" />
             <span>Sign Out</span>
