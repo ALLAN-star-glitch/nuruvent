@@ -60,6 +60,8 @@ import {
   useGetTicketTypesQuery,
   useListMyEventsQuery,
 } from '@/lib/store/api/eventsApi';
+import { useGetPaymentStatsQuery } from '@/lib/store/api/paymentsApi';
+import { useGetAttendeesQuery } from '@/lib/store/api/attendanceApi';
 import type {
   Event,
   GeneratedEventDraft,
@@ -68,7 +70,6 @@ import type {
 import {
   formatPrice,
   getEventDuration,
-  getEventMinPrice,
   getEventStatusName,
   isEventPublished,
 } from '@/lib/utils/eventDisplay';
@@ -176,6 +177,7 @@ export default function DashboardPage() {
 
   const video = useVideoConnection();
 
+  // ---- Events ----
   const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
     { limit: 50, offset: 0, include_creator: false },
     { skip: !isAuthenticated },
@@ -186,9 +188,26 @@ export default function DashboardPage() {
   const eventTypes = eventTypesResponse?.data ?? [];
   const ticketTypes = ticketTypesResponse?.data ?? [];
 
+  // ---- Real payment stats ----
+  // Scoped to the caller's active account via the JWT. When there
+  // are no payments yet, the endpoint returns zeroes — same shape.
+  const { data: paymentStatsResponse, isLoading: paymentsLoading } =
+    useGetPaymentStatsQuery(undefined, { skip: !isAuthenticated });
+
+  // ---- Real attendee stats ----
+  // Fetches the first page of attendees. We only need the total count
+  // for the dashboard metric; the full list is on /dashboard/attendees.
+  const { data: attendeesResponse, isLoading: attendeesLoading } =
+    useGetAttendeesQuery(
+      { page: 1, page_size: 1 },
+      { skip: !isAuthenticated },
+    );
+
   const [createEvent] = useCreateEventMutation();
 
   const events: Event[] = listResponse?.data?.data ?? [];
+  const paymentStats = paymentStatsResponse?.data;
+  const totalAttendees = attendeesResponse?.data?.total ?? 0;
 
   // ---- Video connection state ----
   const zoomConnection = video.getConnection('zoom');
@@ -245,13 +264,9 @@ export default function DashboardPage() {
     [createEvent, router],
   );
 
+  // ---- Metrics sourced from real endpoints ----
   const metrics = useMemo(() => {
     const totalEvents = events.length;
-    const totalAttendees = events.reduce(
-      (s, e) => s + (e.current_attendees ?? 0),
-      0,
-    );
-    const totalRevenue = events.reduce((s, e) => s + getEventMinPrice(e), 0);
     const liveEvents = events.filter(isEventPublished).length;
     const draftEvents = events.filter(
       (e) => getEventStatusName(e) === 'Draft',
@@ -269,18 +284,29 @@ export default function DashboardPage() {
       return s + Math.round(minutes / 60);
     }, 0);
 
+    // Revenue comes from the payments module, in minor units.
+    // formatPrice expects major units — divide by 100.
+    const grossRevenueMajor = (paymentStats?.total_revenue ?? 0) / 100;
+    const netRevenueMajor = (paymentStats?.total_net ?? 0) / 100;
+
     return {
       totalEvents,
-      totalAttendees,
-      totalRevenue,
       liveEvents,
       draftEvents,
       completedEvents,
       cancelledEvents,
       totalCpdHours,
+      totalAttendees,
+      grossRevenue: grossRevenueMajor,
+      netRevenue: netRevenueMajor,
+      transactionCount: paymentStats?.transaction_count ?? 0,
     };
-  }, [events]);
+  }, [events, paymentStats, totalAttendees]);
 
+  // ---- Monthly revenue chart ----
+  // The payments module doesn't yet expose a monthly aggregate, so we
+  // approximate using events on the timeline. When /payments/stats/monthly
+  // lands, replace this with a direct query.
   const monthlyData = useMemo(() => {
     const months: Record<
       string,
@@ -301,8 +327,10 @@ export default function DashboardPage() {
         months[key] = { month: monthName, events: 0, revenue: 0, attendees: 0 };
       }
       months[key].events += 1;
-      months[key].revenue += getEventMinPrice(event);
       months[key].attendees += event.current_attendees ?? 0;
+      // NOTE: revenue per month isn't derivable from events alone.
+      // Leave it as 0 for now; the real chart comes with a monthly
+      // payments aggregate endpoint.
     });
 
     return Object.values(months).slice(-6);
@@ -403,9 +431,9 @@ export default function DashboardPage() {
         bg: 'bg-primary/10',
       },
       {
-        icon: Video,
-        label: 'Replays',
-        href: '/dashboard/replays',
+        icon: CreditCard,
+        label: 'Payments',
+        href: '/dashboard/payments',
         color: 'text-primary',
         bg: 'bg-primary/10',
       },
@@ -425,20 +453,7 @@ export default function DashboardPage() {
     return base;
   }, [video.isLoading, isAuthenticated, hasAnyConnection]);
 
-  const previousMonthRevenue =
-    monthlyData.length > 1
-      ? monthlyData[monthlyData.length - 2]?.revenue ?? 0
-      : 0;
-  const currentMonthRevenue =
-    monthlyData.length > 0
-      ? monthlyData[monthlyData.length - 1]?.revenue ?? 0
-      : 0;
-  const revenueGrowth =
-    previousMonthRevenue > 0
-      ? ((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) *
-        100
-      : 0;
-
+  // ---- Compact stats ----
   const compactStats = [
     {
       label: 'Total Events',
@@ -446,7 +461,7 @@ export default function DashboardPage() {
       icon: Calendar,
       color: 'text-primary',
       detail: `${metrics.liveEvents} live, ${metrics.draftEvents} draft`,
-      growth: metrics.totalEvents > 0 ? '+12%' : '0%',
+      growth: '',
       growthTrend: 'up' as const,
     },
     {
@@ -454,32 +469,37 @@ export default function DashboardPage() {
       value: metrics.totalAttendees.toLocaleString(),
       icon: Users,
       color: 'text-primary',
-      detail: `Across ${metrics.totalEvents} events`,
-      growth: metrics.totalAttendees > 0 ? '+8%' : '0%',
+      detail:
+        metrics.transactionCount > 0
+          ? `${metrics.transactionCount} paid`
+          : 'All-time attendees',
+      growth: '',
       growthTrend: 'up' as const,
     },
     {
       label: 'Revenue',
-      value: formatPrice(metrics.totalRevenue),
+      value: formatPrice(metrics.grossRevenue),
       icon: CreditCard,
       color: 'text-primary',
-      detail: `${metrics.completedEvents} completed`,
-      growth:
-        revenueGrowth > 0
-          ? `+${revenueGrowth.toFixed(0)}%`
-          : `${revenueGrowth.toFixed(0)}%`,
-      growthTrend: revenueGrowth >= 0 ? ('up' as const) : ('down' as const),
+      detail:
+        metrics.netRevenue > 0
+          ? `${formatPrice(metrics.netRevenue)} net`
+          : 'No payments yet',
+      growth: '',
+      growthTrend: 'up' as const,
     },
     {
       label: 'CPD Hours',
       value: metrics.totalCpdHours.toString(),
       icon: Award,
       color: 'text-primary',
-      detail: `${metrics.totalEvents} accredited`,
-      growth: metrics.totalCpdHours > 0 ? '+5%' : '0%',
+      detail: `${metrics.completedEvents} completed`,
+      growth: '',
       growthTrend: 'up' as const,
     },
   ];
+
+  const isLoading = eventsLoading || paymentsLoading || attendeesLoading;
 
   if (!isAuthenticated) {
     return (
@@ -503,7 +523,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (eventsLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
@@ -558,9 +578,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ============================================================
-          PLATFORM CONNECTION BANNER
-          ============================================================ */}
+      {/* Platform connection banner */}
       {!video.isLoading && (
         <div
           className={cn(
@@ -573,9 +591,7 @@ export default function DashboardPage() {
           <div
             className={cn(
               'p-2 rounded-lg shrink-0',
-              hasAnyConnection
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-primary text-primary-foreground',
+              'bg-primary text-primary-foreground',
             )}
           >
             {hasAnyConnection ? (
@@ -634,7 +650,6 @@ export default function DashboardPage() {
               )}
             </p>
 
-            {/* ---- Actions row ---- */}
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <Button
                 size="default"
@@ -650,11 +665,9 @@ export default function DashboardPage() {
                 {hasAnyConnection ? 'Manage platforms' : 'Connect platform'}
               </Button>
 
-              {/* Platform logo shortcuts */}
               <div className="flex items-center gap-1.5 ml-1">
                 {PLATFORMS.map((meta: PlatformMeta) => {
                   const isConnected = !!video.getConnection(meta.platform);
-
                   return (
                     <button
                       key={meta.platform}
@@ -735,7 +748,7 @@ export default function DashboardPage() {
                       <div className="p-1.5 rounded-lg bg-muted">
                         <Icon className={cn('h-4 w-4', stat.color)} />
                       </div>
-                      {stat.growth !== '0%' && (
+                      {stat.growth && stat.growth !== '0%' && (
                         <div
                           className={cn(
                             'flex items-center gap-0.5 text-[10px] font-medium',
@@ -774,12 +787,12 @@ export default function DashboardPage() {
               <CardHeader className="pb-1 px-4 sm:px-5 pt-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-semibold">
-                    Revenue Trend
+                    Activity Trend
                   </CardTitle>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-primary" />
-                      Revenue
+                      Events
                     </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-primary/50" />
@@ -794,7 +807,7 @@ export default function DashboardPage() {
                     <AreaChart data={monthlyData}>
                       <defs>
                         <linearGradient
-                          id="revenueGradient"
+                          id="eventsGradient"
                           x1="0"
                           y1="0"
                           x2="0"
@@ -849,14 +862,16 @@ export default function DashboardPage() {
                       <Tooltip content={<CustomTooltip />} />
                       <Area
                         type="monotone"
-                        dataKey="revenue"
+                        dataKey="events"
+                        name="Events"
                         stroke={COLORS.primary}
-                        fill="url(#revenueGradient)"
+                        fill="url(#eventsGradient)"
                         strokeWidth={2}
                       />
                       <Area
                         type="monotone"
                         dataKey="attendees"
+                        name="Attendees"
                         stroke={COLORS.primary}
                         fill="url(#attendeesGradient)"
                         strokeWidth={2}
