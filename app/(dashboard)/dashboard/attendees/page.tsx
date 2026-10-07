@@ -83,6 +83,7 @@ import {
 } from '@/components/ui/sheet';
 
 import { useGetAttendeesQuery } from '@/lib/store/api/attendanceApi';
+import { useListMyEventsQuery } from '@/lib/store/api/eventsApi';
 import type {
   AttendanceStatus,
   CrossEventAttendee,
@@ -184,6 +185,17 @@ function formatDate(iso: string | undefined): string {
   });
 }
 
+function slugify(input: string): string {
+  return (
+    input
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'event'
+  );
+}
+
 type SortField = 'name' | 'event' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
@@ -202,6 +214,7 @@ export default function AttendeesPage() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>(
     'all',
   );
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('registered_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -241,17 +254,40 @@ export default function AttendeesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedStatus, sortField, sortDirection, itemsPerPage]);
+  }, [selectedStatus, selectedEventId, sortField, sortDirection, itemsPerPage]);
 
   useEffect(() => {
     setSelectedIds([]);
     setSelectAll(false);
   }, [currentPage]);
 
+  // Events for the filter dropdown
+  const { data: eventsResponse } = useListMyEventsQuery({
+    page: 1,
+    page_size: 100,
+    sort_by: 'created_at',
+    sort_order: 'desc',
+  });
+
+  const events = useMemo(() => {
+    const list = eventsResponse?.data?.data ?? [];
+    return list.map((e) => ({
+      id: e.id,
+      title: e.display_name || e.name || 'Untitled event',
+    }));
+  }, [eventsResponse]);
+
+  // Raw event objects — needed to derive platform info for the export.
+  const rawEvents = useMemo(
+    () => eventsResponse?.data?.data ?? [],
+    [eventsResponse],
+  );
+
   const queryParams: ListAllAttendeesParams = useMemo(
     () => ({
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
+      event_id: selectedEventId === 'all' ? undefined : selectedEventId,
       sort_by: sortField,
       sort_order: sortDirection,
       page: currentPage,
@@ -260,6 +296,7 @@ export default function AttendeesPage() {
     [
       searchQuery,
       selectedStatus,
+      selectedEventId,
       sortField,
       sortDirection,
       currentPage,
@@ -278,6 +315,90 @@ export default function AttendeesPage() {
   const attendees: CrossEventAttendee[] = payload?.attendees ?? [];
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
+
+/**
+ * Effective scope of the current view:
+ * - If the user filtered by event → use that event.
+ * - Else if every attendee on the page belongs to a single event → use it.
+ * - Else → null (multi-event view).
+ */
+const effectiveScopedEvent = useMemo(() => {
+  // 1. Explicit filter wins
+  if (selectedEventId !== 'all') {
+    const filtered = events.find((e) => e.id === selectedEventId);
+    if (filtered) return filtered;
+  }
+
+  // 2. No filter — check if the current attendee set is single-event
+  const uniqueEventIds = new Set(attendees.map((a) => a.event_id));
+  if (uniqueEventIds.size === 1) {
+    const onlyId = uniqueEventIds.values().next().value as string | undefined;
+    if (onlyId) {
+      const ev = events.find((e) => e.id === onlyId);
+      if (ev) return ev;
+    }
+  }
+
+  // 3. Multi-event
+  return null;
+}, [selectedEventId, events, attendees]);
+
+const isScopedToEvent = effectiveScopedEvent !== null;
+const scopedEvent = effectiveScopedEvent;
+
+  // ---- Platforms for PDF header ----
+  /**
+   * Distinct platforms shown on the exported PDF.
+   * - If filtered to a single event → derived from that event.
+   * - Else → aggregated across the events present in the current attendee set.
+   *
+   * Adjust the field accesses if your event shape uses different keys.
+   */
+  const exportPlatforms = useMemo(() => {
+    const set = new Set<string>();
+
+    const addForEvent = (ev: (typeof rawEvents)[number] | undefined) => {
+      if (!ev) return;
+      // Prefer explicit platform list on schedules (some events mix platforms)
+      const schedules = (ev as { schedules?: Array<{ platform?: string }> })
+        .schedules;
+      if (Array.isArray(schedules) && schedules.length > 0) {
+        for (const s of schedules) {
+          if (s?.platform) set.add(s.platform);
+        }
+        if (set.size > 0) return;
+      }
+      // Fall back to event-level flags
+      const anyEv = ev as unknown as {
+        is_virtual?: boolean;
+        zoom_link?: string;
+        meet_link?: string;
+        platform?: string;
+      };
+      if (anyEv.platform) {
+        set.add(anyEv.platform);
+        return;
+      }
+      if (anyEv.is_virtual) {
+        if (anyEv.zoom_link) set.add('Zoom');
+        if (anyEv.meet_link) set.add('Google Meet');
+        if (!anyEv.zoom_link && !anyEv.meet_link) set.add('Virtual');
+      } else {
+        set.add('In-Person');
+      }
+    };
+
+    if (isScopedToEvent && scopedEvent) {
+      addForEvent(rawEvents.find((e) => e.id === scopedEvent.id));
+    } else {
+      const eventIdsInView = new Set(attendees.map((a) => a.event_id));
+      for (const ev of rawEvents) {
+        if (eventIdsInView.has(ev.id)) addForEvent(ev);
+      }
+    }
+
+    return Array.from(set);
+  }, [attendees, isScopedToEvent, scopedEvent, rawEvents]);
 
   // ---- Stats ----
   const stats = useMemo(() => {
@@ -371,6 +492,7 @@ export default function AttendeesPage() {
     let n = 0;
     if (searchQuery) n++;
     if (selectedStatus !== 'all') n++;
+    if (selectedEventId !== 'all') n++;
     return n;
   };
 
@@ -378,6 +500,7 @@ export default function AttendeesPage() {
     setSearchInput('');
     setSearchQuery('');
     setSelectedStatus('all');
+    setSelectedEventId('all');
     setSortField('registered_at');
     setSortDirection('desc');
     setCurrentPage(1);
@@ -394,33 +517,50 @@ export default function AttendeesPage() {
     return labels[sortField];
   };
 
-  // ---- Export handler ----
+  // ---- Export handler (scope-aware, includes platforms) ----
   const handleExport = async (format: ExportFormat) => {
     if (attendees.length === 0) return;
     setIsExporting(true);
+
     try {
       const stamp = new Date().toISOString().slice(0, 10);
+
+      const title = isScopedToEvent
+        ? `${scopedEvent!.title} — Attendees`
+        : 'All Events Attendees';
+
+      const subtitle = isScopedToEvent
+        ? 'Attendees for this event'
+        : 'Cross-event attendee directory';
+
+      const slug = isScopedToEvent
+        ? slugify(scopedEvent!.title)
+        : 'all-events';
+
+      const filenameBase = `${slug}-attendees-${stamp}`;
 
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
           selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+          isScopedToEvent ? `Event: ${scopedEvent!.title}` : null,
         ]
           .filter(Boolean)
           .join('  ·  ') || undefined;
 
       if (format === 'csv') {
-        exportToCSV(attendees, `attendees-${stamp}.csv`);
+        exportToCSV(attendees, `${filenameBase}.csv`);
       } else if (format === 'json') {
-        exportToJSON(attendees, `attendees-${stamp}.json`);
+        exportToJSON(attendees, `${filenameBase}.json`);
       } else if (format === 'xlsx') {
-        await exportToExcel(attendees, `attendees-${stamp}.xlsx`);
+        await exportToExcel(attendees, `${filenameBase}.xlsx`);
       } else if (format === 'pdf') {
         await exportToPDF(attendees, {
-          title: 'All Events Attendees',
-          subtitle: 'Cross-event attendee directory',
+          title,
+          subtitle,
           filtersSummary,
-          filename: `attendees-${stamp}.pdf`,
+          platforms: exportPlatforms,
+          filename: `${filenameBase}.pdf`,
         });
       }
     } finally {
@@ -433,11 +573,15 @@ export default function AttendeesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-foreground">
-            All Events Attendees
+          <h1 className="text-2xl font-bold text-foreground truncate">
+            {isScopedToEvent
+              ? `${scopedEvent!.title} — Attendees`
+              : 'All Events Attendees'}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage and track attendees across your events.
+          <p className="text-sm text-muted-foreground mt-1 truncate">
+            {isScopedToEvent
+              ? 'Attendees for this event.'
+              : 'Manage and track attendees across your events.'}
           </p>
         </div>
 
@@ -491,84 +635,84 @@ export default function AttendeesPage() {
         </DropdownMenu>
       </div>
 
-    {/* Stats */}
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      <Card className="border-border shadow-sm rounded-2xl">
-        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-              Total
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border-border shadow-sm rounded-2xl">
+          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+                Total
+              </p>
+              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+              {total}
             </p>
-            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </span>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-            {total}
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-            attendees
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+              attendees
+            </p>
+          </CardContent>
+        </Card>
 
-      <Card className="border-border shadow-sm rounded-2xl">
-        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-              Attended
+        <Card className="border-border shadow-sm rounded-2xl">
+          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+                Attended
+              </p>
+              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
+                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+              {stats.attended}
             </p>
-            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
-              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
-            </span>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-            {stats.attended}
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-            on this page
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+              on this page
+            </p>
+          </CardContent>
+        </Card>
 
-      <Card className="border-border shadow-sm rounded-2xl">
-        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-              Hosts
+        <Card className="border-border shadow-sm rounded-2xl">
+          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+                Hosts
+              </p>
+              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
+                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+              {stats.hosts}
             </p>
-            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
-              <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
-            </span>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-            {stats.hosts}
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-            on this page
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+              on this page
+            </p>
+          </CardContent>
+        </Card>
 
-      <Card className="border-border shadow-sm rounded-2xl">
-        <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-              No Show
+        <Card className="border-border shadow-sm rounded-2xl">
+          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
+                No Show
+              </p>
+              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
+                <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
+              </span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
+              {stats.noShow}
             </p>
-            <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
-              <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
-            </span>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-            {stats.noShow}
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-            on this page
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
+              on this page
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Desktop Filters */}
       {!isMobile && (
@@ -585,6 +729,31 @@ export default function AttendeesPage() {
                     className="pl-9 w-full"
                   />
                 </div>
+
+                <Select
+                  value={selectedEventId}
+                  onValueChange={setSelectedEventId}
+                >
+                  <SelectTrigger className="w-full md:w-[220px] cursor-pointer">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Events
+                    </SelectItem>
+                    {events.map((e) => (
+                      <SelectItem
+                        key={e.id}
+                        value={e.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[200px] truncate align-middle">
+                          {e.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <Select
                   value={selectedStatus}
@@ -1374,6 +1543,34 @@ export default function AttendeesPage() {
                     className="pl-9 h-11 rounded-xl"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5 mb-5">
+                <Label className="text-sm font-medium">Event</Label>
+                <Select
+                  value={selectedEventId}
+                  onValueChange={setSelectedEventId}
+                >
+                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Events
+                    </SelectItem>
+                    {events.map((e) => (
+                      <SelectItem
+                        key={e.id}
+                        value={e.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[260px] truncate align-middle">
+                          {e.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5 mb-5">
