@@ -33,13 +33,10 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
-
-
 import { useListMyRegistrationsQuery } from '@/lib/store/api/registrationsApi';
 import { useGetMySessionLinksQuery } from '@/lib/store/api/attendanceApi';
 import type { CrossEventRegistration } from '@/lib/types/registration';
 import type { SessionLinkGroup } from '@/lib/types/attendance';
-
 
 import { EmptyState } from '@/components/registrations/empty_state';
 import { MobileFilterStrip } from '@/components/registrations/mobile-filter-strip';
@@ -107,7 +104,8 @@ export function TicketsList() {
     refetch: refetchLinks,
   } = useGetMySessionLinksQuery();
 
-  const registrations: CrossEventRegistration[] = regsData?.data?.registrations ?? [];
+  const registrations: CrossEventRegistration[] =
+    regsData?.data?.registrations ?? [];
   const groups: SessionLinkGroup[] = linksData?.data?.groups ?? [];
 
   const merged: MergedRegistration[] = useMemo(
@@ -290,13 +288,22 @@ export function TicketsList() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="created_at" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="created_at"
+                          className="cursor-pointer text-sm"
+                        >
                           Newest first
                         </SelectItem>
-                        <SelectItem value="event_name" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="event_name"
+                          className="cursor-pointer text-sm"
+                        >
                           Event
                         </SelectItem>
-                        <SelectItem value="status" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="status"
+                          className="cursor-pointer text-sm"
+                        >
                           Status
                         </SelectItem>
                       </SelectContent>
@@ -307,7 +314,9 @@ export function TicketsList() {
                         setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
                       }
                       className="cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
-                      title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+                      title={
+                        sortDirection === 'asc' ? 'Ascending' : 'Descending'
+                      }
                     >
                       {sortDirection === 'asc' ? (
                         <ArrowUp className="h-4 w-4 text-primary" />
@@ -320,7 +329,9 @@ export function TicketsList() {
 
                 <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {regsLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {regsLoading && (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    )}
                     {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
                   </span>
                   <Button
@@ -338,9 +349,8 @@ export function TicketsList() {
         </Card>
       )}
 
-      <StatsCards stats={stats} />
-
-     {isLoading ? (
+      {/* Loading — full skeleton replaces stats + list */}
+      {isLoading ? (
         <TicketsListSkeleton />
       ) : errorMessage ? (
         <Card className="border-destructive/30">
@@ -348,43 +358,50 @@ export function TicketsList() {
             {errorMessage}
           </CardContent>
         </Card>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<Ticket className="h-5 w-5 text-primary" />}
-          eyebrow="Your wallet"
-          title={
-            searchQuery || selectedStatus !== 'all'
-              ? 'No matching tickets'
-              : 'No tickets yet'
-          }
-          sub={
-            searchQuery || selectedStatus !== 'all'
-              ? 'Try adjusting your search or filter.'
-              : 'Events you register for will appear here with their QR passes and join links.'
-          }
-          action={
-            !searchQuery && selectedStatus === 'all' ? (
-              <Link href="/events">
-                <Button size="sm" className="cursor-pointer rounded-lg">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Browse events
-                </Button>
-              </Link>
-            ) : undefined
-          }
-        />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
-          {filtered.map((m) => (
-            <TicketCard
-              key={m.registration.id}
-              merged={m}
-              expanded={!collapsedIds.has(m.registration.id)}
-              onToggle={() => toggleCard(m.registration.id)}
-              onCancelled={handleCancelled}
+        <>
+          {/* Stats — only renders after data has loaded */}
+          <StatsCards stats={stats} />
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={<Ticket className="h-5 w-5 text-primary" />}
+              eyebrow="Your wallet"
+              title={
+                searchQuery || selectedStatus !== 'all'
+                  ? 'No matching tickets'
+                  : 'No tickets yet'
+              }
+              sub={
+                searchQuery || selectedStatus !== 'all'
+                  ? 'Try adjusting your search or filter.'
+                  : 'Events you register for will appear here with their QR passes and join links.'
+              }
+              action={
+                !searchQuery && selectedStatus === 'all' ? (
+                  <Link href="/events">
+                    <Button size="sm" className="cursor-pointer rounded-lg">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Browse events
+                    </Button>
+                  </Link>
+                ) : undefined
+              }
             />
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
+              {filtered.map((m) => (
+                <TicketCard
+                  key={m.registration.id}
+                  merged={m}
+                  expanded={!collapsedIds.has(m.registration.id)}
+                  onToggle={() => toggleCard(m.registration.id)}
+                  onCancelled={handleCancelled}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isMobile && (
@@ -439,7 +456,10 @@ export function TicketsList() {
 
               <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <Select
+                  value={selectedStatus}
+                  onValueChange={setSelectedStatus}
+                >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>

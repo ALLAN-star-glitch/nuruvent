@@ -529,65 +529,69 @@ export function RegistrationsList() {
         </Card>
       )}
 
-      <StatsCards stats={stats} />
+    {isLoading ? (
+  <RegistrationsListSkeleton />
+) : errorMessage ? (
+  <Card className="border-destructive/30">
+    <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
+      {errorMessage}
+    </CardContent>
+  </Card>
+) : (
+  <>
+    <StatsCards stats={stats} />
 
-            {isLoading ? (
-        <RegistrationsListSkeleton />
-      ) : errorMessage ? (
-              <Card className="border-destructive/30">
-          <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
-            {errorMessage}
-          </CardContent>
-        </Card>
-      ) : registrations.length === 0 ? (
-        <EmptyState
-          icon={<Users className="h-5 w-5 text-primary" />}
-          eyebrow="Registration center"
-          title="No registrations yet"
-          sub="Once people register for your events, they'll show up here."
-          action={
-            <Button
-              size="sm"
-              className="cursor-pointer rounded-lg"
-              onClick={() => router.push('/dashboard/events')}
-            >
-              <Calendar className="mr-2 h-4 w-4" />
-              Go to events
-            </Button>
-          }
-        />
-      ) : !isMobile && viewMode === 'table' ? (
-        <RegistrationsTable
-          registrations={registrations}
-          total={total}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          totalPages={totalPages}
-          isRowSelected={isRowSelected}
-          selectAll={selectAll}
-          onToggleSort={toggleSort}
-          onSelectAll={handleSelectAll}
-          onSelectOne={handleSelectOne}
-          onView={handleView}
-          onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
-          onItemsPerPageChange={setItemsPerPage}
-          onPageChange={setCurrentPage}
-        />
-      ) : (
-        <RegistrationsGrid
-          registrations={registrations}
-          total={total}
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          totalPages={totalPages}
-          isRowSelected={isRowSelected}
-          onSelectOne={handleSelectOne}
-          onView={handleView}
-          onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
-          onItemsPerPageChange={setItemsPerPage}
-          onPageChange={setCurrentPage}
-        />
-      )}
+    {registrations.length === 0 ? (
+      <EmptyState
+        icon={<Users className="h-5 w-5 text-primary" />}
+        eyebrow="Registration center"
+        title="No registrations yet"
+        sub="Once people register for your events, they'll show up here."
+        action={
+          <Button
+            size="sm"
+            className="cursor-pointer rounded-lg"
+            onClick={() => router.push('/dashboard/events')}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Go to events
+          </Button>
+        }
+      />
+    ) : !isMobile && viewMode === 'table' ? (
+      <RegistrationsTable
+        registrations={registrations}
+        total={total}
+        currentPage={currentPage}
+        itemsPerPage={itemsPerPage}
+        totalPages={totalPages}
+        isRowSelected={isRowSelected}
+        selectAll={selectAll}
+        onToggleSort={toggleSort}
+        onSelectAll={handleSelectAll}
+        onSelectOne={handleSelectOne}
+        onView={handleView}
+        onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
+        onItemsPerPageChange={setItemsPerPage}
+        onPageChange={setCurrentPage}
+      />
+    ) : (
+      <RegistrationsGrid
+        registrations={registrations}
+        total={total}
+        currentPage={currentPage}
+        itemsPerPage={itemsPerPage}
+        totalPages={totalPages}
+        isRowSelected={isRowSelected}
+        onSelectOne={handleSelectOne}
+        onView={handleView}
+        onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
+        onItemsPerPageChange={setItemsPerPage}
+        onPageChange={setCurrentPage}
+      />
+    )}
+  </>
+)}
 
       {isMobile && (
         <MobileFilterStrip
