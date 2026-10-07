@@ -97,6 +97,8 @@ import {
   exportToPDF,
 } from '@/lib/utils/exportAttendees';
 import { StatsCards } from '@/components/registrations/stat_cards';
+import { StatsCardsSkeleton } from '../events/[id]/[attendees]/page';
+
 
 // ============================================================
 // STATUS DISPLAY
@@ -209,7 +211,6 @@ type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'json';
 export default function AttendeesPage() {
   const router = useRouter();
 
-  // ---- Filter / sort / pagination ----
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>(
@@ -222,20 +223,16 @@ export default function AttendeesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  // ---- Selection ----
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
 
-  // ---- Detail dialog ----
   const [selectedAttendee, setSelectedAttendee] =
     useState<CrossEventAttendee | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
-  // ---- Mobile ----
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
-  // ---- Export ----
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
@@ -262,7 +259,6 @@ export default function AttendeesPage() {
     setSelectAll(false);
   }, [currentPage]);
 
-  // Events for the filter dropdown
   const { data: eventsResponse } = useListMyEventsQuery({
     page: 1,
     page_size: 100,
@@ -278,7 +274,6 @@ export default function AttendeesPage() {
     }));
   }, [eventsResponse]);
 
-  // Raw event objects — needed to derive platform info for the export.
   const rawEvents = useMemo(
     () => eventsResponse?.data?.data ?? [],
     [eventsResponse],
@@ -317,50 +312,30 @@ export default function AttendeesPage() {
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
-/**
- * Effective scope of the current view:
- * - If the user filtered by event → use that event.
- * - Else if every attendee on the page belongs to a single event → use it.
- * - Else → null (multi-event view).
- */
-const effectiveScopedEvent = useMemo(() => {
-  // 1. Explicit filter wins
-  if (selectedEventId !== 'all') {
-    const filtered = events.find((e) => e.id === selectedEventId);
-    if (filtered) return filtered;
-  }
-
-  // 2. No filter — check if the current attendee set is single-event
-  const uniqueEventIds = new Set(attendees.map((a) => a.event_id));
-  if (uniqueEventIds.size === 1) {
-    const onlyId = uniqueEventIds.values().next().value as string | undefined;
-    if (onlyId) {
-      const ev = events.find((e) => e.id === onlyId);
-      if (ev) return ev;
+  const effectiveScopedEvent = useMemo(() => {
+    if (selectedEventId !== 'all') {
+      const filtered = events.find((e) => e.id === selectedEventId);
+      if (filtered) return filtered;
     }
-  }
+    const uniqueEventIds = new Set(attendees.map((a) => a.event_id));
+    if (uniqueEventIds.size === 1) {
+      const onlyId = uniqueEventIds.values().next().value as string | undefined;
+      if (onlyId) {
+        const ev = events.find((e) => e.id === onlyId);
+        if (ev) return ev;
+      }
+    }
+    return null;
+  }, [selectedEventId, events, attendees]);
 
-  // 3. Multi-event
-  return null;
-}, [selectedEventId, events, attendees]);
+  const isScopedToEvent = effectiveScopedEvent !== null;
+  const scopedEvent = effectiveScopedEvent;
 
-const isScopedToEvent = effectiveScopedEvent !== null;
-const scopedEvent = effectiveScopedEvent;
-
-  // ---- Platforms for PDF header ----
-  /**
-   * Distinct platforms shown on the exported PDF.
-   * - If filtered to a single event → derived from that event.
-   * - Else → aggregated across the events present in the current attendee set.
-   *
-   * Adjust the field accesses if your event shape uses different keys.
-   */
   const exportPlatforms = useMemo(() => {
     const set = new Set<string>();
 
     const addForEvent = (ev: (typeof rawEvents)[number] | undefined) => {
       if (!ev) return;
-      // Prefer explicit platform list on schedules (some events mix platforms)
       const schedules = (ev as { schedules?: Array<{ platform?: string }> })
         .schedules;
       if (Array.isArray(schedules) && schedules.length > 0) {
@@ -369,7 +344,6 @@ const scopedEvent = effectiveScopedEvent;
         }
         if (set.size > 0) return;
       }
-      // Fall back to event-level flags
       const anyEv = ev as unknown as {
         is_virtual?: boolean;
         zoom_link?: string;
@@ -401,7 +375,6 @@ const scopedEvent = effectiveScopedEvent;
     return Array.from(set);
   }, [attendees, isScopedToEvent, scopedEvent, rawEvents]);
 
-  // ---- Stats ----
   const stats = useMemo(() => {
     const attended = attendees.filter(
       (a) =>
@@ -422,7 +395,6 @@ const scopedEvent = effectiveScopedEvent;
       'Failed to load attendees'
     : null;
 
-  // ---- Selection helpers ----
   const rowKey = (a: CrossEventAttendee) => `${a.attendee_id}-${a.event_id}`;
 
   const isRowSelected = (a: CrossEventAttendee) =>
@@ -433,7 +405,6 @@ const scopedEvent = effectiveScopedEvent;
     [attendees, selectedIds],
   );
 
-  // ---- Handlers ----
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -446,13 +417,13 @@ const scopedEvent = effectiveScopedEvent;
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
       return (
-        <ArrowUpDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+        <ArrowUpDown className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
       );
     }
     return sortDirection === 'asc' ? (
-      <ArrowUp className="h-3.5 w-3.5 ml-1 text-primary" />
+      <ArrowUp className="ml-1 h-3.5 w-3.5 text-primary" />
     ) : (
-      <ArrowDown className="h-3.5 w-3.5 ml-1 text-primary" />
+      <ArrowDown className="ml-1 h-3.5 w-3.5 text-primary" />
     );
   };
 
@@ -518,7 +489,6 @@ const scopedEvent = effectiveScopedEvent;
     return labels[sortField];
   };
 
-  // ---- Export handler (scope-aware, includes platforms) ----
   const handleExport = async (format: ExportFormat) => {
     if (attendees.length === 0) return;
     setIsExporting(true);
@@ -569,17 +539,48 @@ const scopedEvent = effectiveScopedEvent;
     }
   };
 
+  const statsItems = [
+    {
+      label: 'Total',
+      value: total,
+      sub: 'attendees',
+      tone: 'primary' as const,
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      label: 'Attended',
+      value: stats.attended,
+      sub: 'on this page',
+      tone: 'emerald' as const,
+      icon: <CheckCircle2 className="h-4 w-4" />,
+    },
+    {
+      label: 'Hosts',
+      value: stats.hosts,
+      sub: 'on this page',
+      tone: 'amber' as const,
+      icon: <Crown className="h-4 w-4" />,
+    },
+    {
+      label: 'No Show',
+      value: stats.noShow,
+      sub: 'on this page',
+      tone: 'sky' as const,
+      icon: <XCircle className="h-4 w-4" />,
+    },
+  ];
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-foreground truncate">
+          <h1 className="truncate text-2xl font-bold text-foreground">
             {isScopedToEvent
               ? `${scopedEvent!.title} — Attendees`
               : 'All Events Attendees'}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1 truncate">
+          <p className="mt-1 truncate text-sm text-muted-foreground">
             {isScopedToEvent
               ? 'Attendees for this event.'
               : 'Manage and track attendees across your events.'}
@@ -590,13 +591,13 @@ const scopedEvent = effectiveScopedEvent;
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="cursor-pointer w-full sm:w-auto"
+              className="w-full cursor-pointer sm:w-auto"
               disabled={isExporting || attendees.length === 0}
             >
               {isExporting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Download className="h-4 w-4 mr-2" />
+                <Download className="mr-2 h-4 w-4" />
               )}
               Export
             </Button>
@@ -608,846 +609,840 @@ const scopedEvent = effectiveScopedEvent;
               className="cursor-pointer"
               onClick={() => handleExport('pdf')}
             >
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="mr-2 h-4 w-4" />
               PDF
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => handleExport('xlsx')}
             >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
               Excel (.xlsx)
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => handleExport('csv')}
             >
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
               CSV
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={() => handleExport('json')}
             >
-              <FileJson className="h-4 w-4 mr-2" />
+              <FileJson className="mr-2 h-4 w-4" />
               JSON
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-   <StatsCards
-  stats={[
-    {
-      label: 'Total',
-      value: total,
-      sub: 'attendees',
-      tone: 'primary',
-      icon: <Users className="h-4 w-4" />,
-    },
-    {
-      label: 'Attended',
-      value: stats.attended,
-      sub: 'on this page',
-      tone: 'emerald',
-      icon: <CheckCircle2 className="h-4 w-4" />,
-    },
-    {
-      label: 'Hosts',
-      value: stats.hosts,
-      sub: 'on this page',
-      tone: 'amber',
-      icon: <Crown className="h-4 w-4" />,
-    },
-    {
-      label: 'No Show',
-      value: stats.noShow,
-      sub: 'on this page',
-      tone: 'sky',
-      icon: <XCircle className="h-4 w-4" />,
-    },
-  ]}
-/>
-
-      {/* Desktop Filters */}
-      {!isMobile && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row items-center gap-4">
-                <div className="relative flex-1 w-full">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    placeholder="Search by name or email..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-9 w-full"
-                  />
-                </div>
-
-                <Select
-                  value={selectedEventId}
-                  onValueChange={setSelectedEventId}
-                >
-                  <SelectTrigger className="w-full md:w-[220px] cursor-pointer">
-                    <SelectValue placeholder="All Events" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="cursor-pointer">
-                      All Events
-                    </SelectItem>
-                    {events.map((e) => (
-                      <SelectItem
-                        key={e.id}
-                        value={e.id}
-                        className="cursor-pointer"
-                      >
-                        <span className="inline-block max-w-[200px] truncate align-middle">
-                          {e.title}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={selectedStatus}
-                  onValueChange={(v) =>
-                    setSelectedStatus(v as 'all' | AttendanceStatus)
-                  }
-                >
-                  <SelectTrigger className="w-full md:w-[170px] cursor-pointer">
-                    <SelectValue placeholder="All Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="cursor-pointer">
-                      All Status
-                    </SelectItem>
-                    {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s} className="cursor-pointer">
-                        {statusConfig[s].label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <div className="flex items-center gap-1 p-0.5 bg-muted rounded-lg">
-                    <button
-                      onClick={() => setViewMode('table')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'table'
-                          ? 'bg-background text-primary shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Table View"
-                    >
-                      <List className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                        viewMode === 'grid'
-                          ? 'bg-background text-primary shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                      title="Grid View"
-                    >
-                      <Grid3x3 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    |
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
-                      Sort by:
-                    </span>
-                    <Select
-                      value={sortField}
-                      onValueChange={(v) => {
-                        setSortField(v as SortField);
-                        setSortDirection('asc');
-                      }}
-                    >
-                      <SelectTrigger className="h-8 w-[130px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="name"
-                          className="text-sm cursor-pointer"
-                        >
-                          Name
-                        </SelectItem>
-                        <SelectItem
-                          value="event"
-                          className="text-sm cursor-pointer"
-                        >
-                          Event
-                        </SelectItem>
-                        <SelectItem
-                          value="registered_at"
-                          className="text-sm cursor-pointer"
-                        >
-                          Registered
-                        </SelectItem>
-                        <SelectItem
-                          value="status"
-                          className="text-sm cursor-pointer"
-                        >
-                          Status
-                        </SelectItem>
-                        <SelectItem
-                          value="duration"
-                          className="text-sm cursor-pointer"
-                        >
-                          Duration
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <button
-                      onClick={() =>
-                        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
-                      }
-                      className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
-                      title={
-                        sortDirection === 'asc' ? 'Ascending' : 'Descending'
-                      }
-                    >
-                      {sortDirection === 'asc' ? (
-                        <ArrowUp className="h-4 w-4 text-primary" />
-                      ) : (
-                        <ArrowDown className="h-4 w-4 text-primary" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <span className="text-xs text-muted-foreground flex items-center gap-2">
-                    {isFetching && !isLoading && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    {total} attendee{total !== 1 ? 's' : ''}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs cursor-pointer"
-                    onClick={resetFilters}
-                  >
-                    Reset
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Bulk selection bar */}
-            {selectedIds.length > 0 && (
-              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg flex flex-wrap items-center justify-between gap-3">
-                <span className="text-sm font-medium text-foreground">
-                  {selectedIds.length} attendee
-                  {selectedIds.length > 1 ? 's' : ''} selected
-                </span>
-                <div className="flex items-center gap-2">
-                  {selectedAttendees.length === 1 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="cursor-pointer"
-                      onClick={handleViewFirstSelected}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View details
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="cursor-pointer"
-                    onClick={clearSelection}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Loading / Error / Table / Grid */}
+      {/* Content — loading gate */}
       {isLoading ? (
-        <Card>
-          <CardContent className="p-12 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
+        <>
+          <StatsCardsSkeleton cards={4} desktopColumns={4} />
+          <Card className="border-border/60 shadow-none">
+            <CardContent className="flex items-center justify-center p-12 sm:p-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </>
       ) : errorMessage ? (
-        <Card>
-          <CardContent className="p-12 flex flex-col items-center justify-center gap-2 text-destructive">
+        <Card className="border-destructive/30">
+          <CardContent className="flex flex-col items-center justify-center gap-2 p-12 text-destructive">
             <AlertCircle className="h-6 w-6" />
             <p className="text-sm">{errorMessage}</p>
           </CardContent>
         </Card>
-      ) : !isMobile && viewMode === 'table' ? (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="py-3 px-4 w-10">
-                      <Checkbox
-                        checked={selectAll}
-                        onCheckedChange={handleSelectAll}
-                        className="cursor-pointer"
-                      />
-                    </TableHead>
-                    <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
-                      onClick={() => toggleSort('name')}
-                    >
-                      <div className="flex items-center">
-                        Attendee
-                        {getSortIcon('name')}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
-                      onClick={() => toggleSort('event')}
-                    >
-                      <div className="flex items-center">
-                        Event
-                        {getSortIcon('event')}
-                      </div>
-                    </TableHead>
-                    <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
-                      onClick={() => toggleSort('status')}
-                    >
-                      <div className="flex items-center">
-                        Status
-                        {getSortIcon('status')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="py-3 px-4">Sessions</TableHead>
-                    <TableHead
-                      className="py-3 px-4 cursor-pointer hover:text-primary transition-colors select-none"
-                      onClick={() => toggleSort('duration')}
-                    >
-                      <div className="flex items-center">
-                        Duration
-                        {getSortIcon('duration')}
-                      </div>
-                    </TableHead>
-                    <TableHead className="py-3 px-4 text-right">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendees.length > 0 ? (
-                    attendees.map((a) => {
-                      const s = statusConfig[a.effective_status];
-                      const StatusIcon = s.icon;
-                      const isSelected = isRowSelected(a);
+      ) : (
+        <>
+          {/* Stats — only after load */}
+          <StatsCards stats={statsItems} />
 
-                      return (
-                        <TableRow
-                          key={rowKey(a)}
-                          className={`hover:bg-muted/40 transition-colors cursor-pointer ${
-                            isSelected ? 'bg-primary/5' : ''
-                          }`}
-                          onClick={() => handleSelectOne(a)}
-                        >
-                          <TableCell
-                            className="py-4 px-4"
-                            onClick={(e) => e.stopPropagation()}
+          {/* Desktop Filters */}
+          {!isMobile && (
+            <Card className="border-border/60 shadow-none">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col items-center gap-4 md:flex-row">
+                    <div className="relative w-full flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or email..."
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        className="w-full pl-9"
+                      />
+                    </div>
+
+                    <Select
+                      value={selectedEventId}
+                      onValueChange={setSelectedEventId}
+                    >
+                      <SelectTrigger className="w-full cursor-pointer md:w-[220px]">
+                        <SelectValue placeholder="All Events" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Events
+                        </SelectItem>
+                        {events.map((e) => (
+                          <SelectItem
+                            key={e.id}
+                            value={e.id}
+                            className="cursor-pointer"
                           >
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => handleSelectOne(a)}
-                              className="cursor-pointer"
-                            />
+                            <span className="inline-block max-w-[200px] truncate align-middle">
+                              {e.title}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={selectedStatus}
+                      onValueChange={(v) =>
+                        setSelectedStatus(v as 'all' | AttendanceStatus)
+                      }
+                    >
+                      <SelectTrigger className="w-full cursor-pointer md:w-[170px]">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Status
+                        </SelectItem>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem
+                            key={s}
+                            value={s}
+                            className="cursor-pointer"
+                          >
+                            {statusConfig[s].label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-3 sm:flex-row">
+                    <div className="flex w-full items-center gap-2 sm:w-auto">
+                      <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
+                        <button
+                          onClick={() => setViewMode('table')}
+                          className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                            viewMode === 'table'
+                              ? 'bg-background text-primary shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          title="Table View"
+                        >
+                          <List className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setViewMode('grid')}
+                          className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                            viewMode === 'grid'
+                              ? 'bg-background text-primary shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                          title="Grid View"
+                        >
+                          <Grid3x3 className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <span className="hidden text-xs text-muted-foreground sm:inline">
+                        |
+                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <span className="hidden text-xs text-muted-foreground sm:inline">
+                          Sort by:
+                        </span>
+                        <Select
+                          value={sortField}
+                          onValueChange={(v) => {
+                            setSortField(v as SortField);
+                            setSortDirection('asc');
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-[130px] cursor-pointer border-0 bg-transparent text-xs focus:ring-0">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem
+                              value="name"
+                              className="cursor-pointer text-sm"
+                            >
+                              Name
+                            </SelectItem>
+                            <SelectItem
+                              value="event"
+                              className="cursor-pointer text-sm"
+                            >
+                              Event
+                            </SelectItem>
+                            <SelectItem
+                              value="registered_at"
+                              className="cursor-pointer text-sm"
+                            >
+                              Registered
+                            </SelectItem>
+                            <SelectItem
+                              value="status"
+                              className="cursor-pointer text-sm"
+                            >
+                              Status
+                            </SelectItem>
+                            <SelectItem
+                              value="duration"
+                              className="cursor-pointer text-sm"
+                            >
+                              Duration
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <button
+                          onClick={() =>
+                            setSortDirection((d) =>
+                              d === 'asc' ? 'desc' : 'asc',
+                            )
+                          }
+                          className="cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
+                        >
+                          {sortDirection === 'asc' ? (
+                            <ArrowUp className="h-4 w-4 text-primary" />
+                          ) : (
+                            <ArrowDown className="h-4 w-4 text-primary" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {isFetching && !isLoading && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
+                        {total} attendee{total !== 1 ? 's' : ''}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 cursor-pointer text-xs"
+                        onClick={resetFilters}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedIds.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <span className="text-sm font-medium text-foreground">
+                      {selectedIds.length} attendee
+                      {selectedIds.length > 1 ? 's' : ''} selected
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {selectedAttendees.length === 1 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cursor-pointer"
+                          onClick={handleViewFirstSelected}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View details
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="cursor-pointer"
+                        onClick={clearSelection}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Table / Grid */}
+          {!isMobile && viewMode === 'table' ? (
+            <Card className="border-border/60 shadow-none">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="w-10 px-4 py-3">
+                          <Checkbox
+                            checked={selectAll}
+                            onCheckedChange={handleSelectAll}
+                            className="cursor-pointer"
+                          />
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none px-4 py-3 transition-colors hover:text-primary"
+                          onClick={() => toggleSort('name')}
+                        >
+                          <div className="flex items-center">
+                            Attendee
+                            {getSortIcon('name')}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none px-4 py-3 transition-colors hover:text-primary"
+                          onClick={() => toggleSort('event')}
+                        >
+                          <div className="flex items-center">
+                            Event
+                            {getSortIcon('event')}
+                          </div>
+                        </TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none px-4 py-3 transition-colors hover:text-primary"
+                          onClick={() => toggleSort('status')}
+                        >
+                          <div className="flex items-center">
+                            Status
+                            {getSortIcon('status')}
+                          </div>
+                        </TableHead>
+                        <TableHead className="px-4 py-3">Sessions</TableHead>
+                        <TableHead
+                          className="cursor-pointer select-none px-4 py-3 transition-colors hover:text-primary"
+                          onClick={() => toggleSort('duration')}
+                        >
+                          <div className="flex items-center">
+                            Duration
+                            {getSortIcon('duration')}
+                          </div>
+                        </TableHead>
+                        <TableHead className="px-4 py-3 text-right">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attendees.length > 0 ? (
+                        attendees.map((a) => {
+                          const s = statusConfig[a.effective_status];
+                          const StatusIcon = s.icon;
+                          const isSelected = isRowSelected(a);
+
+                          return (
+                            <TableRow
+                              key={rowKey(a)}
+                              className={`cursor-pointer transition-colors hover:bg-muted/40 ${
+                                isSelected ? 'bg-primary/5' : ''
+                              }`}
+                              onClick={() => handleSelectOne(a)}
+                            >
+                              <TableCell
+                                className="px-4 py-4"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleSelectOne(a)}
+                                  className="cursor-pointer"
+                                />
+                              </TableCell>
+                              <TableCell className="px-4 py-4">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarFallback className="bg-primary/10 text-primary">
+                                      {initials(a.display_name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <p className="truncate font-semibold text-foreground">
+                                        {a.display_name}
+                                      </p>
+                                      {a.is_host && (
+                                        <Badge
+                                          variant="outline"
+                                          className="shrink-0 border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
+                                        >
+                                          <Crown className="mr-1 h-3 w-3" />
+                                          Host
+                                        </Badge>
+                                      )}
+                                    </div>
+
+                                    {a.email ? (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Mail className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">
+                                          {a.email}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs italic text-muted-foreground">
+                                        No email on file
+                                      </div>
+                                    )}
+
+                                    {a.phone && (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Phone className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">
+                                          {a.phone}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-4 py-4">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-foreground">
+                                    {a.event_name}
+                                  </p>
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <Calendar className="h-3 w-3 shrink-0" />
+                                    <span>
+                                      {formatDate(a.event_start_date)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="px-4 py-4">
+                                <Badge
+                                  variant="outline"
+                                  className={`${s.color} border`}
+                                >
+                                  <StatusIcon className="mr-1 h-3 w-3" />
+                                  {s.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm text-muted-foreground">
+                                <span className="font-medium text-foreground">
+                                  {a.sessions_attended}
+                                </span>{' '}
+                                / {a.sessions_total}
+                              </TableCell>
+                              <TableCell className="px-4 py-4 text-sm text-muted-foreground">
+                                {formatDuration(a.total_duration_seconds)}
+                              </TableCell>
+                              <TableCell
+                                className="px-4 py-4 text-right"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 cursor-pointer"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-44"
+                                  >
+                                    <DropdownMenuLabel>
+                                      Actions
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => handleView(a)}
+                                    >
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() =>
+                                        router.push(
+                                          `/dashboard/events/${a.event_id}`,
+                                        )
+                                      }
+                                    >
+                                      <ArrowRight className="mr-2 h-4 w-4" />
+                                      Go to Event
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell
+                            colSpan={7}
+                            className="py-12 text-center text-muted-foreground"
+                          >
+                            <div className="flex flex-col items-center gap-2">
+                              <Search className="h-8 w-8 text-muted-foreground/60" />
+                              <p className="font-medium">No attendees found</p>
+                              <p className="text-sm">
+                                Try adjusting your search or filter.
+                              </p>
+                            </div>
                           </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <div className="flex items-center gap-3">
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {total > 0 && (
+                  <div className="flex flex-col items-center justify-between gap-4 border-t border-border p-4 sm:flex-row">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        Rows per page:
+                      </span>
+                      <Select
+                        value={itemsPerPage.toString()}
+                        onValueChange={(v) => setItemsPerPage(Number(v))}
+                      >
+                        <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5" className="cursor-pointer">
+                            5
+                          </SelectItem>
+                          <SelectItem value="10" className="cursor-pointer">
+                            10
+                          </SelectItem>
+                          <SelectItem value="20" className="cursor-pointer">
+                            20
+                          </SelectItem>
+                          <SelectItem value="50" className="cursor-pointer">
+                            50
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {(currentPage - 1) * itemsPerPage + 1} -{' '}
+                        {Math.min(currentPage * itemsPerPage, total)} of {total}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 cursor-pointer p-0"
+                          onClick={() =>
+                            setCurrentPage((p) => Math.max(p - 1, 1))
+                          }
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 cursor-pointer p-0"
+                          onClick={() =>
+                            setCurrentPage((p) =>
+                              Math.min(p + 1, totalPages),
+                            )
+                          }
+                          disabled={currentPage === totalPages}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {attendees.length > 0 ? (
+                  attendees.map((a) => {
+                    const s = statusConfig[a.effective_status];
+                    const StatusIcon = s.icon;
+                    const isSelected = isRowSelected(a);
+
+                    return (
+                      <Card
+                        key={rowKey(a)}
+                        className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                          isSelected ? 'border-primary/50 bg-primary/5' : ''
+                        }`}
+                        onClick={() => handleSelectOne(a)}
+                      >
+                        <CardContent className="space-y-3 p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2">
+                              {!isMobile && (
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => handleSelectOne(a)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="cursor-pointer"
+                                />
+                              )}
                               <Avatar className="h-10 w-10">
                                 <AvatarFallback className="bg-primary/10 text-primary">
                                   {initials(a.display_name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-foreground truncate">
-                                    {a.display_name}
-                                  </p>
-                                  {a.is_host && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 shrink-0"
-                                    >
-                                      <Crown className="h-3 w-3 mr-1" />
-                                      Host
-                                    </Badge>
-                                  )}
-                                </div>
-
-                                {a.email ? (
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Mail className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{a.email}</span>
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-muted-foreground italic">
-                                    No email on file
-                                  </div>
-                                )}
-
-                                {a.phone && (
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Phone className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{a.phone}</span>
-                                  </div>
-                                )}
-                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {a.event_name}
-                              </p>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="h-3 w-3 shrink-0" />
-                                <span>{formatDate(a.event_start_date)}</span>
-                              </div>
+                            <div className="flex flex-wrap items-center justify-end gap-1.5">
+                              {a.is_host && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
+                                >
+                                  <Crown className="mr-1 h-3 w-3" />
+                                  Host
+                                </Badge>
+                              )}
+                              <Badge
+                                variant="outline"
+                                className={`${s.color} border`}
+                              >
+                                <StatusIcon className="mr-1 h-3 w-3" />
+                                {s.label}
+                              </Badge>
                             </div>
-                          </TableCell>
-                          <TableCell className="py-4 px-4">
-                            <Badge
-                              variant="outline"
-                              className={`${s.color} border`}
-                            >
-                              <StatusIcon className="h-3 w-3 mr-1" />
-                              {s.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-sm text-muted-foreground">
-                            <span className="font-medium text-foreground">
-                              {a.sessions_attended}
-                            </span>{' '}
-                            / {a.sessions_total}
-                          </TableCell>
-                          <TableCell className="py-4 px-4 text-sm text-muted-foreground">
-                            {formatDuration(a.total_duration_seconds)}
-                          </TableCell>
-                          <TableCell
-                            className="py-4 px-4 text-right"
+                          </div>
+
+                          <div className="min-w-0">
+                            <h3 className="truncate font-semibold text-foreground">
+                              {a.display_name}
+                            </h3>
+
+                            {a.email ? (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Mail className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{a.email}</span>
+                              </div>
+                            ) : (
+                              <div className="text-xs italic text-muted-foreground">
+                                No email on file
+                              </div>
+                            )}
+
+                            {a.phone && (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Phone className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{a.phone}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 text-xs">
+                            <p className="truncate font-medium text-foreground">
+                              {a.event_name}
+                            </p>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-3 w-3 shrink-0" />
+                              <span className="truncate">
+                                {formatDate(a.event_start_date)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
+                            <span className="text-muted-foreground">
+                              Sessions:{' '}
+                              <span className="font-medium text-foreground">
+                                {a.sessions_attended} / {a.sessions_total}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              {formatDuration(a.total_duration_seconds)}
+                            </span>
+                          </div>
+
+                          <div
+                            className="flex items-center justify-between border-t border-border pt-2"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 cursor-pointer"
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="-ml-2 h-7 cursor-pointer px-2 text-xs text-primary hover:bg-primary/5 hover:text-primary"
+                              onClick={() => handleView(a)}
+                            >
+                              <Eye className="mr-1.5 h-3.5 w-3.5" />
+                              View details
+                            </Button>
+                            {!isMobile && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 cursor-pointer p-0"
+                                  >
+                                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-44"
                                 >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="end"
-                                className="w-44"
-                              >
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => handleView(a)}
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() =>
-                                    router.push(
-                                      `/dashboard/events/${a.event_id}`,
-                                    )
-                                  }
-                                >
-                                  <ArrowRight className="h-4 w-4 mr-2" />
-                                  Go to Event
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="py-12 text-center text-muted-foreground"
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <Search className="h-8 w-8 text-muted-foreground/60" />
-                          <p className="font-medium">No attendees found</p>
-                          <p className="text-sm">
-                            Try adjusting your search or filter.
-                          </p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                                  <DropdownMenuLabel>
+                                    Actions
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() => handleView(a)}
+                                  >
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="cursor-pointer"
+                                    onClick={() =>
+                                      router.push(
+                                        `/dashboard/events/${a.event_id}`,
+                                      )
+                                    }
+                                  >
+                                    <ArrowRight className="mr-2 h-4 w-4" />
+                                    Go to Event
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full py-12 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="h-8 w-8 text-muted-foreground/60" />
+                      <p className="font-medium">No attendees found</p>
+                      <p className="text-sm">
+                        Try adjusting your search or filter.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-            {total > 0 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    Rows per page:
-                  </span>
-                  <Select
-                    value={itemsPerPage.toString()}
-                    onValueChange={(v) => setItemsPerPage(Number(v))}
-                  >
-                    <SelectTrigger className="h-8 w-[70px] cursor-pointer">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5" className="cursor-pointer">
-                        5
-                      </SelectItem>
-                      <SelectItem value="10" className="cursor-pointer">
-                        10
-                      </SelectItem>
-                      <SelectItem value="20" className="cursor-pointer">
-                        20
-                      </SelectItem>
-                      <SelectItem value="50" className="cursor-pointer">
-                        50
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {(currentPage - 1) * itemsPerPage + 1} -{' '}
-                    {Math.min(currentPage * itemsPerPage, total)} of {total}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() =>
-                        setCurrentPage((p) => Math.max(p - 1, 1))
-                      }
-                      disabled={currentPage === 1}
+              {total > 0 && (
+                <div className="flex flex-col items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Rows per page:
+                    </span>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(v) => setItemsPerPage(Number(v))}
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-8 p-0 cursor-pointer"
-                      onClick={() =>
-                        setCurrentPage((p) => Math.min(p + 1, totalPages))
-                      }
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                      <SelectTrigger className="h-8 w-[70px] cursor-pointer">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5" className="cursor-pointer">
+                          5
+                        </SelectItem>
+                        <SelectItem value="10" className="cursor-pointer">
+                          10
+                        </SelectItem>
+                        <SelectItem value="20" className="cursor-pointer">
+                          20
+                        </SelectItem>
+                        <SelectItem value="50" className="cursor-pointer">
+                          50
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {(currentPage - 1) * itemsPerPage + 1} -{' '}
+                      {Math.min(currentPage * itemsPerPage, total)} of {total}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 cursor-pointer p-0"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(p - 1, 1))
+                        }
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 cursor-pointer p-0"
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(p + 1, totalPages))
+                        }
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {attendees.length > 0 ? (
-              attendees.map((a) => {
-                const s = statusConfig[a.effective_status];
-                const StatusIcon = s.icon;
-                const isSelected = isRowSelected(a);
-
-                return (
-                  <Card
-                    key={rowKey(a)}
-                    className={`hover:shadow-lg transition-all duration-200 cursor-pointer ${
-                      isSelected ? 'border-primary/50 bg-primary/5' : ''
-                    }`}
-                    onClick={() => handleSelectOne(a)}
-                  >
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          {!isMobile && (
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => handleSelectOne(a)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="cursor-pointer"
-                            />
-                          )}
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-primary/10 text-primary">
-                              {initials(a.display_name)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                          {a.is_host && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
-                            >
-                              <Crown className="h-3 w-3 mr-1" />
-                              Host
-                            </Badge>
-                          )}
-                          <Badge
-                            variant="outline"
-                            className={`${s.color} border`}
-                          >
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {s.label}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-foreground truncate">
-                          {a.display_name}
-                        </h3>
-
-                        {a.email ? (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Mail className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{a.email}</span>
-                          </div>
-                        ) : (
-                          <div className="text-xs text-muted-foreground italic">
-                            No email on file
-                          </div>
-                        )}
-
-                        {a.phone && (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Phone className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{a.phone}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-1 text-xs">
-                        <p className="font-medium text-foreground truncate">
-                          {a.event_name}
-                        </p>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="h-3 w-3 shrink-0" />
-                          <span className="truncate">
-                            {formatDate(a.event_start_date)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
-                        <span className="text-muted-foreground">
-                          Sessions:{' '}
-                          <span className="font-medium text-foreground">
-                            {a.sessions_attended} / {a.sessions_total}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground">
-                          {formatDuration(a.total_duration_seconds)}
-                        </span>
-                      </div>
-
-                      <div
-                        className="flex items-center justify-between pt-2 border-t border-border"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="cursor-pointer h-7 text-xs px-2 -ml-2 text-primary hover:text-primary hover:bg-primary/5"
-                          onClick={() => handleView(a)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1.5" />
-                          View details
-                        </Button>
-                        {!isMobile && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 p-0 cursor-pointer"
-                              >
-                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-44"
-                            >
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() => handleView(a)}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer"
-                                onClick={() =>
-                                  router.push(
-                                    `/dashboard/events/${a.event_id}`,
-                                  )
-                                }
-                              >
-                                <ArrowRight className="h-4 w-4 mr-2" />
-                                Go to Event
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            ) : (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <Search className="h-8 w-8 text-muted-foreground/60" />
-                  <p className="font-medium">No attendees found</p>
-                  <p className="text-sm">
-                    Try adjusting your search or filter.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {total > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-card rounded-lg border border-border">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Rows per page:
-                </span>
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(v) => setItemsPerPage(Number(v))}
-                >
-                  <SelectTrigger className="h-8 w-[70px] cursor-pointer">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5" className="cursor-pointer">
-                      5
-                    </SelectItem>
-                    <SelectItem value="10" className="cursor-pointer">
-                      10
-                    </SelectItem>
-                    <SelectItem value="20" className="cursor-pointer">
-                      20
-                    </SelectItem>
-                    <SelectItem value="50" className="cursor-pointer">
-                      50
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {(currentPage - 1) * itemsPerPage + 1} -{' '}
-                  {Math.min(currentPage * itemsPerPage, total)} of {total}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0 cursor-pointer"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(p + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </>
       )}
 
       {/* Mobile filter strip */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
-          <div className="pointer-events-auto mx-auto max-w-md bg-background rounded-full shadow-lg border border-border">
-            <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-4 pb-4">
+          <div className="pointer-events-auto mx-auto max-w-md rounded-full border border-border bg-background shadow-lg">
+            <div className="flex items-center justify-between gap-2 px-4 py-2.5">
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
+                className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 transition-colors hover:bg-muted"
               >
-                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground truncate">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm text-foreground">
                   {searchInput || 'Search'}
                 </span>
               </button>
 
-              <div className="w-px h-6 bg-border flex-shrink-0" />
+              <div className="h-6 w-px shrink-0 bg-border" />
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative cursor-pointer"
+                className="relative flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-muted"
               >
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-foreground">Filters</span>
                 {getActiveFilterCount() > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
                     {getActiveFilterCount()}
                   </span>
                 )}
               </button>
 
-              <div className="w-px h-6 bg-border flex-shrink-0" />
+              <div className="h-6 w-px shrink-0 bg-border" />
 
               <button
                 onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
+                className="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors hover:bg-muted"
               >
                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-foreground truncate max-w-[60px]">
+                <span className="max-w-[60px] truncate text-sm text-foreground">
                   {getSortLabel()}
                 </span>
                 {sortDirection === 'asc' ? (
@@ -1468,15 +1463,15 @@ const scopedEvent = effectiveScopedEvent;
           className="h-[85vh] rounded-t-3xl px-0 pb-0"
           showCloseButton={false}
         >
-          <div className="px-6 pt-6 pb-8 h-full flex flex-col">
-            <SheetHeader className="text-left space-y-1">
+          <div className="flex h-full flex-col px-6 pb-8 pt-6">
+            <SheetHeader className="space-y-1 text-left">
               <div className="flex items-center justify-between">
                 <SheetTitle className="text-xl font-semibold">
                   Filter & Sort
                 </SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-muted"
                 >
                   <X className="h-5 w-5 text-muted-foreground" />
                 </button>
@@ -1486,27 +1481,27 @@ const scopedEvent = effectiveScopedEvent;
               </SheetDescription>
             </SheetHeader>
 
-            <div className="flex-1 overflow-y-auto mt-6 pb-6">
-              <div className="space-y-1.5 mb-5">
+            <div className="mt-6 flex-1 overflow-y-auto pb-6">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search attendees..."
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-9 h-11 rounded-xl"
+                    className="h-11 rounded-xl pl-9"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5 mb-5">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Event</Label>
                 <Select
                   value={selectedEventId}
                   onValueChange={setSelectedEventId}
                 >
-                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
                     <SelectValue placeholder="All Events" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1528,7 +1523,7 @@ const scopedEvent = effectiveScopedEvent;
                 </Select>
               </div>
 
-              <div className="space-y-1.5 mb-5">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
@@ -1536,7 +1531,7 @@ const scopedEvent = effectiveScopedEvent;
                     setSelectedStatus(v as 'all' | AttendanceStatus)
                   }
                 >
-                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1544,7 +1539,11 @@ const scopedEvent = effectiveScopedEvent;
                       All Status
                     </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s} className="cursor-pointer">
+                      <SelectItem
+                        key={s}
+                        value={s}
+                        className="cursor-pointer"
+                      >
                         {statusConfig[s].label}
                       </SelectItem>
                     ))}
@@ -1552,13 +1551,13 @@ const scopedEvent = effectiveScopedEvent;
                 </Select>
               </div>
 
-              <div className="space-y-1.5 mb-5">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Sort By</Label>
                 <Select
                   value={sortField}
                   onValueChange={(v) => setSortField(v as SortField)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl cursor-pointer">
+                  <SelectTrigger className="h-11 cursor-pointer rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1589,28 +1588,28 @@ const scopedEvent = effectiveScopedEvent;
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl cursor-pointer"
+                    className="h-11 cursor-pointer rounded-xl"
                     onClick={() => setSortDirection('asc')}
                   >
-                    <ArrowUp className="h-4 w-4 mr-2" />
+                    <ArrowUp className="mr-2 h-4 w-4" />
                     Ascending
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl cursor-pointer"
+                    className="h-11 cursor-pointer rounded-xl"
                     onClick={() => setSortDirection('desc')}
                   >
-                    <ArrowDown className="h-4 w-4 mr-2" />
+                    <ArrowDown className="mr-2 h-4 w-4" />
                     Descending
                   </Button>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
+            <div className="flex gap-3 border-t border-border bg-background pt-4 pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl cursor-pointer"
+                className="h-11 flex-1 cursor-pointer rounded-xl"
                 onClick={() => {
                   resetFilters();
                   setIsFilterSheetOpen(false);
@@ -1619,7 +1618,7 @@ const scopedEvent = effectiveScopedEvent;
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl cursor-pointer"
+                className="h-11 flex-1 cursor-pointer rounded-xl"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters
@@ -1629,9 +1628,9 @@ const scopedEvent = effectiveScopedEvent;
         </SheetContent>
       </Sheet>
 
-      {/* Detail dialog */}
+      {/* Detail dialog — unchanged */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] w-full max-w-[95vw] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Attendee Details</DialogTitle>
             <DialogDescription>Attendance for one event.</DialogDescription>
@@ -1640,31 +1639,31 @@ const scopedEvent = effectiveScopedEvent;
           {selectedAttendee && (
             <div className="space-y-4 sm:space-y-6">
               <div className="flex items-center gap-3 sm:gap-4">
-                <Avatar className="h-14 w-14 sm:h-16 sm:w-16 flex-shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-primary text-base sm:text-lg">
+                <Avatar className="h-14 w-14 shrink-0 sm:h-16 sm:w-16">
+                  <AvatarFallback className="bg-primary/10 text-base text-primary sm:text-lg">
                     {initials(selectedAttendee.display_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-base sm:text-lg font-semibold truncate">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="truncate text-base font-semibold sm:text-lg">
                       {selectedAttendee.display_name}
                     </h3>
                     {selectedAttendee.is_host && (
                       <Badge
                         variant="outline"
-                        className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"
+                        className="border-amber-300 bg-amber-50 text-[10px] text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400"
                       >
-                        <Crown className="h-3 w-3 mr-1" />
+                        <Crown className="mr-1 h-3 w-3" />
                         Host
                       </Badge>
                     )}
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  <p className="truncate text-xs text-muted-foreground sm:text-sm">
                     {selectedAttendee.email || 'No email on file'}
                   </p>
                   {selectedAttendee.phone && (
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate flex items-center gap-1.5">
+                    <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground sm:text-sm">
                       <Phone className="h-3 w-3 shrink-0" />
                       {selectedAttendee.phone}
                     </p>
@@ -1675,11 +1674,11 @@ const scopedEvent = effectiveScopedEvent;
               <Separator />
 
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1 min-w-0">
+                <div className="min-w-0 space-y-1">
                   <Label className="text-xs text-muted-foreground">
                     Event
                   </Label>
-                  <p className="text-sm sm:text-base font-medium truncate">
+                  <p className="truncate text-sm font-medium sm:text-base">
                     {selectedAttendee.event_name}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -1694,7 +1693,7 @@ const scopedEvent = effectiveScopedEvent;
                     variant="outline"
                     className={`${
                       statusConfig[selectedAttendee.effective_status].color
-                    } border mt-1`}
+                    } mt-1 border`}
                   >
                     {statusConfig[selectedAttendee.effective_status].label}
                   </Badge>
@@ -1706,7 +1705,7 @@ const scopedEvent = effectiveScopedEvent;
                   <Label className="text-xs text-muted-foreground">
                     Sessions attended
                   </Label>
-                  <p className="text-sm sm:text-base font-medium">
+                  <p className="text-sm font-medium sm:text-base">
                     {selectedAttendee.sessions_attended} /{' '}
                     {selectedAttendee.sessions_total}
                   </p>
@@ -1715,7 +1714,7 @@ const scopedEvent = effectiveScopedEvent;
                   <Label className="text-xs text-muted-foreground">
                     Total duration
                   </Label>
-                  <p className="text-sm sm:text-base font-medium">
+                  <p className="text-sm font-medium sm:text-base">
                     {formatDuration(selectedAttendee.total_duration_seconds)}
                   </p>
                 </div>
@@ -1745,7 +1744,7 @@ const scopedEvent = effectiveScopedEvent;
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-sm cursor-pointer"
+                  className="w-full cursor-pointer justify-start text-sm"
                   onClick={() => {
                     setIsViewDialogOpen(false);
                     router.push(
@@ -1753,12 +1752,12 @@ const scopedEvent = effectiveScopedEvent;
                     );
                   }}
                 >
-                  <ArrowRight className="h-4 w-4 mr-2 shrink-0" />
+                  <ArrowRight className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">View Event Attendees</span>
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start text-sm cursor-pointer"
+                  className="w-full cursor-pointer justify-start text-sm"
                   onClick={() => {
                     setIsViewDialogOpen(false);
                     router.push(
@@ -1766,16 +1765,16 @@ const scopedEvent = effectiveScopedEvent;
                     );
                   }}
                 >
-                  <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                  <Calendar className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">Go to Event</span>
                 </Button>
               </div>
 
-              <DialogFooter className="gap-2 flex-col sm:flex-row">
+              <DialogFooter className="flex-col gap-2 sm:flex-row">
                 <Button
                   variant="outline"
                   onClick={() => setIsViewDialogOpen(false)}
-                  className="w-full sm:w-auto cursor-pointer"
+                  className="w-full cursor-pointer sm:w-auto"
                 >
                   Close
                 </Button>
