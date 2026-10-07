@@ -31,9 +31,9 @@ function StatCardSkeleton() {
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-3">
-            <Shimmer className="h-2.5 w-20" />
-            <Shimmer className="h-7 w-16" />
             <Shimmer className="h-2.5 w-24" />
+            <Shimmer className="h-7 w-20" />
+            <Shimmer className="h-2.5 w-20" />
           </div>
           <Shimmer className="h-9 w-9 rounded-xl" />
         </div>
@@ -216,6 +216,7 @@ export function RegistrationsListSkeleton() {
         </CardContent>
       </Card>
 
+      {/* ✅ Stats skeleton — the missing piece */}
       <StatsCardsSkeleton />
 
       {/* Table skeleton (desktop) */}
