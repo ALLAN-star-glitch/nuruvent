@@ -25,12 +25,6 @@ const statusConfig: Record<string, StatusVisual> = {
     dot: 'bg-emerald-500',
     icon: CheckCircle2,
   },
-  draft: {
-    label: 'Draft',
-    color: 'bg-muted text-muted-foreground border-border',
-    dot: 'bg-muted-foreground',
-    icon: Clock3,
-  },
   attended: {
     label: 'Attended',
     color: 'bg-primary/10 text-primary border-primary/30',
@@ -50,6 +44,34 @@ const statusConfig: Record<string, StatusVisual> = {
       'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
     dot: 'bg-red-500',
     icon: XCircle,
+  },
+
+  // ---- Event statuses ----
+  draft: {
+    label: 'Draft',
+    color: 'bg-muted text-muted-foreground border-border',
+    dot: 'bg-muted-foreground',
+    icon: Clock3,
+  },
+  published: {
+    label: 'Published',
+    color:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
+    dot: 'bg-emerald-500',
+    icon: CheckCircle2,
+  },
+  completed: {
+    label: 'Completed',
+    color: 'bg-primary/10 text-primary border-primary/30',
+    dot: 'bg-primary',
+    icon: CheckCircle2,
+  },
+  postponed: {
+    label: 'Postponed',
+    color:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
+    dot: 'bg-amber-500',
+    icon: Clock3,
   },
 
   // ---- Payment statuses ----
