@@ -364,7 +364,7 @@ export function TicketsList() {
           }
           action={
             !searchQuery && selectedStatus === 'all' ? (
-              <Link href="/dashboard/events">
+              <Link href="/events">
                 <Button size="sm" className="cursor-pointer rounded-lg">
                   <Calendar className="mr-2 h-4 w-4" />
                   Browse events
