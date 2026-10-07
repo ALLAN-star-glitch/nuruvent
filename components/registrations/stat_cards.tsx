@@ -1,7 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { CheckCircle2, Clock3, Video, User as UserIcon } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock3,
+  Video,
+  User as UserIcon,
+} from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -20,17 +25,16 @@ export interface StatItem {
 interface StatsCardsProps {
   stats: StatItem[];
   /**
-   * Minimum card width in px. Grid auto-fits columns based on available space.
-   * Increase to force fewer columns, decrease to force more.
-   * Default: 180 (works well for 3–5 stats on desktop).
+   * Number of columns on desktop (>= md breakpoint).
+   * Mobile always shows 2 columns.
+   * Defaults to 4.
    */
-  minCardWidth?: number;
+  desktopColumns?: 3 | 4 | 5;
 }
 
 const toneMap: Record<
   StatTone,
   {
-    halo: string;
     iconBg: string;
     iconBorder: string;
     iconFg: string;
@@ -38,87 +42,83 @@ const toneMap: Record<
   }
 > = {
   primary: {
-    halo: 'bg-primary/10',
-    iconBg: 'bg-background',
+    iconBg: 'bg-primary/10',
     iconBorder: 'border-primary/15',
     iconFg: 'text-primary',
-    fallbackIcon: <UserIcon className="h-4 w-4" />,
+    fallbackIcon: <UserIcon className="h-3.5 w-3.5" />,
   },
   emerald: {
-    halo: 'bg-emerald-500/10',
-    iconBg: 'bg-background',
+    iconBg: 'bg-emerald-50 dark:bg-emerald-950/40',
     iconBorder: 'border-emerald-500/15',
     iconFg: 'text-emerald-600 dark:text-emerald-400',
-    fallbackIcon: <CheckCircle2 className="h-4 w-4" />,
+    fallbackIcon: <CheckCircle2 className="h-3.5 w-3.5" />,
   },
   amber: {
-    halo: 'bg-amber-500/10',
-    iconBg: 'bg-background',
+    iconBg: 'bg-amber-50 dark:bg-amber-950/40',
     iconBorder: 'border-amber-500/15',
     iconFg: 'text-amber-600 dark:text-amber-400',
-    fallbackIcon: <Clock3 className="h-4 w-4" />,
+    fallbackIcon: <Clock3 className="h-3.5 w-3.5" />,
   },
   sky: {
-    halo: 'bg-sky-500/10',
-    iconBg: 'bg-background',
+    iconBg: 'bg-sky-50 dark:bg-sky-950/40',
     iconBorder: 'border-sky-500/15',
     iconFg: 'text-sky-600 dark:text-sky-400',
-    fallbackIcon: <Video className="h-4 w-4" />,
+    fallbackIcon: <Video className="h-3.5 w-3.5" />,
   },
 };
 
-export function StatsCards({ stats, minCardWidth = 180 }: StatsCardsProps) {
+const DESKTOP_COLS: Record<3 | 4 | 5, string> = {
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+  5: 'md:grid-cols-5',
+};
+
+export function StatsCards({
+  stats,
+  desktopColumns = 4,
+}: StatsCardsProps) {
   return (
     <div
-      className="grid gap-3 sm:gap-4"
-      style={{
-        gridTemplateColumns: `repeat(auto-fit, minmax(${minCardWidth}px, 1fr))`,
-      }}
+      className={cn(
+        'grid w-full grid-cols-2 gap-2.5 sm:gap-3',
+        DESKTOP_COLS[desktopColumns],
+      )}
     >
       {stats.map((s) => {
         const t = toneMap[s.tone];
         const interactive = !!(s.onClick || s.href);
 
-        const inner = (
+        const card = (
           <Card
             className={cn(
-              'h-full border-border/60 shadow-none transition-all',
-              interactive
-                ? 'cursor-pointer hover:border-primary/40 hover:shadow-sm'
-                : 'hover:border-border',
+              'h-full border-border shadow-sm transition-all duration-200',
+              'hover:shadow-md',
+              interactive && 'cursor-pointer',
             )}
           >
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-muted-foreground sm:text-[11px]">
-                  {s.label}
-                </p>
-                <div className="relative shrink-0">
-                  <div
-                    className={cn(
-                      'absolute inset-0 rounded-lg blur-md sm:rounded-xl',
-                      t.halo,
-                    )}
-                    aria-hidden
-                  />
-                  <div
-                    className={cn(
-                      'relative flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm sm:h-9 sm:w-9 sm:rounded-xl',
-                      t.iconBg,
-                      t.iconBorder,
-                      t.iconFg,
-                    )}
-                  >
-                    {s.icon ?? t.fallbackIcon}
-                  </div>
+            <CardContent className="p-2.5 sm:p-3">
+              <div className="flex items-center justify-between">
+                <div
+                  className={cn(
+                    'flex h-6 w-6 items-center justify-center rounded-md border',
+                    t.iconBg,
+                    t.iconBorder,
+                    t.iconFg,
+                  )}
+                >
+                  {s.icon ?? t.fallbackIcon}
                 </div>
               </div>
 
-              <p className="mt-2 text-[22px] font-semibold leading-none tracking-tight text-foreground tabular-nums sm:mt-3 sm:text-[26px]">
+              <p className="mt-1.5 text-base font-bold leading-tight tracking-tight text-foreground tabular-nums sm:text-lg">
                 {s.value}
               </p>
 
-              <p className="mt-1.5 truncate text-[11px] leading-tight text-muted-foreground sm:mt-2 sm:text-xs">
+              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground sm:text-xs">
+                {s.label}
+              </p>
+
+              <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground/80">
                 {s.sub}
               </p>
             </CardContent>
@@ -127,8 +127,8 @@ export function StatsCards({ stats, minCardWidth = 180 }: StatsCardsProps) {
 
         if (s.href) {
           return (
-            <Link key={s.label} href={s.href} className="block">
-              {inner}
+            <Link key={s.label} href={s.href} className="block min-w-0">
+              {card}
             </Link>
           );
         }
@@ -139,14 +139,18 @@ export function StatsCards({ stats, minCardWidth = 180 }: StatsCardsProps) {
               key={s.label}
               type="button"
               onClick={s.onClick}
-              className="block w-full text-left"
+              className="block w-full min-w-0 text-left"
             >
-              {inner}
+              {card}
             </button>
           );
         }
 
-        return <div key={s.label}>{inner}</div>;
+        return (
+          <div key={s.label} className="min-w-0">
+            {card}
+          </div>
+        );
       })}
     </div>
   );

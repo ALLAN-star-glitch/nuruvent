@@ -533,7 +533,10 @@ export default function EventsDashboardPage() {
       ) : (
         <>
           {/* Stats */}
+
+          <div className="w-full max-w-5xl"></div>
           <StatsCards
+            desktopColumns={5}
             stats={[
               {
                 label: 'Total Events',
@@ -582,6 +585,7 @@ export default function EventsDashboardPage() {
               },
             ]}
           />
+          
 
           {/* Desktop filter bar */}
           {!isMobile && (

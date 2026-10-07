@@ -96,6 +96,7 @@ import {
   exportToJSON,
   exportToPDF,
 } from '@/lib/utils/exportAttendees';
+import { StatsCards } from '@/components/registrations/stat_cards';
 
 // ============================================================
 // STATUS DISPLAY
@@ -635,84 +636,38 @@ const scopedEvent = effectiveScopedEvent;
         </DropdownMenu>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="border-border shadow-sm rounded-2xl">
-          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-                Total
-              </p>
-              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              </span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-              {total}
-            </p>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-              attendees
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm rounded-2xl">
-          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-                Attended
-              </p>
-              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
-                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
-              </span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-              {stats.attended}
-            </p>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-              on this page
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm rounded-2xl">
-          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-                Hosts
-              </p>
-              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40">
-                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
-              </span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-              {stats.hosts}
-            </p>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-              on this page
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm rounded-2xl">
-          <CardContent className="p-4 sm:p-5 flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">
-                No Show
-              </p>
-              <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
-                <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
-              </span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-bold text-foreground leading-none">
-              {stats.noShow}
-            </p>
-            <p className="text-xs sm:text-sm text-muted-foreground leading-snug">
-              on this page
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+   <StatsCards
+  stats={[
+    {
+      label: 'Total',
+      value: total,
+      sub: 'attendees',
+      tone: 'primary',
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      label: 'Attended',
+      value: stats.attended,
+      sub: 'on this page',
+      tone: 'emerald',
+      icon: <CheckCircle2 className="h-4 w-4" />,
+    },
+    {
+      label: 'Hosts',
+      value: stats.hosts,
+      sub: 'on this page',
+      tone: 'amber',
+      icon: <Crown className="h-4 w-4" />,
+    },
+    {
+      label: 'No Show',
+      value: stats.noShow,
+      sub: 'on this page',
+      tone: 'sky',
+      icon: <XCircle className="h-4 w-4" />,
+    },
+  ]}
+/>
 
       {/* Desktop Filters */}
       {!isMobile && (
