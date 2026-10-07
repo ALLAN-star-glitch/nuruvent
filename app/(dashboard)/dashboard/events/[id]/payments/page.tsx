@@ -4,8 +4,8 @@ import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 
-import { PaymentsLedger } from '@/app/(dashboard)/dashboard/payments/_components/PaymentsLedger';
 import { useGetEventByIdQuery } from '@/lib/store/api/eventsApi';
+import { PaymentsLedger } from '@/components/payments/PaymentsLedger';
 
 export default function EventPaymentsPage({
   params,
