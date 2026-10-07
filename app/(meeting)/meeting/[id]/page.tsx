@@ -54,14 +54,38 @@ export async function generateMetadata({
   return {
     title,
     description,
+
+    // ---- NEW: opt this route into indexing ----
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+      },
+    },
+
+    // ---- NEW: fix the canonical so this isn't seen as the homepage ----
+    alternates: {
+      canonical: canonicalUrl,
+    },
+
     openGraph: {
       title,
       description,
       url: canonicalUrl,
       siteName: 'Nuruvent',
       type: 'website',
-      images: [{ url: ogImage, width: 1200, height: 630, alt: eventTitle }],
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: eventTitle,
+        },
+      ],
     },
+
     twitter: {
       card: 'summary_large_image',
       title,
