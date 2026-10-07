@@ -2,12 +2,8 @@
 
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import {
-  fetchEventBySlug,
-  toOgImage,
-} from '@/lib/server/events';
+import { fetchEventBySlug, toOgImage } from '@/lib/server/events';
 import { EventDetailClient } from './_components/EventDetailClient';
-
 
 const PUBLIC_SITE_URL =
   process.env.NEXT_PUBLIC_PUBLIC_SITE_URL || 'https://www.nuruvent.com';
@@ -58,12 +54,6 @@ export async function generateMetadata({
       siteName: 'Nuruvent',
       type: 'website',
       images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [ogImage],
     },
   };
 }
