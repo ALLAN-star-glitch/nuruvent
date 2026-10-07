@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -6,9 +5,7 @@ import Link from 'next/link';
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   Calendar,
-  Filter,
   Loader2,
   RefreshCw,
   Search,
@@ -36,17 +33,18 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
+
+
 import { useListMyRegistrationsQuery } from '@/lib/store/api/registrationsApi';
 import { useGetMySessionLinksQuery } from '@/lib/store/api/attendanceApi';
 import type { CrossEventRegistration } from '@/lib/types/registration';
 import type { SessionLinkGroup } from '@/lib/types/attendance';
 
-import { AttendingCard, type MergedRegistration } from './AttendingCard';
-import { EmptyState } from './EmptyState';
 
-// ============================================================
-// FILTER CONFIG
-// ============================================================
+import { EmptyState } from '@/components/registrations/empty_state';
+import { MobileFilterStrip } from '@/components/registrations/mobile-filter-strip';
+import { StatsCards } from '@/components/registrations/stat_cards';
+import { MergedRegistration, TicketCard } from './TicketCard';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'confirmed', label: 'Confirmed' },
@@ -60,11 +58,7 @@ const STATUS_FILTER_OPTIONS = [
 type SortField = 'created_at' | 'event_name' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-// ============================================================
-// COMPONENT
-// ============================================================
-
-export function AttendingTab() {
+export function TicketsList() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -75,7 +69,6 @@ export function AttendingTab() {
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
-  // ---- Mobile breakpoint ----
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -83,13 +76,11 @@ export function AttendingTab() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // ---- Debounced search ----
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // ---- Query params ----
   const queryParams = useMemo(
     () => ({
       search: searchQuery || undefined,
@@ -118,7 +109,6 @@ export function AttendingTab() {
   const registrations: CrossEventRegistration[] = regsData?.data?.registrations ?? [];
   const groups: SessionLinkGroup[] = linksData?.data?.groups ?? [];
 
-  // ---- Merge registrations with their session-link group ----
   const merged: MergedRegistration[] = useMemo(
     () =>
       registrations.map((r) => {
@@ -128,7 +118,6 @@ export function AttendingTab() {
     [registrations, groups],
   );
 
-  // ---- Client-side search (event name) ----
   const filtered = useMemo(() => {
     if (!searchQuery) return merged;
     const q = searchQuery.toLowerCase();
@@ -149,7 +138,7 @@ export function AttendingTab() {
   const isLoading = regsLoading || linksLoading;
   const errorMessage = regsError
     ? (regsError as { data?: { message?: string } })?.data?.message ??
-      'Failed to load your registrations'
+      'Failed to load your tickets'
     : null;
 
   const handleRefresh = async () => {
@@ -165,7 +154,7 @@ export function AttendingTab() {
     refetchLinks();
   };
 
-  const getActiveFilterCount = () => {
+  const activeFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
     if (selectedStatus !== 'all') n++;
@@ -180,7 +169,7 @@ export function AttendingTab() {
     setSortDirection('desc');
   };
 
-  const getSortLabel = () => {
+  const sortLabel = () => {
     const labels: Record<SortField, string> = {
       created_at: 'Newest',
       event_name: 'Event',
@@ -189,27 +178,72 @@ export function AttendingTab() {
     return labels[sortField];
   };
 
+  // ---- KPI stats ----
+  const total = merged.length;
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const upcoming = merged.filter(
+    (m) =>
+      m.registration.event_start_date &&
+      new Date(m.registration.event_start_date).getTime() > now,
+  ).length;
+  const past = merged.filter(
+    (m) =>
+      m.registration.event_start_date &&
+      new Date(m.registration.event_start_date).getTime() <= now,
+  ).length;
+  const joinReady = merged.filter(
+    (m) => m.registration.is_virtual || m.registration.is_hybrid,
+  ).length;
+
+  const stats = [
+    {
+      label: 'Total',
+      value: total,
+      sub: 'my tickets',
+      tone: 'primary' as const,
+      icon: <Ticket className="h-4 w-4" />,
+    },
+    {
+      label: 'Upcoming',
+      value: upcoming,
+      sub: 'events ahead',
+      tone: 'emerald' as const,
+    },
+    {
+      label: 'Past',
+      value: past,
+      sub: 'events behind',
+      tone: 'amber' as const,
+    },
+    {
+      label: 'Join ready',
+      value: joinReady,
+      sub: 'with links',
+      tone: 'sky' as const,
+    },
+  ];
+
   return (
     <div className="space-y-4 sm:space-y-5">
-      {/* ── Desktop filter card ─────────────────────────────── */}
+      {/* Desktop filter card */}
       {!isMobile && (
-        <Card className="border-border/70 shadow-sm">
+        <Card className="border-border/60 shadow-none">
           <CardContent className="p-4 sm:p-5">
             <div className="flex flex-col gap-4">
-              {/* Row 1: search + status + refresh */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search by event name…"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-10 h-10 sm:h-11 rounded-xl"
+                    className="h-10 rounded-xl pl-10 sm:h-11"
                   />
                 </div>
 
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="w-full md:w-[190px] h-10 sm:h-11 rounded-xl cursor-pointer">
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-xl md:w-[190px] sm:h-11">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -230,19 +264,18 @@ export function AttendingTab() {
 
                 <Button
                   variant="outline"
-                  className="cursor-pointer shrink-0 h-10 sm:h-11 rounded-xl px-5"
+                  className="h-10 shrink-0 cursor-pointer rounded-xl px-5 sm:h-11"
                   onClick={handleRefresh}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className="mr-2 h-4 w-4" />
                   Refresh
                 </Button>
               </div>
 
-              {/* Row 2: sort + count + reset */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border pt-3">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-3 sm:flex-row">
+                <div className="flex w-full items-center gap-2 sm:w-auto">
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                    <span className="hidden text-xs text-muted-foreground sm:inline">
                       Sort by:
                     </span>
                     <Select
@@ -252,17 +285,17 @@ export function AttendingTab() {
                         setSortDirection('asc');
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[140px] text-xs border-0 bg-transparent focus:ring-0 cursor-pointer">
+                      <SelectTrigger className="h-8 w-[140px] cursor-pointer border-0 bg-transparent text-xs focus:ring-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="created_at" className="text-sm cursor-pointer">
+                        <SelectItem value="created_at" className="cursor-pointer text-sm">
                           Newest first
                         </SelectItem>
-                        <SelectItem value="event_name" className="text-sm cursor-pointer">
+                        <SelectItem value="event_name" className="cursor-pointer text-sm">
                           Event
                         </SelectItem>
-                        <SelectItem value="status" className="text-sm cursor-pointer">
+                        <SelectItem value="status" className="cursor-pointer text-sm">
                           Status
                         </SelectItem>
                       </SelectContent>
@@ -272,7 +305,7 @@ export function AttendingTab() {
                       onClick={() =>
                         setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
                       }
-                      className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
+                      className="cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
                       title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                     >
                       {sortDirection === 'asc' ? (
@@ -284,18 +317,15 @@ export function AttendingTab() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                  <span className="text-xs text-muted-foreground flex items-center gap-2">
-                    {regsLoading && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    {filtered.length} registration
-                    {filtered.length !== 1 ? 's' : ''}
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {regsLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                    {filtered.length} ticket{filtered.length !== 1 ? 's' : ''}
                   </span>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 text-xs cursor-pointer"
+                    className="h-8 cursor-pointer text-xs"
                     onClick={resetFilters}
                   >
                     Reset
@@ -307,37 +337,39 @@ export function AttendingTab() {
         </Card>
       )}
 
-      {/* ── Loading ─────────────────────────────────────────── */}
+      <StatsCards stats={stats} />
+
       {isLoading ? (
-        <Card className="border-border/70">
-          <CardContent className="p-12 sm:p-16 flex items-center justify-center">
+        <Card className="border-border/60">
+          <CardContent className="flex items-center justify-center p-12 sm:p-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>
       ) : errorMessage ? (
         <Card className="border-destructive/30">
-          <CardContent className="p-12 sm:p-16 text-center text-destructive text-sm">
+          <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
             {errorMessage}
           </CardContent>
         </Card>
       ) : filtered.length === 0 ? (
         <EmptyState
-          icon={<Ticket className="h-7 w-7 text-muted-foreground" />}
+          icon={<Ticket className="h-5 w-5 text-primary" />}
+          eyebrow="Your wallet"
           title={
             searchQuery || selectedStatus !== 'all'
-              ? 'No matching registrations'
-              : 'No registrations yet'
+              ? 'No matching tickets'
+              : 'No tickets yet'
           }
           sub={
             searchQuery || selectedStatus !== 'all'
               ? 'Try adjusting your search or filter.'
-              : 'Events you register for will appear here with their join links.'
+              : 'Events you register for will appear here with their QR passes and join links.'
           }
           action={
             !searchQuery && selectedStatus === 'all' ? (
               <Link href="/dashboard/events">
-                <Button size="sm" className="cursor-pointer rounded-lg mt-2">
-                  <Calendar className="h-4 w-4 mr-2" />
+                <Button size="sm" className="cursor-pointer rounded-lg">
+                  <Calendar className="mr-2 h-4 w-4" />
                   Browse events
                 </Button>
               </Link>
@@ -345,9 +377,9 @@ export function AttendingTab() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-2">
           {filtered.map((m) => (
-            <AttendingCard
+            <TicketCard
               key={m.registration.id}
               merged={m}
               expanded={!collapsedIds.has(m.registration.id)}
@@ -358,103 +390,60 @@ export function AttendingTab() {
         </div>
       )}
 
-      {/* ── Mobile filter strip (floats above the bottom tab bar) ── */}
       {isMobile && (
-        <div
-          className="fixed inset-x-0 z-40 px-4 pointer-events-none"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
-        >
-          <div className="pointer-events-auto mx-auto max-w-md bg-background/90 backdrop-blur-md rounded-full shadow-lg border border-border/70">
-            <div className="flex items-center justify-between px-4 py-2.5 gap-2">
-              <button
-                onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-2 flex-1 min-w-0 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
-              >
-                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground truncate">
-                  {searchInput || 'Search'}
-                </span>
-              </button>
-
-              <div className="w-px h-6 bg-border flex-shrink-0" />
-
-              <button
-                onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors relative cursor-pointer"
-              >
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-foreground">Filters</span>
-                {getActiveFilterCount() > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-primary-foreground text-[10px] rounded-full flex items-center justify-center font-medium">
-                    {getActiveFilterCount()}
-                  </span>
-                )}
-              </button>
-
-              <div className="w-px h-6 bg-border flex-shrink-0" />
-
-              <button
-                onClick={() => setIsFilterSheetOpen(true)}
-                className="flex items-center gap-1.5 hover:bg-muted rounded-full px-3 py-1.5 transition-colors cursor-pointer"
-              >
-                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-foreground truncate max-w-[60px]">
-                  {getSortLabel()}
-                </span>
-                {sortDirection === 'asc' ? (
-                  <ArrowUp className="h-3 w-3 text-muted-foreground" />
-                ) : (
-                  <ArrowDown className="h-3 w-3 text-muted-foreground" />
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+        <MobileFilterStrip
+          searchValue={searchInput}
+          onSearchClick={() => setIsFilterSheetOpen(true)}
+          filterCount={activeFilterCount()}
+          onFilterClick={() => setIsFilterSheetOpen(true)}
+          sortLabel={sortLabel()}
+          sortDirection={sortDirection}
+          onSortClick={() => setIsFilterSheetOpen(true)}
+        />
       )}
 
-      {/* ── Mobile filter sheet ─────────────────────────────── */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent
           side="bottom"
           className="h-[85vh] rounded-t-3xl px-0 pb-0"
           showCloseButton={false}
         >
-          <div className="px-6 pt-6 pb-8 h-full flex flex-col">
-            <SheetHeader className="text-left space-y-1">
+          <div className="flex h-full flex-col px-6 pb-8 pt-6">
+            <SheetHeader className="space-y-1 text-left">
               <div className="flex items-center justify-between">
                 <SheetTitle className="text-xl font-semibold">
                   Filter & Sort
                 </SheetTitle>
                 <button
                   onClick={() => setIsFilterSheetOpen(false)}
-                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors cursor-pointer"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-muted"
                 >
                   <X className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
               <SheetDescription className="text-sm text-muted-foreground">
-                Refine your registrations
+                Refine your tickets
               </SheetDescription>
             </SheetHeader>
 
-            <div className="flex-1 overflow-y-auto mt-6 pb-6">
-              <div className="space-y-1.5 mb-5">
+            <div className="mt-6 flex-1 overflow-y-auto pb-6">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     placeholder="Search by event name…"
                     value={searchInput}
                     onChange={(e) => setSearchInput(e.target.value)}
-                    className="pl-9 h-11 rounded-xl"
+                    className="h-11 rounded-xl pl-9"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5 mb-5">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger className="h-11 rounded-xl w-full cursor-pointer">
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -474,13 +463,13 @@ export function AttendingTab() {
                 </Select>
               </div>
 
-              <div className="space-y-1.5 mb-5">
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Sort By</Label>
                 <Select
                   value={sortField}
                   onValueChange={(v) => setSortField(v as SortField)}
                 >
-                  <SelectTrigger className="h-11 rounded-xl cursor-pointer">
+                  <SelectTrigger className="h-11 cursor-pointer rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -502,28 +491,28 @@ export function AttendingTab() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant={sortDirection === 'asc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl cursor-pointer"
+                    className="h-11 cursor-pointer rounded-xl"
                     onClick={() => setSortDirection('asc')}
                   >
-                    <ArrowUp className="h-4 w-4 mr-2" />
+                    <ArrowUp className="mr-2 h-4 w-4" />
                     Ascending
                   </Button>
                   <Button
                     variant={sortDirection === 'desc' ? 'default' : 'outline'}
-                    className="h-11 rounded-xl cursor-pointer"
+                    className="h-11 cursor-pointer rounded-xl"
                     onClick={() => setSortDirection('desc')}
                   >
-                    <ArrowDown className="h-4 w-4 mr-2" />
+                    <ArrowDown className="mr-2 h-4 w-4" />
                     Descending
                   </Button>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-border bg-background pb-2">
+            <div className="flex gap-3 border-t border-border bg-background pt-4 pb-2">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl cursor-pointer"
+                className="h-11 flex-1 cursor-pointer rounded-xl"
                 onClick={() => {
                   resetFilters();
                   setIsFilterSheetOpen(false);
@@ -532,7 +521,7 @@ export function AttendingTab() {
                 Reset All
               </Button>
               <Button
-                className="flex-1 h-11 rounded-xl cursor-pointer"
+                className="h-11 flex-1 cursor-pointer rounded-xl"
                 onClick={() => setIsFilterSheetOpen(false)}
               >
                 Apply Filters

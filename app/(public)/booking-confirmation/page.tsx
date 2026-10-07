@@ -224,7 +224,7 @@ export default function BookingConfirmationPage() {
             </div>
           </div>
 
-          {/* Ticket stub — the address block overlapping the banner */}
+          {/* Ticket stub */}
           <div className="relative -mt-10 px-4 sm:px-6">
             <div className="bg-card rounded-2xl border border-border shadow-sm p-4 sm:p-5">
               <div className="flex items-center justify-between gap-4">
@@ -264,7 +264,7 @@ export default function BookingConfirmationPage() {
 
             <Separator />
 
-            {/* Event title — centred, prominent */}
+            {/* Event title */}
             <div className="text-center">
               <p className="text-xs uppercase tracking-widest font-semibold text-primary mb-2">
                 You&apos;re attending
@@ -377,21 +377,21 @@ export default function BookingConfirmationPage() {
               </div>
             )}
 
-            {/* Primary CTA */}
+            {/* Primary CTA — updated */}
             <div className="pt-2">
               <Button
                 asChild
                 className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
               >
-                <Link href="/dashboard/registrations?tab=attending">
+                <Link href="/dashboard/tickets">
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Go to My Registrations
+                  View my tickets
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
               </Button>
               <p className="text-xs text-center text-muted-foreground mt-3 flex items-center justify-center gap-1.5">
                 <Info className="h-3 w-3" />
-                Find your session join links on the registrations page
+                Find your QR pass and session join links on your tickets
               </p>
             </div>
 

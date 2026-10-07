@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LucideIcon,
+  Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +42,8 @@ const navItems: NavItem[] = [
     label: 'Registrations',
     icon: ClipboardList,
   },
-  { href: '/dashboard/attendees', label: 'Attendance', icon: Users },
+  { href: '/dashboard/tickets', label: 'Tickets', icon: Ticket }, 
+  { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
   { href: '/dashboard/replays', label: 'Replays', icon: Clapperboard },

@@ -28,6 +28,7 @@ import {
   Trash2,
   ChevronDown,
   ClipboardList,
+  Ticket,
 } from 'lucide-react';
 
 import { useAppDispatch } from '@/lib/store/hooks';
@@ -51,6 +52,7 @@ interface UserMenuProps {
 const QUICK_LINKS = [
   { label: 'Events', href: '/dashboard/events', icon: Calendar },
   { label: 'Registrations', href: '/dashboard/registrations', icon: ClipboardList },
+  { label: 'Tickets', href: '/dashboard/tickets', icon: Ticket },   // ← add
   { label: 'Attendees', href: '/dashboard/attendees', icon: Users },
   { label: 'Certificates', href: '/dashboard/certificates', icon: Award },
   { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Clock, MapPin, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { SessionLink } from '@/lib/types/attendance';
 
 function formatTimeRange(start: string, end: string): string {
@@ -35,9 +36,14 @@ export function SessionLinkRow({ link }: { link: SessionLink }) {
   const logoUrl = platformLogo[link.platform];
 
   return (
-    <div className="rounded-xl border border-border/70 bg-background p-3 flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="shrink-0 h-10 w-10 rounded-lg border border-border/70 bg-background flex items-center justify-center p-1.5">
+    <div
+      className={cn(
+        'flex flex-col gap-3 rounded-xl border border-border/60 bg-background p-3 transition-colors sm:flex-row sm:items-center',
+        !isJoinable && 'opacity-80',
+      )}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background p-1.5">
           {logoUrl ? (
             <div className="relative h-full w-full">
               <Image
@@ -54,10 +60,10 @@ export function SessionLinkRow({ link }: { link: SessionLink }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground truncate">
+          <p className="truncate text-sm font-medium text-foreground">
             {link.session_title}
           </p>
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground flex-wrap">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3 shrink-0" />
               {formatTimeRange(link.scheduled_start, link.scheduled_end)}
@@ -72,16 +78,16 @@ export function SessionLinkRow({ link }: { link: SessionLink }) {
         {isJoinable ? (
           <Button
             size="sm"
-            className="cursor-pointer h-8 text-xs w-full sm:w-auto rounded-lg"
+            className="h-8 w-full cursor-pointer rounded-lg text-xs sm:w-auto"
             onClick={() =>
               window.open(link.join_url, '_blank', 'noopener,noreferrer')
             }
           >
-            <Video className="h-3.5 w-3.5 mr-1.5" />
+            <Video className="mr-1.5 h-3.5 w-3.5" />
             Join session
           </Button>
         ) : (
-          <span className="text-xs text-muted-foreground italic px-2">
+          <span className="px-2 text-xs italic text-muted-foreground">
             {isExpired ? 'Link expired' : 'Not yet available'}
           </span>
         )}
