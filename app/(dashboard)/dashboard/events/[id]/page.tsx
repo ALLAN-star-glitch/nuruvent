@@ -102,6 +102,7 @@ import {
 } from '@/lib/store/api/attendanceApi';
 import { useFetchAttendanceMutation } from '@/lib/store/api/videoApi';
 import { CreateMeetingPlatformPicker } from '@/components/events/video/CreateMeetingPlatformPicker';
+import { EventDetailSkeleton } from '@/components/registrations/skeleton-loaders';
 
 // ============================================================
 // HELPERS
@@ -876,17 +877,8 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
   // ============================================================
 
   if (isLoading || !eventId) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Loading event details...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  return <EventDetailSkeleton />;
+} 
 
   if (error || !event) {
     return (

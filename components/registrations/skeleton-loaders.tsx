@@ -246,3 +246,136 @@ export function RegistrationsListSkeleton() {
     </div>
   );
 }
+
+// ============================================================
+// EVENT DETAIL SKELETON
+// ============================================================
+
+export function EventDetailSkeleton() {
+  return (
+    <div className="w-full space-y-6">
+      {/* Header */}
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <Shimmer className="h-9 w-9 shrink-0 rounded-lg" />
+          <div className="min-w-0 space-y-2">
+            <Shimmer className="h-6 w-56" />
+            <Shimmer className="h-3 w-32" />
+          </div>
+        </div>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Shimmer className="h-9 w-20 rounded-lg" />
+          <Shimmer className="h-9 w-24 rounded-lg" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left column */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Hero image */}
+          <Shimmer className="aspect-[21/9] w-full rounded-xl" />
+
+          {/* Meeting card */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-4 p-6">
+              <div className="flex items-center justify-between">
+                <Shimmer className="h-5 w-40" />
+                <Shimmer className="h-8 w-24 rounded-lg" />
+              </div>
+              <Shimmer className="h-3 w-3/4" />
+              <div className="space-y-2">
+                <Shimmer className="h-16 w-full rounded-lg" />
+                <Shimmer className="h-16 w-full rounded-lg" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Attendance card */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-4 p-6">
+              <Shimmer className="h-5 w-36" />
+              <div className="grid grid-cols-3 gap-3">
+                <Shimmer className="h-16 rounded-lg" />
+                <Shimmer className="h-16 rounded-lg" />
+                <Shimmer className="h-16 rounded-lg" />
+              </div>
+              <Shimmer className="h-3 w-2/3" />
+            </CardContent>
+          </Card>
+
+          {/* Description */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-3 p-6">
+              <Shimmer className="h-4 w-36" />
+              <Shimmer className="h-3 w-full" />
+              <Shimmer className="h-3 w-full" />
+              <Shimmer className="h-3 w-5/6" />
+            </CardContent>
+          </Card>
+
+          {/* Details grid */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Card key={i} className="border-border shadow-none">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <Shimmer className="h-8 w-8 shrink-0 rounded-lg" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Shimmer className="h-2.5 w-12" />
+                    <Shimmer className="h-3.5 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-4 lg:col-span-1">
+          {/* Event Host */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-3 p-6">
+              <Shimmer className="h-4 w-24" />
+              <div className="flex items-center gap-3">
+                <Shimmer className="h-9 w-9 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Shimmer className="h-3.5 w-32" />
+                  <Shimmer className="h-3 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-3 p-6">
+              <Shimmer className="h-4 w-28" />
+              <Shimmer className="h-9 w-full rounded-lg" />
+              <Shimmer className="h-9 w-full rounded-lg" />
+              <Shimmer className="h-9 w-full rounded-lg" />
+              <Shimmer className="h-9 w-full rounded-lg" />
+            </CardContent>
+          </Card>
+
+          {/* Event Stats */}
+          <Card className="border-border shadow-none">
+            <CardContent className="space-y-3 p-6">
+              <Shimmer className="h-4 w-24" />
+              <div className="flex items-center justify-between">
+                <Shimmer className="h-3 w-16" />
+                <Shimmer className="h-6 w-20 rounded-full" />
+              </div>
+              <div className="flex items-center justify-between">
+                <Shimmer className="h-3 w-20" />
+                <Shimmer className="h-3 w-16" />
+              </div>
+              <div className="flex items-center justify-between">
+                <Shimmer className="h-3 w-16" />
+                <Shimmer className="h-3 w-20" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
