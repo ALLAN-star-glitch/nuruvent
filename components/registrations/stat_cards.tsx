@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { CheckCircle2, Clock3, Video, User as UserIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,18 @@ export interface StatItem {
   sub: string;
   tone: StatTone;
   icon?: React.ReactNode;
+  onClick?: () => void;
+  href?: string;
+}
+
+interface StatsCardsProps {
+  stats: StatItem[];
+  /**
+   * Minimum card width in px. Grid auto-fits columns based on available space.
+   * Increase to force fewer columns, decrease to force more.
+   * Default: 180 (works well for 3–5 stats on desktop).
+   */
+  minCardWidth?: number;
 }
 
 const toneMap: Record<
@@ -54,38 +67,43 @@ const toneMap: Record<
   },
 };
 
-export function StatsCards({ stats }: { stats: StatItem[] }) {
+export function StatsCards({ stats, minCardWidth = 180 }: StatsCardsProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div
+      className="grid gap-3 sm:gap-4"
+      style={{
+        gridTemplateColumns: `repeat(auto-fit, minmax(${minCardWidth}px, 1fr))`,
+      }}
+    >
       {stats.map((s) => {
         const t = toneMap[s.tone];
-        return (
+        const interactive = !!(s.onClick || s.href);
+
+        const inner = (
           <Card
-            key={s.label}
-            className="border-border/60 shadow-none hover:border-border transition-colors"
+            className={cn(
+              'h-full border-border/60 shadow-none transition-all',
+              interactive
+                ? 'cursor-pointer hover:border-primary/40 hover:shadow-sm'
+                : 'hover:border-border',
+            )}
           >
             <CardContent className="p-4 sm:p-5">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.1em] truncate">
-                    {s.label}
-                  </p>
-                  <p className="text-[26px] sm:text-[30px] font-semibold text-foreground tabular-nums mt-2 leading-none tracking-tight">
-                    {s.value}
-                  </p>
-                  <p className="text-[11px] sm:text-xs text-muted-foreground mt-2 truncate">
-                    {s.sub}
-                  </p>
-                </div>
-
+                <p className="text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-muted-foreground sm:text-[11px]">
+                  {s.label}
+                </p>
                 <div className="relative shrink-0">
                   <div
-                    className={cn('absolute inset-0 rounded-xl blur-md', t.halo)}
+                    className={cn(
+                      'absolute inset-0 rounded-lg blur-md sm:rounded-xl',
+                      t.halo,
+                    )}
                     aria-hidden
                   />
                   <div
                     className={cn(
-                      'relative flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm',
+                      'relative flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm sm:h-9 sm:w-9 sm:rounded-xl',
                       t.iconBg,
                       t.iconBorder,
                       t.iconFg,
@@ -95,9 +113,40 @@ export function StatsCards({ stats }: { stats: StatItem[] }) {
                   </div>
                 </div>
               </div>
+
+              <p className="mt-2 text-[22px] font-semibold leading-none tracking-tight text-foreground tabular-nums sm:mt-3 sm:text-[26px]">
+                {s.value}
+              </p>
+
+              <p className="mt-1.5 truncate text-[11px] leading-tight text-muted-foreground sm:mt-2 sm:text-xs">
+                {s.sub}
+              </p>
             </CardContent>
           </Card>
         );
+
+        if (s.href) {
+          return (
+            <Link key={s.label} href={s.href} className="block">
+              {inner}
+            </Link>
+          );
+        }
+
+        if (s.onClick) {
+          return (
+            <button
+              key={s.label}
+              type="button"
+              onClick={s.onClick}
+              className="block w-full text-left"
+            >
+              {inner}
+            </button>
+          );
+        }
+
+        return <div key={s.label}>{inner}</div>;
       })}
     </div>
   );

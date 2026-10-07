@@ -1,6 +1,8 @@
 'use client';
 
-import { PaymentsLedger } from './_components/PaymentsLedger';
+import { PaymentsLedger } from "@/components/payments/PaymentsLedger";
+
+
 
 export default function PaymentsPage() {
   return <PaymentsLedger />;

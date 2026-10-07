@@ -45,6 +45,7 @@ import { EmptyState } from '@/components/registrations/empty_state';
 import { MobileFilterStrip } from '@/components/registrations/mobile-filter-strip';
 import { StatsCards } from '@/components/registrations/stat_cards';
 import { MergedRegistration, TicketCard } from './TicketCard';
+import { TicketsListSkeleton } from '@/components/registrations/skeleton-loaders';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'confirmed', label: 'Confirmed' },
@@ -339,12 +340,8 @@ export function TicketsList() {
 
       <StatsCards stats={stats} />
 
-      {isLoading ? (
-        <Card className="border-border/60">
-          <CardContent className="flex items-center justify-center p-12 sm:p-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </CardContent>
-        </Card>
+     {isLoading ? (
+        <TicketsListSkeleton />
       ) : errorMessage ? (
         <Card className="border-destructive/30">
           <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
