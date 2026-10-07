@@ -93,59 +93,77 @@ export default function PublicLayout({
       {/* Public Footer */}
       <Footer />
 
-      {/* Tawk.to Chat Widget */}
-      <Script
-        id="tawk-to"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{
-          __html: `
-            var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
-            
-            if (typeof window !== 'undefined' && window.Tawk_API && window.Tawk_API.showWidget) {
-              window.Tawk_API.showWidget();
-            }
+     {/* Tawk.to Chat Widget */}
+<Script
+  id="tawk-to"
+  strategy="afterInteractive"
+  dangerouslySetInnerHTML={{
+    __html: `
+      var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
 
-            (function() {
-              if (document.getElementById('tawk-script-loader')) return;
-              var s1 = document.createElement('script'), s0 = document.getElementsByTagName('script')[0];
-              s1.id = 'tawk-script-loader';
-              s1.async = true;
-              s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
-              s1.charset = 'UTF-8';
-              s1.setAttribute('crossorigin', '*');
-              s0.parentNode.insertBefore(s1, s0);
-            })();
+      if (typeof window !== 'undefined' && window.Tawk_API && window.Tawk_API.showWidget) {
+        window.Tawk_API.showWidget();
+      }
 
-            if (typeof window !== 'undefined') {
-              var hideTawkOnDashboard = function() {
-                if (window.location.pathname.startsWith('/dashboard')) {
-                  if (window.Tawk_API && window.Tawk_API.hideWidget) {
-                    window.Tawk_API.hideWidget();
-                  }
-                } else {
-                  if (window.Tawk_API && window.Tawk_API.showWidget) {
-                    window.Tawk_API.showWidget();
-                  }
-                }
-              };
+      (function() {
+        if (document.getElementById('tawk-script-loader')) return;
+        var s1 = document.createElement('script'), s0 = document.getElementsByTagName('script')[0];
+        s1.id = 'tawk-script-loader';
+        s1.async = true;
+        s1.src = 'https://embed.tawk.to/6a6afad8d285f11d460611a5/1juou7nou';
+        s1.charset = 'UTF-8';
+        s1.setAttribute('crossorigin', '*');
+        s0.parentNode.insertBefore(s1, s0);
+      })();
 
-              var originalPushState = history.pushState;
-              history.pushState = function() {
-                originalPushState.apply(this, arguments);
-                setTimeout(hideTawkOnDashboard, 100);
-              };
+      if (typeof window !== 'undefined') {
+        // Paths where the chat widget should stay hidden.
+        var HIDDEN_PATHS = ['/dashboard', '/events/', '/meeting/', '/checkout/'];
 
-              var originalReplaceState = history.replaceState;
-              history.replaceState = function() {
-                originalReplaceState.apply(this, arguments);
-                setTimeout(hideTawkOnDashboard, 100);
-              };
+        var syncTawkVisibility = function() {
+          var path = window.location.pathname;
+          var shouldHide = HIDDEN_PATHS.some(function(p) {
+            return path === p || path.indexOf(p) === 0;
+          });
 
-              window.addEventListener('popstate', hideTawkOnDashboard);
-            }
-          `,
-        }}
-      />
+          if (!window.Tawk_API) return;
+
+          if (shouldHide) {
+            if (window.Tawk_API.hideWidget) window.Tawk_API.hideWidget();
+          } else {
+            if (window.Tawk_API.showWidget) window.Tawk_API.showWidget();
+          }
+        };
+
+        // Run once on load (Tawk may still be initializing — retry briefly)
+        syncTawkVisibility();
+        var retries = 0;
+        var retryTimer = setInterval(function() {
+          syncTawkVisibility();
+          retries += 1;
+          if (retries >= 20 || (window.Tawk_API && window.Tawk_API.hideWidget)) {
+            clearInterval(retryTimer);
+          }
+        }, 250);
+
+        // Hook into client-side navigations
+        var originalPushState = history.pushState;
+        history.pushState = function() {
+          originalPushState.apply(this, arguments);
+          setTimeout(syncTawkVisibility, 100);
+        };
+
+        var originalReplaceState = history.replaceState;
+        history.replaceState = function() {
+          originalReplaceState.apply(this, arguments);
+          setTimeout(syncTawkVisibility, 100);
+        };
+
+        window.addEventListener('popstate', syncTawkVisibility);
+      }
+    `,
+  }}
+/>
 
       {/* JSON-LD Structured Data */}
       <Script

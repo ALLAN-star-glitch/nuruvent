@@ -26,11 +26,11 @@ const SUPABASE_TRANSFORM_ENABLED =
   process.env.SUPABASE_IMAGE_TRANSFORM_ENABLED === 'true';
 
 // ============================================================
-// FETCH
+// FETCH — BY ID
 // ============================================================
 
 /**
- * Server-only fetch of a single event.
+ * Server-only fetch of a single event by UUID.
  * Cached for 5 minutes so repeat OG scrapes don't hammer the API.
  * Returns null if the event is missing, the API is unreachable, or
  * the API responds with a non-2xx status.
@@ -50,6 +50,34 @@ export async function fetchEventById(id: string): Promise<Event | null> {
     return json?.data ?? null;
   } catch (err) {
     console.error('[server/events] fetchEventById failed:', err);
+    return null;
+  }
+}
+
+// ============================================================
+// FETCH — BY SLUG
+// ============================================================
+
+/**
+ * Server-only fetch of a single event by slug.
+ * Mirrors fetchEventById — same cache policy, same error handling.
+ * Used by the public event detail page for metadata generation.
+ */
+export async function fetchEventBySlug(slug: string): Promise<Event | null> {
+  if (!slug || !API_BASE_URL) return null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/events/slug/${slug}`, {
+      next: { revalidate: 300, tags: [`event-slug:${slug}`] },
+      headers: {
+        Accept: 'application/json',
+        ...(PUBLIC_API_KEY ? { 'X-Api-Key': PUBLIC_API_KEY } : {}),
+      },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as BaseResponse<Event>;
+    return json?.data ?? null;
+  } catch (err) {
+    console.error('[server/events] fetchEventBySlug failed:', err);
     return null;
   }
 }
