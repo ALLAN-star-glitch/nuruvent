@@ -2,7 +2,8 @@
 
 'use client';
 
-import { Mail, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { Mail, CheckCircle2, Ticket, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { OpenEmailButton } from '@/components/email/OpenEmailButton';
 
 interface GuestEmailDialogProps {
@@ -19,6 +21,7 @@ interface GuestEmailDialogProps {
   email: string;
   eventName: string;
   registrationNumber?: string;
+  isAuthenticated?: boolean;
 }
 
 export function GuestEmailDialog({
@@ -27,6 +30,7 @@ export function GuestEmailDialog({
   email,
   eventName,
   registrationNumber,
+  isAuthenticated = false,
 }: GuestEmailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -38,7 +42,7 @@ export function GuestEmailDialog({
             </div>
           </div>
           <DialogTitle className="text-lg font-semibold tracking-tight">
-            Check your inbox
+            You&apos;re registered
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             We&apos;ve sent your ticket and join link for{' '}
@@ -54,7 +58,6 @@ export function GuestEmailDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Registration summary */}
         {registrationNumber && (
           <div className="rounded-xl border border-border bg-muted/40 p-3">
             <div className="flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
@@ -67,7 +70,6 @@ export function GuestEmailDialog({
           </div>
         )}
 
-        {/* What to do next */}
         <div className="space-y-2 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">What happens next</p>
           <ul className="list-inside list-disc space-y-1 text-xs leading-relaxed">
@@ -78,12 +80,40 @@ export function GuestEmailDialog({
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-col">
-          {email ? (
-            <OpenEmailButton
-              email={email}
-              className="h-11 w-full cursor-pointer rounded-xl"
-            />
-          ) : null}
+          {isAuthenticated ? (
+            <>
+              <Button
+                asChild
+                className="h-11 w-full cursor-pointer rounded-xl"
+              >
+                <Link
+                  href="/dashboard/tickets"
+                  onClick={() => onOpenChange(false)}
+                >
+                  <Ticket className="mr-2 h-4 w-4" />
+                  View my tickets
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+
+              {email ? (
+                <OpenEmailButton
+                  email={email}
+                  label="Open email instead"
+                  className="h-11 w-full cursor-pointer rounded-xl"
+                />
+              ) : null}
+            </>
+          ) : (
+            <>
+              {email ? (
+                <OpenEmailButton
+                  email={email}
+                  className="h-11 w-full cursor-pointer rounded-xl"
+                />
+              ) : null}
+            </>
+          )}
 
           <button
             type="button"

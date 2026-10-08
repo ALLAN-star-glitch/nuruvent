@@ -1,13 +1,15 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // app/(public)/events/[slug]/_components/EventDetailClient.tsx
 
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Award,
   BadgeCheck,
   Building2,
@@ -27,6 +29,7 @@ import {
   Share2,
   Tag,
   User,
+  UserPlus,
   Users,
   Video,
   XCircle,
@@ -79,6 +82,8 @@ interface GuestForm {
   phone: string;
 }
 
+type AuthMode = 'choice' | 'guest-form';
+
 interface Props {
   slug: string;
 }
@@ -100,6 +105,10 @@ function getMinTicketPrice(event: Event): number {
 
 export function EventDetailClient({ slug }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const ticketParam = searchParams.get('ticket');
+  const autorunParam = searchParams.get('autorun') === '1';
 
   const {
     data: response,
@@ -131,17 +140,22 @@ export function EventDetailClient({ slug }: Props) {
     phone: '',
   });
 
-  // ---- Free-event email confirmation dialog ----
+  // For anonymous users: choice first, then guest form on demand.
+  const [authMode, setAuthMode] = useState<AuthMode>('choice');
+
+  // Free-event email confirmation dialog.
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
-  // ---- Mobile sticky CTA state ----
+  // Mobile sticky CTA state.
   const ticketCardRef = useRef<HTMLDivElement | null>(null);
   const [showMobileCta, setShowMobileCta] = useState(false);
 
-  // Prefill guest inputs on auth load
+  // Guards against re-running the autorun on every render.
+  const autorunFiredRef = useRef(false);
+
+  // ---- Prefill guest inputs on auth load ----
   useEffect(() => {
     if (isAuthenticated) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGuest({
         name: account?.displayName || account?.name || user?.name || '',
         email: user?.email || '',
@@ -150,21 +164,26 @@ export function EventDetailClient({ slug }: Props) {
     }
   }, [isAuthenticated, account, user]);
 
-  // Watch the ticket card — show the sticky bar only when it's off-screen
+  // ---- Preselect ticket from URL ----
+  useEffect(() => {
+    if (!ticketParam || !event?.tickets) return;
+    const match = event.tickets.find(
+      (t) => t.ticket_type?.id === ticketParam,
+    );
+    if (match) {
+      setSelectedTicketTypeId(ticketParam);
+    }
+  }, [ticketParam, event]);
+
+  // ---- Watch ticket card for the sticky mobile CTA ----
   useEffect(() => {
     const node = ticketCardRef.current;
     if (!node) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowMobileCta(!entry.isIntersecting);
-      },
-      {
-        rootMargin: '-80px 0px 0px 0px',
-        threshold: 0,
-      },
+      ([entry]) => setShowMobileCta(!entry.isIntersecting),
+      { rootMargin: '-80px 0px 0px 0px', threshold: 0 },
     );
-
     observer.observe(node);
     return () => observer.disconnect();
   }, [event]);
@@ -186,6 +205,7 @@ export function EventDetailClient({ slug }: Props) {
     setBookingError('');
   };
 
+  // ---- Share ----
   const handleShare = async () => {
     if (!event) return;
     const url = window.location.href;
@@ -211,15 +231,13 @@ export function EventDetailClient({ slug }: Props) {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ---- Registration submission (shared by guest and authenticated) ----
+  const submitRegistration = async () => {
     if (!event) return;
-
     if (!selectedTicketTypeId) {
       setBookingError('Please select a ticket to continue.');
       return;
     }
-
     if (!isAuthenticated) {
       if (!guest.name.trim() || !guest.email.trim()) {
         setBookingError(
@@ -244,11 +262,21 @@ export function EventDetailClient({ slug }: Props) {
 
       setRegistration(res.data);
 
-      // For free events, prompt the user to check their email for the
-      // ticket + join links. Paid events route through checkout instead.
-      if (totalPrice === 0) {
-        setIsEmailDialogOpen(true);
+      // Paid events go straight to checkout.
+      if (totalPrice > 0) {
+        const email =
+          res.data.guest?.email || user?.email || guest.email || '';
+        const emailParam = email
+          ? `&email=${encodeURIComponent(email)}`
+          : '';
+        router.push(
+          `/checkout/${event.slug}?registration=${res.data.id}${emailParam}`,
+        );
+        return;
       }
+
+      // Free events show the email dialog.
+      setIsEmailDialogOpen(true);
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
@@ -257,17 +285,38 @@ export function EventDetailClient({ slug }: Props) {
     }
   };
 
-  const handleProceedToPayment = () => {
-    if (!registration || !event) return;
-
-    const email = registration.guest?.email || user?.email || '';
-    const emailParam = email ? `&email=${encodeURIComponent(email)}` : '';
-
-    router.push(
-      `/checkout/${event.slug}?registration=${registration.id}${emailParam}`,
-    );
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitRegistration();
   };
 
+  // ---- Autorun after returning from signup ----
+  useEffect(() => {
+    if (!autorunParam) return;
+    if (!isAuthenticated) return;
+    if (!selectedTicketTypeId) return;
+    if (registration) return;
+    if (isRegistering) return;
+    if (autorunFiredRef.current) return;
+
+    autorunFiredRef.current = true;
+
+    // Clear the autorun flag from the URL so a refresh doesn't resubmit.
+    const cleanUrl = `/events/${slug}?ticket=${selectedTicketTypeId}`;
+    router.replace(cleanUrl);
+
+    // Fire-and-forget; errors are shown inline.
+    void submitRegistration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    autorunParam,
+    isAuthenticated,
+    selectedTicketTypeId,
+    registration,
+    isRegistering,
+  ]);
+
+  // ---- Back ----
   const handleBack = (e: React.MouseEvent) => {
     e.preventDefault();
     router.back();
@@ -278,6 +327,20 @@ export function EventDetailClient({ slug }: Props) {
       behavior: 'smooth',
       block: 'start',
     });
+  };
+
+  // ---- Create account handler ----
+  const handleCreateAccount = () => {
+    if (!selectedTicketTypeId) return;
+    const returnTo = `/events/${slug}?ticket=${selectedTicketTypeId}&autorun=1`;
+    router.push(`/signup?next=${encodeURIComponent(returnTo)}`);
+  };
+
+  // ---- Continue as guest ----
+  const handleContinueAsGuest = () => {
+    setAuthMode('guest-form');
+    // Give the reveal a beat, then scroll the user to the card.
+    setTimeout(() => scrollToTicketCard(), 50);
   };
 
   if (isLoading) return <EventDetailSkeleton />;
@@ -640,7 +703,19 @@ export function EventDetailClient({ slug }: Props) {
 
                       {totalPrice > 0 ? (
                         <Button
-                          onClick={handleProceedToPayment}
+                          onClick={() => {
+                            const email =
+                              registration.guest?.email ||
+                              user?.email ||
+                              guest.email ||
+                              '';
+                            const emailParam = email
+                              ? `&email=${encodeURIComponent(email)}`
+                              : '';
+                            router.push(
+                              `/checkout/${event.slug}?registration=${registration.id}${emailParam}`,
+                            );
+                          }}
                           className="h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                         >
                           <CreditCard className="mr-2 h-4 w-4" />
@@ -675,125 +750,231 @@ export function EventDetailClient({ slug }: Props) {
                       </div>
 
                       {hasSelection && (
-                        <div className="space-y-3 pt-2">
-                          <Separator />
-                          <Label className="block text-xs font-semibold uppercase tracking-wider text-foreground">
-                            2. Attendee Information
-                          </Label>
-
+                        <>
+                          {/* Signed-in path */}
                           {isAuthenticated ? (
-                            <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/40 p-3">
-                              <User className="h-4 w-4 shrink-0 text-primary" />
-                              <div className="min-w-0 text-xs">
-                                <p className="truncate font-medium text-foreground">
-                                  {account?.displayName ||
-                                    account?.name ||
-                                    user?.name}
-                                </p>
-                                <p className="truncate text-muted-foreground">
-                                  {user?.email}
-                                </p>
+                            <>
+                              <Separator />
+                              <div className="space-y-3">
+                                <Label className="block text-xs font-semibold uppercase tracking-wider text-foreground">
+                                  2. Attendee Information
+                                </Label>
+                                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/40 p-3">
+                                  <User className="h-4 w-4 shrink-0 text-primary" />
+                                  <div className="min-w-0 text-xs">
+                                    <p className="truncate font-medium text-foreground">
+                                      {account?.displayName ||
+                                        account?.name ||
+                                        user?.name}
+                                    </p>
+                                    <p className="truncate text-muted-foreground">
+                                      {user?.email}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
+
+                              <Button
+                                type="submit"
+                                disabled={
+                                  isRegistering || !selectedTicketTypeId
+                                }
+                                className="mt-2 h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                              >
+                                {isRegistering ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Registering...
+                                  </>
+                                ) : (
+                                  'Complete Registration'
+                                )}
+                              </Button>
+                            </>
                           ) : (
-                            <div className="space-y-3">
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor="guestName"
-                                  className="text-xs"
-                                >
-                                  Full Name{' '}
-                                  <span className="text-destructive">*</span>
-                                </Label>
-                                <div className="relative">
-                                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                  <Input
-                                    id="guestName"
-                                    value={guest.name}
-                                    onChange={(e) =>
-                                      setGuest({
-                                        ...guest,
-                                        name: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Jane Doe"
-                                    className="h-10 rounded-lg pl-9 text-xs"
-                                    required
-                                  />
-                                </div>
-                              </div>
+                            <>
+                              {/* Anonymous: choice or guest form */}
+                              {authMode === 'choice' ? (
+                                <>
+                                  <Separator />
+                                  <div className="space-y-2 pt-1">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                                      2. Continue as
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Create an account to manage your
+                                      tickets, or continue as a guest — no
+                                      signup required.
+                                    </p>
+                                  </div>
 
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor="guestEmail"
-                                  className="text-xs"
-                                >
-                                  Email Address{' '}
-                                  <span className="text-destructive">*</span>
-                                </Label>
-                                <div className="relative">
-                                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                  <Input
-                                    id="guestEmail"
-                                    type="email"
-                                    value={guest.email}
-                                    onChange={(e) =>
-                                      setGuest({
-                                        ...guest,
-                                        email: e.target.value,
-                                      })
-                                    }
-                                    placeholder="jane@example.com"
-                                    className="h-10 rounded-lg pl-9 text-xs"
-                                    required
-                                  />
-                                </div>
-                              </div>
+                                  <div className="space-y-2 pt-1">
+                                    <Button
+                                      type="button"
+                                      onClick={handleCreateAccount}
+                                      disabled={!selectedTicketTypeId}
+                                      className="h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                                    >
+                                      <UserPlus className="mr-2 h-4 w-4" />
+                                      Create an account
+                                      <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
 
-                              <div className="space-y-1">
-                                <Label
-                                  htmlFor="guestPhone"
-                                  className="text-xs"
-                                >
-                                  Phone Number (Optional)
-                                </Label>
-                                <div className="relative">
-                                  <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                  <Input
-                                    id="guestPhone"
-                                    type="tel"
-                                    value={guest.phone}
-                                    onChange={(e) =>
-                                      setGuest({
-                                        ...guest,
-                                        phone: e.target.value,
-                                      })
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleContinueAsGuest}
+                                      disabled={!selectedTicketTypeId}
+                                      className="h-11 w-full cursor-pointer rounded-xl font-medium"
+                                    >
+                                      Continue as guest
+                                    </Button>
+
+                                    <p className="pt-2 text-center text-[11px] text-muted-foreground">
+                                      Already have an account?{' '}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const returnTo = `/events/${slug}?ticket=${selectedTicketTypeId}&autorun=1`;
+                                          router.push(
+                                            `/signin?next=${encodeURIComponent(returnTo)}`,
+                                          );
+                                        }}
+                                        className="font-medium text-primary underline-offset-2 hover:underline"
+                                      >
+                                        Sign in
+                                      </button>
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <Separator />
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <Label className="block text-xs font-semibold uppercase tracking-wider text-foreground">
+                                        2. Attendee Information
+                                      </Label>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setAuthMode('choice')
+                                        }
+                                        className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                                      >
+                                        Back
+                                      </button>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label
+                                        htmlFor="guestName"
+                                        className="text-xs"
+                                      >
+                                        Full Name{' '}
+                                        <span className="text-destructive">
+                                          *
+                                        </span>
+                                      </Label>
+                                      <div className="relative">
+                                        <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                          id="guestName"
+                                          value={guest.name}
+                                          onChange={(e) =>
+                                            setGuest({
+                                              ...guest,
+                                              name: e.target.value,
+                                            })
+                                          }
+                                          placeholder="Jane Doe"
+                                          className="h-10 rounded-lg pl-9 text-xs"
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label
+                                        htmlFor="guestEmail"
+                                        className="text-xs"
+                                      >
+                                        Email Address{' '}
+                                        <span className="text-destructive">
+                                          *
+                                        </span>
+                                      </Label>
+                                      <div className="relative">
+                                        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                          id="guestEmail"
+                                          type="email"
+                                          value={guest.email}
+                                          onChange={(e) =>
+                                            setGuest({
+                                              ...guest,
+                                              email: e.target.value,
+                                            })
+                                          }
+                                          placeholder="jane@example.com"
+                                          className="h-10 rounded-lg pl-9 text-xs"
+                                          required
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <Label
+                                        htmlFor="guestPhone"
+                                        className="text-xs"
+                                      >
+                                        Phone Number (Optional)
+                                      </Label>
+                                      <div className="relative">
+                                        <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                          id="guestPhone"
+                                          type="tel"
+                                          value={guest.phone}
+                                          onChange={(e) =>
+                                            setGuest({
+                                              ...guest,
+                                              phone: e.target.value,
+                                            })
+                                          }
+                                          placeholder="+254 700 000 000"
+                                          className="h-10 rounded-lg pl-9 text-xs"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <p className="text-[11px] text-muted-foreground">
+                                      We&apos;ll email your ticket and join
+                                      links to this address.
+                                    </p>
+                                  </div>
+
+                                  <Button
+                                    type="submit"
+                                    disabled={
+                                      isRegistering || !selectedTicketTypeId
                                     }
-                                    placeholder="+254 700 000 000"
-                                    className="h-10 rounded-lg pl-9 text-xs"
-                                  />
-                                </div>
-                              </div>
-                            </div>
+                                    className="mt-2 h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+                                  >
+                                    {isRegistering ? (
+                                      <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Registering...
+                                      </>
+                                    ) : (
+                                      'Complete Registration'
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                            </>
                           )}
-
-                          <Button
-                            type="submit"
-                            disabled={
-                              isRegistering || !selectedTicketTypeId
-                            }
-                            className="mt-2 h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-                          >
-                            {isRegistering ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Registering...
-                              </>
-                            ) : (
-                              'Complete Registration'
-                            )}
-                          </Button>
-                        </div>
+                        </>
                       )}
                     </form>
                   )}
@@ -836,6 +1017,7 @@ export function EventDetailClient({ slug }: Props) {
         email={guest.email || user?.email || registration?.guest?.email || ''}
         eventName={event.display_name || event.name}
         registrationNumber={registration?.registration_number}
+        isAuthenticated={isAuthenticated}
       />
     </div>
   );

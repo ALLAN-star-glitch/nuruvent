@@ -5,7 +5,9 @@
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from '@/lib/store';
-import { ThemeProvider } from '@/components/providers/ThemeProvider'; // <-- add
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { TokenRefresher } from '@/components/providers/TokenRefresher';
+
 
 export default function StoreProvider({
   children,
@@ -15,7 +17,12 @@ export default function StoreProvider({
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <ThemeProvider>{children}</ThemeProvider>   {/* <-- wrap */}
+        <ThemeProvider>
+          {/* Runs once, keeps the cookie session alive while the
+              tab is open. Renders nothing. */}
+          <TokenRefresher />
+          {children}
+        </ThemeProvider>
       </PersistGate>
     </Provider>
   );

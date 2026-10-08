@@ -2,6 +2,8 @@
 
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Building2, CheckCircle, Mail, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -19,6 +21,7 @@ interface SuccessStepProps {
   institutionName?: string;
   onGoToDashboard: () => void;
   onExploreEvents: () => void;
+  nextUrl?: string | null;
 }
 
 // ============================================================
@@ -32,7 +35,23 @@ export function SuccessStep({
   institutionName,
   onGoToDashboard,
   onExploreEvents,
+  nextUrl,
 }: SuccessStepProps) {
+  const router = useRouter();
+
+  // If we arrived here with a `next` URL — the user came from an event
+  // page, chose "Create account", and wants to return and complete
+  // registration — auto-redirect after a beat so they land back on
+  // the event with their ticket preselected.
+  //
+  // The delay gives the success animation time to render and lets a
+  // fast user tap a button first (the unmount clears the timer).
+  useEffect(() => {
+    if (!nextUrl) return;
+    const t = setTimeout(() => router.replace(nextUrl), 800);
+    return () => clearTimeout(t);
+  }, [nextUrl, router]);
+
   const isInstitution = accountType === 'account_type_institution';
   const accountLabel = isInstitution ? 'Institution' : 'Personal';
 

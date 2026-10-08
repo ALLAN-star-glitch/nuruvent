@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi } from '@reduxjs/toolkit/query/react';
 import type { Action } from '@reduxjs/toolkit';
 import { REHYDRATE } from 'redux-persist';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 function isHydrateAction(action: Action): action is Action<typeof REHYDRATE> & {
   key: string;
@@ -13,23 +12,9 @@ function isHydrateAction(action: Action): action is Action<typeof REHYDRATE> & {
   return action.type === REHYDRATE;
 }
 
-const baseQuery = fetchBaseQuery({
-  baseUrl: API_URL,
-  credentials: 'include', // ✅ Cookies are sent automatically
-  prepareHeaders: (headers) => {
-    // ✅ Set Content-Type only
-    headers.set('Content-Type', 'application/json');
-    
-    // ❌ NO token handling - cookies handle authentication
-    // ❌ NO Authorization header - cookies are sent via credentials: 'include'
-    
-    return headers;
-  },
-});
-
 export const api = createApi({
   reducerPath: 'api',
-  baseQuery,
+  baseQuery: baseQueryWithReauth,
   extractRehydrationInfo(action, { reducerPath }): any {
     if (isHydrateAction(action)) {
       if (action.payload && action.payload[reducerPath]) {
@@ -41,27 +26,27 @@ export const api = createApi({
     }
     return undefined;
   },
-tagTypes: [
-  'User',
-  'Auth',
-  'Events',
-  'EventTypes',
-  'EventStatuses',
-  'TrashCount',
-  'Memberships',
-  'Teams',
-  'Invitations',
-  'EventCategories',
-  'TicketTypes',
-  'Registrations',
-  'Waitlist',
-  'Orders',
-  'Payments',
-  'VideoConnections',
-  'Event',
-  'Attendance',
-  'VideoMeeting',
-  'SessionRoster',
-],
+  tagTypes: [
+    'User',
+    'Auth',
+    'Events',
+    'EventTypes',
+    'EventStatuses',
+    'TrashCount',
+    'Memberships',
+    'Teams',
+    'Invitations',
+    'EventCategories',
+    'TicketTypes',
+    'Registrations',
+    'Waitlist',
+    'Orders',
+    'Payments',
+    'VideoConnections',
+    'Event',
+    'Attendance',
+    'VideoMeeting',
+    'SessionRoster',
+  ],
   endpoints: () => ({}),
 });

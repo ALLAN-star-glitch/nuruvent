@@ -61,6 +61,12 @@ export function SignInForm() {
   const [resendTimer, setResendTimer] = useState(0);
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
 
+  // Guest account detection — shown when the backend returns
+  // 409 with reason "guest_account". Routes the user to password reset.
+  const [guestAccountEmail, setGuestAccountEmail] = useState<string | null>(
+    null,
+  );
+
   const otpRef = useRef('');
 
   useEffect(() => {
@@ -114,6 +120,16 @@ export function SignInForm() {
     if (error) setError(null);
     if (successMessage) setSuccessMessage(null);
     if (sessionExpiredMessage) setSessionExpiredMessage(false);
+
+    // Clear the guest banner if the email is edited away from
+    // the one that triggered it.
+    if (
+      name === 'email' &&
+      guestAccountEmail &&
+      value !== guestAccountEmail
+    ) {
+      setGuestAccountEmail(null);
+    }
   };
 
   const handleOtpChange = (value: string) => {
@@ -123,12 +139,20 @@ export function SignInForm() {
     setSuccessMessage(null);
   };
 
+  const handleGuestPasswordReset = () => {
+    if (!guestAccountEmail) return;
+    router.push(
+      `/forgot-password?email=${encodeURIComponent(guestAccountEmail)}`,
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setError(null);
     setSuccessMessage(null);
     setSessionExpiredMessage(false);
+    setGuestAccountEmail(null);
     setIsLoading(true);
 
     console.log('🔍 Login attempt for:', formData.email);
@@ -192,6 +216,17 @@ export function SignInForm() {
           const input = document.getElementById('2fa-otp-input');
           if (input) (input as HTMLInputElement)?.focus();
         }, 100);
+        setIsLoading(false);
+        return;
+      }
+
+      // Guest account: backend returns 409 with reason "guest_account"
+      // when the email belongs to an auto-created guest user.
+      const reason = err.data?.data?.reason;
+      if (err.status === 409 && reason === 'guest_account') {
+        setGuestAccountEmail(formData.email);
+        setError(null);
+        setSuccessMessage(null);
         setIsLoading(false);
         return;
       }
@@ -542,6 +577,36 @@ export function SignInForm() {
               <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
+            )}
+
+            {guestAccountEmail && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3 dark:border-amber-900/50 dark:bg-amber-950/20"
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      This account has no password
+                    </p>
+                    <p className="text-xs leading-relaxed text-amber-800/80 dark:text-amber-300/80">
+                      You registered as a guest. Set a password to manage your
+                      tickets here — we&apos;ll email you a link.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleGuestPasswordReset}
+                  className="w-full h-9 rounded-lg cursor-pointer"
+                >
+                  Send password reset link
+                </Button>
+              </motion.div>
             )}
 
             <div className="group">

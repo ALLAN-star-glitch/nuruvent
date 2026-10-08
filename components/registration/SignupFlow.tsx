@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Loader2, Shield, Sparkles } from 'lucide-react';
 
@@ -26,6 +26,9 @@ import { AccountTypeStep } from './steps/AccountTypeSteps';
 
 export function SignupFlow() {
   const router = useRouter();
+
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get('next');
 
   const form = useSignupForm();
 
@@ -198,20 +201,21 @@ export function SignupFlow() {
                   />
                 )}
 
-                {form.currentStep === 'success' && form.accountType && (
-                  <SuccessStep
-                    accountType={form.accountType}
-                    email={resolveDisplayEmail(form)}
-                    displayName={resolveDisplayName(form)}
-                    institutionName={
-                      form.accountType === 'account_type_institution'
-                        ? form.formData.institutionName
-                        : undefined
-                    }
-                    onGoToDashboard={handleGoToDashboard}
-                    onExploreEvents={handleExploreEvents}
-                  />
-                )}
+               {form.currentStep === 'success' && form.accountType && (
+                    <SuccessStep
+                      accountType={form.accountType}
+                      email={resolveDisplayEmail(form)}
+                      displayName={resolveDisplayName(form)}
+                      institutionName={
+                        form.accountType === 'account_type_institution'
+                          ? form.formData.institutionName
+                          : undefined
+                      }
+                      onGoToDashboard={handleGoToDashboard}
+                      onExploreEvents={handleExploreEvents}
+                      nextUrl={nextUrl}
+                    />
+                  )}
 
                 {/* Primary continue button */}
                 {showContinueButton && (
