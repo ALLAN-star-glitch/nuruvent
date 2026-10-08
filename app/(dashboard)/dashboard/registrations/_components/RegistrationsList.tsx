@@ -1,3 +1,5 @@
+// app/(dashboard)/dashboard/registrations/_components/RegistrationsList.tsx
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -53,8 +55,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
-
 import { useListAllRegistrationsQuery } from '@/lib/store/api/registrationsApi';
+import { useListMyEventsQuery } from '@/lib/store/api/eventsApi';
 import type {
   CrossEventRegistration,
   ListAllRegistrationsParams,
@@ -72,9 +74,7 @@ import { EmptyState } from '@/components/registrations/empty_state';
 import { MobileFilterStrip } from '@/components/registrations/mobile-filter-strip';
 import { StatsCards } from '@/components/registrations/stat_cards';
 import { RegistrationsDetailDialog } from './RegistrationsDetailDialog';
-import { RegistrationsListSkeleton } from '@/components/registrations/skeleton-loaders';
-
-
+import { StatsCardsSkeleton } from '../../events/[id]/[attendees]/page';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'confirmed', label: 'Confirmed' },
@@ -90,12 +90,24 @@ type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
 type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'json';
 
+function slugify(input: string): string {
+  return (
+    input
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'event'
+  );
+}
+
 export function RegistrationsList() {
   const router = useRouter();
 
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -131,7 +143,13 @@ export function RegistrationsList() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPage(1);
-  }, [selectedStatus, sortField, sortDirection, itemsPerPage]);
+  }, [
+    selectedStatus,
+    selectedEventId,
+    sortField,
+    sortDirection,
+    itemsPerPage,
+  ]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -139,10 +157,35 @@ export function RegistrationsList() {
     setSelectAll(false);
   }, [currentPage]);
 
+  // ---- Events for the filter dropdown ----
+  const { data: eventsResponse } = useListMyEventsQuery({
+    page: 1,
+    page_size: 100,
+    sort_by: 'created_at',
+    sort_order: 'desc',
+  });
+
+  const events = useMemo(() => {
+    const list = eventsResponse?.data?.data ?? [];
+    return list.map((e) => ({
+      id: e.id,
+      title: e.display_name || e.name || 'Untitled event',
+    }));
+  }, [eventsResponse]);
+
+  const selectedEvent = useMemo(
+    () =>
+      selectedEventId === 'all'
+        ? null
+        : events.find((e) => e.id === selectedEventId) ?? null,
+    [selectedEventId, events],
+  );
+
   const queryParams: ListAllRegistrationsParams = useMemo(
     () => ({
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
+      event_id: selectedEventId === 'all' ? undefined : selectedEventId,
       sort_by: sortField,
       sort_order: sortDirection,
       page: currentPage,
@@ -151,6 +194,7 @@ export function RegistrationsList() {
     [
       searchQuery,
       selectedStatus,
+      selectedEventId,
       sortField,
       sortDirection,
       currentPage,
@@ -175,7 +219,8 @@ export function RegistrationsList() {
       'Failed to load registrations'
     : null;
 
-  const isRowSelected = (r: CrossEventRegistration) => selectedIds.includes(r.id);
+  const isRowSelected = (r: CrossEventRegistration) =>
+    selectedIds.includes(r.id);
 
   const selectedRegs = useMemo(
     () => registrations.filter((r) => selectedIds.includes(r.id)),
@@ -221,6 +266,7 @@ export function RegistrationsList() {
     let n = 0;
     if (searchQuery) n++;
     if (selectedStatus !== 'all') n++;
+    if (selectedEventId !== 'all') n++;
     return n;
   };
 
@@ -228,6 +274,7 @@ export function RegistrationsList() {
     setSearchInput('');
     setSearchQuery('');
     setSelectedStatus('all');
+    setSelectedEventId('all');
     setSortField('created_at');
     setSortDirection('desc');
     setCurrentPage(1);
@@ -243,34 +290,44 @@ export function RegistrationsList() {
     return labels[sortField];
   };
 
+  // ---- Export (scope-aware) ----
   const handleExport = async (format: ExportFormat) => {
     if (registrations.length === 0) return;
     setIsExporting(true);
     try {
       const stamp = new Date().toISOString().slice(0, 10);
+
+      const scoped = selectedEvent !== null;
+      const title = scoped
+        ? `${selectedEvent!.title} — Registrations`
+        : 'Registrations';
+      const subtitle = scoped
+        ? 'Registrations for this event'
+        : 'Across all your events';
+      const slug = scoped ? slugify(selectedEvent!.title) : 'all-events';
+      const filenameBase = `${slug}-registrations-${stamp}`;
+
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
           selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+          scoped ? `Event: ${selectedEvent!.title}` : null,
         ]
           .filter(Boolean)
           .join('  ·  ') || undefined;
 
       if (format === 'csv') {
-        exportRegistrationsToCSV(registrations, `registrations-${stamp}.csv`);
+        exportRegistrationsToCSV(registrations, `${filenameBase}.csv`);
       } else if (format === 'json') {
-        exportRegistrationsToJSON(registrations, `registrations-${stamp}.json`);
+        exportRegistrationsToJSON(registrations, `${filenameBase}.json`);
       } else if (format === 'xlsx') {
-        await exportRegistrationsToExcel(
-          registrations,
-          `registrations-${stamp}.xlsx`,
-        );
+        await exportRegistrationsToExcel(registrations, `${filenameBase}.xlsx`);
       } else if (format === 'pdf') {
         await exportRegistrationsToPDF(registrations, {
-          title: 'Registrations',
-          subtitle: 'Across all your events',
+          title,
+          subtitle,
           filtersSummary,
-          filename: `registrations-${stamp}.pdf`,
+          filename: `${filenameBase}.pdf`,
         });
       }
     } finally {
@@ -278,7 +335,7 @@ export function RegistrationsList() {
     }
   };
 
-  // ---- KPI stats ----
+  // ---- KPI stats (scoped to current filter) ----
   const confirmed = registrations.filter((r) => r.status === 'confirmed').length;
   const pending = registrations.filter((r) => r.status === 'pending').length;
   const guests = registrations.filter((r) => r.is_guest).length;
@@ -287,7 +344,7 @@ export function RegistrationsList() {
     {
       label: 'Total',
       value: total,
-      sub: 'across your events',
+      sub: selectedEvent ? 'in this event' : 'across your events',
       tone: 'primary' as const,
       icon: <Users className="h-4 w-4" />,
     },
@@ -313,6 +370,17 @@ export function RegistrationsList() {
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      {/* Header — reflect scope when an event filter is active */}
+      {(selectedEvent || selectedEventId !== 'all') && (
+        <div className="text-sm text-muted-foreground">
+          Showing registrations for{' '}
+          <span className="font-medium text-foreground">
+            {selectedEvent?.title ?? 'this event'}
+          </span>
+          .
+        </div>
+      )}
+
       {/* Desktop filter card */}
       {!isMobile && (
         <Card className="border-border/60 shadow-none">
@@ -328,6 +396,31 @@ export function RegistrationsList() {
                     className="h-10 rounded-xl pl-10 sm:h-11"
                   />
                 </div>
+
+                <Select
+                  value={selectedEventId}
+                  onValueChange={setSelectedEventId}
+                >
+                  <SelectTrigger className="h-10 w-full cursor-pointer rounded-xl md:w-[220px] sm:h-11">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Events
+                    </SelectItem>
+                    {events.map((e) => (
+                      <SelectItem
+                        key={e.id}
+                        value={e.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[200px] truncate align-middle">
+                          {e.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                   <SelectTrigger className="h-10 w-full cursor-pointer rounded-xl md:w-[190px] sm:h-11">
@@ -353,7 +446,7 @@ export function RegistrationsList() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      className="h-10 w-full shrink-0 cursor-pointer rounded-xl sm:h-11 md:w-auto"
+                      className="h-10 w-full shrink-0 cursor-pointer rounded-xl px-5 sm:h-11 md:w-auto"
                       disabled={isExporting || registrations.length === 0}
                     >
                       {isExporting ? (
@@ -445,16 +538,28 @@ export function RegistrationsList() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="created_at" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="created_at"
+                          className="cursor-pointer text-sm"
+                        >
                           Newest first
                         </SelectItem>
-                        <SelectItem value="attendee_name" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="attendee_name"
+                          className="cursor-pointer text-sm"
+                        >
                           Name
                         </SelectItem>
-                        <SelectItem value="event_name" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="event_name"
+                          className="cursor-pointer text-sm"
+                        >
                           Event
                         </SelectItem>
-                        <SelectItem value="status" className="cursor-pointer text-sm">
+                        <SelectItem
+                          value="status"
+                          className="cursor-pointer text-sm"
+                        >
                           Status
                         </SelectItem>
                       </SelectContent>
@@ -465,7 +570,6 @@ export function RegistrationsList() {
                         setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
                       }
                       className="cursor-pointer rounded-md p-1 transition-colors hover:bg-muted"
-                      title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
                     >
                       {sortDirection === 'asc' ? (
                         <ArrowUp className="h-4 w-4 text-primary" />
@@ -529,69 +633,88 @@ export function RegistrationsList() {
         </Card>
       )}
 
-    {isLoading ? (
-  <RegistrationsListSkeleton />
-) : errorMessage ? (
-  <Card className="border-destructive/30">
-    <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
-      {errorMessage}
-    </CardContent>
-  </Card>
-) : (
-  <>
-    <StatsCards stats={stats} />
+      {/* Loading gate */}
+      {isLoading ? (
+        <StatsCardsSkeleton cards={4} desktopColumns={4} />
+      ) : errorMessage ? (
+        <Card className="border-destructive/30">
+          <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
+            {errorMessage}
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <StatsCards stats={stats} />
 
-    {registrations.length === 0 ? (
-      <EmptyState
-        icon={<Users className="h-5 w-5 text-primary" />}
-        eyebrow="Registration center"
-        title="No registrations yet"
-        sub="Once people register for your events, they'll show up here."
-        action={
-          <Button
-            size="sm"
-            className="cursor-pointer rounded-lg"
-            onClick={() => router.push('/dashboard/events')}
-          >
-            <Calendar className="mr-2 h-4 w-4" />
-            Go to events
-          </Button>
-        }
-      />
-    ) : !isMobile && viewMode === 'table' ? (
-      <RegistrationsTable
-        registrations={registrations}
-        total={total}
-        currentPage={currentPage}
-        itemsPerPage={itemsPerPage}
-        totalPages={totalPages}
-        isRowSelected={isRowSelected}
-        selectAll={selectAll}
-        onToggleSort={toggleSort}
-        onSelectAll={handleSelectAll}
-        onSelectOne={handleSelectOne}
-        onView={handleView}
-        onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
-        onItemsPerPageChange={setItemsPerPage}
-        onPageChange={setCurrentPage}
-      />
-    ) : (
-      <RegistrationsGrid
-        registrations={registrations}
-        total={total}
-        currentPage={currentPage}
-        itemsPerPage={itemsPerPage}
-        totalPages={totalPages}
-        isRowSelected={isRowSelected}
-        onSelectOne={handleSelectOne}
-        onView={handleView}
-        onGoToEvent={(id: unknown) => router.push(`/dashboard/events/${id}`)}
-        onItemsPerPageChange={setItemsPerPage}
-        onPageChange={setCurrentPage}
-      />
-    )}
-  </>
-)}
+          {registrations.length === 0 ? (
+            <EmptyState
+              icon={<Users className="h-5 w-5 text-primary" />}
+              eyebrow="Registration center"
+              title={
+                selectedEvent
+                  ? `No registrations for ${selectedEvent.title}`
+                  : 'No registrations yet'
+              }
+              sub={
+                searchQuery || selectedStatus !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : selectedEvent
+                    ? 'Once people register for this event, they will show up here.'
+                    : "Once people register for your events, they'll show up here."
+              }
+              action={
+                !searchQuery &&
+                selectedStatus === 'all' &&
+                selectedEventId === 'all' ? (
+                  <Button
+                    size="sm"
+                    className="cursor-pointer rounded-lg"
+                    onClick={() => router.push('/dashboard/events')}
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Go to events
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : !isMobile && viewMode === 'table' ? (
+            <RegistrationsTable
+              registrations={registrations}
+              total={total}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              isRowSelected={isRowSelected}
+              selectAll={selectAll}
+              onToggleSort={toggleSort}
+              onSelectAll={handleSelectAll}
+              onSelectOne={handleSelectOne}
+              onView={handleView}
+              onGoToEvent={(id: unknown) =>
+                router.push(`/dashboard/events/${id}`)
+              }
+              onItemsPerPageChange={setItemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          ) : (
+            <RegistrationsGrid
+              registrations={registrations}
+              total={total}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalPages={totalPages}
+              isRowSelected={isRowSelected}
+              onSelectOne={handleSelectOne}
+              onView={handleView}
+              onGoToEvent={(id: unknown) =>
+                router.push(`/dashboard/events/${id}`)
+              }
+              onItemsPerPageChange={setItemsPerPage}
+              onPageChange={setCurrentPage}
+            />
+          )}
+        </>
+      )}
 
       {isMobile && (
         <MobileFilterStrip
@@ -605,6 +728,7 @@ export function RegistrationsList() {
         />
       )}
 
+      {/* Mobile filter sheet */}
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent
           side="bottom"
@@ -641,6 +765,34 @@ export function RegistrationsList() {
                     className="h-11 rounded-xl pl-9"
                   />
                 </div>
+              </div>
+
+              <div className="mb-5 space-y-1.5">
+                <Label className="text-sm font-medium">Event</Label>
+                <Select
+                  value={selectedEventId}
+                  onValueChange={setSelectedEventId}
+                >
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
+                    <SelectValue placeholder="All Events" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Events
+                    </SelectItem>
+                    {events.map((e) => (
+                      <SelectItem
+                        key={e.id}
+                        value={e.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[260px] truncate align-middle">
+                          {e.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="mb-5 space-y-1.5">

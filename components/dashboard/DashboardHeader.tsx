@@ -25,6 +25,7 @@ import {
   Settings,
   ExternalLink,
   type LucideIcon,
+  TicketCheckIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
@@ -61,7 +62,8 @@ const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/events', label: 'Events', icon: Calendar },
   { href: '/dashboard/registrations', label: 'Registrations', icon: ClipboardList },
-  { href: '/dashboard/attendees', label: 'Attendance', icon: Users },
+    { href: '/dashboard/tickets', label: 'My Tickets', icon: TicketCheckIcon },
+  { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
   { href: '/dashboard/replays', label: 'Replays', icon: Clapperboard },
