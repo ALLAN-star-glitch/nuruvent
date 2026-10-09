@@ -372,14 +372,12 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-              {/* Brand — smaller on mobile, full size on lg+ */}
+             {/* After — one image, sized by CSS */}
               <span className="inline-flex items-center shrink-0">
-                <span className="lg:hidden">
-                  <Logo width={90} />
-                </span>
-                <span className="hidden lg:inline-flex">
-                  <Logo width={120} />
-                </span>
+                <Logo
+                  width={120}
+                  className="w-18 sm:w-22 md:w-25 lg:w-30"
+                />
               </span>
 
               {/* Team switcher — always visible, compact on small screens */}

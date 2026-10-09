@@ -1,4 +1,5 @@
 // components/shared/Logo.tsx
+
 'use client';
 
 import Image from 'next/image';
@@ -10,8 +11,8 @@ interface LogoProps {
   /** Skip the wrapping <Link> when the parent already handles navigation. */
   asLink?: boolean;
   /**
-   * Size hint for the rendered logo. Defaults to the desktop size (120×28).
-   * Pass a smaller value (e.g. 90) for tight header slots on mobile.
+   * Base width in pixels. Defaults to the desktop size (120).
+   * If you pass a className with Tailwind width classes, that wins.
    */
   width?: number;
   className?: string;
@@ -35,6 +36,8 @@ export function Logo({
       height={height}
       priority
       loading="eager"
+      // `className` overrides the intrinsic width/height when it
+      // contains width utilities like `w-[72px] lg:w-[120px]`.
       className={cn('w-auto h-auto', className)}
     />
   );
