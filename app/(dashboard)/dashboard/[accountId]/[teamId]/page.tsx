@@ -523,6 +523,8 @@ export default function DashboardPage() {
     return <DashboardLoading />;
   }
 
+
+  
   return (
     <div className="space-y-6">
       <TeamOnboardingBanner accountId={accountId} teamId={teamId} />
