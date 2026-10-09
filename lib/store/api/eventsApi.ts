@@ -46,6 +46,21 @@ import type {
 interface SearchMyEventsParams extends SearchEventsParams {
   team_id?: string;
   team_type?: 'personal' | 'institution';
+  scope?: 'team' | 'personal';
+}
+
+/** Params for GET /events/me (authenticated, permission-scoped). */
+interface ListMyEventsParams extends ListEventsParams {
+  team_id?: string;
+  team_type?: 'personal' | 'institution';
+  scope?: 'team' | 'personal';
+}
+
+/** Params for GET /events/me?only_deleted=true (trash count). */
+interface TrashedEventsCountParams {
+  team_id?: string;
+  team_type?: 'personal' | 'institution';
+  scope?: 'team' | 'personal';
 }
 
 /** Params for GET /events/categories (public reference data). */
@@ -242,8 +257,11 @@ export const eventsApi = api.injectEndpoints({
      * Distinct from the public `listEvents` (which uses GET /events).
      * The backend mounts these at different paths so the public and
      * protected list flows never overlap.
+     *
+     * Pass `scope: 'team'` + `team_id` + `team_type` to fetch only the
+     * events belonging to a specific team.
      */
-    listMyEvents: builder.query<BaseResponse<PaginatedEvents>, ListEventsParams>(
+    listMyEvents: builder.query<BaseResponse<PaginatedEvents>, ListMyEventsParams>(
       {
         query: (params) => ({
           url: '/events/me',
@@ -318,15 +336,24 @@ export const eventsApi = api.injectEndpoints({
     /**
      * GET /events/me?only_deleted=true&page_size=1 — count of trashed
      * events. Reads `total` off the paginated envelope.
+     *
+     * Pass `scope: 'team'` + `team_id` + `team_type` to count only
+     * trashed events belonging to a specific team.
      */
-    getTrashedEventsCount: builder.query<{ count: number }, void>({
-      query: () => ({
+    getTrashedEventsCount: builder.query<
+      { count: number },
+      TrashedEventsCountParams | void
+    >({
+      query: (params) => ({
         url: '/events/me',
         method: 'GET',
         params: {
           only_deleted: true,
           page: 1,
           page_size: 1,
+          scope: params?.scope,
+          team_id: params?.team_id,
+          team_type: params?.team_type,
         },
       }),
       transformResponse: (response: BaseResponse<PaginatedEvents>) => ({
@@ -335,7 +362,7 @@ export const eventsApi = api.injectEndpoints({
       providesTags: ['TrashCount'],
     }),
 
-        // ============================================================
+    // ============================================================
     // PROTECTED MUTATIONS — meeting management
     // ============================================================
 
@@ -346,21 +373,21 @@ export const eventsApi = api.injectEndpoints({
      * already have one. Idempotent — schedules with an existing
      * meeting are skipped.
      */
-  createEventMeeting: builder.mutation<
-  BaseResponse<Event>,
-  { eventId: string; platform: VideoPlatform }
->({
-  query: ({ eventId, platform }) => ({
-    url: `/events/${eventId}/meeting`,
-    method: 'POST',
-    body: { platform },
-  }),
-  invalidatesTags: (_result, _error, { eventId }) => [
-    { type: 'Events', id: eventId },
-    { type: 'Events', id: 'LIST' },
-    { type: 'Events', id: 'MINE' },
-  ],
-}),
+    createEventMeeting: builder.mutation<
+      BaseResponse<Event>,
+      { eventId: string; platform: VideoPlatform }
+    >({
+      query: ({ eventId, platform }) => ({
+        url: `/events/${eventId}/meeting`,
+        method: 'POST',
+        body: { platform },
+      }),
+      invalidatesTags: (_result, _error, { eventId }) => [
+        { type: 'Events', id: eventId },
+        { type: 'Events', id: 'LIST' },
+        { type: 'Events', id: 'MINE' },
+      ],
+    }),
 
     /**
      * DELETE /events/{id}/meeting
@@ -399,9 +426,7 @@ export const eventsApi = api.injectEndpoints({
       ],
     }),
 
-
-
-        /**
+    /**
      * POST /video/meetings/signature
      *
      * Issues a signed JWT that authorizes the browser to join a Zoom
@@ -440,8 +465,7 @@ export const eventsApi = api.injectEndpoints({
       // No invalidation.
     }),
 
-
-        /**
+    /**
      * GET /video/meetings/:id/join-info
      *
      * Returns everything the browser needs to join a meeting via the
@@ -449,29 +473,29 @@ export const eventsApi = api.injectEndpoints({
      * (for hosts) a ZAK. Role is decided server-side from the meeting
      * owner.
      */
-  getMeetingJoinInfo: builder.query<
-  BaseResponse<{
-    meeting_number: string;
-    signature: string;
-    sdk_key: string;
-    password: string;
-    web_endpoint: string;
-    zak?: string;
-    role: number;
-  }>,
-  { meetingId: string; platform: VideoPlatform }
->({
-  query: (args) => {
-    console.log('[join-info] query args →', args);
-    const built = {
-      url: `/video/meetings/${args.meetingId}/join-info`,
-      method: 'GET' as const,
-      params: { platform: args.platform },
-    };
-    console.log('[join-info] query built →', built);
-    return built;
-  },
-}),
+    getMeetingJoinInfo: builder.query<
+      BaseResponse<{
+        meeting_number: string;
+        signature: string;
+        sdk_key: string;
+        password: string;
+        web_endpoint: string;
+        zak?: string;
+        role: number;
+      }>,
+      { meetingId: string; platform: VideoPlatform }
+    >({
+      query: (args) => {
+        console.log('[join-info] query args →', args);
+        const built = {
+          url: `/video/meetings/${args.meetingId}/join-info`,
+          method: 'GET' as const,
+          params: { platform: args.platform },
+        };
+        console.log('[join-info] query built →', built);
+        return built;
+      },
+    }),
 
     // ============================================================
     // PROTECTED MUTATIONS — create
@@ -531,7 +555,6 @@ export const eventsApi = api.injectEndpoints({
         { type: 'Events', id: 'UPCOMING' },
       ],
     }),
-
 
     /**
      * POST /events/{id}/schedules/reorder
@@ -994,7 +1017,6 @@ export const {
   useBulkDeleteEventMediaMutation,
 } = eventsApi;
 
-
 // ---- Protected mutations — meeting management ----
 export const {
   useCreateEventMeetingMutation,
@@ -1002,21 +1024,16 @@ export const {
   useRegenerateEventMeetingMutation,
 } = eventsApi;
 
-
 export const {
   useGetMeetingJoinInfoQuery,
   useLazyGetMeetingJoinInfoQuery,
 } = eventsApi;
-
 
 // ---- Protected mutations — meeting SDK ----
 export const {
   useGenerateMeetingSignatureMutation,
   useFetchMeetingZAKMutation,
 } = eventsApi;
-
-
-
 
 // ============================================================
 // CONVENIENCE RE-EXPORTS

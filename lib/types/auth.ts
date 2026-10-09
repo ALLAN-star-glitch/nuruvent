@@ -118,7 +118,6 @@ export interface RegisterWithInvitationRequest {
   token: string;
   name: string;
   password: string;
-  phone?: string;
 }
 
 /** POST /api/v1/auth/verify-otp */

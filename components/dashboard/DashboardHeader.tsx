@@ -1,36 +1,22 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useParams } from 'next/navigation';
 import {
   Menu,
   PlusCircle,
   LogOut,
-  ChevronDown,
   Search,
   X,
-  Building2,
-  Home,
-  CheckCircle,
-  RefreshCw,
-  ArrowLeftRight,
-  LayoutDashboard,
-  Calendar,
-  ClipboardList,
-  Users,
-  CreditCard,
-  Award,
-  Clapperboard,
-  Trash2,
-  Settings,
   ExternalLink,
-  type LucideIcon,
-  TicketCheckIcon,
+  Settings,
 } from 'lucide-react';
-import { Logo } from '@/components/shared/Logo';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { TeamSwitcher } from '@/components/layout/TeamSwitcher';
+import { Logo } from '@/components/shared/Logo';
 import {
   Sheet,
   SheetContent,
@@ -44,31 +30,46 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
+import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 // ============================================================
-// DASHBOARD NAV ITEMS (mirror DashboardSidebar)
+// DASHBOARD NAV ITEMS
 // ============================================================
+
+import {
+  LayoutDashboard,
+  Calendar,
+  ClipboardList,
+  Users,
+  CreditCard,
+  Award,
+  Clapperboard,
+  Trash2,
+  TicketCheckIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import { TeamsNavItem } from '../layout/TeamsNavItem';
 
 interface NavItem {
-  href: string;
+  segment: string;
   label: string;
   icon: LucideIcon;
   isTrash?: boolean;
 }
 
 const DASHBOARD_NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/events', label: 'Events', icon: Calendar },
-  { href: '/dashboard/registrations', label: 'Registrations', icon: ClipboardList },
-    { href: '/dashboard/tickets', label: 'My Tickets', icon: TicketCheckIcon },
-  { href: '/dashboard/attendees', label: 'Attendees', icon: Users },
-  { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
-  { href: '/dashboard/certificates', label: 'Certificates', icon: Award },
-  { href: '/dashboard/replays', label: 'Replays', icon: Clapperboard },
-  { href: '/dashboard/trash', label: 'Trash', icon: Trash2, isTrash: true },
-  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
+  { segment: '', label: 'Dashboard', icon: LayoutDashboard },
+  { segment: 'events', label: 'Events', icon: Calendar },
+  { segment: 'registrations', label: 'Registrations', icon: ClipboardList },
+  { segment: 'tickets', label: 'My Tickets', icon: TicketCheckIcon },
+  { segment: 'attendees', label: 'Attendees', icon: Users },
+  { segment: 'payments', label: 'Payments', icon: CreditCard },
+  { segment: 'certificates', label: 'Certificates', icon: Award },
+  { segment: 'replays', label: 'Replays', icon: Clapperboard },
+  { segment: 'trash', label: 'Trash', icon: Trash2, isTrash: true },
+  { segment: 'settings', label: 'Settings', icon: Settings },
 ];
 
 // ============================================================
@@ -83,24 +84,6 @@ interface DashboardHeaderProps {
   };
 }
 
-interface Team {
-  id: string;
-  name: string;
-  type: 'personal' | 'institution';
-  role: string;
-  avatar?: string;
-}
-
-// ============================================================
-// MOCK DATA
-// ============================================================
-
-const mockTeams: Team[] = [
-  { id: 'personal-1', name: "John's Personal Team", type: 'personal', role: 'Account Admin' },
-  { id: 'nuruvent', name: 'Nuruvent', type: 'institution', role: 'Event Manager' },
-  { id: 'techcorp', name: 'TechCorp', type: 'institution', role: 'Team Member' },
-];
-
 // ============================================================
 // COMPONENT
 // ============================================================
@@ -108,29 +91,20 @@ const mockTeams: Team[] = [
 export function DashboardHeader({ user }: DashboardHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const params = useParams<{ accountId?: string; teamId?: string }>();
+
+  const accountId = params?.accountId;
+  const teamId = params?.teamId;
+
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [showTeamSwitcher, setShowTeamSwitcher] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [currentTeam, setCurrentTeam] = useState<Team>(mockTeams[0]);
-  const teamSwitcherRef = useRef<HTMLDivElement>(null);
+
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (teamSwitcherRef.current && !teamSwitcherRef.current.contains(event.target as Node)) {
-        setShowTeamSwitcher(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Close the drawer whenever the route changes
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDrawerOpen(false);
   }, [pathname]);
 
@@ -151,67 +125,57 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     try {
       await logout().unwrap();
       dispatch(clearAuth());
+      dispatch(clearWorkspace());
       router.push('/');
     } catch (error) {
       console.error('Logout failed:', error);
       dispatch(clearAuth());
+      dispatch(clearWorkspace());
       router.push('/');
     }
   };
 
   const handleCreateEvent = () => {
-    router.push('/dashboard/events/new');
+    if (accountId && teamId) {
+      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
+    } else {
+      router.push('/dashboard');
+    }
   };
 
-  const handleTeamSwitch = (team: Team) => {
-    setCurrentTeam(team);
-    setShowTeamSwitcher(false);
+  const buildTeamNavHref = (segment: string) => {
+    if (segment === '') return '/dashboard';
+    if (!accountId || !teamId) return '/accounts';
+    return `/dashboard/${accountId}/${teamId}/${segment}`;
   };
 
-  const getTeamIcon = (type: Team['type']) => {
-    return type === 'personal' ? Home : Building2;
+  const isTeamNavActive = (segment: string) => {
+    if (segment === '') return pathname === '/dashboard';
+    if (!accountId || !teamId) return false;
+    const href = `/dashboard/${accountId}/${teamId}/${segment}`;
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const getTeamColor = (type: Team['type']) => {
-    return type === 'personal'
-      ? 'text-blue-600 dark:text-blue-400'
-      : 'text-indigo-600 dark:text-indigo-400';
-  };
-
-  const getTeamBgColor = (type: Team['type']) => {
-    return type === 'personal'
-      ? 'bg-blue-50 dark:bg-blue-950/30'
-      : 'bg-indigo-50 dark:bg-indigo-950/30';
-  };
-
-  const toggleTeamSwitcher = () => {
-    setShowTeamSwitcher(!showTeamSwitcher);
-  };
-
-  const isActiveLink = (href: string) => {
-    if (href === '/dashboard') return pathname === href;
-    return pathname === href || pathname.startsWith(href + '/');
-  };
-
-  // Public nav active check (routes like "/", "/events", "/pricing")
   const isPublicActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname === href || pathname.startsWith(href + '/');
   };
+
+  const hasTeamContext = Boolean(accountId && teamId);
 
   return (
     <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-[#202124] dark:border-[#3C4043]/80 dark:backdrop-blur-sm dark:bg-[#202124]/95">
       <div className="container mx-auto px-2.5 sm:px-4">
         <div className="flex flex-col">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 md:gap-3">
-            {/* Left: Mobile/Tablet Drawer Menu + Logo */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Left: Drawer Menu + Brand + Team Switcher */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 max-w-[520px]">
               <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
                 <SheetTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
+                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer shrink-0"
                     aria-label="Open navigation menu"
                   >
                     <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -229,22 +193,58 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </div>
                   </SheetHeader>
 
-                  <div className="p-4 flex-1 overflow-y-auto space-y-6">
-                    {/* ---------- Dashboard nav ---------- */}
+                  <div className="p-3 flex-1 overflow-y-auto space-y-5">
+                    <TeamSwitcher variant="drawer" />
+
+                  {hasTeamContext && (
                     <div>
                       <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 dark:text-gray-500">
                         Menu
                       </p>
                       <nav className="space-y-0.5">
-                        {DASHBOARD_NAV_ITEMS.map((item) => {
-                          const isActive = isActiveLink(item.href);
+                        {/* Dashboard — always first */}
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsDrawerOpen(false)}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                            isTeamNavActive('')
+                              ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                              : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                          )}
+                        >
+                          <LayoutDashboard
+                            className={cn(
+                              'h-5 w-5 shrink-0',
+                              isTeamNavActive('')
+                                ? 'text-primary'
+                                : 'text-gray-400 dark:text-gray-500',
+                            )}
+                          />
+                          <span>Dashboard</span>
+                        </Link>
+
+                        {/* Teams — expandable dropdown */}
+                        <TeamsNavItem
+                          accountId={accountId}
+                          onNavigate={(href) => {
+                            setIsDrawerOpen(false);
+                            router.push(href);
+                          }}
+                        />
+
+                        {/* Everything else (excluding root & teams) */}
+                        {DASHBOARD_NAV_ITEMS.filter(
+                          (i) => i.segment !== '' && i.segment !== 'teams',
+                        ).map((item) => {
+                          const isActive = isTeamNavActive(item.segment);
                           const Icon = item.icon;
                           const isTrash = item.isTrash;
 
                           return (
                             <Link
-                              key={item.href}
-                              href={item.href}
+                              key={item.segment}
+                              href={buildTeamNavHref(item.segment)}
                               onClick={() => setIsDrawerOpen(false)}
                               className={cn(
                                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
@@ -275,8 +275,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         })}
                       </nav>
                     </div>
+                  )}
 
-                    {/* ---------- Public nav ---------- */}
                     <div>
                       <div className="flex items-center justify-between px-3 mb-2">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider dark:text-gray-500">
@@ -317,7 +317,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </div>
                   </div>
 
-                  {/* Drawer Footer - Logout and User */}
                   <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3 dark:border-[#3C4043] dark:bg-[#2D2E32]">
                     <button
                       type="button"
@@ -350,10 +349,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         </div>
                       ) : (
                         <>
-                          <LogOut className="h-5 w-5 shrink-0 text-red-400 group-hover:text-red-500 transition-colors" />
-                          <span className="text-sm font-medium group-hover:text-red-600 transition-colors">
-                            Logout
-                          </span>
+                          <LogOut className="h-5 w-5 shrink-0 text-red-400" />
+                          <span className="text-sm font-medium">Logout</span>
                         </>
                       )}
                     </button>
@@ -375,24 +372,42 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center shrink-0 hover:opacity-80 transition-opacity cursor-pointer"
-              >
-                <Logo />
-              </Link>
+              {/* Brand — smaller on mobile, full size on lg+ */}
+              <span className="inline-flex items-center shrink-0">
+                <span className="lg:hidden">
+                  <Logo width={90} />
+                </span>
+                <span className="hidden lg:inline-flex">
+                  <Logo width={120} />
+                </span>
+              </span>
+
+              {/* Team switcher — always visible, compact on small screens */}
+              <div className="min-w-0 flex-1 max-w-[220px] sm:max-w-[280px] lg:max-w-[260px]">
+                <TeamSwitcher variant="compact" />
+              </div>
+
+              {/* Team settings shortcut — only when inside a team */}
+              {hasTeamContext && (
+                <Link
+                  href={`/dashboard/${accountId}/${teamId}/settings`}
+                  aria-label="Team settings"
+                  className="hidden sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
+              )}
             </div>
 
-            {/* Search Bar - Visible on desktop and large screens */}
+            {/* Search (desktop) */}
             <div className="hidden xl:flex items-center flex-1 max-w-2xl mx-4 justify-center">
               <div className="w-full max-w-xl relative">
                 <SearchBar />
               </div>
             </div>
 
-            {/* Right Header Controls */}
+            {/* Right controls */}
             <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
-              {/* Search Toggle Button - visible on tablet & mobile */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -407,109 +422,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              {/* TEAM SWITCHER */}
-              <div className="relative" ref={teamSwitcherRef}>
-                <button
-                  type="button"
-                  onClick={toggleTeamSwitcher}
-                  className="flex items-center justify-center gap-1 md:gap-1.5 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-full md:rounded-lg h-8 w-8 md:h-9 md:w-auto px-0 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium transition-colors dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#3C4043] border border-transparent hover:border-gray-200 dark:hover:border-[#3C4043] cursor-pointer"
-                  aria-label="Switch team"
-                >
-                  <ArrowLeftRight className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-                  <span className="hidden md:inline-block text-gray-700 dark:text-gray-300 font-medium">
-                    Switch Team
-                  </span>
-                  <span className="hidden lg:inline-block max-w-[90px] xl:max-w-[120px] truncate text-gray-500 dark:text-gray-400">
-                    ({currentTeam.name})
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'hidden md:block h-3.5 w-3.5 text-gray-400 transition-transform duration-200 shrink-0',
-                      showTeamSwitcher ? 'rotate-180' : '',
-                    )}
-                  />
-                </button>
-
-                {showTeamSwitcher && (
-                  <div className="absolute right-0 mt-2 w-64 sm:w-72 bg-white dark:bg-[#2D2E32] rounded-2xl shadow-2xl border border-gray-200/80 dark:border-[#3C4043] py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="px-3 sm:px-4 py-1.5 sm:py-2">
-                      <p className="text-[10px] sm:text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                        Switch Team
-                      </p>
-                    </div>
-                    <div className="h-px bg-gradient-to-r from-gray-100 to-transparent dark:from-[#3C4043] mx-3 sm:mx-4" />
-                    <div className="mt-1">
-                      {mockTeams.map((team) => {
-                        const Icon = getTeamIcon(team.type);
-                        const isActive = currentTeam.id === team.id;
-                        return (
-                          <button
-                            key={team.id}
-                            type="button"
-                            onClick={() => handleTeamSwitch(team)}
-                            className={cn(
-                              'flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 w-full text-left transition-colors cursor-pointer',
-                              isActive
-                                ? 'bg-blue-50 dark:bg-blue-950/30'
-                                : 'hover:bg-gray-50 dark:hover:bg-[#3C4043]/50',
-                            )}
-                          >
-                            <div
-                              className={cn(
-                                'h-8 w-8 sm:h-9 sm:w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
-                                getTeamBgColor(team.type),
-                                isActive
-                                  ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-[#2D2E32]'
-                                  : '',
-                              )}
-                            >
-                              <Icon
-                                className={cn('h-4 w-4 sm:h-4.5 sm:w-4.5', getTeamColor(team.type))}
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p
-                                className={cn(
-                                  'text-sm font-medium truncate',
-                                  isActive
-                                    ? 'text-blue-700 dark:text-blue-300'
-                                    : 'text-gray-700 dark:text-gray-300',
-                                )}
-                              >
-                                {team.name}
-                              </p>
-                              <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 truncate">
-                                {team.type === 'personal' ? 'Personal Team' : 'Institution Team'} •{' '}
-                                {team.role}
-                              </p>
-                            </div>
-                            {isActive && (
-                              <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="h-px bg-gradient-to-r from-gray-100 to-transparent dark:from-[#3C4043] mx-3 sm:mx-4" />
-                    <div className="px-3 sm:px-4 pt-1.5">
-                      <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
-                        <RefreshCw className="h-3 w-3" />
-                        Switch to view different team events &amp; permissions
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Create Event Button */}
               <button
                 type="button"
                 onClick={handleCreateEvent}
                 className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all px-2.5 sm:px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md cursor-pointer shrink-0"
               >
                 <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
-                <span className="inline lg:hidden">Create Event</span>
-                <span className="hidden lg:inline">Create Event</span>
+                <span>Create Event</span>
               </button>
 
               <ThemeToggle />
@@ -517,11 +436,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </div>
           </div>
 
-          {/* Mobile/Tablet Search Dropdown */}
+          {/* Mobile search dropdown */}
           <div
             className={cn(
               'xl:hidden transition-all duration-300 ease-in-out relative z-20',
-              isMobileSearchOpen ? 'max-h-16 pb-2 opacity-100' : 'max-h-0 opacity-0 overflow-hidden',
+              isMobileSearchOpen
+                ? 'max-h-16 pb-2 opacity-100'
+                : 'max-h-0 opacity-0 overflow-hidden',
             )}
           >
             <SearchBar />

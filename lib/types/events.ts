@@ -632,6 +632,7 @@ export interface UpdateEventRequest {
 export interface ListEventsParams {
   team_id?: string;
   team_type?: 'personal' | 'institution';
+  scope?: 'team' | 'personal';
 
   event_type_id?: string;
   event_status_id?: string;

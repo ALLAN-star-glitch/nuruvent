@@ -14,7 +14,6 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
   const [collapsed, setCollapsed] = useState(false);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
-  // Show loading state while auth is being restored
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -25,21 +24,20 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
 
   return (
     <div className="flex flex-1 relative">
-      {/* Sidebar - Floating with glassmorphism */}
-      <DashboardSidebar 
+      <DashboardSidebar
         collapsed={collapsed}
         onCollapseChange={setCollapsed}
       />
 
       {/* Spacer that adjusts based on sidebar state */}
-      <div 
+      <div
         className={`hidden md:block flex-shrink-0 transition-all duration-300 ${
           collapsed ? 'w-[110px]' : 'w-[270px]'
-        }`} 
+        }`}
       />
 
-      {/* Main Content - Children will now include the welcome banner via the layout */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-12 space-y-6">
+      {/* Single source of padding for every page under (dashboard) */}
+      <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
         {children}
       </main>
     </div>

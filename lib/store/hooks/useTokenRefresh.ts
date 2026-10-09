@@ -19,8 +19,6 @@ export function useTokenRefresh() {
       return;
     }
 
-    let cancelled = false;
-
     const tick = async () => {
       try {
         await fetch(
@@ -31,17 +29,23 @@ export function useTokenRefresh() {
           },
         );
       } catch {
-        // Network blip — the reactive wrapper will catch the next 401.
+        // Network blip — the reactive wrapper handles the next 401.
       }
     };
 
-    // Fire once on mount so a long-idle tab refreshes immediately.
-    tick();
-
+    // Do NOT tick on mount.
+    //
+    // The reactive base query (baseQueryWithReauth) already handles the
+    // "cookie expired on arrival" case by refreshing and retrying the
+    // original request. Firing the timer on mount races that path and
+    // can consume the refresh token twice — the backend rotates on every
+    // refresh, so the second call 401s.
+    //
+    // The timer only handles "I've been open for 12 minutes", which the
+    // reactive wrapper would miss. That's its whole job.
     timer.current = setInterval(tick, REFRESH_INTERVAL_MS);
 
     return () => {
-      cancelled = true;
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
     };

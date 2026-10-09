@@ -142,17 +142,23 @@ export const attendanceApi = api.injectEndpoints({
      * Cross-event attendee directory, scoped to the caller's
      * accounts. Backed by attendee_rollup_statuses.
      */
-    getAttendees: builder.query<
-      BaseResponse<CrossEventAttendeesPayload>,
-      ListAllAttendeesParams | void
-    >({
-      query: (params) => ({
-        url: '/attendees',
-        method: 'GET',
-        params: params ?? undefined,
+   getAttendees: builder.query<
+    BaseResponse<CrossEventAttendeesPayload>,
+    ListAllAttendeesParams | void
+  >({
+    query: (params) => ({
+      url: '/attendees',
+      method: 'GET',
+      params: params ?? undefined,
       }),
-      providesTags: [{ type: 'Attendance' as const, id: 'ALL-ATTENDEES' }],
-    }),
+      providesTags: (_r, _e, params) => [
+    { type: 'Attendance' as const, id: 'ALL-ATTENDEES' },
+    {
+      type: 'Attendance' as const,
+      id: `TEAM-ATTENDEES-${params?.team_id ?? 'all'}`,
+    },
+  ],
+  }),
 
     // ============================================================
     // EXPORT

@@ -3,7 +3,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -91,6 +91,9 @@ interface EditEventWizardProps {
 
 export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const router = useRouter();
+  const params = useParams<{ accountId: string; teamId: string }>();
+  const accountId = params.accountId;
+  const teamId = params.teamId;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublished, setIsPublished] = useState(false);
@@ -127,22 +130,6 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const image = useEventImage(formState.setErrors);
   const validation = useEventValidation(formState.formData);
 
-  // ------------------------------------------------------------------
-  // Auto-save is declared BEFORE hydration on purpose.
-  //
-  // React runs effects in the order their hooks were declared. If
-  // useAutoSave is declared after useEventHydration, the auto-save
-  // effect runs on the same commit as the hydration effect — before
-  // the hydrated state has been applied. It then sees the initial
-  // empty form as "changed" and writes it to the backend, clobbering
-  // the loaded schedules on soft navigation.
-  //
-  // Declaring auto-save first guarantees:
-  //   1. `autoSave.setLastSavedData` in the hydration callback refers
-  //      to an initialized object.
-  //   2. On the commit where hydration runs, the auto-save effect
-  //      fires AFTER and sees the hydrated values.
-  // ------------------------------------------------------------------
   const autoSave = useAutoSave({
     formData: formState.formData,
     draft,
@@ -354,14 +341,14 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       await deleteEvent(eventId).unwrap();
       setIsDeleteDialogOpen(false);
       toast.success('Event deleted');
-      router.push('/dashboard/events');
+      router.push(`/dashboard/${accountId}/${teamId}/events`);
     } catch (err: unknown) {
       const message =
         (err as { data?: { message?: string } })?.data?.message ??
         'Failed to delete event.';
       toast.error(message);
     }
-  }, [deleteEvent, eventId, router]);
+  }, [deleteEvent, eventId, router, accountId, teamId]);
 
   const handleEventTypeTouched = useCallback(() => {
     formState.setTouched((prev) => ({ ...prev, event_type_id: true }));
@@ -431,7 +418,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
               : hydrationError}
           </p>
           <Button
-            onClick={() => router.push('/dashboard/events')}
+            onClick={() => router.push(`/dashboard/${accountId}/${teamId}/events`)}
             className="w-full sm:w-auto cursor-pointer"
           >
             Go to Events
@@ -447,7 +434,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
         <div className="flex items-start sm:items-center gap-3">
           <Link
-            href="/dashboard/events"
+            href={`/dashboard/${accountId}/${teamId}/events`}
             className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
@@ -549,7 +536,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
 
             {isPublishedStatus && event?.slug && (
               <Link
-                href={`/dashboard/events/${event.id}`}
+                href={`/dashboard/${accountId}/${teamId}/events/${event.id}`}
                 className="col-span-2 sm:col-span-1"
               >
                 <Button
@@ -621,14 +608,12 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                     onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
                      eventId={eventId}
                      onSchedulesCommitted={(next) => {
-                    // Sync autosave's diff baseline to the reordered list so it
-                    // doesn't fire a duplicate PUT with the same session numbers.
                     autoSave.setLastSavedData({
                       ...formState.formData,
                       schedules: next,
                     });
                   }}
-                    
+
                   />
                 )}
                 {currentStep === 2 && (
@@ -813,12 +798,14 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
         selectedEventType={selectedEventType}
         onGoToEvents={() => {
           setIsSaveDialogOpen(false);
-          router.push('/dashboard/events');
+          router.push(`/dashboard/${accountId}/${teamId}/events`);
         }}
         onViewEvent={() => {
           setIsSaveDialogOpen(false);
           if (createdEventId) {
-            router.push(`/dashboard/events/${createdEventId}`);
+            router.push(
+              `/dashboard/${accountId}/${teamId}/events/${createdEventId}`,
+            );
           }
         }}
         onDismiss={() => setIsSaveDialogOpen(false)}
@@ -837,7 +824,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       <PlatformPickerModal
         open={isPlatformPickerOpen}
         onOpenChange={setIsPlatformPickerOpen}
-        returnUrl={`/dashboard/events/${eventId}/edit`}
+        returnUrl={`/dashboard/${accountId}/${teamId}/events/${eventId}/edit`}
       />
 
       {/* AI draft replace confirmation */}

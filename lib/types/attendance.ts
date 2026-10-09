@@ -234,8 +234,10 @@ export interface CrossEventAttendeesPayload {
 
 export interface ListAllAttendeesParams {
   event_id?: string;
+  team_id?: string;                    // ← NEW
+  scope?: 'team' | 'personal';         // ← NEW
   search?: string;
-  status?: string; // comma-separated
+  status?: string;
   sort_by?: 'name' | 'event' | 'registered_at' | 'status' | 'duration';
   sort_order?: 'asc' | 'desc';
   page?: number;

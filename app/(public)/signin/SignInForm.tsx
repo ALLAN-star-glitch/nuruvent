@@ -41,6 +41,7 @@ export function SignInForm() {
   );
 
   const sessionExpired = searchParams.get('session') === 'expired';
+  const nextUrl = searchParams.get('next');
 
   const [login, { isLoading: isLoginLoading }] = useLoginMutation();
   const [verifyTwoFactor, { isLoading: isVerifyLoading }] =
@@ -91,9 +92,9 @@ export function SignInForm() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.push(nextUrl || '/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, nextUrl]);
 
   useEffect(() => {
     if (loginStep === 'two_factor' && twoFactorEmail) {
@@ -192,12 +193,12 @@ export function SignInForm() {
 
       if (response.data && 'access_token' in response.data) {
         console.log('✅ Direct login successful');
-        router.push('/dashboard');
+        router.push(nextUrl || '/dashboard');
         setIsLoading(false);
         return;
       }
 
-      router.push('/dashboard');
+      router.push(nextUrl || '/dashboard');
       setIsLoading(false);
     } catch (err: any) {
       console.error('❌ Login error caught:', err);
@@ -255,7 +256,7 @@ export function SignInForm() {
         otp: code,
       }).unwrap();
 
-      router.push('/dashboard');
+      router.push(nextUrl || '/dashboard');
     } catch (err: any) {
       setError(err.data?.message || 'Invalid 2FA code. Please try again.');
     } finally {

@@ -1,3 +1,4 @@
+// lib/store/api/baseApi.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createApi } from '@reduxjs/toolkit/query/react';
 import type { Action } from '@reduxjs/toolkit';
@@ -29,6 +30,7 @@ export const api = createApi({
   tagTypes: [
     'User',
     'Auth',
+    'Profile',          // <-- NEW
     'Events',
     'EventTypes',
     'EventStatuses',

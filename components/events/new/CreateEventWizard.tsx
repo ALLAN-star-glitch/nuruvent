@@ -3,7 +3,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
@@ -76,6 +76,9 @@ const AI_DRAFT_STORAGE_KEY = 'nuruvent_ai_draft';
 
 export function CreateEventWizard() {
   const router = useRouter();
+  const params = useParams<{ accountId: string; teamId: string }>();
+  const accountId = params.accountId;
+  const teamId = params.teamId;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isPublished, setIsPublished] = useState(false);
@@ -256,12 +259,16 @@ export function CreateEventWizard() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('from') !== 'ai') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('from') !== 'ai') return;
 
-    const eventTypeId = params.get('event_type_id') ?? '';
+    const eventTypeId = urlParams.get('event_type_id') ?? '';
 
-    window.history.replaceState({}, '', '/dashboard/events/new');
+    window.history.replaceState(
+      {},
+      '',
+      `/dashboard/${accountId}/${teamId}/events/new`,
+    );
 
     const raw = sessionStorage.getItem(AI_DRAFT_STORAGE_KEY);
     if (!raw) return;
@@ -310,9 +317,12 @@ export function CreateEventWizard() {
   const handleCreateAnother = useCallback(() => {
     handleDraftReset();
     setIsSaveDialogOpen(false);
-    setTimeout(() => router.push('/dashboard/events/new'), 100);
+    setTimeout(
+      () => router.push(`/dashboard/${accountId}/${teamId}/events/new`),
+      100,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, accountId, teamId]);
 
   const handleEventTypeTouched = useCallback(() => {
     formState.setTouched((prev) => ({ ...prev, event_type_id: true }));
@@ -363,7 +373,7 @@ export function CreateEventWizard() {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
         <div className="flex items-start sm:items-center gap-3">
           <Link
-            href="/dashboard/events"
+            href={`/dashboard/${accountId}/${teamId}/events`}
             className="p-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
@@ -449,7 +459,7 @@ export function CreateEventWizard() {
 
       {createdEventId && (
         <Link
-          href={`/dashboard/events/${createdEventId}`}
+          href={`/dashboard/${accountId}/${teamId}/events/${createdEventId}`}
           className="col-span-2 sm:col-span-1"
         >
           <Button
@@ -688,12 +698,14 @@ export function CreateEventWizard() {
         onGoToEvents={() => {
           handleDraftReset();
           setIsSaveDialogOpen(false);
-          router.push('/dashboard/events');
+          router.push(`/dashboard/${accountId}/${teamId}/events`);
         }}
         onViewEvent={() => {
           setIsSaveDialogOpen(false);
           if (createdEventId) {
-            router.push(`/dashboard/events/${createdEventId}`);
+            router.push(
+              `/dashboard/${accountId}/${teamId}/events/${createdEventId}`,
+            );
           }
         }}
         onDismiss={handleCreateAnother}
@@ -712,7 +724,7 @@ export function CreateEventWizard() {
       <PlatformPickerModal
         open={isPlatformPickerOpen}
         onOpenChange={setIsPlatformPickerOpen}
-        returnUrl="/dashboard/events/new"
+        returnUrl={`/dashboard/${accountId}/${teamId}/events/new`}
       />
     </div>
   );
