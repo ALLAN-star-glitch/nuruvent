@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 
 import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
 import { useRegisterForEventMutation } from '@/lib/store/api/registrationsApi';
+import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import {
   selectActiveAccount,
@@ -122,6 +123,11 @@ export function EventDetailClient({ slug }: Props) {
   const account = useAppSelector(selectActiveAccount);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
+  // Teams query gives us the account that owns the event's team.
+  // The event itself only carries team_id (per the ownership model),
+  // so we traverse team → account to build dashboard URLs.
+  const { data: teamsData } = useGetUserTeamsQuery();
+
   const [registerForEvent, { isLoading: isRegistering }] =
     useRegisterForEventMutation();
 
@@ -152,6 +158,21 @@ export function EventDetailClient({ slug }: Props) {
 
   // Guards against re-running the autorun on every render.
   const autorunFiredRef = useRef(false);
+
+  // ---- Resolve the team-scoped tickets destination ----
+  //
+  // The event has team_id, not account_id. We resolve the account by
+  // looking up the team in the user's team list. This mirrors the same
+  // event → team → account traversal the event cards use.
+  const owningTeam = useMemo(
+    () => teamsData?.teams?.find((t) => t.id === event?.team_id) ?? null,
+    [teamsData, event?.team_id],
+  );
+
+  const ticketsHref =
+    owningTeam && event?.team_id
+      ? `/dashboard/${owningTeam.account_id}/${event.team_id}/tickets`
+      : '/dashboard/tickets';
 
   // ---- Prefill guest inputs on auth load ----
   useEffect(() => {
@@ -1018,6 +1039,7 @@ export function EventDetailClient({ slug }: Props) {
         eventName={event.display_name || event.name}
         registrationNumber={registration?.registration_number}
         isAuthenticated={isAuthenticated}
+        ticketsHref={ticketsHref}
       />
     </div>
   );

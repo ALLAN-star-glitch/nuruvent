@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -17,12 +17,12 @@ import {
   GraduationCap,
   Handshake,
   Heart,
+  Home,
   MapPin,
   Mic2,
   Presentation,
   Share2,
   Sparkles,
-  User,
   Users2,
   Video,
 } from 'lucide-react';
@@ -31,6 +31,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+
+import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
+import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 
 import type { Event } from '@/lib/types/events';
 import {
@@ -85,6 +88,34 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
+  // ---- Ownership resolution (event → team → account) ----
+  const { data: teamsData } = useGetUserTeamsQuery();
+  const { data: accounts } = useGetMyAccountsQuery();
+
+  const memberTeamIds = useMemo(
+    () => new Set((teamsData?.teams ?? []).map((t) => t.id)),
+    [teamsData],
+  );
+
+  const isPrivate = event.visibility === 'private' || event.is_private === true;
+  const isMemberOfOwningTeam = event.team_id
+    ? memberTeamIds.has(event.team_id)
+    : false;
+
+  const owningTeam = useMemo(
+    () => teamsData?.teams?.find((t) => t.id === event.team_id) ?? null,
+    [teamsData, event.team_id],
+  );
+
+  const eventAccountId =
+    owningTeam?.account_id ?? event.account_id ?? null;
+
+  const eventAccount = useMemo(() => {
+    if (!eventAccountId || !accounts) return null;
+    return accounts.find((a) => a.id === eventAccountId) ?? null;
+  }, [accounts, eventAccountId]);
+
+  // ---- Display helpers ----
   const typeName = getEventTypeName(event);
   const typeColor = getEventTypeColor(event);
   const typeIcon = getEventTypeIcon(event.event_type?.slug);
@@ -108,27 +139,53 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const fillRate = getEventFillRate(event);
   const location = getEventLocation(event);
 
-  const handleNavigate = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // ---- Destinations ----
+  //
+  // detailHref     — where the card (and "View details") navigates.
+  //                  Dashboard for owned teams, public slug otherwise.
+  //
+  // registerHref   — where "Register" / "Get Ticket" navigates.
+  //                  Always the public event page. The page itself
+  //                  handles the registration flow.
+  const isDashboardDestination = isPrivate || isMemberOfOwningTeam;
+
+  const publicDetailHref = `/events/${event.slug}`;
+  const dashboardDetailHref =
+    isDashboardDestination && eventAccountId && event.team_id
+      ? `/dashboard/${eventAccountId}/${event.team_id}/events/${event.id}`
+      : null;
+
+  const detailHref = dashboardDetailHref ?? publicDetailHref;
+  const registerHref = publicDetailHref;
+
+  const canInteract = !isPast && !isFullyBooked;
+
+  // ---- Handlers ----
+  const handleCardClick = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (onClick) {
       onClick();
-    } else {
-      router.push(`/events/${event.slug}`);
+      return;
     }
+    router.push(detailHref);
   };
 
-  const handleButtonClick = (e: React.MouseEvent) => {
+  const handleRegisterClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!isPast && !isFullyBooked) {
-      router.push(`/events/${event.slug}`);
-    }
+    if (!canInteract) return;
+    router.push(registerHref);
   };
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsLiked(!isLiked);
+  };
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // TODO: wire up share sheet
   };
 
   const getGlowColor = () => {
@@ -158,10 +215,25 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const glow = getGlowColor();
 
+  // ---- Account logo ----
+  const accountIsPersonal = (eventAccount?.type ?? '').includes('personal');
+  const AccountFallbackIcon = accountIsPersonal ? Home : Building2;
+
+  const accountLogo = eventAccount?.logo_url ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={eventAccount.logo_url}
+      alt={eventAccount.name}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <AccountFallbackIcon className="h-3.5 w-3.5" />
+  );
+
   return (
     <div
       className="block h-full cursor-pointer"
-      onClick={handleNavigate}
+      onClick={handleCardClick}
       role="link"
       tabIndex={0}
       onMouseEnter={() => setIsHovered(true)}
@@ -169,7 +241,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          handleNavigate(e as unknown as React.MouseEvent);
+          handleCardClick(e);
         }
       }}
     >
@@ -181,7 +253,8 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             'shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] -translate-y-2',
             glow.shadow,
           ],
-          featured && 'ring-2 ring-secondary-400/40 shadow-lg shadow-secondary-100/50 dark:shadow-secondary-900/20',
+          featured &&
+            'ring-2 ring-secondary-400/40 shadow-lg shadow-secondary-100/50 dark:shadow-secondary-900/20',
         )}
       >
         {/* Glow effect container */}
@@ -240,7 +313,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Gradient overlay on hover */}
+          {/* Hover gradient */}
           <div
             className={cn(
               'absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent transition-opacity duration-500 pointer-events-none',
@@ -249,10 +322,10 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           />
 
           {/* Date badge */}
-          <div className="absolute bottom-4 left-4 z-10">
+          <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-10">
             <div
               className={cn(
-                'flex items-center gap-3 bg-background/95 backdrop-blur-md rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 border border-border transition-all duration-300',
+                'flex items-center gap-2.5 sm:gap-3 bg-background/95 backdrop-blur-md rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 border border-border transition-all duration-300',
                 isHovered
                   ? 'shadow-2xl shadow-black/20 scale-105'
                   : 'shadow-lg shadow-black/10',
@@ -262,47 +335,47 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 <span className="text-[8px] sm:text-[10px] font-bold tracking-wider text-amber-600 dark:text-amber-400 uppercase">
                   {month}
                 </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-foreground leading-none">
+                <span className="text-xl sm:text-3xl font-extrabold text-foreground leading-none">
                   {day}
                 </span>
               </div>
-              <div className="w-px h-8 sm:h-10 bg-border" />
+              <div className="w-px h-7 sm:h-10 bg-border" />
               <div className="flex flex-col leading-none">
                 <span className="text-[8px] sm:text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                   {weekday}
                 </span>
-                <span className="text-xs sm:text-sm font-semibold text-foreground">
+                <span className="text-[11px] sm:text-sm font-semibold text-foreground">
                   {time}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Featured badge */}
+          {/* Featured */}
           {event.is_featured && (
             <div className="absolute top-3 left-3 z-10">
-              <Badge className="bg-gradient-to-r from-secondary-400 via-secondary-500 to-secondary-600 text-white border-0 shadow-lg shadow-secondary-500/40 px-3 py-1.5 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-full animate-pulse">
+              <Badge className="bg-gradient-to-r from-secondary-400 via-secondary-500 to-secondary-600 text-white border-0 shadow-lg shadow-secondary-500/40 px-2.5 sm:px-3 py-1 sm:py-1.5 flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold rounded-full animate-pulse">
                 <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 Featured
               </Badge>
             </div>
           )}
 
-          {/* Event type badge */}
+          {/* Event type */}
           <div className="absolute top-3 right-3 z-10">
             <Badge
-              className="border-0 shadow-lg shadow-black/20 px-3 py-1.5 text-white text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-md rounded-full"
+              className="border-0 shadow-lg shadow-black/20 px-2.5 sm:px-3 py-1 sm:py-1.5 text-white text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-md rounded-full"
               style={{ backgroundColor: typeColor }}
             >
               {typeIcon}
-              {typeName}
+              <span className="hidden xs:inline">{typeName}</span>
             </Badge>
           </div>
 
-          {/* Virtual badge */}
+          {/* Virtual */}
           {event.is_virtual && (
-            <div className="absolute bottom-4 right-4 z-10">
-              <Badge className="bg-primary-500/90 backdrop-blur-md text-white border-0 shadow-lg shadow-primary-500/30 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full">
+            <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-10">
+              <Badge className="bg-primary-500/90 backdrop-blur-md text-white border-0 shadow-lg shadow-primary-500/30 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
                 <Video className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 <span className="hidden xs:inline">Virtual</span>
                 <span className="xs:hidden">Online</span>
@@ -310,12 +383,21 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Low availability */}
-          {isLowAvailability && !isPast && !isFullyBooked && spotsLeft !== null && (
+          {/* Private */}
+          {isPrivate && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-              <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-white border-0 shadow-lg shadow-amber-500/40 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-3 py-1.5 rounded-full animate-pulse">
+              <Badge className="bg-foreground/90 text-background backdrop-blur-md border-0 shadow-lg text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
+                Private
+              </Badge>
+            </div>
+          )}
+
+          {/* Low availability */}
+          {isLowAvailability && canInteract && spotsLeft !== null && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
+              <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-white border-0 shadow-lg shadow-amber-500/40 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full animate-pulse">
                 <ClockIcon className="h-3 w-3" />
-                Only {spotsLeft} spots left!
+                Only {spotsLeft} left!
               </Badge>
             </div>
           )}
@@ -329,7 +411,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Past event */}
+          {/* Past */}
           {isPast && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm">
               <Badge className="bg-foreground/90 text-background border-0 shadow-2xl text-sm font-bold px-6 py-3 rounded-full">
@@ -345,17 +427,24 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">
               <span className="truncate flex items-center gap-1.5">
-                <span className="text-muted-foreground hidden xs:inline">Hosted by</span>
-                <span className="font-semibold text-foreground hover:text-primary-500 transition-colors flex items-center gap-1.5">
-                  {hostIsInstitution ? (
-                    <Building2 className="h-3.5 w-3.5 text-primary-500" />
-                  ) : (
-                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
+                <span className="text-muted-foreground hidden xs:inline">
+                  Hosted by
+                </span>
+                <span className="font-semibold text-foreground hover:text-primary-500 transition-colors flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={cn(
+                      'flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md',
+                      accountIsPersonal
+                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
+                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
+                    )}
+                  >
+                    {accountLogo}
+                  </span>
                   <span className="truncate">{hostName}</span>
                 </span>
                 {hostIsInstitution && (
-                  <span className="inline-flex items-center gap-1 flex-shrink-0">
+                  <span className="hidden xs:inline-flex items-center gap-1 flex-shrink-0">
                     <Award className="h-3.5 w-3.5 text-primary-500" />
                     <span className="text-[8px] sm:text-[9px] font-medium text-primary-600 dark:text-primary-300 bg-primary-50 dark:bg-primary-950/40 px-1.5 py-0.5 rounded-full border border-primary-100 dark:border-primary-900/50">
                       Verified
@@ -384,7 +473,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 />
               </button>
               <button
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleShare}
                 className="p-1.5 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-300"
                 aria-label="Share"
               >
@@ -406,78 +495,84 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Divider */}
           <div className="h-px bg-border my-1" />
 
-          {/* Pricing */}
-          <div className="flex flex-col gap-2 pt-0.5">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Registration Fee
-                </span>
-                <span
-                  className={cn(
-                    'text-2xl sm:text-3xl font-bold',
-                    isFree ? 'text-tertiary-600 dark:text-tertiary-400' : 'text-primary-600 dark:text-primary-400',
-                  )}
-                >
-                  {formatPrice(price)}
-                </span>
-              </div>
+          {/* Price */}
+          <div className="flex flex-col">
+            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              Registration Fee
+            </span>
+            <span
+              className={cn(
+                'text-2xl sm:text-3xl font-bold',
+                isFree
+                  ? 'text-tertiary-600 dark:text-tertiary-400'
+                  : 'text-primary-600 dark:text-primary-400',
+              )}
+            >
+              {formatPrice(price)}
+            </span>
+          </div>
 
+          {/* Certificate fee */}
+          {hasCertificate && (
+            <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/80 to-amber-100/40 dark:from-amber-950/30 dark:to-amber-950/10 rounded-lg px-3 py-1.5 sm:py-2 border border-amber-200/60 dark:border-amber-900/40">
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
+                Certificate Fee:
+              </span>
+              <span className="text-sm sm:text-base font-bold text-amber-800 dark:text-amber-200">
+                {formatPrice(certificatePrice)}
+              </span>
+            </div>
+          )}
+
+          {/* ---- Actions ---- */}
+          <div className="mt-auto pt-2 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
+            {/* View details — always present */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(detailHref);
+              }}
+              className={cn(
+                'h-10 flex-1 rounded-full text-xs sm:text-sm font-semibold cursor-pointer',
+                'border-border hover:bg-accent',
+              )}
+            >
+              <span>View details</span>
+              <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1" />
+            </Button>
+
+            {/* Register / Get Ticket — the public event page */}
+            {canInteract && (
               <Button
-                size="default"
+                type="button"
+                onClick={handleRegisterClick}
                 className={cn(
-                  'rounded-full font-semibold text-xs sm:text-sm px-5 sm:px-7 h-9 sm:h-11 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer',
+                  'h-10 flex-1 rounded-full text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer',
                   isFree
                     ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600 hover:from-tertiary-600 hover:to-tertiary-700 text-white'
                     : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white',
-                  (isPast || isFullyBooked) &&
-                    'opacity-50 cursor-not-allowed hover:shadow-md',
-                  !isPast && !isFullyBooked && 'hover:scale-105',
+                  'hover:scale-[1.02]',
                 )}
-                onClick={handleButtonClick}
-                disabled={isPast || isFullyBooked}
-                type="button"
               >
-                <span>
-                  {isPast
-                    ? 'Ended'
-                    : isFullyBooked
-                      ? 'Full'
-                      : isFree
-                        ? 'Register'
-                        : 'Get Ticket'}
-                </span>
-                {!isPast && !isFullyBooked && (
-                  <ArrowUpRight
-                    className={cn(
-                      'h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1 transition-all duration-300',
-                      isHovered ? 'translate-x-0.5 -translate-y-0.5' : '',
-                    )}
-                  />
-                )}
+                <span>{isFree ? 'Register' : 'Get Ticket'}</span>
+                <ArrowUpRight
+                  className={cn(
+                    'h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1 transition-all duration-300',
+                    isHovered ? 'translate-x-0.5 -translate-y-0.5' : '',
+                  )}
+                />
               </Button>
-            </div>
-
-            {/* Certificate fee */}
-            {hasCertificate && (
-              <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/80 to-amber-100/40 dark:from-amber-950/30 dark:to-amber-950/10 rounded-lg px-3 py-1.5 sm:py-2 border border-amber-200/60 dark:border-amber-900/40 mt-0.5">
-                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                <span className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
-                  Certificate Fee:
-                </span>
-                <span className="text-sm sm:text-base font-bold text-amber-800 dark:text-amber-200">
-                  {formatPrice(certificatePrice)}
-                </span>
-              </div>
             )}
           </div>
 
           {/* Spots left bar */}
-          {!isPast && !isFullyBooked && spotsLeft !== null && (
-            <div className="flex items-center gap-3 mt-0.5">
+          {canInteract && spotsLeft !== null && (
+            <div className="flex items-center gap-3 mt-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className={cn(
@@ -492,7 +587,9 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               <span
                 className={cn(
                   'text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors duration-300',
-                  spotsLeft <= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-tertiary-600 dark:text-tertiary-400',
+                  spotsLeft <= 5
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-tertiary-600 dark:text-tertiary-400',
                 )}
               >
                 {spotsLeft} left

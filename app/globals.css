@@ -331,3 +331,56 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* app/globals.css — add these */
+
+@keyframes ticket-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes ticket-breathe {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes ticket-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    opacity: 0.75;
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.animate-ticket-shimmer {
+  animation: ticket-shimmer 3.5s ease-in-out infinite;
+}
+
+.animate-ticket-breathe {
+  animation: ticket-breathe 5s ease-in-out infinite;
+}
+
+.animate-ticket-dot {
+  animation: ticket-dot-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticket-shimmer,
+  .animate-ticket-breathe,
+  .animate-ticket-dot {
+    animation: none;
+  }
+}

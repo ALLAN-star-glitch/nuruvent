@@ -22,6 +22,16 @@ interface GuestEmailDialogProps {
   eventName: string;
   registrationNumber?: string;
   isAuthenticated?: boolean;
+  /**
+   * Where "View my tickets" navigates. Built by the caller from the
+   * event's team → account chain so the button lands on the correct
+   * team-scoped tickets page.
+   *
+   * Falls back to the generic /dashboard/tickets route when the
+   * caller can't resolve the team (shouldn't happen for authenticated
+   * users, but keeps the button functional either way).
+   */
+  ticketsHref?: string;
 }
 
 export function GuestEmailDialog({
@@ -31,6 +41,7 @@ export function GuestEmailDialog({
   eventName,
   registrationNumber,
   isAuthenticated = false,
+  ticketsHref = '/dashboard/tickets',
 }: GuestEmailDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -87,7 +98,7 @@ export function GuestEmailDialog({
                 className="h-11 w-full cursor-pointer rounded-xl"
               >
                 <Link
-                  href="/dashboard/tickets"
+                  href={ticketsHref}
                   onClick={() => onOpenChange(false)}
                 >
                   <Ticket className="mr-2 h-4 w-4" />

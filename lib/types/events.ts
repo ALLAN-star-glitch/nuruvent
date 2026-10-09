@@ -173,7 +173,8 @@ export interface Schedule {
 
   zoom_link?: string;
   meet_link?: string;
-/**
+
+  /**
    * Platform-side meeting code. "spaces/abc-defg-hij" for Google
    * Meet, numeric string for Zoom. Matches video_meetings.external_id.
    * Use this — not video_meeting_id — to build join URLs.
@@ -188,9 +189,6 @@ export interface Schedule {
    */
   video_meeting_id?: string | null;
   max_attendees?: number;
-
-
-  
 }
 
 export interface Ticket {
@@ -322,7 +320,21 @@ export interface Event {
   certificate_template?: CertificateTemplate;
 
   // ---- Ownership ----
+  /**
+   * Team that owns this event. Used by the client to determine
+   * dashboard-vs-public routing and to fetch the parent account.
+   */
   team_id: string;
+
+  /**
+   * Account that owns the team that owns this event.
+   *
+   * Used to build dashboard URLs of the form
+   * `/dashboard/{account_id}/{team_id}/events/{event_id}`.
+   * Present on all event responses.
+   */
+  account_id: string;
+
   organizer: Organizer | null;
   creator?: Creator;
 

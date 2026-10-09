@@ -1,7 +1,6 @@
 // app/(public)/events/[slug]/page.tsx
 
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { fetchEventBySlug, toOgImage } from '@/lib/server/events';
 import { EventDetailClient } from './_components/EventDetailClient';
 
@@ -64,12 +63,19 @@ export async function generateMetadata({
 
 export default async function EventDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const event = await fetchEventBySlug(slug);
 
-  if (!event) {
-    notFound();
-  }
+  // Server-side fetch primes SEO + HTML for public events.
+  //
+  // It runs anonymously (no browser auth), so it will fail for
+  // private events. We do NOT call notFound() here — instead we let
+  // the client component retry with the user's auth token and decide
+  // what to render. That way private-event members can still see the
+  // page, and anonymous visitors get the client-side "private/not
+  // found" state.
+  //
+  // Public events: this fetch succeeds and primes the client cache,
+  // so the client's useGetEventBySlugQuery resolves instantly.
+  await fetchEventBySlug(slug).catch(() => null);
 
-  // Server-fetched event primes both the HTML and the client cache.
   return <EventDetailClient slug={slug} />;
 }

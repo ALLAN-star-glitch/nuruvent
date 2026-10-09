@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -37,6 +37,9 @@ import { cn } from '@/lib/utils';
 
 import { useGetRegistrationQuery } from '@/lib/store/api/registrationsApi';
 import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
+import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectIsAuthenticated } from '@/lib/store/slices/authSlice';
 
 // ============================================================
 // HELPERS
@@ -67,6 +70,9 @@ export default function BookingConfirmationPage() {
   const [copied, setCopied] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { data: teamsData } = useGetUserTeamsQuery();
+
   const {
     data: regRes,
     isLoading: regLoading,
@@ -84,6 +90,19 @@ export default function BookingConfirmationPage() {
 
   const registration = regRes?.data;
   const event = eventRes?.data;
+
+  // Resolve the team-scoped tickets destination. Events only carry
+  // team_id; we traverse via the user's team list to find the parent
+  // account, mirroring the pattern used elsewhere in the app.
+  const owningTeam = useMemo(
+    () => teamsData?.teams?.find((t) => t.id === event?.team_id) ?? null,
+    [teamsData, event?.team_id],
+  );
+
+  const ticketsHref =
+    owningTeam && event?.team_id
+      ? `/dashboard/${owningTeam.account_id}/${event.team_id}/tickets`
+      : '/dashboard/tickets';
 
   const isLoading = regLoading || eventLoading;
   const isError = regError || eventError || !registration || !event;
@@ -377,21 +396,36 @@ export default function BookingConfirmationPage() {
               </div>
             )}
 
-            {/* Primary CTA — updated */}
+            {/* Primary CTA — team-scoped for authenticated users */}
             <div className="pt-2">
-              <Button
-                asChild
-                className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
-              >
-                <Link href="/dashboard/tickets">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  View my tickets
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
+              {isAuthenticated ? (
+                <Button
+                  asChild
+                  className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <Link href={ticketsHref}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    View my tickets
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <Link href={`/events/${event.slug}`}>
+                    <Ticket className="h-4 w-4 mr-2" />
+                    View event details
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Link>
+                </Button>
+              )}
               <p className="text-xs text-center text-muted-foreground mt-3 flex items-center justify-center gap-1.5">
                 <Info className="h-3 w-3" />
-                Find your QR pass and session join links on your tickets
+                {isAuthenticated
+                  ? 'Find your QR pass and session join links on your tickets'
+                  : 'Your ticket and join links are in your confirmation email'}
               </p>
             </div>
 

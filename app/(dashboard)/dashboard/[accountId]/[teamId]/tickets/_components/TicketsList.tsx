@@ -62,7 +62,10 @@ export function TicketsList() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
+  // Cards are collapsed by default. We track which ones are expanded.
+  // An empty set means "everything is collapsed".
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const [isMobile, setIsMobile] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
@@ -126,7 +129,7 @@ export function TicketsList() {
   }, [merged, searchQuery]);
 
   const toggleCard = (id: string) => {
-    setCollapsedIds((prev) => {
+    setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -394,7 +397,7 @@ export function TicketsList() {
                 <TicketCard
                   key={m.registration.id}
                   merged={m}
-                  expanded={!collapsedIds.has(m.registration.id)}
+                  expanded={expandedIds.has(m.registration.id)}
                   onToggle={() => toggleCard(m.registration.id)}
                   onCancelled={handleCancelled}
                 />
