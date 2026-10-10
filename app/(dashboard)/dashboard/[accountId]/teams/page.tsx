@@ -48,7 +48,7 @@ export default function TeamsListPage() {
   );
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full min-w-0 space-y-4 sm:space-y-6">
       {/* HEADER */}
       <div className="flex items-start gap-2 sm:gap-3">
         <Link
@@ -58,9 +58,9 @@ export default function TeamsListPage() {
         >
           <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </Link>
+
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
-            {/* Account logo (falls back to icon) */}
+          <div className="mb-1.5 flex min-w-0 items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
             <span
               className={cn(
                 'flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded',
@@ -75,20 +75,29 @@ export default function TeamsListPage() {
               {account?.display_name || account?.name || 'Account'}
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Teams
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            All teams in this account.
-          </p>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Teams
+              </h1>
+              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                All teams in this account.
+              </p>
+            </div>
+
+            {/* Button moves inside the title block on mobile so it
+                wraps below the heading instead of forcing overflow. */}
+            <Button
+              onClick={() => router.push(`/dashboard/${accountId}/teams/new`)}
+              className="shrink-0 cursor-pointer gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">New team</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+          </div>
         </div>
-        <Button
-          onClick={() => router.push(`/dashboard/${accountId}/teams/new`)}
-          className="cursor-pointer gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">New team</span>
-        </Button>
       </div>
 
       {/* LIST */}
@@ -121,7 +130,7 @@ export default function TeamsListPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {teams.map((team) => {
             const Icon = team.type === 'personal' ? Home : Building2;
             const isPersonal = team.type === 'personal';
@@ -131,10 +140,10 @@ export default function TeamsListPage() {
             return (
               <div
                 key={team.id}
-                className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5"
+                className="flex min-w-0 flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5"
               >
                 {/* Identity block */}
-                <div className="flex items-start gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <div
                     className={cn(
                       'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg',
@@ -147,12 +156,12 @@ export default function TeamsListPage() {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-lg font-semibold text-foreground sm:text-xl">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <p className="truncate text-base font-semibold text-foreground sm:text-lg md:text-xl">
                         {team.display_name || team.name}
                       </p>
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-2">
                       <Badge
                         variant="outline"
                         className={cn(
@@ -164,7 +173,7 @@ export default function TeamsListPage() {
                       >
                         {isPersonal ? 'Personal' : 'Institution'}
                       </Badge>
-                      <span className="truncate text-xs text-muted-foreground">
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">
                         {team.slug}
                       </span>
                     </div>

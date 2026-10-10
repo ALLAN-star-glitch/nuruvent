@@ -1290,7 +1290,7 @@ export default function CertificatesPage() {
 
       {/* Mobile Floating Filter Strip */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
+        <div className="fixed bottom-15 left-0 right-0 z-50 px-4 pb-4 pointer-events-none">
           <div className="pointer-events-auto mx-auto max-w-md bg-white rounded-full shadow-lg border border-gray-200/80 backdrop-blur-sm bg-white/95">
             <div className="flex items-center justify-between px-4 py-2.5 gap-2">
               <button

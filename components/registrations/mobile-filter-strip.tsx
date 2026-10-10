@@ -23,9 +23,10 @@ export function MobileFilterStrip({
   sortLabel,
   sortDirection,
   onSortClick,
-  bottomOffset = 40,
+  bottomOffset = 70,
   className,
 }: MobileFilterStripProps) {
+
   return (
     <div
       className={cn(

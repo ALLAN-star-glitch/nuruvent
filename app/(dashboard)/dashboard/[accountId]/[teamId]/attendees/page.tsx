@@ -1421,7 +1421,7 @@ export default function AttendeesPage() {
       )}
 
       {isMobile && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-4 pb-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-15 z-50 px-4 pb-4">
           <div className="pointer-events-auto mx-auto max-w-md rounded-full border border-border bg-background shadow-lg">
             <div className="flex items-center justify-between gap-2 px-4 py-2.5">
               <button

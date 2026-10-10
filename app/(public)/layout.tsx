@@ -118,7 +118,7 @@ export default function PublicLayout({
 
       if (typeof window !== 'undefined') {
         // Paths where the chat widget should stay hidden.
-        var HIDDEN_PATHS = ['/dashboard', '/events/', '/meeting/', '/checkout/'];
+        var HIDDEN_PATHS = ['/dashboard', '/events/', '/meeting/', '/checkout/', '/profile'];
 
         var syncTawkVisibility = function() {
           var path = window.location.pathname;

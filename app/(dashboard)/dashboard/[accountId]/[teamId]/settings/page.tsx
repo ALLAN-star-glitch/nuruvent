@@ -313,7 +313,7 @@ export default function TeamSettingsPage() {
   if (isError || !team) {
     return (
       <div className="w-full py-16">
-        <div className="mx-auto max-w-sm text-center">
+        <div className="mx-auto max-w-sm px-4 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
             <AlertCircle className="h-7 w-7 text-destructive" />
           </div>
@@ -335,9 +335,9 @@ export default function TeamSettingsPage() {
   }
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-x-hidden sm:space-y-6">
       {/* HEADER */}
-      <div className="flex items-start gap-2 sm:gap-3">
+      <div className="flex min-w-0 items-start gap-2 sm:gap-3">
         <Link
           href={`/dashboard/${accountId}/${teamId}`}
           className="mt-0.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:p-2"
@@ -346,7 +346,7 @@ export default function TeamSettingsPage() {
           <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
+          <div className="mb-1.5 flex min-w-0 items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
             <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
             <span className="truncate">
               {account?.display_name || account?.name || 'Account'}
@@ -354,7 +354,7 @@ export default function TeamSettingsPage() {
             <span className="shrink-0 text-muted-foreground/50">/</span>
             <span className="truncate">{team.display_name || team.name}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
             <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl">
               Team settings
             </h1>
@@ -377,11 +377,17 @@ export default function TeamSettingsPage() {
       </div>
 
       {/* TWO-COLUMN LAYOUT */}
-      <div className="grid gap-4 sm:gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
+      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-w-0 lg:sticky lg:top-6 lg:h-fit lg:self-start">
           {/* Mobile: horizontal scrollable pill tabs */}
-          <div className="-mx-3 overflow-x-auto px-3 pb-1 lg:hidden scrollbar-none">
-            <nav className="flex gap-1.5 w-max">
+          <div
+            className="-mx-4 overflow-x-auto overscroll-x-contain px-4 pb-1 lg:hidden"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <nav className="flex w-max gap-1.5">
               {TABS.map((t) => {
                 const isActive = tab === t.key;
                 const Icon = t.icon;
@@ -450,7 +456,7 @@ export default function TeamSettingsPage() {
           </nav>
         </aside>
 
-        <div className="min-w-0 space-y-4 sm:space-y-6">
+        <div className="min-w-0 max-w-full space-y-4 sm:space-y-6">
           {tab === 'general' && (
             <Card className="w-full max-w-2xl border-border/70 shadow-sm">
               <CardHeader className="px-4 py-4 sm:px-6 sm:py-5">
@@ -471,7 +477,7 @@ export default function TeamSettingsPage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g. My Technology Team"
-                    className="h-10 rounded-xl text-sm sm:h-11"
+                    className="h-10 w-full rounded-xl text-sm sm:h-11"
                   />
                   <p className="text-[11px] text-muted-foreground sm:text-xs">
                     Shown on event pages and in menus.
@@ -487,7 +493,7 @@ export default function TeamSettingsPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. my-it-team"
-                    className="h-10 rounded-xl text-sm sm:h-11"
+                    className="h-10 w-full rounded-xl text-sm sm:h-11"
                   />
                   <p className="text-[11px] text-muted-foreground sm:text-xs">
                     Used internally to identify this team. Letters, numbers,
@@ -498,7 +504,7 @@ export default function TeamSettingsPage() {
                 <Separator />
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-center justify-between gap-4">
                     <span className="text-xs text-muted-foreground sm:text-sm">
                       Slug
                     </span>
@@ -506,7 +512,7 @@ export default function TeamSettingsPage() {
                       {team.slug}
                     </code>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-center justify-between gap-4">
                     <span className="text-xs text-muted-foreground sm:text-sm">
                       Team ID
                     </span>
@@ -592,7 +598,7 @@ export default function TeamSettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">
                         Delete this team
@@ -794,37 +800,37 @@ function MembersPanel({
   const showSearch = members.length > 1;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0 max-w-full space-y-4 sm:space-y-6">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {showSearch ? (
           <form
             onSubmit={handleSearchSubmit}
-            className="relative w-full sm:max-w-xs"
+            className="relative w-full min-w-0 sm:max-w-xs"
           >
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search members…"
-              className="h-10 rounded-xl pl-9 text-sm"
+              className="h-10 w-full rounded-xl pl-9 text-sm"
             />
           </form>
         ) : (
           <div className="hidden sm:block" />
         )}
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <Button
             onClick={() => setAddExistingOpen(true)}
             variant="outline"
-            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+            className="w-full shrink-0 cursor-pointer gap-2 sm:w-auto"
           >
             <UserCheck className="h-4 w-4" />
             Add existing
           </Button>
           <Button
             onClick={() => setInviteOpen(true)}
-            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+            className="w-full shrink-0 cursor-pointer gap-2 sm:w-auto"
           >
             <UserPlus className="h-4 w-4" />
             Invite
@@ -1068,7 +1074,7 @@ function MemberRow({
       </Avatar>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <p className="truncate text-sm font-medium text-foreground">
             {displayName}
           </p>
@@ -1081,11 +1087,11 @@ function MemberRow({
             </Badge>
           )}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:gap-x-3 sm:text-xs">
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:gap-x-3 sm:text-xs">
           {email ? (
-            <span className="truncate">{email}</span>
+            <span className="max-w-full truncate">{email}</span>
           ) : (
-            <span className="truncate font-mono">
+            <span className="max-w-full truncate font-mono">
               {member.user_id.slice(0, 8)}…
             </span>
           )}
@@ -1094,7 +1100,7 @@ function MemberRow({
           </span>
         </div>
 
-        <div className="mt-1.5 flex items-center gap-1.5 sm:hidden">
+        <div className="mt-1.5 flex min-w-0 items-center gap-1.5 sm:hidden">
           {role && (
             <Badge
               variant="outline"
@@ -1254,9 +1260,9 @@ function InvitationsPanel({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
+    <div className="min-w-0 max-w-full space-y-4 sm:space-y-6">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap gap-1.5">
           {INVITATION_FILTERS.map((f) => {
             const active = filter === f.key;
             return (
@@ -1277,18 +1283,18 @@ function InvitationsPanel({
           })}
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <Button
             onClick={() => setAddExistingOpen(true)}
             variant="outline"
-            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+            className="w-full shrink-0 cursor-pointer gap-2 sm:w-auto"
           >
             <UserCheck className="h-4 w-4" />
             Add existing
           </Button>
           <Button
             onClick={() => setInviteOpen(true)}
-            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+            className="w-full shrink-0 cursor-pointer gap-2 sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Invite
@@ -1404,7 +1410,7 @@ function InvitationRow({
   const isPending = invitation.status === 'pending';
 
   return (
-    <div className="flex flex-col gap-2.5 px-3 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-4">
+    <div className="flex min-w-0 flex-col gap-2.5 px-3 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted sm:h-9 sm:w-9">
           <Mail className="h-3.5 w-3.5 text-muted-foreground sm:h-4 sm:w-4" />
@@ -1413,7 +1419,7 @@ function InvitationRow({
           <p className="truncate text-sm font-medium text-foreground">
             {invitation.email}
           </p>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:gap-x-3 sm:text-xs">
+          <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground sm:gap-x-3 sm:text-xs">
             <span>Role: {roleLabel(invitation.role)}</span>
             <span className="hidden sm:inline">
               Sent {formatShortDate(invitation.created_at)}
@@ -1424,7 +1430,7 @@ function InvitationRow({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 pl-11 sm:shrink-0 sm:pl-0">
+      <div className="flex shrink-0 items-center gap-2 pl-11 sm:pl-0">
         <Badge
           variant="outline"
           className={cn('gap-1 text-[10px]', meta.className)}

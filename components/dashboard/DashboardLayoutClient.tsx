@@ -1,9 +1,8 @@
-// app/(dashboard)/DashboardLayoutClient.tsx
-
 'use client';
 
 import { useState } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { useAppSelector } from '@/lib/store/hooks';
 
 interface DashboardLayoutClientProps {
@@ -37,9 +36,11 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
       />
 
       {/* Single source of padding for every page under (dashboard) */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
+      <main className="flex-1 overflow-y-auto px-4 py-6 pb-20 md:px-8 md:py-8">
         {children}
       </main>
+
+      <MobileBottomNav />
     </div>
   );
 }
