@@ -154,6 +154,18 @@ const STATUS_OPTIONS: AttendanceStatus[] = [
   'no-show',
 ];
 
+const UNKNOWN_STATUS: StatusDisplay = {
+  label: 'Unknown',
+  color: 'bg-muted text-muted-foreground border-border',
+  icon: ClockIcon,
+};
+
+function statusDisplay(status: string | undefined): StatusDisplay {
+  if (!status) return UNKNOWN_STATUS;
+  const normalized = status.replace(/_/g, '-') as AttendanceStatus;
+  return statusConfig[normalized] ?? UNKNOWN_STATUS;
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '?';
@@ -390,7 +402,7 @@ export default function AttendeesPage() {
       (a) => a.effective_status === 'registered',
     ).length;
     const noShow = attendees.filter(
-      (a) => a.effective_status === 'no-show',
+      (a) => (a.effective_status ?? '').replace(/_/g, '-') === 'no-show',
     ).length;
     const hosts = attendees.filter((a) => a.is_host).length;
     return { attended, registered, noShow, hosts };
@@ -938,7 +950,7 @@ export default function AttendeesPage() {
                     <TableBody>
                       {attendees.length > 0 ? (
                         attendees.map((a) => {
-                          const s = statusConfig[a.effective_status];
+                          const s = statusDisplay(a.effective_status);
                           const StatusIcon = s.icon;
                           const isSelected = isRowSelected(a);
 
@@ -1692,10 +1704,10 @@ export default function AttendeesPage() {
                   <Badge
                     variant="outline"
                     className={`${
-                      statusConfig[selectedAttendee.effective_status].color
-                    } mt-1 border`}
+                    statusDisplay(selectedAttendee.effective_status).color
+                  } mt-1 border`}
                   >
-                    {statusConfig[selectedAttendee.effective_status].label}
+                    {statusDisplay(selectedAttendee.effective_status).label}
                   </Badge>
                 </div>
               </div>
