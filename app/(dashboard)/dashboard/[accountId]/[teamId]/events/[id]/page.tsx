@@ -1181,9 +1181,126 @@ export default function EventDetailPage({
           </Card>
         </div>
 
-        {/* Right column */}
-        <div className="lg:col-span-1 space-y-4">
-          <Card>
+        {/* Right column — order-first on mobile, normal on desktop */}
+        <div className="lg:col-span-1 space-y-4 order-first lg:order-none">
+          {/* Quick Actions — first on mobile and desktop */}
+          <Card className="order-1 lg:order-2">
+            <CardContent className="p-6 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                Quick Actions
+              </h3>
+
+              {isPublished && (
+                <Link
+                  href={`/events/${event.slug}`}
+                  target="_blank"
+                  className="block"
+                >
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Register Event
+                  </Button>
+                </Link>
+              )}
+
+              {isHost && (
+                <>
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Event
+                    </Button>
+                  </Link>
+
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      View Payments
+                    </Button>
+                  </Link>
+
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/attendees`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      View Attendees
+                    </Button>
+                  </Link>
+
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/registrations`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      View Registrations
+                    </Button>
+                  </Link>
+
+                  {event.is_virtual && (
+                    <Button
+                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"
+                      onClick={openPlatformPicker}
+                    >
+                      <Plug className="h-4 w-4 mr-2" />
+                      Manage Connection
+                    </Button>
+                  )}
+
+                  {isDraft && (
+                    <Button
+                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-4 py-2.5 h-auto"
+                      onClick={handlePublish}
+                      disabled={isPublishing}
+                    >
+                      {isPublishing ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      {isPublishing ? 'Publishing...' : 'Publish Event'}
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="destructive"
+                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Event Host — second on mobile, third on desktop */}
+          <Card className="order-2 lg:order-1">
             <CardContent className="p-6">
               <h3 className="text-sm font-semibold text-foreground mb-3">
                 Event Host
@@ -1225,122 +1342,8 @@ export default function EventDetailPage({
             </CardContent>
           </Card>
 
-       <Card>
-        <CardContent className="p-6 space-y-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            Quick Actions
-          </h3>
-
-          {isPublished && (
-            <Link
-              href={`/events/${event.slug}`}
-              target="_blank"
-              className="block"
-            >
-              <Button
-                variant="outline"
-                className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Register Event
-              </Button>
-            </Link>
-          )}
-
-          {isHost && (
-            <>
-              <Link
-                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
-                className="block"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Event
-                </Button>
-              </Link>
-
-              <Link
-                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`}
-                className="block"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                >
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  View Payments
-                </Button>
-              </Link>
-
-              <Link
-                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/attendees`}
-                className="block"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  View Attendees
-                </Button>
-              </Link>
-
-              <Link
-                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/registrations`}
-                className="block"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                >
-                  <Users className="h-4 w-4 mr-2" />
-                  View Registrations
-                </Button>
-              </Link>
-
-              {event.is_virtual && (
-                <Button
-                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"
-                  onClick={openPlatformPicker}
-                >
-                  <Plug className="h-4 w-4 mr-2" />
-                  Manage Connection
-                </Button>
-              )}
-
-              {isDraft && (
-                <Button
-                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-4 py-2.5 h-auto"
-                  onClick={handlePublish}
-                  disabled={isPublishing}
-                >
-                  {isPublishing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  {isPublishing ? 'Publishing...' : 'Publish Event'}
-                </Button>
-              )}
-
-              <Button
-                variant="destructive"
-                className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                disabled={isDeleting}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-          <Card>
+          {/* Event Stats — third on mobile, second on desktop */}
+          <Card className="order-3 lg:order-3">
             <CardContent className="p-6 space-y-3">
               <h3 className="text-sm font-semibold text-foreground">
                 Event Stats
