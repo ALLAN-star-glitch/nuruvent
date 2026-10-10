@@ -53,6 +53,13 @@ export interface UseAutoSaveResult {
 }
 
 interface UseAutoSaveParams {
+  /**
+   * The team this event belongs to. Sent as ?team_id= on the initial
+   * createDraft request so the backend scopes the new draft to the
+   * correct team.
+   */
+  teamId: string;
+
   formData: EventFormData;
   draft: UseEventDraftResult;
   image: UseEventImageResult;
@@ -68,6 +75,7 @@ interface UseAutoSaveParams {
 }
 
 export function useAutoSave({
+  teamId,
   formData,
   draft,
   image,
@@ -163,9 +171,10 @@ export function useAutoSave({
           throw err;
         }
       } else {
-        const response = await createDraft(
-          buildDraftPayload(current),
-        ).unwrap();
+        const response = await createDraft({
+          teamId,
+          data: buildDraftPayload(current),
+        }).unwrap();
 
         const newId = response.data.id;
         draft.setDraftId(newId);
@@ -196,6 +205,7 @@ export function useAutoSave({
       setIsAutoSaving(false);
     }
   }, [
+    teamId,
     createDraft,
     draft,
     image,

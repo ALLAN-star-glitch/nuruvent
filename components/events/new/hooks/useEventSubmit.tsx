@@ -41,6 +41,14 @@ export interface UseEventSubmitResult {
 }
 
 interface UseEventSubmitParams {
+  /**
+   * The team this event belongs to. Sent as ?team_id= on create
+   * requests so the backend scopes the new event to the correct
+   * team. Without it, the backend falls back to the request
+   * context's team, which can be stale.
+   */
+  teamId: string;
+
   formData: EventFormData;
   draft: UseEventDraftResult;
   image: UseEventImageResult;
@@ -62,6 +70,7 @@ interface UseEventSubmitParams {
 }
 
 export function useEventSubmit({
+  teamId,
   formData,
   draft,
   image,
@@ -89,7 +98,6 @@ export function useEventSubmit({
       setError(null);
 
       if (status === 'published' && !isPublishReady) {
-        // Run every step's validation so the user sees all errors at once.
         const merged: FormErrors = {
           ...validateStep(1),
           ...validateStep(2),
@@ -120,22 +128,7 @@ export function useEventSubmit({
               image.clearImage();
             }
 
-            // ============ DEBUG START ============
             const payload = buildUpdatePayload(formData);
-
-            console.log('=== [PUT] useEventSubmit (publish) ===');
-            console.log('formData.is_recurring =', formData.is_recurring);
-            console.log(
-              'formData.recurrence =',
-              JSON.stringify(formData.recurrence, null, 2),
-            );
-            console.log(
-              'formData.recurrence?.days_of_week =',
-              formData.recurrence?.days_of_week,
-            );
-            console.log('transform output =', JSON.stringify(payload, null, 2));
-            console.log('======================================');
-            // ============ DEBUG END ============
 
             await updateEvent({
               id: currentId,
@@ -147,9 +140,10 @@ export function useEventSubmit({
             onCreated(currentId);
             draft.clearDraftId();
           } else {
-            const response = await createEvent(
-              buildPublishPayload(formData),
-            ).unwrap();
+            const response = await createEvent({
+              teamId,
+              data: buildPublishPayload(formData),
+            }).unwrap();
             onCreated(response.data.id);
             image.clearImage();
           }
@@ -166,22 +160,7 @@ export function useEventSubmit({
               image.clearImage();
             }
 
-            // ============ DEBUG START ============
             const payload = buildUpdatePayload(formData);
-
-            console.log('=== [PUT] useEventSubmit (save draft) ===');
-            console.log('formData.is_recurring =', formData.is_recurring);
-            console.log(
-              'formData.recurrence =',
-              JSON.stringify(formData.recurrence, null, 2),
-            );
-            console.log(
-              'formData.recurrence?.days_of_week =',
-              formData.recurrence?.days_of_week,
-            );
-            console.log('transform output =', JSON.stringify(payload, null, 2));
-            console.log('=========================================');
-            // ============ DEBUG END ============
 
             const response = await updateEvent({
               id: currentId,
@@ -189,9 +168,10 @@ export function useEventSubmit({
             }).unwrap();
             onCreated(response.data.id);
           } else {
-            const response = await createDraft(
-              buildDraftPayload(formData),
-            ).unwrap();
+            const response = await createDraft({
+              teamId,
+              data: buildDraftPayload(formData),
+            }).unwrap();
             const newId = response.data.id;
             draft.setDraftId(newId);
             onCreated(newId);
@@ -221,6 +201,7 @@ export function useEventSubmit({
       }
     },
     [
+      teamId,
       createDraft,
       createEvent,
       draft,

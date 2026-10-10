@@ -504,13 +504,22 @@ export const eventsApi = api.injectEndpoints({
     /**
      * POST /events/draft — create a draft event.
      *
-     * Scope is resolved by the backend from the JWT. Do NOT send
-     * team_id or account_id in the body.
+     * The team is passed as ?team_id=<uuid> so the backend scopes the
+     * new draft to the correct team. Without it, the backend falls
+     * back to the request context's team (from the auth middleware),
+     * which can be stale if the URL team changed.
+     *
+     * Do NOT send team_id in the body — the backend reads it from the
+     * query string.
      */
-    createDraft: builder.mutation<BaseResponse<Event>, CreateDraftRequest>({
-      query: (data) => ({
+    createDraft: builder.mutation<
+      BaseResponse<Event>,
+      { teamId: string; data: CreateDraftRequest }
+    >({
+      query: ({ teamId, data }) => ({
         url: '/events/draft',
         method: 'POST',
+        params: { team_id: teamId },
         body: data,
       }),
       invalidatesTags: [
@@ -520,11 +529,19 @@ export const eventsApi = api.injectEndpoints({
       ],
     }),
 
-    /** POST /events — create and publish an event. */
-    createEvent: builder.mutation<BaseResponse<Event>, CreateEventRequest>({
-      query: (data) => ({
+    /**
+     * POST /events — create and publish an event.
+     *
+     * Same as createDraft: the team is passed as ?team_id=<uuid>.
+     */
+    createEvent: builder.mutation<
+      BaseResponse<Event>,
+      { teamId: string; data: CreateEventRequest }
+    >({
+      query: ({ teamId, data }) => ({
         url: '/events',
         method: 'POST',
+        params: { team_id: teamId },
         body: data,
       }),
       invalidatesTags: [

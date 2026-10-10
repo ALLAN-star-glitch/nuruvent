@@ -105,6 +105,7 @@ export function CreateEventWizard() {
   const validation = useEventValidation(formState.formData);
 
   const autoSave = useAutoSave({
+    teamId,
     formData: formState.formData,
     draft,
     image,
@@ -113,6 +114,7 @@ export function CreateEventWizard() {
   });
 
   const submit = useEventSubmit({
+    teamId,
     formData: formState.formData,
     draft,
     image,
@@ -247,13 +249,16 @@ export function CreateEventWizard() {
   const handlePublishAIDraft = useCallback(
     async (draftData: GeneratedEventDraft, eventTypeId: string) => {
       const payload = draftToPublishPayload(draftData, eventTypeId);
-      const response = await createEvent(payload).unwrap();
+      const response = await createEvent({
+        teamId,
+        data: payload,
+      }).unwrap();
 
       setCreatedEventId(response.data.id);
       setIsPublished(true);
       setIsSaveDialogOpen(true);
     },
-    [createEvent],
+    [createEvent, teamId],
   );
 
   useEffect(() => {

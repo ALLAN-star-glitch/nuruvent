@@ -131,6 +131,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const validation = useEventValidation(formState.formData);
 
   const autoSave = useAutoSave({
+    teamId,
     formData: formState.formData,
     draft,
     image,
@@ -150,6 +151,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   );
 
   const submit = useEventSubmit({
+    teamId,
     formData: formState.formData,
     draft,
     image,

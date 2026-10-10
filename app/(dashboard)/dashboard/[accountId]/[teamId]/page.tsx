@@ -254,22 +254,25 @@ export default function DashboardPage() {
   );
 
   const handlePublishAIDraft = useCallback(
-    async (draft: GeneratedEventDraft, eventTypeId: string) => {
-      try {
-        const payload = draftToPublishPayload(draft, eventTypeId);
-        const response = await createEvent(payload).unwrap();
-        toast.success('Event published successfully!');
-        router.push(`/dashboard/${accountId}/${teamId}/events/${response.data.id}`);
-      } catch (err: unknown) {
-        const message =
-          err && typeof err === 'object' && 'data' in err
-            ? (err as { data?: { message?: string } }).data?.message
-            : 'Failed to publish event';
-        toast.error(message || 'Failed to publish event');
-      }
-    },
-    [createEvent, router, accountId, teamId],
-  );
+  async (draft: GeneratedEventDraft, eventTypeId: string) => {
+    try {
+      const payload = draftToPublishPayload(draft, eventTypeId);
+      const response = await createEvent({
+        teamId,
+        data: payload,
+      }).unwrap();
+      toast.success('Event published successfully!');
+      router.push(`/dashboard/${accountId}/${teamId}/events/${response.data.id}`);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'data' in err
+          ? (err as { data?: { message?: string } }).data?.message
+          : 'Failed to publish event';
+      toast.error(message || 'Failed to publish event');
+    }
+  },
+  [createEvent, router, accountId, teamId],
+);
 
   const metrics = useMemo(() => {
     const totalEvents = events.length;
@@ -524,7 +527,7 @@ export default function DashboardPage() {
   }
 
 
-  
+
   return (
     <div className="space-y-6">
       <TeamOnboardingBanner accountId={accountId} teamId={teamId} />
