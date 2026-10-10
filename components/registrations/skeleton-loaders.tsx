@@ -42,10 +42,27 @@ function StatCardSkeleton() {
   );
 }
 
-function StatsCardsSkeleton() {
+export function StatsCardsSkeleton({
+  cards = 4,
+  desktopColumns = 4,
+}: {
+  cards?: number;
+  desktopColumns?: 3 | 4 | 5;
+}) {
+  const DESKTOP_COLS: Record<3 | 4 | 5, string> = {
+    3: 'md:grid-cols-3',
+    4: 'md:grid-cols-4',
+    5: 'md:grid-cols-5',
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-      {[0, 1, 2, 3].map((i) => (
+    <div
+      className={cn(
+        'grid w-full grid-cols-2 gap-3 sm:gap-4',
+        DESKTOP_COLS[desktopColumns],
+      )}
+    >
+      {Array.from({ length: cards }).map((_, i) => (
         <StatCardSkeleton key={i} />
       ))}
     </div>

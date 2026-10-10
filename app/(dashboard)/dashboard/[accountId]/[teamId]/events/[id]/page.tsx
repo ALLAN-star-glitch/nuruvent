@@ -31,6 +31,7 @@ import {
   Video,
   Link2,
   DollarSign,
+  Users,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -1025,17 +1026,19 @@ export default function EventDetailPage({
             ))}
 
           {/* Attendance — host only */}
-          {isHost && (
-            <AttendanceCard
-              eventId={event.id}
-              summary={attendanceSummary}
-              loading={isAttendanceLoading}
-              error={attendanceErrorMessage}
-              fetchingSessionIds={fetchingSessionIds}
-              onFetchAttendance={handleFetchAttendance}
-              onExportAll={handleExportAll}
-            />
-          )}
+        {isHost && (
+        <AttendanceCard
+          eventId={event.id}
+          accountId={accountId}
+          teamId={teamId}
+          summary={attendanceSummary}
+          loading={isAttendanceLoading}
+          error={attendanceErrorMessage}
+          fetchingSessionIds={fetchingSessionIds}
+          onFetchAttendance={handleFetchAttendance}
+          onExportAll={handleExportAll}
+        />
+      )}
 
           {/* Description */}
           {event.description && (
@@ -1222,94 +1225,107 @@ export default function EventDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6 space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                Quick Actions
-              </h3>
+       <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">
+            Quick Actions
+          </h3>
 
-              {isPublished && (
-                <Link
-                  href={`/events/${event.slug}`}
-                  target="_blank"
-                  className="block"
+          {isPublished && (
+            <Link
+              href={`/events/${event.slug}`}
+              target="_blank"
+              className="block"
+            >
+              <Button
+                variant="outline"
+                className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Register Event
+              </Button>
+            </Link>
+          )}
+
+          {isHost && (
+            <>
+              <Link
+                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+                className="block"
+              >
+                <Button
+                  variant="outline"
+                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
                 >
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Register Event
-                  </Button>
-                </Link>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Event
+                </Button>
+              </Link>
+
+              <Link
+                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`}
+                className="block"
+              >
+                <Button
+                  variant="outline"
+                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  View Payments
+                </Button>
+              </Link>
+
+              <Link
+                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/attendees`}
+                className="block"
+              >
+                <Button
+                  variant="outline"
+                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  View Attendees
+                </Button>
+              </Link>
+
+              {event.is_virtual && (
+                <Button
+                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"
+                  onClick={openPlatformPicker}
+                >
+                  <Plug className="h-4 w-4 mr-2" />
+                  Manage Connection
+                </Button>
               )}
 
-              {isHost && (
-                <>
-                  <Link
-                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
-                    className="block"
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit Event
-                    </Button>
-                  </Link>
-
-                  <Link
-                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`}
-                    className="block"
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                    >
-                      <DollarSign className="h-4 w-4 mr-2" />
-                      View Payments
-                    </Button>
-                  </Link>
-
-                  {event.is_virtual && (
-                    <Button
-                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"
-                      onClick={openPlatformPicker}
-                    >
-                      <Plug className="h-4 w-4 mr-2" />
-                      Manage Connection
-                    </Button>
+              {isDraft && (
+                <Button
+                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-4 py-2.5 h-auto"
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                >
+                  {isPublishing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
                   )}
-
-                  {isDraft && (
-                    <Button
-                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-4 py-2.5 h-auto"
-                      onClick={handlePublish}
-                      disabled={isPublishing}
-                    >
-                      {isPublishing ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4 mr-2" />
-                      )}
-                      {isPublishing ? 'Publishing...' : 'Publish Event'}
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="destructive"
-                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    disabled={isDeleting}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
-                  </Button>
-                </>
+                  {isPublishing ? 'Publishing...' : 'Publish Event'}
+                </Button>
               )}
-            </CardContent>
-          </Card>
+
+              <Button
+                variant="destructive"
+                className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
           <Card>
             <CardContent className="p-6 space-y-3">

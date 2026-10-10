@@ -98,7 +98,8 @@ import {
   exportToPDF,
 } from '@/lib/utils/exportAttendees';
 import { StatsCards } from '@/components/registrations/stat_cards';
-import { StatsCardsSkeleton } from '../events/[id]/[attendees]/page';
+import { StatsCardsSkeleton } from '@/components/registrations/skeleton-loaders';
+
 
 interface StatusDisplay {
   label: string;

@@ -74,6 +74,10 @@ export interface AttendanceCardProps {
   /** Event this card belongs to. Used to link to the full attendees page. */
   eventId: string;
 
+  /** Current route params — used to build the attendees link. */
+  accountId: string;
+  teamId: string;
+
   summary: EventAttendanceSummary | null;
   loading?: boolean;
   error?: string | null;
@@ -105,6 +109,8 @@ export interface AttendanceCardProps {
 
 export function AttendanceCard({
   eventId,
+  accountId,
+  teamId,
   summary,
   loading = false,
   error = null,
@@ -278,7 +284,7 @@ export function AttendanceCard({
                   <Separator className="my-4" />
                   <div className="flex items-center justify-between gap-2">
                     <Link
-                      href={`/dashboard/events/${eventId}/attendees`}
+                      href={`/dashboard/${accountId}/${teamId}/events/${eventId}/attendees`}
                       className="text-sm text-primary hover:underline inline-flex items-center gap-1"
                     >
                       View all attendees
