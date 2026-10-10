@@ -193,10 +193,16 @@ export default function DashboardPage() {
 
   const video = useVideoConnection();
 
-  const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
-    { limit: 50, offset: 0, include_creator: false },
-    { skip: !isAuthenticated },
-  );
+const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
+  {
+    limit: 50,
+    offset: 0,
+    include_creator: false,
+    scope: 'team',
+    team_id: teamId,
+  },
+  { skip: !isAuthenticated || !teamId },
+);
 
   const { data: eventTypesResponse } = useGetEventTypesQuery();
   const { data: ticketTypesResponse } = useGetTicketTypesQuery();
@@ -207,10 +213,10 @@ export default function DashboardPage() {
     useGetPaymentStatsQuery(undefined, { skip: !isAuthenticated });
 
   const { data: attendeesResponse, isLoading: attendeesLoading } =
-    useGetAttendeesQuery(
-      { page: 1, page_size: 1 },
-      { skip: !isAuthenticated },
-    );
+  useGetAttendeesQuery(
+    { page: 1, page_size: 1, team_id: teamId },
+    { skip: !isAuthenticated || !teamId },
+  );
 
   const [createEvent] = useCreateEventMutation();
 
