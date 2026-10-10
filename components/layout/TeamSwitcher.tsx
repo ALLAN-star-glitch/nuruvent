@@ -221,14 +221,13 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
           : 'px-3 py-2.5',
       )}
     >
-      {renderAccountLogo(activeAccount, 32)}
+      {/* Account logo — hidden on mobile, visible from sm upward */}
+      <span className="hidden sm:flex shrink-0">
+        {renderAccountLogo(activeAccount, 32)}
+      </span>
 
-      <span
-        className={cn(
-          'min-w-0 flex-1',
-          variant === 'compact' && 'hidden sm:block',
-        )}
-      >
+      {/* Text — always visible; both lines truncate */}
+      <span className="min-w-0 flex-1 block">
         <span className="block truncate text-sm font-medium text-foreground">
           {triggerPrimary}
         </span>
@@ -330,7 +329,11 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
           ))}
         </div>
       ) : (
-        <div role="radiogroup" aria-label="Select a team" className="space-y-0.5">
+        <div
+          role="radiogroup"
+          aria-label="Select a team"
+          className="space-y-0.5"
+        >
           {teams.map(renderTeamRow)}
         </div>
       )}

@@ -98,7 +98,7 @@ export function DashboardSidebar({
   const dispatch = useAppDispatch();
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
- const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [teamsExpanded, setTeamsExpanded] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -288,7 +288,7 @@ export function DashboardSidebar({
           </nav>
 
           {/* ============================================================
-              Section 2: Teams dropdown
+              Section 2: Teams dropdown — conspicuous
           ============================================================ */}
           {accountId && (
             <>
@@ -297,73 +297,113 @@ export function DashboardSidebar({
               {/* Expanded list */}
               {!collapsed && (
                 <div className="py-3 px-3">
+                  {/* Toggle button with count badge */}
                   <button
                     type="button"
                     onClick={() => setTeamsExpanded((v) => !v)}
                     className={cn(
                       'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all cursor-pointer',
-                      'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
+                      teamsExpanded
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
                     )}
                   >
-                    <Users className="h-[18px] w-[18px] shrink-0 text-foreground/70" />
+                    <Users
+                      className={cn(
+                        'h-[18px] w-[18px] shrink-0',
+                        teamsExpanded ? 'text-primary' : 'text-foreground/70',
+                      )}
+                    />
                     <span className="flex-1">Teams</span>
+
+                    {/* Count badge */}
+                    {teams.length > 0 && (
+                      <span
+                        className={cn(
+                          'flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold',
+                          teamsExpanded
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-primary/10 text-primary',
+                        )}
+                      >
+                        {teams.length}
+                      </span>
+                    )}
+
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 shrink-0 text-foreground/60 transition-transform',
-                        teamsExpanded && 'rotate-180',
+                        'h-4 w-4 shrink-0 transition-transform',
+                        teamsExpanded
+                          ? 'rotate-180 text-primary'
+                          : 'text-foreground/60',
                       )}
                     />
                   </button>
 
                   {teamsExpanded && (
-                    <div className="mt-0.5 ml-4 space-y-0.5 border-l border-border/60 pl-2">
+                    <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5">
+                      {/* Teams list */}
                       {teams.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-muted-foreground">
+                        <p className="px-2 py-2 text-xs text-muted-foreground">
                           No teams yet
                         </p>
                       ) : (
-                        teams.map((team) => {
-                          const isActive = isTeamActive(team.id);
-                          const Icon =
-                            team.type === 'personal' ? Home : Building2;
-                          return (
-                            <Link
-                              key={team.id}
-                              href={buildTeamHref(team.id)}
-                              className={cn(
-                                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors cursor-pointer',
-                                isActive
-                                  ? 'bg-primary/10 text-primary font-medium'
-                                  : 'text-foreground/75 hover:bg-accent/60 hover:text-foreground',
-                              )}
-                            >
-                              <Icon
+                        <div
+                          role="radiogroup"
+                          aria-label="Your teams"
+                          className="space-y-0.5"
+                        >
+                          {teams.map((team) => {
+                            const isActive = isTeamActive(team.id);
+                            const Icon =
+                              team.type === 'personal' ? Home : Building2;
+                            return (
+                              <Link
+                                key={team.id}
+                                href={buildTeamHref(team.id)}
                                 className={cn(
-                                  'h-4 w-4 shrink-0',
+                                  'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-all cursor-pointer',
                                   isActive
-                                    ? 'text-primary'
-                                    : 'text-foreground/60',
+                                    ? 'bg-primary/10 text-primary font-semibold ring-1 ring-primary/30'
+                                    : 'text-foreground/80 hover:bg-accent/60 hover:text-foreground',
                                 )}
-                              />
-                              <span className="truncate flex-1">
-                                {team.display_name || team.name}
-                              </span>
-                              {isActive && (
-                                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                              )}
-                            </Link>
-                          );
-                        })
+                              >
+                                {/* Left accent bar on the active team */}
+                                {isActive && (
+                                  <span
+                                    aria-hidden
+                                    className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary"
+                                  />
+                                )}
+
+                                <Icon
+                                  className={cn(
+                                    'h-4 w-4 shrink-0',
+                                    isActive
+                                      ? 'text-primary'
+                                      : 'text-foreground/60',
+                                  )}
+                                />
+                                <span className="truncate flex-1">
+                                  {team.display_name || team.name}
+                                </span>
+                                {isActive && (
+                                  <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                )}
+                              </Link>
+                            );
+                          })}
+                        </div>
                       )}
 
-                      {/* Actions */}
-                      <div className="mt-1 border-t border-border/60 pt-1 space-y-0.5">
+                      {/* Actions — primary-tinted inside the container */}
+                      <div className="mt-2 border-t border-primary/15 pt-2 space-y-0.5">
                         {teamId && (
                           <Link
                             href={`${teamBase}/settings`}
-                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
+                            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                           >
-                            <Settings className="h-4 w-4 shrink-0 text-foreground/60" />
+                            <Settings className="h-4 w-4 shrink-0" />
                             <span>Team settings</span>
                           </Link>
                         )}
@@ -372,26 +412,26 @@ export function DashboardSidebar({
                           <button
                             type="button"
                             onClick={() => setInviteOpen(true)}
-                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
+                            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                           >
-                            <UserPlus className="h-4 w-4 shrink-0 text-foreground/60" />
+                            <UserPlus className="h-4 w-4 shrink-0" />
                             <span>Invite member</span>
                           </button>
                         )}
 
                         <Link
                           href={`${accountBase}/teams/new`}
-                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                         >
-                          <Plus className="h-4 w-4 shrink-0 text-foreground/60" />
+                          <Plus className="h-4 w-4 shrink-0" />
                           <span>New team</span>
                         </Link>
 
                         <Link
                           href={`${accountBase}/teams`}
-                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-foreground/75 hover:bg-accent/60 hover:text-foreground transition-colors cursor-pointer"
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                         >
-                          <LayoutDashboard className="h-4 w-4 shrink-0 text-foreground/60" />
+                          <LayoutDashboard className="h-4 w-4 shrink-0" />
                           <span>Manage teams</span>
                         </Link>
                       </div>

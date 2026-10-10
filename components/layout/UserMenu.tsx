@@ -103,28 +103,51 @@ function MobileSection({
   expanded,
   onToggle,
   badge,
+  highlight = false,
   children,
 }: {
   title: string;
   expanded: boolean;
   onToggle: () => void;
   badge?: number;
+  /** Conspicuous treatment — tinted background, primary-tinted border. */
+  highlight?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-border last:border-b-0">
+    <div
+      className={cn(
+        'border-b border-border last:border-b-0',
+        highlight && 'bg-primary/5',
+      )}
+    >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50"
+        className={cn(
+          'flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors',
+          highlight ? 'hover:bg-primary/10' : 'hover:bg-accent/50',
+        )}
       >
         <span className="flex items-center gap-2.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span
+            className={cn(
+              'text-[11px] font-semibold uppercase tracking-wider',
+              highlight ? 'text-primary' : 'text-muted-foreground',
+            )}
+          >
             {title}
           </span>
           {badge !== undefined && badge > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">
+            <span
+              className={cn(
+                'flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold',
+                highlight
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-primary/10 text-primary',
+              )}
+            >
               {badge}
             </span>
           )}
@@ -132,14 +155,20 @@ function MobileSection({
 
         <ChevronRight
           className={cn(
-            'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+            'h-4 w-4 shrink-0 transition-transform duration-200',
+            highlight ? 'text-primary' : 'text-muted-foreground',
             expanded && 'rotate-90',
           )}
         />
       </button>
 
       {expanded && (
-        <div className="animate-in fade-in slide-in-from-top-1 space-y-0.5 px-2 pb-2 duration-200">
+        <div
+          className={cn(
+            'animate-in fade-in slide-in-from-top-1 space-y-0.5 px-2 pb-2 duration-200',
+            highlight && 'px-3 pb-3',
+          )}
+        >
           {children}
         </div>
       )}
@@ -169,7 +198,11 @@ export function UserMenu({ user }: UserMenuProps) {
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [open, setOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionKey>('actions');
+  const [activeSection, setActiveSection] = useState<SectionKey>(
+    // Auto-select Teams when inside a team context so the switcher is the
+    // first thing the user sees.
+    teamId && accountId ? 'teams' : 'actions',
+  );
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -181,7 +214,7 @@ export function UserMenu({ user }: UserMenuProps) {
     account: boolean;
   }>({
     actions: true,
-    teams: false,
+    teams: true, // expanded by default so it's conspicuous
     account: true,
   });
 
@@ -246,10 +279,10 @@ export function UserMenu({ user }: UserMenuProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Reset mobile sections on close: Teams collapsed, others expanded.
+  // Reset mobile sections on close: Teams expanded, others expanded.
   useEffect(() => {
     if (!open && isMobile) {
-      setMobileSections({ actions: true, teams: false, account: true });
+      setMobileSections({ actions: true, teams: true, account: true });
     }
   }, [open, isMobile]);
 
@@ -378,19 +411,29 @@ export function UserMenu({ user }: UserMenuProps) {
           );
         }}
         className={cn(
-          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
+          'relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all cursor-pointer',
           isActive
-            ? 'bg-primary/10 text-primary'
+            ? 'bg-primary/10 text-primary ring-1 ring-primary/30'
             : 'text-foreground hover:bg-accent',
         )}
       >
+        {/* Left accent bar on the active team */}
+        {isActive && (
+          <span
+            aria-hidden
+            className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary"
+          />
+        )}
+
         {renderAccountLogo(teamAccount, 28)}
 
         <span className="min-w-0 flex-1">
           <span
             className={cn(
               'block truncate text-sm',
-              isActive ? 'font-medium text-primary' : 'text-foreground',
+              isActive
+                ? 'font-semibold text-primary'
+                : 'text-foreground',
             )}
           >
             {team.display_name || team.name}
@@ -409,6 +452,32 @@ export function UserMenu({ user }: UserMenuProps) {
       </button>
     );
   };
+
+  // ============================================================
+  // CONSPICUOUS "YOUR TEAMS" CONTAINER
+  //
+  // Wraps the teams list (and manage-this-team actions) in a tinted,
+  // bordered card so the section reads as a distinct block inside the
+  // user menu panel.
+  // ============================================================
+
+  const teamsSectionHeader = (
+    <div className="mb-2 flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/15 text-primary">
+          <Users className="h-3 w-3" />
+        </span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">
+          Your Teams
+        </span>
+      </div>
+      {teams.length > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+          {teams.length}
+        </span>
+      )}
+    </div>
+  );
 
   // ============================================================
   // DESKTOP PANEL RENDERER
@@ -476,25 +545,24 @@ export function UserMenu({ user }: UserMenuProps) {
       case 'teams':
         return (
           <div className="space-y-1">
-            {/* Teams section label */}
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              Your Teams
-            </p>
+            {/* Conspicuous Your Teams card */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+              {teamsSectionHeader}
 
-            {/* Teams list — always visible, selectable */}
-            {teams.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
-                No teams yet
-              </p>
-            ) : (
-              <div
-                role="radiogroup"
-                aria-label="Your teams"
-                className="space-y-0.5"
-              >
-                {teams.map(renderTeamRow)}
-              </div>
-            )}
+              {teams.length === 0 ? (
+                <p className="px-1 py-2 text-xs text-muted-foreground">
+                  No teams yet
+                </p>
+              ) : (
+                <div
+                  role="radiogroup"
+                  aria-label="Your teams"
+                  className="space-y-0.5"
+                >
+                  {teams.map(renderTeamRow)}
+                </div>
+              )}
+            </div>
 
             {/* ---- Manage this team (collapsible) ---- */}
             {teamId && accountId && teamSettingsHref && (
@@ -697,6 +765,7 @@ export function UserMenu({ user }: UserMenuProps) {
           {SECTIONS.map((section) => {
             const Icon = section.icon;
             const isActive = activeSection === section.key;
+            const isTeams = section.key === 'teams';
             return (
               <button
                 key={section.key}
@@ -718,6 +787,19 @@ export function UserMenu({ user }: UserMenuProps) {
                 <span className={cn('text-sm', isActive && 'font-medium')}>
                   {section.label}
                 </span>
+                {/* Small count badge on the Teams nav item */}
+                {isTeams && teams.length > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-primary/10 text-primary',
+                    )}
+                  >
+                    {teams.length}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -785,7 +867,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
         {/* ---- Sections ---- */}
 
-        {/* Quick Actions — expanded by default */}
+        {/* Quick Actions */}
         <MobileSection
           title="Quick Actions"
           expanded={mobileSections.actions}
@@ -833,12 +915,13 @@ export function UserMenu({ user }: UserMenuProps) {
           </button>
         </MobileSection>
 
-        {/* Your Teams — collapsed by default */}
+        {/* Your Teams — conspicuous treatment via highlight */}
         <MobileSection
           title="Your Teams"
           expanded={mobileSections.teams}
           onToggle={() => toggleMobileSection('teams')}
           badge={teams.length > 0 ? teams.length : undefined}
+          highlight
         >
           {teams.length === 0 ? (
             <p className="px-2 py-2 text-xs text-muted-foreground">
@@ -854,19 +937,23 @@ export function UserMenu({ user }: UserMenuProps) {
               <button
                 type="button"
                 onClick={() => navigateTo(teamSettingsHref)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-primary/10 cursor-pointer"
               >
-                <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm">Team settings</span>
+                <Settings className="h-4 w-4 shrink-0 text-primary" />
+                <span className="text-sm font-medium text-primary">
+                  Team settings
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={openInviteDialog}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-primary/10 cursor-pointer"
               >
-                <UserPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="text-sm">Invite member</span>
+                <UserPlus className="h-4 w-4 shrink-0 text-primary" />
+                <span className="text-sm font-medium text-primary">
+                  Invite member
+                </span>
               </button>
             </>
           )}
@@ -876,14 +963,16 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(newTeamHref)}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-primary/10 cursor-pointer"
           >
-            <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">Create new team</span>
+            <Plus className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-sm font-medium text-primary">
+              Create new team
+            </span>
           </button>
         </MobileSection>
 
-        {/* Account — expanded by default */}
+        {/* Account */}
         <MobileSection
           title="Account"
           expanded={mobileSections.account}
