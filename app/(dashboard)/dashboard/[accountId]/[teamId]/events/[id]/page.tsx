@@ -12,9 +12,7 @@ import {
   ArrowLeft,
   Calendar,
   CalendarDays,
-  Check,
   Clock,
-  Copy,
   Edit,
   ExternalLink,
   Loader2,
@@ -72,7 +70,6 @@ import {
   isHostInstitution,
 } from '@/lib/utils/eventDisplay';
 import {
-  nuruventMeetingUrl,
   platformMeetingCode,
   schedulePlatform,
 } from '@/lib/utils/meetingUrl';
@@ -83,6 +80,7 @@ import {
   type PlatformMeta,
 } from '@/components/events/video/PlatformPickerModal';
 import { MeetingCard } from '@/components/events/video/MeetingCard';
+import { MeetingCardReadOnly } from '@/components/events/video/MeetingCardReadOnly';
 import { useVideoConnection } from '@/components/events/video/useVideoConnection';
 import { AddMeetingDialog } from '@/components/events/video/AddMeetingDialog';
 
@@ -90,7 +88,6 @@ import {
   EditMeetingDialog,
   type EditMeetingFormValues,
 } from '@/components/meeting/EditMeetingDialog';
-import { ShareMeetingDialog } from '@/components/meeting/ShareMeetingDialog';
 import { DeleteMeetingDialog } from '@/components/meeting/DeleteMeetingDialog';
 
 import { useAppSelector } from '@/lib/store/hooks';
@@ -159,10 +156,6 @@ function schedulePlatformMeta(s: Schedule): PlatformMeta | undefined {
   return PLATFORMS.find((m) => m.platform === p);
 }
 
-function sessionLabel(s: Schedule, index: number): string {
-  return s.session_name?.trim() || `Session ${index + 1}`;
-}
-
 async function copyToClipboard(text: string): Promise<boolean> {
   if (!text) return false;
   try {
@@ -222,7 +215,6 @@ export default function EventDetailPage({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [copiedEvent, setCopiedEvent] = useState(false);
   const [publishError, setPublishError] = useState<{
     message: string;
     details: string[];
@@ -231,13 +223,11 @@ export default function EventDetailPage({
     useState(false);
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [sharingSessionId, setSharingSessionId] = useState<string | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [runningSessionId, setRunningSessionId] = useState<string | null>(null);
   const [runningAction, setRunningAction] = useState<
-    'create' | 'edit' | 'share' | 'regenerate' | 'delete' | 'add' | null
+    'create' | 'edit' | 'regenerate' | 'delete' | 'add' | null
   >(null);
-  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
 
   const video = useVideoConnection();
   const [isPlatformPickerOpen, setIsPlatformPickerOpen] = useState(false);
@@ -347,6 +337,8 @@ export default function EventDetailPage({
   const isDraft = event ? isEventDraft(event) : false;
   const isPublished = event ? isEventPublished(event) : false;
 
+  const isHost = !!user?.id && event?.creator?.id === user.id;
+
   const hasZoomConnection = !!video.getConnection('zoom');
   const hasMeetConnection = !!video.getConnection('google_meet');
   const hasAnyConnection = hasZoomConnection || hasMeetConnection;
@@ -357,9 +349,6 @@ export default function EventDetailPage({
 
   const editingSession = event?.schedules?.find(
     (s) => s.id === editingSessionId,
-  );
-  const sharingSession = event?.schedules?.find(
-    (s) => s.id === sharingSessionId,
   );
 
   const openPlatformPicker = () => {
@@ -468,40 +457,12 @@ export default function EventDetailPage({
     }
   };
 
-  const handleCopyEventLink = async () => {
-    if (!event) return;
-    const url = getPublicEventUrl(event.slug);
-    const ok = await copyToClipboard(url);
-    if (ok) {
-      setCopiedEvent(true);
-      toast.success('Event link copied to clipboard');
-      setTimeout(() => setCopiedEvent(false), 2000);
-    } else {
-      toast.error('Could not copy the link');
-    }
-  };
-
-  const handleCopySessionLink = async (sessionId: string, link: string) => {
-    const ok = await copyToClipboard(link);
-    if (ok) {
-      setCopiedSessionId(sessionId);
-      toast.success('Join link copied');
-      setTimeout(() => setCopiedSessionId(null), 2000);
-    } else {
-      toast.error('Could not copy the link');
-    }
-  };
-
   const handleJoinLink = (link: string) => {
     window.open(link, '_blank', 'noopener,noreferrer');
   };
 
   const handleEditSession = (sessionId: string) => {
     setEditingSessionId(sessionId);
-  };
-
-  const handleShareSession = (sessionId: string) => {
-    setSharingSessionId(sessionId);
   };
 
   const handleRegenerateSession = async (sessionId: string) => {
@@ -553,121 +514,108 @@ export default function EventDetailPage({
     }
   };
 
-const handleSaveMeeting = async (values: EditMeetingFormValues) => {
-  if (!event || !editingSession) return;
+  const handleSaveMeeting = async (values: EditMeetingFormValues) => {
+    if (!event || !editingSession) return;
 
-  setRunningSessionId(editingSession.id);
-  setRunningAction('edit');
-  const t = toast.loading('Updating session…');
+    setRunningSessionId(editingSession.id);
+    setRunningAction('edit');
+    const t = toast.loading('Updating session…');
 
-  try {
-    const wasVirtual = editingSession.is_virtual;
-    const wasPlatform = editingSession.platform as VideoPlatform | undefined;
-    const wasMeetingId = editingSession.video_meeting_id;
+    try {
+      const wasVirtual = editingSession.is_virtual;
+      const wasPlatform = editingSession.platform as VideoPlatform | undefined;
+      const wasMeetingId = editingSession.video_meeting_id;
 
-    const willBeVirtual = values.is_virtual;
-    const willPlatform = values.platform;
+      const willBeVirtual = values.is_virtual;
+      const willPlatform = values.platform;
 
-   const platformChanged =
-      wasVirtual && willBeVirtual &&
-      wasPlatform !== undefined && willPlatform !== undefined &&
-      wasPlatform !== willPlatform;
+      const platformChanged =
+        wasVirtual && willBeVirtual &&
+        wasPlatform !== undefined && willPlatform !== undefined &&
+        wasPlatform !== willPlatform;
 
-    const goingVirtual = willBeVirtual && !wasVirtual;
-    const goingInPerson = !willBeVirtual && wasVirtual;
+      const goingVirtual = willBeVirtual && !wasVirtual;
+      const goingInPerson = !willBeVirtual && wasVirtual;
 
-    const shouldDeleteMeeting = wasMeetingId !== undefined && (platformChanged || goingInPerson);
-    const shouldCreateMeeting = willPlatform !== undefined && (goingVirtual || platformChanged);
+      const shouldDeleteMeeting =
+        wasMeetingId !== undefined && (platformChanged || goingInPerson);
+      const shouldCreateMeeting =
+        willPlatform !== undefined && (goingVirtual || platformChanged);
 
-    const clearingMeeting = platformChanged || goingInPerson;
+      const clearingMeeting = platformChanged || goingInPerson;
 
-    const schedules = (event.schedules ?? []).map((s) => {
-      if (s.id !== editingSession.id) {
+      const schedules = (event.schedules ?? []).map((s) => {
+        if (s.id !== editingSession.id) {
+          return {
+            id: s.id,
+            session_name: s.session_name,
+            session_number: s.session_number,
+            start_date: s.start_date,
+            end_date: s.end_date,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            timezone: s.timezone,
+            location: s.location,
+            is_virtual: s.is_virtual,
+            platform: s.platform,
+            zoom_link: s.zoom_link,
+            meet_link: s.meet_link,
+            max_attendees: s.max_attendees,
+          };
+        }
+
         return {
           id: s.id,
-          session_name: s.session_name,
+          session_name: values.session_name,
           session_number: s.session_number,
-          start_date: s.start_date,
-          end_date: s.end_date,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          timezone: s.timezone,
-          location: s.location,
-          is_virtual: s.is_virtual,
-          platform: s.platform,
-          zoom_link: s.zoom_link,
-          meet_link: s.meet_link,
+          start_date: values.start_date,
+          end_date: values.end_date ?? s.end_date,
+          start_time: values.start_time + ':00',
+          end_time: values.end_time + ':00',
+          timezone: values.timezone,
+          location: willBeVirtual ? s.location : values.location,
+          is_virtual: willBeVirtual,
+          platform: willBeVirtual ? willPlatform ?? s.platform : undefined,
+          zoom_link: clearingMeeting ? '' : s.zoom_link,
+          meet_link: clearingMeeting ? '' : s.meet_link,
           max_attendees: s.max_attendees,
         };
+      });
+
+      if (shouldDeleteMeeting) {
+        try {
+          await deleteEventMeeting(event.id).unwrap();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('Failed to delete existing meeting:', err);
+        }
       }
 
-      return {
-        id: s.id,
-        session_name: values.session_name,
-        session_number: s.session_number,
-        start_date: values.start_date,
-        end_date: values.end_date ?? s.end_date,
-        start_time: values.start_time + ':00',
-        end_time: values.end_time + ':00',
-        timezone: values.timezone,
-        location: willBeVirtual ? s.location : values.location,
-        is_virtual: willBeVirtual,
-        platform: willBeVirtual ? willPlatform ?? s.platform : undefined,
-        zoom_link: clearingMeeting ? '' : s.zoom_link,
-        meet_link: clearingMeeting ? '' : s.meet_link,
-        max_attendees: s.max_attendees,
-      };
-    });
-
-    if (shouldDeleteMeeting) {
-      try {
-        await deleteEventMeeting(event.id).unwrap();
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.warn('Failed to delete existing meeting:', err);
-      }
-    }
-
-    await updateEvent({
-      id: event.id,
-      data: { schedules },
-    }).unwrap();
-
-    if (shouldCreateMeeting && willPlatform) {
-      await createEventMeeting({
-        eventId: event.id,
-        platform: willPlatform,
+      await updateEvent({
+        id: event.id,
+        data: { schedules },
       }).unwrap();
-    }
 
-    toast.dismiss(t);
-    toast.success('Session updated');
-    setEditingSessionId(null);
-    refetch();
-  } catch (err: unknown) {
-    toast.dismiss(t);
-    const msg =
-      (err as { data?: { message?: string } })?.data?.message ??
-      'Failed to update session';
-    toast.error(msg);
-  } finally {
-    setRunningSessionId(null);
-    setRunningAction(null);
-  }
-};
+      if (shouldCreateMeeting && willPlatform) {
+        await createEventMeeting({
+          eventId: event.id,
+          platform: willPlatform,
+        }).unwrap();
+      }
 
-  const handleShareCopy = async () => {
-    if (!event || !sharingSession) return;
-    const link = nuruventMeetingUrl(sharingSession, event) ?? '';
-    const platformLabel = schedulePlatformMeta(sharingSession)?.label ?? 'video';
-    const label = sessionLabel(sharingSession, 0);
-    const text = `Join "${label}" on ${platformLabel}: ${link}`;
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      toast.success('Join link copied');
-      setSharingSessionId(null);
-    } else {
-      toast.error('Could not copy the link');
+      toast.dismiss(t);
+      toast.success('Session updated');
+      setEditingSessionId(null);
+      refetch();
+    } catch (err: unknown) {
+      toast.dismiss(t);
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to update session';
+      toast.error(msg);
+    } finally {
+      setRunningSessionId(null);
+      setRunningAction(null);
     }
   };
 
@@ -854,8 +802,8 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
   };
 
   if (isLoading || !eventId) {
-  return <EventDetailSkeleton />;
-} 
+    return <EventDetailSkeleton />;
+  }
 
   if (error || !event) {
     return (
@@ -870,8 +818,10 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
             don&apos;t have permission to view it.
           </p>
           <Button
-            onClick={() => router.push(`/dashboard/${accountId}/${teamId}/events`)}
-            className="cursor-pointer"
+            onClick={() =>
+              router.push(`/dashboard/${accountId}/${teamId}/events`)
+            }
+            className="cursor-pointer px-5 py-2.5"
           >
             Go to Events
           </Button>
@@ -888,6 +838,10 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
   const location = getEventLocation(event);
   const price = getEventMinPrice(event);
 
+  const organizerLogo = event.organizer?.avatar_url;
+  const organizerName =
+    event.organizer?.display_name || event.organizer?.name || hostName;
+
   return (
     <div className="w-full">
       {/* Header */}
@@ -899,6 +853,28 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
           >
             <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
+
+          {/* Organizer logo */}
+          {organizerLogo ? (
+            <div className="relative h-11 w-11 sm:h-14 sm:w-14 rounded-full overflow-hidden border border-border bg-muted shrink-0 shadow-sm">
+              <Image
+                src={organizerLogo}
+                alt={organizerName}
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
+          ) : (
+            <div className="h-11 w-11 sm:h-14 sm:w-14 rounded-full border border-border bg-primary/10 flex items-center justify-center shrink-0 shadow-sm">
+              {hostIsInstitution ? (
+                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              ) : (
+                <User className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              )}
+            </div>
+          )}
+
           <div className="min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl sm:text-2xl font-bold text-foreground break-words">
@@ -930,22 +906,29 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              Event ID: {event.id.slice(0, 8)}...
+              {organizerName} · Event ID: {event.id.slice(0, 8)}...
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-          <Link href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}>
-            <Button variant="outline" className="cursor-pointer">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-          </Link>
+          {isHost && (
+            <Link
+              href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+            >
+              <Button
+                variant="outline"
+                className="cursor-pointer px-5 py-2.5 h-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            </Link>
+          )}
 
-          {isDraft && (
+          {isHost && isDraft && (
             <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-5 py-2.5 h-auto"
               onClick={handlePublish}
               disabled={isPublishing}
             >
@@ -965,21 +948,26 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
 
           {isPublished && (
             <Link href={`/events/${event.slug}`} target="_blank">
-              <Button variant="outline" className="cursor-pointer">
+              <Button
+                variant="outline"
+                className="cursor-pointer px-5 py-2.5 h-auto"
+              >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Public
               </Button>
             </Link>
           )}
 
-          <Button
-            variant="destructive"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            className="cursor-pointer"
-            disabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {isHost && (
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="cursor-pointer px-5 py-2.5 h-auto"
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1005,43 +993,49 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
           </div>
 
           {/* Meeting card */}
-         {(event.is_virtual || event.is_hybrid) && (
-            <MeetingCard
-              event={event}
-              isDraft={isDraft}
-              hasZoomConnection={hasZoomConnection}
-              hasMeetConnection={hasMeetConnection}
-              hasAnyConnection={hasAnyConnection}
-              connectedPlatforms={connectedPlatformMetas}
-              runningSessionId={runningSessionId}
-              runningAction={runningAction}
-              copiedSessionId={copiedSessionId}
-              onCreateMeetings={handleCreateMeetings}
-              onOpenPlatformPicker={openPlatformPicker}
-              onAddMeeting={() => setIsAddMeetingDialogOpen(true)}
-              onCopyLink={handleCopySessionLink}
-              onJoinLink={handleJoinLink}
-              onEditSession={handleEditSession}
-              onShareSession={handleShareSession}
-              onRegenerateSession={handleRegenerateSession}
-              onDeleteSession={handleDeleteSession}
-              onStartMeeting={handleStartMeeting}
-              onRegenerateAll={handleRegenerateAll}
-              onDeleteAll={handleDeleteAll}
-              editEventHref={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+          {(event.is_virtual || event.is_hybrid) &&
+            (isHost ? (
+              <MeetingCard
+                event={event}
+                isDraft={isDraft}
+                currentUserId={user?.id}
+                hasZoomConnection={hasZoomConnection}
+                hasMeetConnection={hasMeetConnection}
+                hasAnyConnection={hasAnyConnection}
+                connectedPlatforms={connectedPlatformMetas}
+                runningSessionId={runningSessionId}
+                runningAction={runningAction}
+                onCreateMeetings={handleCreateMeetings}
+                onOpenPlatformPicker={openPlatformPicker}
+                onAddMeeting={() => setIsAddMeetingDialogOpen(true)}
+                onJoinLink={handleJoinLink}
+                onEditSession={handleEditSession}
+                onRegenerateSession={handleRegenerateSession}
+                onDeleteSession={handleDeleteSession}
+                onStartMeeting={handleStartMeeting}
+                onRegenerateAll={handleRegenerateAll}
+                onDeleteAll={handleDeleteAll}
+                editEventHref={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+              />
+            ) : (
+              <MeetingCardReadOnly
+                event={event}
+                ticketsHref={`/dashboard/${accountId}/${teamId}/tickets`}
+              />
+            ))}
+
+          {/* Attendance — host only */}
+          {isHost && (
+            <AttendanceCard
+              eventId={event.id}
+              summary={attendanceSummary}
+              loading={isAttendanceLoading}
+              error={attendanceErrorMessage}
+              fetchingSessionIds={fetchingSessionIds}
+              onFetchAttendance={handleFetchAttendance}
+              onExportAll={handleExportAll}
             />
           )}
-
-          {/* Attendance */}
-         <AttendanceCard
-            eventId={event.id}
-            summary={attendanceSummary}
-            loading={isAttendanceLoading}
-            error={attendanceErrorMessage}
-            fetchingSessionIds={fetchingSessionIds}
-            onFetchAttendance={handleFetchAttendance}
-            onExportAll={handleExportAll}
-          />
 
           {/* Description */}
           {event.description && (
@@ -1192,13 +1186,25 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
                 Event Host
               </h3>
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  {hostIsInstitution ? (
-                    <Building2 className="h-5 w-5 text-primary" />
-                  ) : (
-                    <User className="h-5 w-5 text-primary" />
-                  )}
-                </div>
+                {organizerLogo ? (
+                  <div className="relative h-11 w-11 rounded-full overflow-hidden border border-border bg-muted shrink-0">
+                    <Image
+                      src={organizerLogo}
+                      alt={organizerName}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-primary/10 rounded-full shrink-0">
+                    {hostIsInstitution ? (
+                      <Building2 className="h-5 w-5 text-primary" />
+                    ) : (
+                      <User className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <p className="font-medium text-foreground flex items-center gap-1.5 flex-wrap">
                     {hostName}
@@ -1222,51 +1228,6 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
                 Quick Actions
               </h3>
 
-              <Link
-                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
-                className="block"
-              >
-                <Button
-                  variant="outline"
-                  className="w-full justify-start cursor-pointer"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Event
-                </Button>
-              </Link>
-
-              <Link href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`} className="block">
-                <Button variant="outline" className="w-full justify-start cursor-pointer">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  View Payments
-                </Button>
-              </Link>
-
-              {event.is_virtual && (
-                <Button
-                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-                  onClick={openPlatformPicker}
-                >
-                  <Plug className="h-4 w-4 mr-2" />
-                  Manage Connection
-                </Button>
-              )}
-
-              {isDraft && (
-                <Button
-                  className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors"
-                  onClick={handlePublish}
-                  disabled={isPublishing}
-                >
-                  {isPublishing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  {isPublishing ? 'Publishing...' : 'Publish Event'}
-                </Button>
-              )}
-
               {isPublished && (
                 <Link
                   href={`/events/${event.slug}`}
@@ -1275,41 +1236,78 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
                 >
                   <Button
                     variant="outline"
-                    className="w-full justify-start cursor-pointer"
+                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    View Public Page
+                    Register Event
                   </Button>
                 </Link>
               )}
 
-              <Button
-                variant="outline"
-                className="w-full justify-start cursor-pointer"
-                onClick={handleCopyEventLink}
-              >
-                {copiedEvent ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2 text-primary" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Event Link
-                  </>
-                )}
-              </Button>
+              {isHost && (
+                <>
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Event
+                    </Button>
+                  </Link>
 
-              <Button
-                variant="destructive"
-                className="w-full justify-start cursor-pointer"
-                onClick={() => setIsDeleteDialogOpen(true)}
-                disabled={isDeleting}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
-              </Button>
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/payments`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      View Payments
+                    </Button>
+                  </Link>
+
+                  {event.is_virtual && (
+                    <Button
+                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"
+                      onClick={openPlatformPicker}
+                    >
+                      <Plug className="h-4 w-4 mr-2" />
+                      Manage Connection
+                    </Button>
+                  )}
+
+                  {isDraft && (
+                    <Button
+                      className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer transition-colors px-4 py-2.5 h-auto"
+                      onClick={handlePublish}
+                      disabled={isPublishing}
+                    >
+                      {isPublishing ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      {isPublishing ? 'Publishing...' : 'Publish Event'}
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="destructive"
+                    className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {isDeleting ? 'Moving to trash...' : 'Move to Trash'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -1402,13 +1400,13 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
             <Button
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
-              className="cursor-pointer w-full sm:w-auto"
+              className="cursor-pointer w-full sm:w-auto px-5 py-2.5 h-auto"
             >
               Cancel
             </Button>
             <Button
               variant="outline"
-              className="cursor-pointer w-full sm:w-auto text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+              className="cursor-pointer w-full sm:w-auto text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50 hover:bg-amber-50 dark:hover:bg-amber-950/30 px-5 py-2.5 h-auto"
               onClick={handleDelete}
               disabled={isDeleting}
             >
@@ -1460,14 +1458,14 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
             <Button
               variant="outline"
               onClick={() => setIsPublishErrorDialogOpen(false)}
-              className="w-full sm:w-auto cursor-pointer"
+              className="w-full sm:w-auto cursor-pointer px-5 py-2.5 h-auto"
             >
               Close
             </Button>
 
             {publishErrorIsConnectionIssue ? (
               <Button
-                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-5 py-2.5 h-auto"
                 onClick={() => {
                   setIsPublishErrorDialogOpen(false);
                   openPlatformPicker();
@@ -1478,7 +1476,7 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
               </Button>
             ) : (
               <Button
-                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-5 py-2.5 h-auto"
                 onClick={() => {
                   setIsPublishErrorDialogOpen(false);
                   router.push(
@@ -1495,31 +1493,13 @@ const handleSaveMeeting = async (values: EditMeetingFormValues) => {
       </Dialog>
 
       {/* Session-scoped dialogs */}
-     <EditMeetingDialog
+      <EditMeetingDialog
         open={editingSessionId !== null}
         onOpenChange={(open) => !open && setEditingSessionId(null)}
         schedule={editingSession}
         saving={runningAction === 'edit'}
         platforms={connectedPlatformMetas}
         onSave={handleSaveMeeting}
-      />
-
-      <ShareMeetingDialog
-        open={sharingSessionId !== null}
-        onOpenChange={(open) => !open && setSharingSessionId(null)}
-        meetingLink={
-          sharingSession && event
-            ? nuruventMeetingUrl(sharingSession, event)
-            : undefined
-        }
-        shareText={
-          sharingSession && event
-            ? `Join "${sessionLabel(sharingSession, 0)}" on ${
-                schedulePlatformMeta(sharingSession)?.label ?? 'video'
-              }: ${nuruventMeetingUrl(sharingSession, event) ?? ''}`
-            : ''
-        }
-        onCopy={handleShareCopy}
       />
 
       <DeleteMeetingDialog

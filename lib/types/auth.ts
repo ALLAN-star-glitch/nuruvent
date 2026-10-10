@@ -50,7 +50,7 @@ export type InstitutionType =
  * Account-level role. Mirrors the `role` values stored in
  * `account_members.role` and emitted in the JWT.
  */
-export type AccountRole = 'account_admin' | 'trainer';
+export type AccountRole = 'account_admin' | 'trainer' | 'learner';
 
 /**
  * Platform-level role. Only present for Nuruvent staff accounts.

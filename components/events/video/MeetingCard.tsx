@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
-  Copy,
   Edit,
   ExternalLink,
   Link2,
@@ -36,7 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import type { Event, Schedule, VideoPlatform } from '@/lib/types/events';
+import type { Event, Schedule } from '@/lib/types/events';
 import {
   nuruventMeetingUrl,
   schedulePlatform,
@@ -52,6 +51,9 @@ export interface MeetingCardProps {
   event: Event;
   isDraft: boolean;
 
+  /** Current viewer's user ID — used to detect whether they're the event host. */
+  currentUserId: string | undefined;
+
   hasZoomConnection: boolean;
   hasMeetConnection: boolean;
   hasAnyConnection: boolean;
@@ -62,22 +64,17 @@ export interface MeetingCardProps {
   runningAction:
     | 'create'
     | 'edit'
-    | 'share'
     | 'regenerate'
     | 'delete'
     | 'add'
     | null;
 
-  copiedSessionId: string | null;
-
   onCreateMeetings: () => void;
   onOpenPlatformPicker: () => void;
   onAddMeeting: () => void;
 
-  onCopyLink: (sessionId: string, link: string) => void;
   onJoinLink: (link: string) => void;
   onEditSession: (sessionId: string) => void;
-  onShareSession: (sessionId: string) => void;
   onRegenerateSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
 
@@ -89,8 +86,8 @@ export interface MeetingCardProps {
   editEventHref: string;
 
   /**
-   * Whether the card body starts expanded. Defaults to false so the
-   * event page isn't dominated by sessions on first load.
+   * Whether the card body starts expanded. Defaults to true so sessions
+   * are visible immediately on the event page.
    */
   defaultExpanded?: boolean;
 }
@@ -116,12 +113,14 @@ function hasMeeting(s: Schedule): boolean {
 }
 
 /**
- * Best display link for a virtual session. Prefers the Nuruvent
- * wrapper URL so join flows route through us and attendance tracking
- * works. Falls back to the raw provider link so the row still renders
- * something clickable when the wrapper can't be built.
+ * Best link for a virtual session. Prefers the Nuruvent wrapper URL so
+ * join flows route through us and attendance tracking works. Falls back
+ * to the raw provider link.
+ *
+ * NOTE: this is only used to drive the Join button now — the URL string
+ * itself is never rendered in the UI.
  */
-function displayLink(s: Schedule, event: Event): string | undefined {
+function resolveJoinLink(s: Schedule, event: Event): string | undefined {
   return nuruventMeetingUrl(s, event) ?? rawProviderLink(s);
 }
 
@@ -137,6 +136,21 @@ function sessionTimeLabel(s: Schedule): string {
   return parts.join(' · ');
 }
 
+/**
+ * Is the current viewer the host (creator) of the event?
+ *
+ * The backend includes `creator` on the payload only when the caller is
+ * authorized to see creator details — which is always true for the host
+ * themselves, and may be true for other account members depending on
+ * their role. The identity check is what actually determines host
+ * status; `creator` being absent simply means the viewer isn't allowed
+ * to see who created the event, which also means they're not the host.
+ */
+function isEventHost(event: Event, currentUserId: string | undefined): boolean {
+  if (!currentUserId) return false;
+  return event.creator?.id === currentUserId;
+}
+
 // ============================================================
 // MEETING CARD
 // ============================================================
@@ -144,29 +158,28 @@ function sessionTimeLabel(s: Schedule): string {
 export function MeetingCard({
   event,
   isDraft,
+  currentUserId,
   hasZoomConnection,
   hasMeetConnection,
   hasAnyConnection,
-  connectedPlatforms,
+  connectedPlatforms: _connectedPlatforms,
   runningSessionId,
   runningAction,
-  copiedSessionId,
   onCreateMeetings,
   onOpenPlatformPicker,
   onAddMeeting,
-  onCopyLink,
   onJoinLink,
   onEditSession,
-  onShareSession,
   onRegenerateSession,
   onDeleteSession,
   onStartMeeting,
   onRegenerateAll,
   onDeleteAll,
   editEventHref,
-  defaultExpanded = false,
+  defaultExpanded = true,
 }: MeetingCardProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const isHost = isEventHost(event, currentUserId);
 
   const allSchedules = event.schedules ?? [];
 
@@ -184,7 +197,8 @@ export function MeetingCard({
   );
 
   const summary = (() => {
-    const virtualCount = virtualWithMeeting.length + virtualMissingMeeting.length;
+    const virtualCount =
+      virtualWithMeeting.length + virtualMissingMeeting.length;
 
     if (virtualCount === 0 && inPersonSchedules.length === 0) {
       return 'No sessions.';
@@ -333,14 +347,16 @@ export function MeetingCard({
                         key={s.id}
                         session={s}
                         index={idx}
-                        running={runningSessionId === s.id ? runningAction : null}
+                        running={
+                          runningSessionId === s.id ? runningAction : null
+                        }
                         onEdit={onEditSession}
                       />
                     );
                   }
 
-                  const link = displayLink(s, event);
                   const meta = scheduleMeta(s);
+                  const joinLink = resolveJoinLink(s, event);
 
                   return (
                     <SessionRow
@@ -348,13 +364,13 @@ export function MeetingCard({
                       session={s}
                       index={idx}
                       meta={meta}
-                      link={link}
-                      running={runningSessionId === s.id ? runningAction : null}
-                      copied={copiedSessionId === s.id}
-                      onCopy={onCopyLink}
+                      joinLink={joinLink}
+                      isHost={isHost}
+                      running={
+                        runningSessionId === s.id ? runningAction : null
+                      }
                       onJoin={onJoinLink}
                       onEdit={onEditSession}
-                      onShare={onShareSession}
                       onRegenerate={onRegenerateSession}
                       onDelete={onDeleteSession}
                       onStart={onStartMeeting}
@@ -673,13 +689,11 @@ interface SessionRowProps {
   session: Schedule;
   index: number;
   meta: PlatformMeta | undefined;
-  link: string | undefined;
+  joinLink: string | undefined;
+  isHost: boolean;
   running: MeetingCardProps['runningAction'];
-  copied: boolean;
-  onCopy: (sessionId: string, link: string) => void;
   onJoin: (link: string) => void;
   onEdit: (sessionId: string) => void;
-  onShare: (sessionId: string) => void;
   onRegenerate: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;
   onStart?: (session: Schedule) => void;
@@ -689,13 +703,11 @@ function SessionRow({
   session,
   index,
   meta,
-  link,
+  joinLink,
+  isHost,
   running,
-  copied,
-  onCopy,
   onJoin,
   onEdit,
-  onShare,
   onRegenerate,
   onDelete,
   onStart,
@@ -703,6 +715,7 @@ function SessionRow({
   const label = sessionLabel(session, index);
   const time = sessionTimeLabel(session);
   const isRunning = running !== null;
+  const configured = hasMeeting(session);
 
   return (
     <div className="rounded-lg border border-border bg-background/70 overflow-hidden">
@@ -746,11 +759,12 @@ function SessionRow({
           )}
         </div>
 
-        {link ? (
+        {configured ? (
           <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1.5">
-            <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
-            <p className="text-xs font-mono text-foreground/80 truncate flex-1 min-w-0">
-              {link}
+            <Check className="h-3 w-3 text-primary shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              Meeting configured
+              {meta ? ` · ${meta.label}` : ''}
             </p>
           </div>
         ) : (
@@ -766,23 +780,21 @@ function SessionRow({
       </div>
 
       <div className="border-t border-border px-3 sm:px-4 py-2 flex items-center gap-1.5 flex-wrap bg-muted/20">
-        {link ? (
+        {configured ? (
           <>
-            <Button
-              size="sm"
-              className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-              onClick={() => {
-                if (link) {
-                  window.open(link, '_blank', 'noopener,noreferrer');
-                }
-              }}
-              disabled={isRunning}
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              Join
-            </Button>
+            {isHost && joinLink && (
+              <Button
+                size="sm"
+                className="cursor-pointer h-8 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+                onClick={() => onJoin(joinLink)}
+                disabled={isRunning}
+              >
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                Join
+              </Button>
+            )}
 
-            {meta?.platform === 'zoom' && onStart && (
+            {isHost && meta?.platform === 'zoom' && onStart && (
               <Button
                 size="sm"
                 variant="outline"
@@ -799,94 +811,14 @@ function SessionRow({
               size="sm"
               variant="outline"
               className="cursor-pointer h-8 text-xs"
-              onClick={() => onCopy(session.id, link)}
+              onClick={() => onEdit(session.id)}
               disabled={isRunning}
             >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5 mr-1.5" />
-                  Copy
-                </>
-              )}
+              <Edit className="h-3.5 w-3.5 mr-1.5" />
+              Edit
             </Button>
 
-            <div className="hidden sm:flex items-center gap-1.5">
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer h-8 text-xs"
-                onClick={() => onEdit(session.id)}
-                disabled={isRunning}
-              >
-                <Edit className="h-3.5 w-3.5 mr-1.5" />
-                Edit
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer h-8 text-xs"
-                onClick={() => onShare(session.id)}
-                disabled={isRunning}
-              >
-                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                Share
-              </Button>
-            </div>
-
-            <div className="sm:hidden ml-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer h-8 w-8 p-0"
-                    disabled={isRunning}
-                    aria-label="More actions"
-                  >
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => onEdit(session.id)}
-                  >
-                    <Edit className="h-3.5 w-3.5 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    onClick={() => onShare(session.id)}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 mr-2" />
-                    Share
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                    onClick={() => onRegenerate(session.id)}
-                  >
-                    <RefreshCw className="h-3.5 w-3.5 mr-2" />
-                    Regenerate
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                    onClick={() => onDelete(session.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="hidden sm:block ml-auto">
+            <div className="ml-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -907,6 +839,7 @@ function SessionRow({
                     <RefreshCw className="h-3.5 w-3.5 mr-2" />
                     Regenerate
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="cursor-pointer text-destructive focus:text-destructive"
                     onClick={() => onDelete(session.id)}

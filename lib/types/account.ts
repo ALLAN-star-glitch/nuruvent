@@ -111,7 +111,7 @@ export interface AccountType {
 // ACCOUNT MEMBER
 // ============================================================
 
-export type AccountRole = 'account_admin' | 'trainer';
+export type AccountRole = 'account_admin' | 'trainer' | 'learner';
 
 /**
  * Mirrors backend MemberResponse exactly.
@@ -129,6 +129,13 @@ export interface AccountMember {
   role: AccountRole | string;
   is_active: boolean;
   joined_at: string;
+
+  // Identity fields — populated by GET /accounts/:id/members.
+  // May be absent on mutation responses (AddMember, UpdateMemberRole).
+  name?: string;
+  display_name?: string;
+  email?: string;
+  avatar_url?: string;
 }
 
 export interface AddMemberRequest {

@@ -8,9 +8,9 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowLeft,
+  BookOpen,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clock,
   GraduationCap,
   Loader2,
@@ -23,6 +23,7 @@ import {
   Settings2,
   Shield,
   Trash2,
+  UserCheck,
   UserMinus,
   UserPlus,
   Users,
@@ -54,14 +55,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -82,19 +75,20 @@ import {
   useRemoveTeamMemberMutation,
   useGetTeamInvitationsQuery,
   useResendInvitationMutation,
-  useInviteMemberMutation,
 } from '@/lib/store/api/teamsApi';
 import {
   useGetAccountByIdQuery,
   useGetAccountMembersQuery,
   useUpdateAccountMemberRoleMutation,
 } from '@/lib/store/api/accountsApi';
-import { useGetPublicProfileQuery } from '@/lib/store/api/profileApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import { selectUser } from '@/lib/store/slices/authSlice';
 import { cn } from '@/lib/utils';
 import type { TeamMember } from '@/lib/types/team';
 import type { Invitation, InvitationStatus } from '@/lib/types/invitation';
+
+import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
+import { AddExistingMemberDialog } from '@/components/team/AddExistingMemberDialog';
 
 // ============================================================
 // TYPES + CONSTANTS
@@ -121,10 +115,6 @@ const TABS: Array<{
   },
 ];
 
-// ============================================================
-// HASH → TAB ROUTING
-// ============================================================
-
 const HASH_TO_TAB: Record<string, SettingsTab> = {
   general: 'general',
   members: 'members',
@@ -138,6 +128,7 @@ function readTabFromHash(): SettingsTab | null {
   return HASH_TO_TAB[raw] ?? null;
 }
 
+// Roles assignable via the role-change dropdown in the member row.
 const ASSIGNABLE_ROLES = [
   {
     value: 'account_admin',
@@ -148,6 +139,11 @@ const ASSIGNABLE_ROLES = [
     value: 'trainer',
     label: 'Trainer',
     hint: 'Can create and run events; cannot manage members.',
+  },
+  {
+    value: 'learner',
+    label: 'Learner',
+    hint: 'Can view events, register, and access their own certificates.',
   },
 ] as const;
 
@@ -169,6 +165,7 @@ const INVITATION_FILTERS: Array<{
 function roleLabel(role?: string | null): string {
   if (role === 'account_admin') return 'Admin';
   if (role === 'trainer') return 'Trainer';
+  if (role === 'learner') return 'Learner';
   return role || '—';
 }
 
@@ -223,7 +220,16 @@ export default function TeamSettingsPage() {
   const [deleteTeam, { isLoading: deleting }] = useDeleteTeamMutation();
   const [leaveTeam, { isLoading: leaving }] = useLeaveTeamMutation();
 
-  // Initialize from the current hash so deep links open the right tab.
+  // Caller's role in this account — drives the invite dialog's role picker.
+  const { data: accountMembers } = useGetAccountMembersQuery(accountId, {
+    skip: !accountId,
+  });
+  const myRoleInAccount = useMemo(
+    () =>
+      accountMembers?.find((m) => m.user_id === currentUserId)?.role ?? null,
+    [accountMembers, currentUserId],
+  );
+
   const [tab, setTab] = useState<SettingsTab>(
     () => readTabFromHash() ?? 'general',
   );
@@ -239,8 +245,6 @@ export default function TeamSettingsPage() {
     setDisplayName(team.display_name ?? '');
   }, [team]);
 
-  // Sync the active tab with the URL hash: handles back/forward,
-  // manual hash edits, and in-page navigation from other routes.
   useEffect(() => {
     const applyHash = () => {
       const next = readTabFromHash();
@@ -252,8 +256,6 @@ export default function TeamSettingsPage() {
     return () => window.removeEventListener('hashchange', applyHash);
   }, []);
 
-  // Update the hash silently when the user picks a tab. `replaceState`
-  // avoids stacking history entries — back button leaves the page.
   const handleTabChange = (next: SettingsTab) => {
     setTab(next);
     if (typeof window !== 'undefined') {
@@ -332,9 +334,6 @@ export default function TeamSettingsPage() {
     );
   }
 
-  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
-  const ActiveIcon = activeTab.icon;
-
   return (
     <div className="w-full space-y-4 sm:space-y-6">
       {/* HEADER */}
@@ -379,66 +378,35 @@ export default function TeamSettingsPage() {
 
       {/* TWO-COLUMN LAYOUT */}
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        {/* Rail — dropdown on mobile, vertical sidebar on lg+ */}
         <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
-          {/* Mobile: dropdown select */}
-          <div className="lg:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer',
-                    activeTab.danger
-                      ? 'border-destructive/30 bg-destructive/5 text-destructive'
-                      : 'border-border bg-card text-foreground',
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <ActiveIcon className="h-4 w-4 shrink-0" />
-                    <span className="truncate text-sm font-medium">
-                      {activeTab.label}
-                    </span>
-                  </span>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-[240px]"
-              >
-                {TABS.map((t) => {
-                  const Icon = t.icon;
-                  const isActive = tab === t.key;
-                  return (
-                    <DropdownMenuItem
-                      key={t.key}
-                      onClick={() => handleTabChange(t.key)}
-                      className={cn(
-                        'cursor-pointer flex-col items-start gap-0.5 py-2',
-                        t.danger && 'text-destructive focus:text-destructive',
-                        isActive && !t.danger && 'bg-accent',
-                      )}
-                    >
-                      <span className="flex items-center gap-2 text-sm font-medium">
-                        <Icon className="h-4 w-4" />
-                        {t.label}
-                      </span>
-                      <span
-                        className={cn(
-                          'text-xs',
-                          t.danger
-                            ? 'text-destructive/70'
-                            : 'text-muted-foreground',
-                        )}
-                      >
-                        {t.hint}
-                      </span>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Mobile: horizontal scrollable pill tabs */}
+          <div className="-mx-3 overflow-x-auto px-3 pb-1 lg:hidden scrollbar-none">
+            <nav className="flex gap-1.5 w-max">
+              {TABS.map((t) => {
+                const isActive = tab === t.key;
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => handleTabChange(t.key)}
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                      isActive
+                        ? t.danger
+                          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                          : 'border-primary/40 bg-primary/10 text-primary'
+                        : t.danger
+                          ? 'border-border text-destructive/80 hover:bg-destructive/5'
+                          : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
 
           {/* Desktop: vertical nav */}
@@ -482,7 +450,6 @@ export default function TeamSettingsPage() {
           </nav>
         </aside>
 
-        {/* Panel — content swaps; rail stays */}
         <div className="min-w-0 space-y-4 sm:space-y-6">
           {tab === 'general' && (
             <Card className="w-full max-w-2xl border-border/70 shadow-sm">
@@ -577,10 +544,17 @@ export default function TeamSettingsPage() {
               accountId={accountId}
               teamId={teamId}
               currentUserId={currentUserId}
+              currentUserRole={myRoleInAccount}
             />
           )}
 
-          {tab === 'invitations' && <InvitationsPanel teamId={teamId} />}
+          {tab === 'invitations' && (
+            <InvitationsPanel
+              teamId={teamId}
+              accountId={accountId}
+              currentUserRole={myRoleInAccount}
+            />
+          )}
 
           {tab === 'danger' && (
             <div className="w-full max-w-2xl space-y-4 sm:space-y-6">
@@ -723,14 +697,17 @@ function MembersPanel({
   accountId,
   teamId,
   currentUserId,
+  currentUserRole,
 }: {
   accountId: string;
   teamId: string;
   currentUserId: string | null;
+  currentUserRole: string | null;
 }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
 
   const me = useAppSelector(selectUser);
@@ -753,6 +730,22 @@ function MembersPanel({
   const [updateRole, { isLoading: updatingRole }] =
     useUpdateAccountMemberRoleMutation();
 
+  const userByUserId = useMemo(() => {
+    const map = new Map<
+      string,
+      { name?: string; display_name?: string; email?: string; avatar_url?: string }
+    >();
+    accountMembers?.forEach((m) =>
+      map.set(m.user_id, {
+        name: m.name,
+        display_name: m.display_name,
+        email: m.email,
+        avatar_url: m.avatar_url,
+      }),
+    );
+    return map;
+  }, [accountMembers]);
+
   const roleByUserId = useMemo(() => {
     const map = new Map<string, string>();
     accountMembers?.forEach((m) => map.set(m.user_id, m.role));
@@ -773,7 +766,7 @@ function MembersPanel({
       await updateRole({
         accountId,
         userId,
-        data: { role: role as 'account_admin' | 'trainer' },
+        data: { role: role as 'account_admin' | 'trainer' | 'learner' },
       }).unwrap();
       toast.success('Role updated');
     } catch (err) {
@@ -819,13 +812,24 @@ function MembersPanel({
         ) : (
           <div className="hidden sm:block" />
         )}
-        <Button
-          onClick={() => setInviteOpen(true)}
-          className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
-        >
-          <UserPlus className="h-4 w-4" />
-          Invite
-        </Button>
+
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            onClick={() => setAddExistingOpen(true)}
+            variant="outline"
+            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+          >
+            <UserCheck className="h-4 w-4" />
+            Add existing
+          </Button>
+          <Button
+            onClick={() => setInviteOpen(true)}
+            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+          >
+            <UserPlus className="h-4 w-4" />
+            Invite
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -865,6 +869,7 @@ function MembersPanel({
                 member={m}
                 me={me}
                 role={roleByUserId.get(m.user_id) ?? null}
+                enrichedUserFromAccount={userByUserId.get(m.user_id)}
                 currentUserId={currentUserId}
                 busy={busy}
                 onChangeRole={handleChangeRole}
@@ -879,6 +884,14 @@ function MembersPanel({
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         teamId={teamId}
+        currentUserRole={currentUserRole}
+      />
+
+      <AddExistingMemberDialog
+        open={addExistingOpen}
+        onOpenChange={setAddExistingOpen}
+        teamId={teamId}
+        accountId={accountId}
       />
 
       <AlertDialog
@@ -919,6 +932,7 @@ function MemberRowWithProfile({
   member,
   me,
   role,
+  enrichedUserFromAccount,
   currentUserId,
   busy,
   onChangeRole,
@@ -927,6 +941,12 @@ function MemberRowWithProfile({
   member: TeamMember;
   me: SelfProfile | null;
   role: string | null;
+  enrichedUserFromAccount?: {
+    name?: string;
+    display_name?: string;
+    email?: string;
+    avatar_url?: string;
+  };
   currentUserId: string | null;
   busy: boolean;
   onChangeRole: (userId: string, role: string) => void;
@@ -934,27 +954,25 @@ function MemberRowWithProfile({
 }) {
   const isSelf = currentUserId === member.user_id;
 
-  const { data: profile } = useGetPublicProfileQuery(member.user_id, {
-    skip: isSelf || !!member.user,
-  });
-
-  const enrichedUser =
-    member.user ??
-    (isSelf && me
-      ? {
-          id: member.user_id,
-          name: me.name ?? '',
-          display_name: me.displayName ?? me.name ?? '',
-          email: me.email ?? '',
-          avatar_url: me.avatar_url ?? '',
-        }
-      : profile
+  const enrichedUser = enrichedUserFromAccount
+    ? {
+        id: member.user_id,
+        name: enrichedUserFromAccount.name ?? '',
+        display_name:
+          enrichedUserFromAccount.display_name ??
+          enrichedUserFromAccount.name ??
+          '',
+        email: enrichedUserFromAccount.email ?? '',
+        avatar_url: enrichedUserFromAccount.avatar_url ?? '',
+      }
+    : member.user ??
+      (isSelf && me
         ? {
-            id: profile.id,
-            name: profile.display_name ?? '',
-            display_name: profile.display_name ?? '',
-            email: '',
-            avatar_url: profile.avatar_url ?? '',
+            id: member.user_id,
+            name: me.name ?? '',
+            display_name: me.displayName ?? me.name ?? '',
+            email: me.email ?? '',
+            avatar_url: me.avatar_url ?? '',
           }
         : undefined);
 
@@ -1028,6 +1046,10 @@ function MemberRow({
     .slice(0, 2);
 
   const isAdmin = role === 'account_admin';
+  const isTrainer = role === 'trainer';
+  const isLearner = role === 'learner';
+
+  const RoleIcon = isAdmin ? Shield : isTrainer ? GraduationCap : BookOpen;
 
   return (
     <div className="flex min-w-0 items-center gap-2.5 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
@@ -1072,7 +1094,6 @@ function MemberRow({
           </span>
         </div>
 
-        {/* Mobile-only role badge, stacked below the name */}
         <div className="mt-1.5 flex items-center gap-1.5 sm:hidden">
           {role && (
             <Badge
@@ -1081,21 +1102,18 @@ function MemberRow({
                 'gap-1 text-[10px]',
                 isAdmin
                   ? 'border-indigo-200 text-indigo-600 bg-indigo-50/50 dark:border-indigo-900 dark:text-indigo-400 dark:bg-indigo-950/30'
-                  : 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30',
+                  : isTrainer
+                    ? 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30'
+                    : 'border-emerald-200 text-emerald-600 bg-emerald-50/50 dark:border-emerald-900 dark:text-emerald-400 dark:bg-emerald-950/30',
               )}
             >
-              {isAdmin ? (
-                <Shield className="h-3 w-3" />
-              ) : (
-                <GraduationCap className="h-3 w-3" />
-              )}
+              <RoleIcon className="h-3 w-3" />
               {roleLabel(role)}
             </Badge>
           )}
         </div>
       </div>
 
-      {/* Inline role badge on sm+ */}
       {role && (
         <Badge
           variant="outline"
@@ -1103,14 +1121,12 @@ function MemberRow({
             'hidden shrink-0 gap-1 text-[10px] sm:inline-flex',
             isAdmin
               ? 'border-indigo-200 text-indigo-600 bg-indigo-50/50 dark:border-indigo-900 dark:text-indigo-400 dark:bg-indigo-950/30'
-              : 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30',
+              : isTrainer
+                ? 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30'
+                : 'border-emerald-200 text-emerald-600 bg-emerald-50/50 dark:border-emerald-900 dark:text-emerald-400 dark:bg-emerald-950/30',
           )}
         >
-          {isAdmin ? (
-            <Shield className="h-3 w-3" />
-          ) : (
-            <GraduationCap className="h-3 w-3" />
-          )}
+          <RoleIcon className="h-3 w-3" />
           {roleLabel(role)}
         </Badge>
       )}
@@ -1139,19 +1155,30 @@ function MemberRow({
                 Change role
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="w-64">
-                {ASSIGNABLE_ROLES.map((r) => (
-                  <DropdownMenuItem
-                    key={r.value}
-                    disabled={role === r.value}
-                    onClick={() => onChangeRole(member.user_id, r.value)}
-                    className="cursor-pointer flex-col items-start gap-0.5 py-2"
-                  >
-                    <span className="text-sm font-medium">{r.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {r.hint}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                {ASSIGNABLE_ROLES.map((r) => {
+                  const Icon =
+                    r.value === 'account_admin'
+                      ? Shield
+                      : r.value === 'trainer'
+                        ? GraduationCap
+                        : BookOpen;
+                  return (
+                    <DropdownMenuItem
+                      key={r.value}
+                      disabled={role === r.value}
+                      onClick={() => onChangeRole(member.user_id, r.value)}
+                      className="cursor-pointer items-start gap-2 py-2"
+                    >
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium">{r.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {r.hint}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  );
+                })}
                 <DropdownMenuSeparator />
                 <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
                   Roles apply across the whole account.
@@ -1177,9 +1204,18 @@ function MemberRow({
 // INVITATIONS PANEL
 // ============================================================
 
-function InvitationsPanel({ teamId }: { teamId: string }) {
+function InvitationsPanel({
+  teamId,
+  accountId,
+  currentUserRole,
+}: {
+  teamId: string;
+  accountId: string;
+  currentUserRole: string | null;
+}) {
   const [filter, setFilter] = useState<'all' | InvitationStatus>('all');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addExistingOpen, setAddExistingOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useGetTeamInvitationsQuery(
@@ -1240,13 +1276,24 @@ function InvitationsPanel({ teamId }: { teamId: string }) {
             );
           })}
         </div>
-        <Button
-          onClick={() => setInviteOpen(true)}
-          className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          Invite
-        </Button>
+
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            onClick={() => setAddExistingOpen(true)}
+            variant="outline"
+            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+          >
+            <UserCheck className="h-4 w-4" />
+            Add existing
+          </Button>
+          <Button
+            onClick={() => setInviteOpen(true)}
+            className="w-full cursor-pointer gap-2 sm:w-auto shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            Invite
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -1298,6 +1345,14 @@ function InvitationsPanel({ teamId }: { teamId: string }) {
         open={inviteOpen}
         onOpenChange={setInviteOpen}
         teamId={teamId}
+        currentUserRole={currentUserRole}
+      />
+
+      <AddExistingMemberDialog
+        open={addExistingOpen}
+        onOpenChange={setAddExistingOpen}
+        teamId={teamId}
+        accountId={accountId}
       />
     </div>
   );
@@ -1393,170 +1448,5 @@ function InvitationRow({
         )}
       </div>
     </div>
-  );
-}
-
-// ============================================================
-// INVITE MEMBER DIALOG
-// ============================================================
-
-function InviteMemberDialog({
-  open,
-  onOpenChange,
-  teamId,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  teamId: string;
-}) {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'account_admin' | 'trainer'>('trainer');
-  const [invite, { isLoading }] = useInviteMemberMutation();
-
-  useEffect(() => {
-    if (!open) {
-      setEmail('');
-      setRole('trainer');
-    }
-  }, [open]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) {
-      toast.error('Email is required');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      toast.error('Enter a valid email address');
-      return;
-    }
-    try {
-      await invite({ teamId, data: { email: trimmed, role } }).unwrap();
-      toast.success('Invitation sent', {
-        description: `We emailed ${trimmed}.`,
-      });
-      onOpenChange(false);
-    } catch (err) {
-      const message =
-        (err as { data?: { message?: string } })?.data?.message ??
-        'Failed to send invitation';
-      toast.error(message);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:w-full">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 sm:h-8 sm:w-8">
-              <Mail className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
-            </div>
-            Invite a member
-          </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
-            We&apos;ll email them a link. They can accept it with or without an
-            existing Nuruvent account.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="invite-email" className="text-xs sm:text-sm">
-              Email address
-            </Label>
-            <Input
-              id="invite-email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoFocus
-              placeholder="teammate@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-10 rounded-xl text-sm sm:h-11"
-              disabled={isLoading}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs sm:text-sm">Role</Label>
-            <div className="grid gap-2">
-              {ASSIGNABLE_ROLES.map((r) => {
-                const selected = role === r.value;
-                const Icon =
-                  r.value === 'account_admin' ? Shield : GraduationCap;
-                return (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setRole(r.value)}
-                    disabled={isLoading}
-                    className={cn(
-                      'flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-colors cursor-pointer sm:gap-3 sm:p-3',
-                      selected
-                        ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
-                        : 'border-border hover:bg-accent',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:h-8 sm:w-8',
-                        selected
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground',
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p
-                        className={cn(
-                          'text-xs font-medium sm:text-sm',
-                          selected ? 'text-primary' : 'text-foreground',
-                        )}
-                      >
-                        {r.label}
-                      </p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">
-                        {r.hint}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Roles apply across the whole account, not just this team.
-            </p>
-          </div>
-          <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-              className="w-full cursor-pointer sm:w-auto"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full cursor-pointer gap-2 sm:w-auto"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending…
-                </>
-              ) : (
-                'Send invitation'
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

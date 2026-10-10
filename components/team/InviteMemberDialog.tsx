@@ -1,8 +1,15 @@
 // components/team/InviteMemberDialog.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2, Mail, Send, Shield, GraduationCap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  BookOpen,
+  GraduationCap,
+  Loader2,
+  Mail,
+  Send,
+  Shield,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -19,49 +26,100 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { useInviteMemberMutation } from '@/lib/store/api/teamsApi';
 
-// Local — the backend only accepts these two values.
-const ASSIGNABLE_ROLES = [
+// ============================================================
+// ASSIGNABLE ROLES
+// ============================================================
+//
+// Roles are account-scoped. Trainers may only invite learners;
+// account admins may invite any of the three.
+
+const ALL_ROLES = [
   {
     value: 'account_admin',
     label: 'Admin',
     hint: 'Full access to teams, members, events, and billing.',
     icon: Shield,
+    invitableBy: ['account_admin'],
   },
   {
     value: 'trainer',
     label: 'Trainer',
     hint: 'Can create and run events; cannot manage members.',
     icon: GraduationCap,
+    invitableBy: ['account_admin'],
+  },
+  {
+    value: 'learner',
+    label: 'Learner',
+    hint: 'Can view events, register, and access their own certificates.',
+    icon: BookOpen,
+    invitableBy: ['account_admin', 'trainer'],
   },
 ] as const;
 
-type AssignableRole = (typeof ASSIGNABLE_ROLES)[number]['value'];
+type AssignableRole = (typeof ALL_ROLES)[number]['value'];
+
+// ============================================================
+// PROPS
+// ============================================================
 
 interface InviteMemberDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   teamId: string;
+
+  /**
+   * The current user's role in the account. When provided, the role
+   * picker filters to the roles the caller is allowed to grant.
+   */
+  currentUserRole?: string | null;
+
   onInvited?: () => void;
 }
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export function InviteMemberDialog({
   open,
   onOpenChange,
   teamId,
+  currentUserRole,
   onInvited,
 }: InviteMemberDialogProps) {
+  // Roles the current user is allowed to grant.
+  const assignableRoles = useMemo(() => {
+    if (!currentUserRole) return ALL_ROLES;
+    return ALL_ROLES.filter((r) =>
+      (r.invitableBy as readonly string[]).includes(currentUserRole),
+    );
+  }, [currentUserRole]);
+
+  // Default selection: prefer trainer, otherwise the first assignable
+  // role. For a trainer caller that's learner; for an admin it's trainer.
+  const defaultRole: AssignableRole =
+    assignableRoles.find((r) => r.value === 'trainer')?.value ??
+    assignableRoles[0]?.value ??
+    'learner';
+
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<AssignableRole>('trainer');
+  const [role, setRole] = useState<AssignableRole>(defaultRole);
 
   const [invite, { isLoading }] = useInviteMemberMutation();
 
+  // Reset when the dialog opens/closes, and re-derive the default role
+  // in case the caller's role has changed.
   useEffect(() => {
     if (!open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail('');
-      setRole('trainer');
+      setRole(defaultRole);
+    } else {
+      setRole(defaultRole);
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +189,7 @@ export function InviteMemberDialog({
           <div className="space-y-2">
             <Label>Role</Label>
             <div className="grid gap-2">
-              {ASSIGNABLE_ROLES.map((r) => {
+              {assignableRoles.map((r) => {
                 const Icon = r.icon;
                 const selected = role === r.value;
                 return (

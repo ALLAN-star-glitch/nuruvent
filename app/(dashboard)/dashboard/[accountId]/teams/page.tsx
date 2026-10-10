@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Building2,
   Home,
   Loader2,
@@ -33,20 +34,43 @@ export default function TeamsListPage() {
   // Backend ignores account_id param — filter client-side.
   const teams = (data?.teams ?? []).filter((t) => t.account_id === accountId);
 
+  const accountIsPersonal = (account?.type ?? '').includes('personal');
+  const AccountFallbackIcon = accountIsPersonal ? Home : Building2;
+  const accountLogo = account?.logo_url ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={account.logo_url}
+      alt={account.name}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <AccountFallbackIcon className="h-3.5 w-3.5" />
+  );
+
   return (
     <div className="w-full space-y-6">
       {/* HEADER */}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2 sm:gap-3">
         <Link
           href={`/dashboard/${accountId}`}
-          className="mt-0.5 shrink-0 cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="mt-0.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:p-2"
           aria-label="Back to account"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            <span className="h-1 w-1 rounded-full bg-primary" />
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
+            {/* Account logo (falls back to icon) */}
+            <span
+              className={cn(
+                'flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded',
+                accountIsPersonal
+                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
+                  : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
+              )}
+            >
+              {accountLogo}
+            </span>
             <span className="truncate">
               {account?.display_name || account?.name || 'Account'}
             </span>
@@ -54,7 +78,7 @@ export default function TeamsListPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Teams
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             All teams in this account.
           </p>
         </div>
@@ -107,59 +131,67 @@ export default function TeamsListPage() {
             return (
               <div
                 key={team.id}
-                className="group flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
+                className="flex flex-col gap-4 rounded-xl border border-border/70 bg-card p-4 sm:p-5"
               >
-                <Link
-                  href={teamHref}
-                  className="flex flex-col gap-3 cursor-pointer"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div
-                      className={cn(
-                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                        isPersonal
-                          ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
-                          : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        'text-[10px]',
-                        isPersonal
-                          ? 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30'
-                          : 'border-indigo-200 text-indigo-600 bg-indigo-50/50 dark:border-indigo-900 dark:text-indigo-400 dark:bg-indigo-950/30',
-                      )}
-                    >
-                      {isPersonal ? 'Personal' : 'Institution'}
-                    </Badge>
+                {/* Identity block */}
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg',
+                      isPersonal
+                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
+                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
-                      {team.display_name || team.name}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {team.slug}
-                    </p>
-                  </div>
-                </Link>
 
-                <div className="mt-1 flex items-center justify-between border-t border-border/70 pt-3">
-                  <Link
-                    href={teamHref}
-                    className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-lg font-semibold text-foreground sm:text-xl">
+                        {team.display_name || team.name}
+                      </p>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'shrink-0 text-[10px]',
+                          isPersonal
+                            ? 'border-blue-200 text-blue-600 bg-blue-50/50 dark:border-blue-900 dark:text-blue-400 dark:bg-blue-950/30'
+                            : 'border-indigo-200 text-indigo-600 bg-indigo-50/50 dark:border-indigo-900 dark:text-indigo-400 dark:bg-indigo-950/30',
+                        )}
+                      >
+                        {isPersonal ? 'Personal' : 'Institution'}
+                      </Badge>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {team.slug}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="mt-auto flex flex-col gap-2 border-t border-border/70 pt-4 sm:flex-row sm:items-center">
+                  <Button
+                    asChild
+                    className="w-full cursor-pointer gap-1.5 sm:flex-1"
                   >
-                    Open →
-                  </Link>
-                  <Link
-                    href={settingsHref}
-                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                    <Link href={teamHref}>
+                      Open
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="w-full cursor-pointer gap-1.5 sm:w-auto"
                   >
-                    <Settings className="h-3.5 w-3.5" />
-                    Manage
-                  </Link>
+                    <Link href={settingsHref}>
+                      <Settings className="h-4 w-4" />
+                      Manage
+                    </Link>
+                  </Button>
                 </div>
               </div>
             );
