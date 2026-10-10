@@ -201,7 +201,7 @@ const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
     scope: 'team',
     team_id: teamId,
   },
-  { skip: !isAuthenticated || !teamId },
+  { skip: !isAuthenticated || !teamId, refetchOnMountOrArgChange: true },
 );
 
   const { data: eventTypesResponse } = useGetEventTypesQuery();
@@ -212,13 +212,18 @@ const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
 const { data: paymentStatsResponse, isLoading: paymentsLoading } =
   useGetPaymentStatsQuery(
     { team_id: teamId, scope: 'team' },
-    { skip: !isAuthenticated || !teamId },
+    { skip: !isAuthenticated || !teamId, refetchOnMountOrArgChange: true },
   );
 
- const { data: attendeesResponse, isLoading: attendeesLoading } =
+  const { data: attendeesResponse, isLoading: attendeesLoading } =
   useGetAttendeesQuery(
-    { page: 1, page_size: 1, team_id: teamId },
-    { skip: !isAuthenticated || !teamId },
+    {
+      page: 1,
+      page_size: 1,
+      team_id: teamId,
+      scope: 'team',
+    },
+    { skip: !isAuthenticated || !teamId, refetchOnMountOrArgChange: true },
   );
 
   const [createEvent] = useCreateEventMutation();
