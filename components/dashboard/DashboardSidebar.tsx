@@ -37,6 +37,7 @@ import { LogoutDialog } from '@/components/ui/LogoutDialog';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { FaLaptopHouse } from 'react-icons/fa';
+import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 
 // ============================================================
 // TYPES
@@ -160,10 +161,10 @@ export function DashboardSidebar({
     return segment === '' ? accountBase : `${accountBase}/${segment}`;
   };
 
-  const buildTeamHref = (id: string) => {
-    if (!accountId) return '/accounts';
-    return `${accountBase}/${id}`;
-  };
+ const buildTeamHref = (id: string) => {
+  if (!accountId) return '/accounts';
+  return buildTeamSwitchHref(pathname, accountId, id);
+};
 
   const isTeamNavActive = (segment: string) => {
     if (!accountId || !teamId) return false;
@@ -229,6 +230,7 @@ export function DashboardSidebar({
                   <Link
                     key={item.segment || 'root'}
                     href={buildTeamNavHref(item.segment)}
+                    prefetch = {false}
                     className={cn(
                       'flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-all duration-150 group relative cursor-pointer',
                       isActive
@@ -252,6 +254,7 @@ export function DashboardSidebar({
                 <Link
                   key={item.segment || 'root'}
                   href={buildTeamNavHref(item.segment)}
+                  prefetch={false}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
                     isActive

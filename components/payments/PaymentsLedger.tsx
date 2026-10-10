@@ -174,10 +174,16 @@ type ViewMode = 'table' | 'grid';
 
 export interface PaymentsLedgerProps {
   eventId?: string;
+  /**
+   * Team to scope the ledger to. When set, the backend filters to
+   * payments whose event belongs to this team. When omitted, the
+   * ledger is account-wide.
+   */
+  teamId?: string;
   compact?: boolean;
 }
 
-export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
+export function PaymentsLedger({ eventId, teamId, compact }: PaymentsLedgerProps) {
   const isScoped = !!eventId;
   const isCompact = compact ?? isScoped;
 
@@ -235,9 +241,16 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
     eventId,
   ]);
 
-  const { data: eventsResponse } = useListMyEventsQuery(
-    { page: 1, page_size: 100, sort_by: 'created_at', sort_order: 'desc' },
-    { skip: isScoped },
+   const { data: eventsResponse } = useListMyEventsQuery(
+    {
+      page: 1,
+      page_size: 100,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+      scope: teamId ? 'team' : undefined,
+      team_id: teamId,
+    },
+    { skip: isScoped || !teamId },
   );
 
   const events = useMemo(() => {
@@ -258,6 +271,8 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
       event_id: effectiveEventId,
       sort_by: sortField,
       sort_order: sortDirection,
+      team_id: teamId,
+      scope: teamId ? 'team' : undefined,
     }),
     [
       currentPage,
@@ -268,19 +283,34 @@ export function PaymentsLedger({ eventId, compact }: PaymentsLedgerProps) {
       effectiveEventId,
       sortField,
       sortDirection,
+      teamId,
     ],
   );
 
-  const {
-    data: listResponse,
-    isLoading,
-    isFetching,
-    error,
-  } = useListPaymentsQuery(queryParams);
+  console.log('[PL] teamId prop =', teamId);
+console.log('[PL] queryParams =', queryParams);
+console.log('[PL] stats args =', { event_id: effectiveEventId, team_id: teamId, scope: teamId ? 'team' : undefined });
+console.log('[PL] team_id in queryParams =', queryParams.team_id);
 
-  const { data: statsResponse } = useGetPaymentStatsQuery(
-    effectiveEventId ? { event_id: effectiveEventId } : undefined,
-  );
+  const {
+  data: listResponse,
+  isLoading,
+  isFetching,
+  error,
+} = useListPaymentsQuery(queryParams, {
+  refetchOnMountOrArgChange: true,
+});
+
+const { data: statsResponse } = useGetPaymentStatsQuery(
+  {
+    event_id: effectiveEventId,
+    team_id: teamId,
+    scope: teamId ? 'team' : undefined,
+  },
+  {
+    refetchOnMountOrArgChange: true,
+  },
+);
 
   const payments: PaymentListItem[] = listResponse?.data?.payments ?? [];
   const total = listResponse?.data?.total ?? 0;

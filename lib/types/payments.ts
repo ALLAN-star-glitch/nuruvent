@@ -187,6 +187,8 @@ export interface ListPaymentsParams {
   sort_order?: 'asc' | 'desc';
   date_from?: string;
   date_to?: string;
+  team_id?: string;
+  scope?: 'team';
 }
 
 export interface PaymentStats {

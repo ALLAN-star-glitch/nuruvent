@@ -55,7 +55,11 @@ export default function EventPaymentsPage({
         </div>
       </div>
 
-      <PaymentsLedger eventId={id} />
+      <PaymentsLedger
+        key={`${teamId}:${id}`}
+        eventId={id}
+        teamId={teamId}
+      />
     </div>
   );
 }

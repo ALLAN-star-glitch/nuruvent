@@ -245,6 +245,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             <Link
                               key={item.segment}
                               href={buildTeamNavHref(item.segment)}
+                              prefetch = {false}
                               onClick={() => setIsDrawerOpen(false)}
                               className={cn(
                                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',

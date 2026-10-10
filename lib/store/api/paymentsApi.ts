@@ -98,6 +98,11 @@ export const paymentsApi = api.injectEndpoints({
      * active account (JWT's active_account_id). Every fee amount is
      * computed on the backend using the rates snapshotted at order
      * creation (platform) and payment initiation (processing).
+     *
+     * Cache tags are namespaced by team_id so switching teams
+     * produces distinct cache entries — otherwise every team's
+     * ledger would share the same LIST tag and stale data would
+     * leak across teams.
      */
     listPayments: builder.query<
       BaseResponse<PaymentListResponse>,
@@ -117,18 +122,27 @@ export const paymentsApi = api.injectEndpoints({
           sort_order: params?.sort_order,
           date_from: params?.date_from,
           date_to: params?.date_to,
+          team_id: params?.team_id,
+          scope: params?.scope,
         },
       }),
-      providesTags: (result) =>
-        result?.data?.payments
-          ? [
-              ...result.data.payments.map((p) => ({
-                type: 'Payments' as const,
-                id: p.id,
-              })),
-              { type: 'Payments' as const, id: 'LIST' },
-            ]
-          : [{ type: 'Payments' as const, id: 'LIST' }],
+      providesTags: (result, _error, arg) => {
+        const teamKey = arg?.team_id ?? 'account';
+        const listTag = {
+          type: 'Payments' as const,
+          id: `LIST:${teamKey}`,
+        };
+        if (result?.data?.payments) {
+          return [
+            ...result.data.payments.map((p) => ({
+              type: 'Payments' as const,
+              id: p.id,
+            })),
+            listTag,
+          ];
+        }
+        return [listTag];
+      },
     }),
 
     /**
@@ -137,10 +151,19 @@ export const paymentsApi = api.injectEndpoints({
      * Aggregate summary for the caller's active account. Same filters
      * as listPayments minus pagination and search. Returns gross
      * revenue, platform fee total, processing fee total, and net.
+     *
+     * Cache tags are namespaced by team_id for the same reason as
+     * listPayments.
      */
     getPaymentStats: builder.query<
       BaseResponse<PaymentStats>,
-      { event_id?: string; date_from?: string; date_to?: string } | void
+      {
+        event_id?: string;
+        date_from?: string;
+        date_to?: string;
+        team_id?: string;
+        scope?: 'team';
+      } | void
     >({
       query: (params) => ({
         url: '/payments/stats',
@@ -149,9 +172,16 @@ export const paymentsApi = api.injectEndpoints({
           event_id: params?.event_id,
           date_from: params?.date_from,
           date_to: params?.date_to,
+          team_id: params?.team_id,
+          scope: params?.scope,
         },
       }),
-      providesTags: [{ type: 'Payments', id: 'STATS' }],
+      providesTags: (_result, _error, arg) => [
+        {
+          type: 'Payments' as const,
+          id: `STATS:${arg?.team_id ?? 'account'}`,
+        },
+      ],
     }),
   }),
 });

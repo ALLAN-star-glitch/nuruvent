@@ -209,10 +209,13 @@ const { data: listResponse, isLoading: eventsLoading } = useListMyEventsQuery(
   const eventTypes = eventTypesResponse?.data ?? [];
   const ticketTypes = ticketTypesResponse?.data ?? [];
 
-  const { data: paymentStatsResponse, isLoading: paymentsLoading } =
-    useGetPaymentStatsQuery(undefined, { skip: !isAuthenticated });
+const { data: paymentStatsResponse, isLoading: paymentsLoading } =
+  useGetPaymentStatsQuery(
+    { team_id: teamId, scope: 'team' },
+    { skip: !isAuthenticated || !teamId },
+  );
 
-  const { data: attendeesResponse, isLoading: attendeesLoading } =
+ const { data: attendeesResponse, isLoading: attendeesLoading } =
   useGetAttendeesQuery(
     { page: 1, page_size: 1, team_id: teamId },
     { skip: !isAuthenticated || !teamId },
