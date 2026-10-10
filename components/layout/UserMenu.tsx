@@ -23,6 +23,7 @@ import {
   Video,
   Trash2,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   Ticket,
   Home,
@@ -34,6 +35,7 @@ import {
   ExternalLink,
   Mail,
   UserPlus,
+  X,
 } from 'lucide-react';
 
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
@@ -93,6 +95,59 @@ const QUICK_LINKS = [
 ];
 
 // ============================================================
+// MOBILE SECTION (collapsible)
+// ============================================================
+
+function MobileSection({
+  title,
+  expanded,
+  onToggle,
+  badge,
+  children,
+}: {
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  badge?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-border last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50"
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {title}
+          </span>
+          {badge !== undefined && badge > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">
+              {badge}
+            </span>
+          )}
+        </span>
+
+        <ChevronRight
+          className={cn(
+            'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+            expanded && 'rotate-90',
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 space-y-0.5 px-2 pb-2 duration-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // COMPONENT
 // ============================================================
 
@@ -118,6 +173,20 @@ export function UserMenu({ user }: UserMenuProps) {
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  // Mobile menu sections: only Teams collapsed.
+  const [mobileSections, setMobileSections] = useState<{
+    actions: boolean;
+    teams: boolean;
+    account: boolean;
+  }>({
+    actions: true,
+    teams: false,
+    account: true,
+  });
+
+  // Desktop "Manage this team" sub-block: collapsed by default.
+  const [desktopManageCollapsed, setDesktopManageCollapsed] = useState(true);
 
   const { data: profile } = useGetMyProfileQuery();
   const { data: accounts } = useGetMyAccountsQuery();
@@ -176,6 +245,24 @@ export function UserMenu({ user }: UserMenuProps) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
+
+  // Reset mobile sections on close: Teams collapsed, others expanded.
+  useEffect(() => {
+    if (!open && isMobile) {
+      setMobileSections({ actions: true, teams: false, account: true });
+    }
+  }, [open, isMobile]);
+
+  // Reset desktop "Manage this team" collapse on close.
+  useEffect(() => {
+    if (!open && !isMobile) {
+      setDesktopManageCollapsed(true);
+    }
+  }, [open, isMobile]);
+
+  const toggleMobileSection = (key: 'actions' | 'teams' | 'account') => {
+    setMobileSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const getUserInitials = () => {
     const source = displayName || user?.name;
@@ -268,7 +355,7 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   // ============================================================
-  // TEAM ROW (used in the Teams panel)
+  // TEAM ROW — selectable (radio-like)
   // ============================================================
 
   const renderTeamRow = (team: Team) => {
@@ -282,6 +369,8 @@ export function UserMenu({ user }: UserMenuProps) {
       <button
         key={team.id}
         type="button"
+        role="radio"
+        aria-checked={isActive}
         onClick={() => {
           setOpen(false);
           router.push(
@@ -387,62 +476,93 @@ export function UserMenu({ user }: UserMenuProps) {
       case 'teams':
         return (
           <div className="space-y-1">
+            {/* Teams section label */}
             <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Your Teams
             </p>
 
+            {/* Teams list — always visible, selectable */}
             {teams.length === 0 ? (
               <p className="px-3 py-2 text-xs text-muted-foreground">
                 No teams yet
               </p>
             ) : (
-              teams.map(renderTeamRow)
+              <div
+                role="radiogroup"
+                aria-label="Your teams"
+                className="space-y-0.5"
+              >
+                {teams.map(renderTeamRow)}
+              </div>
             )}
 
-            {/* Team-scoped management — only when a team is active */}
+            {/* ---- Manage this team (collapsible) ---- */}
             {teamId && accountId && teamSettingsHref && (
               <>
                 <div className="my-2 h-px bg-border" />
 
-                <p className="px-3 pt-1 pb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Manage this team
-                </p>
-
                 <button
                   type="button"
-                  onClick={() => navigateTo(`${teamSettingsHref}#general`)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                  onClick={() => setDesktopManageCollapsed((v) => !v)}
+                  aria-expanded={!desktopManageCollapsed}
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
                 >
-                  <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">Team settings</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Manage this team
+                  </span>
+                  <ChevronRight
+                    className={cn(
+                      'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                      !desktopManageCollapsed && 'rotate-90',
+                    )}
+                  />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => navigateTo(`${teamSettingsHref}#members`)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-                >
-                  <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">Members</span>
-                </button>
+                {!desktopManageCollapsed && (
+                  <div className="space-y-0.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigateTo(`${teamSettingsHref}#general`)
+                      }
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                    >
+                      <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm">Team settings</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => navigateTo(`${teamSettingsHref}#invitations`)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-                >
-                  <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">Invitations</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigateTo(`${teamSettingsHref}#members`)
+                      }
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                    >
+                      <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm">Members</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={openInviteDialog}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-                >
-                  <UserPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm">Invite member</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigateTo(`${teamSettingsHref}#invitations`)
+                      }
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                    >
+                      <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm">Invitations</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={openInviteDialog}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                    >
+                      <UserPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm">Invite member</span>
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
@@ -635,32 +755,46 @@ export function UserMenu({ user }: UserMenuProps) {
       )}
     >
       <div className="max-h-[calc(100vh-5rem)] overflow-y-auto">
-        <div className="flex items-center gap-3 border-b border-border p-4">
-          <Avatar className="h-10 w-10">
+        {/* ---- Sticky header ---- */}
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-popover/95 p-4 backdrop-blur-sm">
+          <Avatar className="h-10 w-10 shrink-0">
             <AvatarImage src={avatarUrl} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
               {getUserInitials()}
             </AvatarFallback>
           </Avatar>
-          <div className="flex min-w-0 flex-col">
-            <p className="truncate text-sm font-medium leading-none text-foreground">
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <p className="truncate text-sm font-semibold leading-none text-foreground">
               {displayName}
             </p>
             <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
               {email}
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close menu"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Quick Actions */}
-        <div className="p-2">
-          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Quick Actions
-          </p>
+        {/* ---- Sections ---- */}
+
+        {/* Quick Actions — expanded by default */}
+        <MobileSection
+          title="Quick Actions"
+          expanded={mobileSections.actions}
+          onToggle={() => toggleMobileSection('actions')}
+        >
           <button
             type="button"
             onClick={() => navigateTo(dashboardHref)}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Dashboard</span>
@@ -668,7 +802,7 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(buildQuickLink('events'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Events</span>
@@ -676,7 +810,7 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(buildQuickLink('registrations'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <ClipboardList className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Registrations</span>
@@ -684,7 +818,7 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(buildQuickLink('tickets'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Ticket className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Tickets</span>
@@ -692,18 +826,20 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(buildQuickLink('attendees'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Attendees</span>
           </button>
-        </div>
+        </MobileSection>
 
-        {/* Teams (mobile) */}
-        <div className="border-t border-border p-2">
-          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Your Teams
-          </p>
+        {/* Your Teams — collapsed by default */}
+        <MobileSection
+          title="Your Teams"
+          expanded={mobileSections.teams}
+          onToggle={() => toggleMobileSection('teams')}
+          badge={teams.length > 0 ? teams.length : undefined}
+        >
           {teams.length === 0 ? (
             <p className="px-2 py-2 text-xs text-muted-foreground">
               No teams yet
@@ -714,10 +850,11 @@ export function UserMenu({ user }: UserMenuProps) {
 
           {teamId && teamSettingsHref && (
             <>
+              <div className="my-1 h-px bg-border" />
               <button
                 type="button"
                 onClick={() => navigateTo(teamSettingsHref)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
               >
                 <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-sm">Team settings</span>
@@ -726,7 +863,7 @@ export function UserMenu({ user }: UserMenuProps) {
               <button
                 type="button"
                 onClick={openInviteDialog}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
               >
                 <UserPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-sm">Invite member</span>
@@ -734,25 +871,28 @@ export function UserMenu({ user }: UserMenuProps) {
             </>
           )}
 
+          <div className="my-1 h-px bg-border" />
+
           <button
             type="button"
             onClick={() => navigateTo(newTeamHref)}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Create new team</span>
           </button>
-        </div>
+        </MobileSection>
 
-        {/* Account */}
-        <div className="border-t border-border p-2">
-          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Account
-          </p>
+        {/* Account — expanded by default */}
+        <MobileSection
+          title="Account"
+          expanded={mobileSections.account}
+          onToggle={() => toggleMobileSection('account')}
+        >
           <button
             type="button"
             onClick={() => navigateTo('/profile')}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <User className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">My Profile</span>
@@ -760,24 +900,26 @@ export function UserMenu({ user }: UserMenuProps) {
           <button
             type="button"
             onClick={() => navigateTo(settingsHref)}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
           >
             <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Account Settings</span>
           </button>
-        </div>
 
-        {/* Sign out */}
-        <div className="border-t border-border p-2">
+          <div className="my-1 h-px bg-border" />
+
           <button
             type="button"
             onClick={openLogoutDialog}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
+            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             <span className="text-sm">Sign Out</span>
           </button>
-        </div>
+        </MobileSection>
+
+        {/* Bottom breathing room */}
+        <div className="h-2" />
       </div>
     </div>
   );

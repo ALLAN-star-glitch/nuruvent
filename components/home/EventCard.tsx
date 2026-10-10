@@ -528,6 +528,13 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           )}
 
           {/* ---- Actions ---- */}
+          {/*
+            Mobile: full-width buttons stacked vertically, 44px tall,
+            comfortable tap targets. Text grows to text-sm for legibility.
+
+            sm+: back to the compact side-by-side pill buttons, h-10,
+            text-xs, rounded-full.
+          */}
           <div className="mt-auto pt-2 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
             {/* View details — always present */}
             <Button
@@ -538,12 +545,16 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 router.push(detailHref);
               }}
               className={cn(
-                'h-10 flex-1 rounded-full text-xs sm:text-sm font-semibold cursor-pointer',
+                'cursor-pointer gap-1.5 font-semibold transition-all duration-300',
+                // Mobile
+                'h-11 w-full rounded-xl text-sm',
+                // Desktop
+                'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
                 'border-border hover:bg-accent',
               )}
             >
               <span>View details</span>
-              <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1" />
+              <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
             </Button>
 
             {/* Register / Get Ticket — the public event page */}
@@ -552,7 +563,11 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 type="button"
                 onClick={handleRegisterClick}
                 className={cn(
-                  'h-10 flex-1 rounded-full text-xs sm:text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer',
+                  'cursor-pointer gap-1.5 font-semibold shadow-md hover:shadow-lg transition-all duration-300',
+                  // Mobile
+                  'h-11 w-full rounded-xl text-sm',
+                  // Desktop
+                  'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
                   isFree
                     ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600 hover:from-tertiary-600 hover:to-tertiary-700 text-white'
                     : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white',
@@ -562,7 +577,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 <span>{isFree ? 'Register' : 'Get Ticket'}</span>
                 <ArrowUpRight
                   className={cn(
-                    'h-3.5 w-3.5 sm:h-4 sm:w-4 ml-1 transition-all duration-300',
+                    'h-4 w-4 sm:h-3.5 sm:w-3.5 transition-all duration-300',
                     isHovered ? 'translate-x-0.5 -translate-y-0.5' : '',
                   )}
                 />

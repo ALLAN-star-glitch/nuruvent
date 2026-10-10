@@ -7,6 +7,7 @@ import {
   Building2,
   Check,
   ChevronDown,
+  ChevronRight,
   Home,
   LayoutDashboard,
   Plus,
@@ -64,12 +65,21 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Manage-this-team section: collapsed by default on desktop.
+  const [manageCollapsed, setManageCollapsed] = useState(true);
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Reset manage collapse whenever the popover closes.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!open) setManageCollapsed(true);
+  }, [open]);
 
   const { data: accounts } = useGetMyAccountsQuery();
   const { data: teamsData, isLoading: teamsLoading } = useGetUserTeamsQuery();
@@ -134,7 +144,6 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
 
   const handleSelectTeam = (team: Team) => {
     setOpen(false);
-
     const href = buildTeamSwitchHref(pathname, team.account_id, team.id);
     router.push(href);
   };
@@ -157,9 +166,7 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
 
   const handleOpenTeamSettings = () => {
     if (!accountId || !activeTeam) return;
-    navigateTo(
-      `/dashboard/${accountId}/${activeTeam.id}/settings`,
-    );
+    navigateTo(`/dashboard/${accountId}/${activeTeam.id}/settings`);
   };
 
   const renderAccountLogo = (
@@ -239,6 +246,13 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
     </button>
   );
 
+  // ============================================================
+  // SELECTABLE TEAM ROW
+  //
+  // Styled like a radio option: full-width, selected state with a
+  // primary tint, checkmark on the right when active.
+  // ============================================================
+
   const renderTeamRow = (team: Team) => {
     const isActive = activeTeam?.id === team.id;
     const teamAccount = accountById.get(team.account_id);
@@ -248,9 +262,11 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
       <button
         key={team.id}
         type="button"
+        role="radio"
+        aria-checked={isActive}
         onClick={() => handleSelectTeam(team)}
         className={cn(
-          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
+          'group/row flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
           isActive
             ? 'bg-primary/10 text-primary'
             : 'text-foreground hover:bg-accent',
@@ -277,10 +293,16 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
           </span>
         </span>
 
-        {isActive && <Check className="h-4 w-4 shrink-0 text-primary" />}
+        {isActive && (
+          <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        )}
       </button>
     );
   };
+
+  // ============================================================
+  // PANEL CONTENT
+  // ============================================================
 
   const panelContent = (
     <div className="space-y-1 p-2">
@@ -288,37 +310,78 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
         Switch team
       </p>
 
+      {/* Teams list — always visible, selectable */}
       {teams.length === 0 ? (
         <p className="px-3 py-2 text-xs text-muted-foreground">
           No teams yet
         </p>
       ) : isMultiAccount && groupedTeams ? (
-        groupedTeams.map((group, index) => (
-          <div key={group.accountId}>
-            {index > 0 && <div className="my-2 h-px bg-border" />}
-            <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {group.label}
-            </p>
-            {group.teams.map(renderTeamRow)}
-          </div>
-        ))
+        <div role="radiogroup" aria-label="Select a team">
+          {groupedTeams.map((group, index) => (
+            <div key={group.accountId}>
+              {index > 0 && <div className="my-2 h-px bg-border" />}
+              <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.teams.map(renderTeamRow)}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
-        teams.map(renderTeamRow)
+        <div role="radiogroup" aria-label="Select a team" className="space-y-0.5">
+          {teams.map(renderTeamRow)}
+        </div>
       )}
 
       <div className="my-2 h-px bg-border" />
 
-      {/* Team settings — only when a team is active */}
+      {/* ---- Manage this team (collapsible) ---- */}
       {activeTeam && accountId && (
-        <button
-          type="button"
-          onClick={handleOpenTeamSettings}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-        >
-          <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="text-sm">Team settings</span>
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setManageCollapsed((v) => !v)}
+            aria-expanded={!manageCollapsed}
+            className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Manage this team
+            </span>
+            <ChevronRight
+              className={cn(
+                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                !manageCollapsed && 'rotate-90',
+              )}
+            />
+          </button>
+
+          {!manageCollapsed && (
+            <div className="space-y-0.5 pt-1">
+              <button
+                type="button"
+                onClick={handleOpenTeamSettings}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+              >
+                <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm">Team settings</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleManageTeams}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+              >
+                <LayoutDashboard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm">Manage teams</span>
+              </button>
+            </div>
+          )}
+        </>
       )}
+
+      <div className="my-2 h-px bg-border" />
 
       <button
         type="button"
@@ -329,14 +392,17 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
         <span className="text-sm">Create new team</span>
       </button>
 
-      <button
-        type="button"
-        onClick={handleManageTeams}
-        className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-      >
-        <LayoutDashboard className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="text-sm">Manage teams</span>
-      </button>
+      {/* If no active team, still show a path to manage teams */}
+      {!activeTeam && accountId && (
+        <button
+          type="button"
+          onClick={handleManageTeams}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
+        >
+          <LayoutDashboard className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="text-sm">Manage teams</span>
+        </button>
+      )}
     </div>
   );
 
@@ -372,7 +438,7 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
         sideOffset={6}
         className="w-[var(--radix-popover-trigger-width)] min-w-[320px] p-0"
       >
-        <div className="max-h-[400px] overflow-y-auto">{panelContent}</div>
+        <div className="max-h-[420px] overflow-y-auto">{panelContent}</div>
       </PopoverContent>
     </Popover>
   );
