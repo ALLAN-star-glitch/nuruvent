@@ -113,13 +113,17 @@ listAllRegistrations: builder.query<
       page: params?.page ?? 1,
       page_size: params?.page_size ?? 20,
       event_id: params?.event_id,
+      team_id: params?.team_id,
+      scope: params?.scope,
       search: params?.search,
       status: params?.status,
       sort_by: params?.sort_by,
       sort_order: params?.sort_order,
     },
   }),
-  providesTags: [{ type: 'Registrations', id: 'LIST_ALL' }],
+  providesTags: (_result, _error, arg) => [
+  { type: 'Registrations' as const, id: `LIST_ALL:${arg?.team_id ?? 'account'}` },
+],
 }),
 
     /** GET /registrations/:id

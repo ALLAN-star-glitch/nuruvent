@@ -161,12 +161,17 @@ export function RegistrationsList() {
   }, [currentPage]);
 
   // ---- Events for the filter dropdown ----
-  const { data: eventsResponse } = useListMyEventsQuery({
-    page: 1,
-    page_size: 100,
-    sort_by: 'created_at',
-    sort_order: 'desc',
-  });
+  const { data: eventsResponse } = useListMyEventsQuery(
+    {
+      page: 1,
+      page_size: 100,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+      scope: teamId ? 'team' : undefined,
+      team_id: teamId,
+    },
+    { skip: !teamId },
+  );
 
   const events = useMemo(() => {
     const list = eventsResponse?.data?.data ?? [];
@@ -189,6 +194,8 @@ export function RegistrationsList() {
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
       event_id: selectedEventId === 'all' ? undefined : selectedEventId,
+      team_id: teamId,
+      scope: teamId ? 'team' : undefined,
       sort_by: sortField,
       sort_order: sortDirection,
       page: currentPage,
@@ -198,6 +205,7 @@ export function RegistrationsList() {
       searchQuery,
       selectedStatus,
       selectedEventId,
+      teamId,
       sortField,
       sortDirection,
       currentPage,
@@ -210,7 +218,12 @@ export function RegistrationsList() {
     isLoading,
     isFetching,
     error,
-  } = useListAllRegistrationsQuery(queryParams);
+  } = useListAllRegistrationsQuery(queryParams,
+    {
+    refetchOnMountOrArgChange: true,
+  }
+
+  );
 
   const payload = response?.data;
   const registrations: CrossEventRegistration[] = payload?.registrations ?? [];

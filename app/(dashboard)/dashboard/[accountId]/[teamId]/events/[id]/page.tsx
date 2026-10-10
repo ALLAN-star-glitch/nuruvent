@@ -1288,6 +1288,19 @@ export default function EventDetailPage({
                 </Button>
               </Link>
 
+              <Link
+                href={`/dashboard/${accountId}/${teamId}/events/${event.id}/registrations`}
+                className="block"
+              >
+                <Button
+                  variant="outline"
+                  className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  View Registrations
+                </Button>
+              </Link>
+
               {event.is_virtual && (
                 <Button
                   className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer px-4 py-2.5 h-auto"

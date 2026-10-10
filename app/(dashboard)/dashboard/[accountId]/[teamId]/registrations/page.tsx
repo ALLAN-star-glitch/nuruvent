@@ -1,10 +1,12 @@
 'use client';
 
-import { RegistrationsList } from "./_components/RegistrationsList";
-
-
+import { useParams } from 'next/navigation';
+import { RegistrationsList } from './_components/RegistrationsList';
 
 export default function RegistrationsPage() {
+  const params = useParams<{ accountId: string; teamId: string }>();
+  const teamId = params.teamId;
+
   return (
     <div className="space-y-5 pb-44 md:pb-20">
       {/* Header */}
@@ -21,7 +23,7 @@ export default function RegistrationsPage() {
         </p>
       </div>
 
-      <RegistrationsList />
+      <RegistrationsList key={teamId} />
     </div>
   );
 }

@@ -138,6 +138,8 @@ export interface ListAllRegistrationsParams {
   page?: number;
   page_size?: number;
   event_id?: string;
+  team_id?: string;
+  scope?: 'team';
   search?: string;
   status?: string;
   sort_by?: 'created_at' | 'attendee_name' | 'event_name' | 'status';
