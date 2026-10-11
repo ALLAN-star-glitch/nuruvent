@@ -260,11 +260,7 @@ export function UserMenu({ user }: UserMenuProps) {
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [open, setOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<SectionKey>(
-    // Auto-select Teams when inside a team context so the switcher is the
-    // first thing the user sees.
-    teamId && accountId ? 'teams' : 'actions',
-  );
+  const [activeSection, setActiveSection] = useState<SectionKey>('actions');
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
