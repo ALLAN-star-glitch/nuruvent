@@ -78,7 +78,7 @@ import {
 } from '@/lib/store/api/teamsApi';
 import {
   useGetAccountByIdQuery,
-  useGetAccountMembersQuery,
+  useGetMyMembershipQuery,
   useUpdateAccountMemberRoleMutation,
 } from '@/lib/store/api/accountsApi';
 import { useAppSelector } from '@/lib/store/hooks';
@@ -220,15 +220,14 @@ export default function TeamSettingsPage() {
   const [deleteTeam, { isLoading: deleting }] = useDeleteTeamMutation();
   const [leaveTeam, { isLoading: leaving }] = useLeaveTeamMutation();
 
-  // Caller's role in this account — drives the invite dialog's role picker.
-  const { data: accountMembers } = useGetAccountMembersQuery(accountId, {
+  // Caller's own role in this account. Self-service endpoint — works
+  // for learners, trainers, and admins alike. Using /me instead of the
+  // account member list avoids a 403 for learners, who do not hold
+  // `member:read`.
+  const { data: myMembership } = useGetMyMembershipQuery(accountId, {
     skip: !accountId,
   });
-  const myRoleInAccount = useMemo(
-    () =>
-      accountMembers?.find((m) => m.user_id === currentUserId)?.role ?? null,
-    [accountMembers, currentUserId],
-  );
+  const myRoleInAccount = myMembership?.role ?? null;
 
   const [tab, setTab] = useState<SettingsTab>(
     () => readTabFromHash() ?? 'general',
@@ -727,36 +726,11 @@ function MembersPanel({
     { skip: !teamId },
   );
 
-  const { data: accountMembers } = useGetAccountMembersQuery(accountId, {
-    skip: !accountId,
-  });
+const [removeMember, { isLoading: removing }] =
+  useRemoveTeamMemberMutation();
+const [updateRole, { isLoading: updatingRole }] =
+  useUpdateAccountMemberRoleMutation();
 
-  const [removeMember, { isLoading: removing }] =
-    useRemoveTeamMemberMutation();
-  const [updateRole, { isLoading: updatingRole }] =
-    useUpdateAccountMemberRoleMutation();
-
-  const userByUserId = useMemo(() => {
-    const map = new Map<
-      string,
-      { name?: string; display_name?: string; email?: string; avatar_url?: string }
-    >();
-    accountMembers?.forEach((m) =>
-      map.set(m.user_id, {
-        name: m.name,
-        display_name: m.display_name,
-        email: m.email,
-        avatar_url: m.avatar_url,
-      }),
-    );
-    return map;
-  }, [accountMembers]);
-
-  const roleByUserId = useMemo(() => {
-    const map = new Map<string, string>();
-    accountMembers?.forEach((m) => map.set(m.user_id, m.role));
-    return map;
-  }, [accountMembers]);
 
   const members = membersData?.members ?? [];
   const total = membersData?.total ?? 0;
@@ -870,18 +844,27 @@ function MembersPanel({
           </div>
           <div className="divide-y divide-border/70">
             {members.map((m) => (
-              <MemberRowWithProfile
-                key={m.id}
-                member={m}
-                me={me}
-                role={roleByUserId.get(m.user_id) ?? null}
-                enrichedUserFromAccount={userByUserId.get(m.user_id)}
-                currentUserId={currentUserId}
-                busy={busy}
-                onChangeRole={handleChangeRole}
-                onRemove={setPendingRemove}
-              />
-            ))}
+  <MemberRowWithProfile
+    key={m.id}
+    member={m}
+    me={me}
+    role={m.role ?? null}
+    enrichedUserFromAccount={
+      m.name || m.email
+        ? {
+            name: m.name,
+            display_name: m.display_name,
+            email: m.email,
+            avatar_url: m.avatar_url,
+          }
+        : undefined
+    }
+    currentUserId={currentUserId}
+    busy={busy}
+    onChangeRole={handleChangeRole}
+    onRemove={setPendingRemove}
+  />
+))}
           </div>
         </div>
       )}

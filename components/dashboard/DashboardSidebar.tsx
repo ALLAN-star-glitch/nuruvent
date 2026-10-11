@@ -36,11 +36,14 @@ import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
 import { LogoutDialog } from '@/components/ui/LogoutDialog';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
-import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
+import {
+  useGetMyAccountsQuery,
+  useGetMyMembershipQuery,
+} from '@/lib/store/api/accountsApi';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 import { accountLabel } from '@/lib/utils/account-label';
-import type { Account } from '@/lib/types/account';
+import type { Account, AccountRole } from '@/lib/types/account';
 import type { Team } from '@/lib/types/team';
 
 // ============================================================
@@ -54,6 +57,21 @@ interface NavItem {
   isTrash?: boolean;
   /** Absolute href — bypasses team-scoped URL building. */
   href?: string;
+  /**
+   * Only shown to account admins and trainers.
+   *
+   * Registrations, Attendees, and Trash are organizer views.
+   * Learners see their own registrations via /tickets instead.
+   */
+  organizersOnly?: boolean;
+  /**
+   * Only shown to account admins.
+   *
+   * Payments are owner data — an invited trainer is here to run
+   * events, not to audit the account's money. If a trainer owns their
+   * own account, they see payments there as the account_admin.
+   */
+  adminsOnly?: boolean;
 }
 
 interface DashboardSidebarProps {
@@ -66,16 +84,42 @@ interface DashboardSidebarProps {
 // ============================================================
 
 const TEAM_NAV_ITEMS: NavItem[] = [
-  { segment: 'workspaces', label: 'My Workspaces', icon: Layers, href: '/accounts' },
+  {
+    segment: 'workspaces',
+    label: 'My Workspaces',
+    icon: Layers,
+    href: '/accounts',
+  },
   { segment: '', label: 'Dashboard', icon: LayoutDashboard },
-  { segment: 'events', label: 'Events', icon: Calendar },
-  { segment: 'registrations', label: 'Registrations', icon: ClipboardList },
-  { segment: 'tickets', label: 'Tickets', icon: Ticket },
-  { segment: 'attendees', label: 'Attendees', icon: Users },
-  { segment: 'payments', label: 'Payments', icon: CreditCard },
+  { segment: 'events', label: 'Team Events', icon: Calendar },
+  {
+    segment: 'registrations',
+    label: 'Registrations',
+    icon: ClipboardList,
+    organizersOnly: true,
+  },
+  { segment: 'tickets', label: 'My Tickets', icon: Ticket },
+  {
+    segment: 'attendees',
+    label: 'Attendees',
+    icon: Users,
+    organizersOnly: true,
+  },
+  {
+    segment: 'payments',
+    label: 'Payments',
+    icon: CreditCard,
+    adminsOnly: true,
+  },
   { segment: 'certificates', label: 'Certificates', icon: Award },
   { segment: 'replays', label: 'Replays', icon: Clapperboard },
-  { segment: 'trash', label: 'Trash', icon: Trash2, isTrash: true },
+  {
+    segment: 'trash',
+    label: 'Trash',
+    icon: Trash2,
+    isTrash: true,
+    organizersOnly: true,
+  },
 ];
 
 // ============================================================
@@ -110,19 +154,52 @@ export function DashboardSidebar({
   const [teamsExpanded, setTeamsExpanded] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Teams — unfiltered so the sidebar can switch across accounts,
-  // matching TeamSwitcher / UserMenu.
+  // Teams — unfiltered so the sidebar can switch across accounts.
   const { data: teamsResponse } = useGetUserTeamsQuery();
   const teams = teamsResponse?.teams ?? [];
 
   // Accounts — used to resolve each team's parent-account logo.
   const { data: accounts } = useGetMyAccountsQuery();
 
+  // The caller's role in the active account. Self-service endpoint —
+  // works for every role.
+  const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
+    skip: !accountId,
+  });
+
   const accountById = useMemo(() => {
     const map = new Map<string, Account>();
     accounts?.forEach((a) => map.set(a.id, a));
     return map;
   }, [accounts]);
+
+  // Role-derived visibility flags.
+  //
+  //   isAdmin      → account_admin
+  //   isOrganizer  → account_admin OR trainer
+  //
+  // When the role hasn't loaded yet, both are false — organizer and
+  // admin items stay hidden to avoid a flash before the real role
+  // arrives.
+  const isAdmin = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin';
+  }, [myMembership]);
+
+  const isOrganizer = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin' || role === 'trainer';
+  }, [myMembership]);
+
+  const visibleNavItems = useMemo(
+    () =>
+      TEAM_NAV_ITEMS.filter((item) => {
+        if (item.adminsOnly) return isAdmin;
+        if (item.organizersOnly) return isOrganizer;
+        return true;
+      }),
+    [isAdmin, isOrganizer],
+  );
 
   useEffect(() => {
     if (externalCollapsed !== undefined) {
@@ -159,7 +236,7 @@ export function DashboardSidebar({
   };
 
   // ------------------------------------------------------------
-  // URL builders — the sidebar is scoped to /dashboard/:accountId/:teamId
+  // URL builders — scoped to /dashboard/:accountId/:teamId
   // ------------------------------------------------------------
   const accountBase = accountId ? `/dashboard/${accountId}` : '/accounts';
   const teamBase =
@@ -176,14 +253,6 @@ export function DashboardSidebar({
     return segment === '' ? accountBase : `${accountBase}/${segment}`;
   };
 
-  /**
-   * Build a switch link for a specific team.
-   *
-   * IMPORTANT: uses `team.account_id`, not the currently-active
-   * `accountId`, so switching to a team in another account produces
-   * a correct URL and the header's TeamSwitcher picks up the new
-   * account's logo.
-   */
   const buildTeamHref = (team: Team) => {
     return buildTeamSwitchHref(pathname, team.account_id, team.id);
   };
@@ -198,8 +267,6 @@ export function DashboardSidebar({
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  // Only highlight the active team when the URL actually carries it,
-  // so nothing looks "selected" on /profile.
   const isTeamActive = (id: string) => urlTeamId === id;
 
   const isProfileActive =
@@ -210,7 +277,7 @@ export function DashboardSidebar({
   );
 
   // ------------------------------------------------------------
-  // Account logo — matches TeamSwitcher / UserMenu.
+  // Account logo
   // ------------------------------------------------------------
   const renderAccountLogo = (
     account: Account | null | undefined,
@@ -279,7 +346,7 @@ export function DashboardSidebar({
         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
           {/* Section 1: team-scoped nav */}
           <nav className="px-3 py-3 space-y-0.5">
-            {TEAM_NAV_ITEMS.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive = isTeamNavActive(item);
               const Icon = item.icon;
               const isTrash = item.isTrash;
@@ -360,16 +427,14 @@ export function DashboardSidebar({
           </nav>
 
           {/* ============================================================
-              Section 2: Teams dropdown — conspicuous
+              Section 2: Teams dropdown
           ============================================================ */}
           {accountId && (
             <>
               <div className="border-t border-border/50" />
 
-              {/* Expanded list */}
               {!collapsed && (
                 <div className="py-3 px-3">
-                  {/* Toggle button with count badge */}
                   <button
                     type="button"
                     onClick={() => setTeamsExpanded((v) => !v)}
@@ -388,7 +453,6 @@ export function DashboardSidebar({
                     />
                     <span className="flex-1">Teams</span>
 
-                    {/* Count badge */}
                     {teams.length > 0 && (
                       <span
                         className={cn(
@@ -414,7 +478,6 @@ export function DashboardSidebar({
 
                   {teamsExpanded && (
                     <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5">
-                      {/* Teams list */}
                       {teams.length === 0 ? (
                         <p className="px-2 py-2 text-xs text-muted-foreground">
                           No teams yet
@@ -442,7 +505,6 @@ export function DashboardSidebar({
                                     : 'text-foreground/80 hover:bg-accent/60 hover:text-foreground',
                                 )}
                               >
-                                {/* Left accent bar on the active team */}
                                 {isActive && (
                                   <span
                                     aria-hidden
@@ -477,7 +539,6 @@ export function DashboardSidebar({
                         </div>
                       )}
 
-                      {/* Actions — primary-tinted inside the container */}
                       <div className="mt-2 border-t border-primary/15 pt-2 space-y-0.5">
                         {teamId && (
                           <Link
@@ -521,7 +582,6 @@ export function DashboardSidebar({
                 </div>
               )}
 
-              {/* Collapsed: single icon that expands the rail */}
               {collapsed && (
                 <div className="py-3 px-2">
                   <button

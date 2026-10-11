@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, MouseEvent } from 'react';
+import { useState, MouseEvent, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useParams } from 'next/navigation';
 import {
@@ -29,6 +29,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
+import { useGetMyMembershipQuery } from '@/lib/store/api/accountsApi';
 import {
   Sheet,
   SheetContent,
@@ -36,6 +37,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { LogoutDialog } from '@/components/ui/LogoutDialog';
+import type { AccountRole } from '@/lib/types/account';
 
 // ============================================================
 // TYPES & CONSTANTS
@@ -56,6 +58,20 @@ interface MoreNavItem {
   segment?: string;
   isTrash?: boolean;
   section?: 'workspace' | 'account';
+  /**
+   * Only shown to account admins and trainers.
+   *
+   * Registrations, Attendees, and Trash are organizer views. Learners
+   * use /tickets for their own registrations.
+   */
+  organizersOnly?: boolean;
+  /**
+   * Only shown to account admins.
+   *
+   * Payments are owner data — an invited trainer is here to run
+   * events, not to audit the account's money.
+   */
+  adminsOnly?: boolean;
 }
 
 const PRIMARY_ITEMS: PrimaryNavItem[] = [
@@ -90,19 +106,87 @@ export function MobileBottomNav() {
 
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
+  // Caller's role in the active account. Self-service endpoint — works
+  // for every role.
+  const { data: myMembership } = useGetMyMembershipQuery(
+    accountId ?? '',
+    { skip: !accountId },
+  );
+
+  // Role-derived visibility flags.
+  //
+  //   isAdmin      → account_admin
+  //   isOrganizer  → account_admin OR trainer
+  //
+  // When the role hasn't loaded yet, both are false — organizer and
+  // admin items stay hidden to avoid a flash before the real role
+  // arrives.
+  const isAdmin = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin';
+  }, [myMembership]);
+
+  const isOrganizer = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin' || role === 'trainer';
+  }, [myMembership]);
+
+  // Hook rules: all hooks are called before any early return. The
+  // early return for unauthenticated users is placed after the hooks.
   if (!isAuthenticated) return null;
 
   const teamBase =
     accountId && teamId ? `/dashboard/${accountId}/${teamId}` : null;
 
-  const moreItems: MoreNavItem[] = [
+  const allMoreItems: MoreNavItem[] = [
     // Team-scoped items
-    { key: 'registrations', label: 'Registrations', icon: ClipboardList, segment: 'registrations', section: 'workspace' },
-    { key: 'attendees', label: 'Attendees', icon: Users, segment: 'attendees', section: 'workspace' },
-    { key: 'payments', label: 'Payments', icon: CreditCard, segment: 'payments', section: 'workspace' },
-    { key: 'certificates', label: 'Certificates', icon: Award, segment: 'certificates', section: 'workspace' },
-    { key: 'replays', label: 'Replays', icon: Clapperboard, segment: 'replays', section: 'workspace' },
-    { key: 'trash', label: 'Trash', icon: Trash2, segment: 'trash', isTrash: true, section: 'workspace' },
+    {
+      key: 'registrations',
+      label: 'Registrations',
+      icon: ClipboardList,
+      segment: 'registrations',
+      section: 'workspace',
+      organizersOnly: true,
+    },
+    {
+      key: 'attendees',
+      label: 'Attendees',
+      icon: Users,
+      segment: 'attendees',
+      section: 'workspace',
+      organizersOnly: true,
+    },
+    {
+      key: 'payments',
+      label: 'Payments',
+      icon: CreditCard,
+      segment: 'payments',
+      section: 'workspace',
+      adminsOnly: true,
+    },
+    {
+      key: 'certificates',
+      label: 'Certificates',
+      icon: Award,
+      segment: 'certificates',
+      section: 'workspace',
+    },
+    {
+      key: 'replays',
+      label: 'Replays',
+      icon: Clapperboard,
+      segment: 'replays',
+      section: 'workspace',
+    },
+    {
+      key: 'trash',
+      label: 'Trash',
+      icon: Trash2,
+      segment: 'trash',
+      isTrash: true,
+      section: 'workspace',
+      organizersOnly: true,
+    },
 
     // Account-scoped items
     {
@@ -134,6 +218,15 @@ export function MobileBottomNav() {
       section: 'account',
     },
   ];
+
+  // Filter by role. adminsOnly is checked first so an item marked
+  // adminsOnly is never shown to a trainer who happens to hold an
+  // organizer flag.
+  const moreItems = allMoreItems.filter((item) => {
+    if (item.adminsOnly) return isAdmin;
+    if (item.organizersOnly) return isOrganizer;
+    return true;
+  });
 
   const buildHref = (item: MoreNavItem) => {
     if (item.href) return item.href;

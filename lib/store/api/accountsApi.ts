@@ -199,6 +199,23 @@ export const accountsApi = api.injectEndpoints({
       ],
     }),
 
+    /**
+     * GET /accounts/:id/members/me
+     *
+     * Self-service: returns the caller's own membership row in an
+     * account. Used by the UserMenu role badge so it doesn't depend on
+     * the full member list — which learners can't read.
+     *
+     * Returns 404 when the caller isn't a member of the account.
+     */
+    getMyMembership: builder.query<AccountMember, string>({
+      query: (accountId) => `/accounts/${accountId}/members/me`,
+      transformResponse: (response: Envelope<AccountMember>) => response.data,
+      providesTags: (_r, _e, accountId) => [
+        { type: 'Memberships', id: `${accountId}:me` },
+      ],
+    }),
+
     /** POST /accounts/:id/members */
     addAccountMember: builder.mutation<
       AccountMember,
@@ -228,6 +245,10 @@ export const accountsApi = api.injectEndpoints({
       transformResponse: (response: Envelope<AccountMember>) => response.data,
       invalidatesTags: (_r, _e, { accountId }) => [
         { type: 'Memberships', id: `${accountId}:members` },
+        // Invalidate the self-service row too — if the caller just
+        // changed their own role (edge case) the badge should refetch.
+        { type: 'Memberships', id: `${accountId}:me` },
+        'Teams'
       ],
     }),
 
@@ -253,6 +274,7 @@ export const accountsApi = api.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, accountId) => [
         { type: 'Memberships', id: accountId },
+        { type: 'Memberships', id: `${accountId}:me` },
         { type: 'Memberships', id: 'LIST' },
       ],
     }),
@@ -305,6 +327,7 @@ export const {
 
   // Members
   useGetAccountMembersQuery,
+  useGetMyMembershipQuery,
   useAddAccountMemberMutation,
   useUpdateAccountMemberRoleMutation,
   useRemoveAccountMemberMutation,

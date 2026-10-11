@@ -62,17 +62,43 @@ export interface UpdateTeamRequest {
  *   - DELETE /api/v1/teams/:id/members/:userId
  *   - POST   /api/v1/teams/:id/leave
  *
- * Note: roles are NOT on team members — they inherit from the
- * account membership (see backend doc comments).
+ * Identity fields (name, display_name, email, avatar_url) and the
+ * account-level `role` are populated only by the enriched read path —
+ * GET /teams/:id/members. Mutation responses (add member, accept
+ * invitation) omit them.
+ *
+ * Roles are NOT team-scoped. The `role` here is the member's role in
+ * the team's parent account.
  */
 export interface TeamMember {
   id: string;
   team_id: string;
   user_id: string;
   is_active: boolean;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
 
-  // Denormalized user shape returned by the backend.
-  // VERIFY field names against your team MemberResponse DTO.
+  // ---- Enriched identity (read path only) ----
+  name?: string;
+  display_name?: string;
+  email?: string;
+  avatar_url?: string;
+
+  // ---- Account-level role of this member (read path only) ----
+  role?: string;
+
+  /**
+   * Legacy nested user shape.
+   *
+   * The backend does not currently return this; the enriched fields
+   * above are the canonical source. This is retained so any code that
+   * still reads `member.user` compiles during the transition. New
+   * code should use the flat fields above.
+   *
+   * @deprecated Use the flat fields (name, display_name, email,
+   * avatar_url) instead.
+   */
   user?: {
     id: string;
     name: string;
@@ -80,10 +106,6 @@ export interface TeamMember {
     email: string;
     avatar_url: string;
   };
-
-  joined_at: string;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface TeamMemberListResponse {

@@ -75,6 +75,7 @@ import { MobileFilterStrip } from '@/components/registrations/mobile-filter-stri
 import { StatsCards } from '@/components/registrations/stat_cards';
 import { RegistrationsDetailDialog } from './RegistrationsDetailDialog';
 import { StatsCardsSkeleton } from '../../events/[id]/[attendees]/page';
+import { NoRegistrationAccess } from './NoRegistrationAccess';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'confirmed', label: 'Confirmed' },
@@ -235,6 +236,13 @@ export function RegistrationsList() {
       'Failed to load registrations'
     : null;
 
+    // 403 → the caller holds no organizer grant on this team's account.
+  // Render the friendly access state instead of a raw error.
+  const isForbidden =
+    !!error &&
+    typeof error === 'object' &&
+    'status' in error &&
+    (error as { status?: number }).status === 403;
   const isRowSelected = (r: CrossEventRegistration) =>
     selectedIds.includes(r.id);
 
@@ -649,16 +657,19 @@ export function RegistrationsList() {
         </Card>
       )}
 
-      {/* Loading gate */}
+  
+     {/* Loading gate */}
       {isLoading ? (
         <StatsCardsSkeleton cards={4} desktopColumns={4} />
+      ) : isForbidden ? (
+        <NoRegistrationAccess teamId={teamId} />
       ) : errorMessage ? (
         <Card className="border-destructive/30">
           <CardContent className="p-12 text-center text-sm text-destructive sm:p-16">
             {errorMessage}
           </CardContent>
         </Card>
-      ) : (
+      ) :  (
         <>
           <StatsCards stats={stats} />
 

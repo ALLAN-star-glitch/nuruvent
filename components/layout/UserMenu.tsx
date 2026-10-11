@@ -44,7 +44,7 @@ import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
 import {
   useGetMyAccountsQuery,
-  useGetAccountMembersQuery,
+  useGetMyMembershipQuery,
 } from '@/lib/store/api/accountsApi';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { useGetMyProfileQuery } from '@/lib/store/api/profileApi';
@@ -52,7 +52,7 @@ import { LogoutDialog } from '../ui/LogoutDialog';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { cn } from '@/lib/utils';
 import { accountLabel } from '@/lib/utils/account-label';
-import type { Account, AccountMember, AccountRole } from '@/lib/types/account';
+import type { Account, AccountRole } from '@/lib/types/account';
 import type { Team } from '@/lib/types/team';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 
@@ -100,21 +100,61 @@ const SECTIONS: Array<{
 // QUICK LINKS
 // ============================================================
 
-const QUICK_LINKS = [
-  { label: 'Events', segment: 'events', icon: Calendar },
-  { label: 'Registrations', segment: 'registrations', icon: ClipboardList },
-  { label: 'Tickets', segment: 'tickets', icon: Ticket },
-  { label: 'Attendees', segment: 'attendees', icon: Users },
+interface QuickLink {
+  label: string;
+  segment: string;
+  icon: typeof Calendar;
+  isTrash?: boolean;
+  /**
+   * Only shown to account admins and trainers.
+   *
+   * Registrations, Attendees, and Trash are organizer views. Learners
+   * see their own registrations via /tickets instead.
+   */
+  organizersOnly?: boolean;
+  /**
+   * Only shown to account admins.
+   *
+   * Payments are owner data — an invited trainer is here to run
+   * events, not to audit the account's money.
+   */
+  adminsOnly?: boolean;
+}
+
+const QUICK_LINKS: QuickLink[] = [
+  { label: 'Team Events', segment: 'events', icon: Calendar },
+  {
+    label: 'Registrations',
+    segment: 'registrations',
+    icon: ClipboardList,
+    organizersOnly: true,
+  },
+  { label: 'My Tickets', segment: 'tickets', icon: Ticket },
+  {
+    label: 'Attendees',
+    segment: 'attendees',
+    icon: Users,
+    organizersOnly: true,
+  },
   { label: 'Certificates', segment: 'certificates', icon: Award },
-  { label: 'Payments', segment: 'payments', icon: CreditCard },
+  {
+    label: 'Payments',
+    segment: 'payments',
+    icon: CreditCard,
+    adminsOnly: true,
+  },
   { label: 'Replays', segment: 'replays', icon: Video },
-  { label: 'Trash', segment: 'trash', icon: Trash2, isTrash: true },
+  {
+    label: 'Trash',
+    segment: 'trash',
+    icon: Trash2,
+    isTrash: true,
+    organizersOnly: true,
+  },
 ];
 
 // Mobile keeps Trash off the quick list (matches current mobile behavior).
-const MOBILE_QUICK_LINKS = QUICK_LINKS.filter(
-  (item) => !item.isTrash,
-);
+const MOBILE_QUICK_LINKS_BASE = QUICK_LINKS.filter((item) => !item.isTrash);
 
 // ============================================================
 // MOBILE SECTION (collapsible)
@@ -247,9 +287,15 @@ export function UserMenu({ user }: UserMenuProps) {
   const { data: accounts } = useGetMyAccountsQuery();
   const { data: teamsData } = useGetUserTeamsQuery();
 
-  // Account-level role: fetch members of the active account and find
-  // the current user's membership record.
-  const { data: accountMembers } = useGetAccountMembersQuery(
+  // Account-level role: fetch the caller's own membership in the active
+  // account.
+  //
+  // Self-service endpoint — no member-list permission required. This is
+  // what makes the role badge render for every role, including learners.
+  // Do not swap this back to useGetAccountMembersQuery: learners do not
+  // hold `member:read`, so the member-list call returns 403 and the
+  // badge disappears.
+  const { data: myMembership } = useGetMyMembershipQuery(
     accountId ?? '',
     { skip: !accountId },
   );
@@ -269,17 +315,49 @@ export function UserMenu({ user }: UserMenuProps) {
   // ------------------------------------------------------------
   // ROLE RESOLUTION
   // ------------------------------------------------------------
-  const currentUserId = profile?.id;
-
-  const myMembership = useMemo<AccountMember | undefined>(() => {
-    if (!accountMembers || !currentUserId) return undefined;
-    return accountMembers.find((m) => m.user_id === currentUserId);
-  }, [accountMembers, currentUserId]);
-
   const roleLabel = useMemo(() => {
     if (!myMembership?.role) return undefined;
     return roleDisplayLabel(myMembership.role as AccountRole);
   }, [myMembership]);
+
+  // Role-derived visibility flags.
+  //
+  //   isAdmin      → account_admin
+  //   isOrganizer  → account_admin OR trainer
+  //
+  // When the role hasn't loaded yet, both are false — organizer and
+  // admin items stay hidden to avoid a flash before the real role
+  // arrives.
+  const isAdmin = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin';
+  }, [myMembership]);
+
+  const isOrganizer = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin' || role === 'trainer';
+  }, [myMembership]);
+
+  // Filtered lists, computed once per render.
+  const visibleQuickLinks = useMemo(
+    () =>
+      QUICK_LINKS.filter((item) => {
+        if (item.adminsOnly) return isAdmin;
+        if (item.organizersOnly) return isOrganizer;
+        return true;
+      }),
+    [isAdmin, isOrganizer],
+  );
+
+  const visibleMobileQuickLinks = useMemo(
+    () =>
+      MOBILE_QUICK_LINKS_BASE.filter((item) => {
+        if (item.adminsOnly) return isAdmin;
+        if (item.organizersOnly) return isOrganizer;
+        return true;
+      }),
+    [isAdmin, isOrganizer],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -570,7 +648,7 @@ export function UserMenu({ user }: UserMenuProps) {
 
             <div className="my-2 h-px bg-border" />
 
-            {QUICK_LINKS.map((item) => {
+            {visibleQuickLinks.map((item) => {
               const Icon = item.icon;
               const href = buildQuickLink(item.segment);
               return (
@@ -949,7 +1027,7 @@ export function UserMenu({ user }: UserMenuProps) {
             <span className="text-sm">Dashboard</span>
           </button>
 
-          {MOBILE_QUICK_LINKS.map((item) => {
+          {visibleMobileQuickLinks.map((item) => {
             const Icon = item.icon;
             const href = buildQuickLink(item.segment);
             return (
