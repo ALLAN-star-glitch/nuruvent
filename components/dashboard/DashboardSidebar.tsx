@@ -430,8 +430,8 @@ export function DashboardSidebar({
                           <span>New team</span>
                         </Link>
 
-                        <Link
-                          href={`${accountBase}/teams`}
+                       <Link
+                          href="/accounts"
                           className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                         >
                           <LayoutDashboard className="h-4 w-4 shrink-0" />

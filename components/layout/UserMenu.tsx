@@ -648,7 +648,7 @@ export function UserMenu({ user }: UserMenuProps) {
             {accountId && (
               <button
                 type="button"
-                onClick={() => navigateTo(`/dashboard/${accountId}/teams`)}
+                onClick={() => navigateTo('/accounts')}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
               >
                 <LayoutDashboard className="h-4 w-4 shrink-0 text-muted-foreground" />

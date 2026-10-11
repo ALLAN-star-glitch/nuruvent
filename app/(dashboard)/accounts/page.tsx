@@ -235,17 +235,11 @@ export default function AccountsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Your Accounts</h1>
+          <h1 className="text-2xl font-bold text-foreground">Please First Select Your Workspace</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pick an account to open its workspace, or create a new one.
+            Pick a workspace to select a team, or create a new one.
           </p>
         </div>
-        <Button asChild className="cursor-pointer">
-          <Link href="/accounts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New account
-          </Link>
-        </Button>
       </div>
 
       {isLoading && <LoadingSkeleton />}
@@ -254,7 +248,7 @@ export default function AccountsPage() {
         <Card className="border-destructive/30">
           <CardContent className="p-12 text-center text-destructive">
             <AlertCircle className="mx-auto mb-3 h-8 w-8" />
-            <p className="font-medium">Couldn&apos;t load your accounts</p>
+            <p className="font-medium">Couldn&apos;t load your workspaces</p>
             <Button
               variant="outline"
               className="mt-4 cursor-pointer"

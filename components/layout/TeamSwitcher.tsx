@@ -221,8 +221,8 @@ export function TeamSwitcher({ variant = 'default' }: TeamSwitcherProps) {
           : 'px-3 py-2.5',
       )}
     >
-      {/* Account logo — hidden on mobile, visible from sm upward */}
-      <span className="hidden sm:flex shrink-0">
+      {/* Account logo — always visible */}
+      <span className="flex shrink-0">
         {renderAccountLogo(activeAccount, 32)}
       </span>
 

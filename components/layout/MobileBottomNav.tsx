@@ -108,7 +108,7 @@ export function MobileBottomNav() {
       key: 'teams',
       label: 'Teams',
       icon: Building2,
-      href: accountId ? `/dashboard/${accountId}/teams` : '/accounts',
+      href: '/accounts',
       section: 'account',
     },
     {

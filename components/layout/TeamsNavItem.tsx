@@ -179,14 +179,14 @@ export function TeamsNavItem({
                 <Plus className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
                 <span>New team</span>
               </button>
-              <button
-                type="button"
-                onClick={() => go(`/dashboard/${accountId}/teams`)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white"
-              >
-                <LayoutDashboard className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
-                <span>Manage teams</span>
-              </button>
+            <button
+            type="button"
+            onClick={() => go('/accounts')}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white"
+            >
+            <LayoutDashboard className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+            <span>Manage teams</span>
+            </button>
             </div>
           )}
         </div>

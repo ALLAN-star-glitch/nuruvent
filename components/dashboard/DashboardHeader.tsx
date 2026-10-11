@@ -245,7 +245,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             <Link
                               key={item.segment}
                               href={buildTeamNavHref(item.segment)}
-                              prefetch = {false}
+                              prefetch={false}
                               onClick={() => setIsDrawerOpen(false)}
                               className={cn(
                                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
@@ -373,16 +373,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-             {/* After — one image, sized by CSS */}
-              <span className="inline-flex items-center shrink-0">
+              {/* Nuruvent logo — hidden on mobile, visible from md upward.
+                  On mobile the team switcher takes its place. */}
+              <span className="hidden md:inline-flex items-center shrink-0">
                 <Logo
                   width={120}
-                  className="w-18 sm:w-22 md:w-25 lg:w-30"
+                  className="w-22 md:w-25 lg:w-30"
                 />
               </span>
 
-              {/* Team switcher — always visible, compact on small screens */}
-              <div className="min-w-0 flex-1 max-w-[220px] sm:max-w-[280px] lg:max-w-[260px]">
+              {/* Team switcher — always visible.
+                  Takes the freed space where the logo used to be on mobile. */}
+              <div className="min-w-0 flex-1 max-w-none md:max-w-[280px] lg:max-w-[260px]">
                 <TeamSwitcher variant="compact" />
               </div>
 

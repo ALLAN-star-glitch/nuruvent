@@ -36,10 +36,10 @@ export function accountLabel(
     | null
     | undefined,
 ): string {
-  if (!account) return 'Account';
+  if (!account) return 'Workspace';
 
   const raw = (account.display_name || account.name || '').trim();
-  if (raw) return `${raw} Account`;
+  if (raw) return `${raw} Workspace`;
 
   const isPersonal = (account.type ?? '').includes('personal');
   return isPersonal ? 'Personal Account' : 'Institution Account';
