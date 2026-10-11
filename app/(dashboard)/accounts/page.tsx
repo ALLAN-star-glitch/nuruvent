@@ -235,7 +235,7 @@ export default function AccountsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Please First Select Your Workspace</h1>
+          <h1 className="text-2xl font-bold text-foreground">Please Select Your Workspace</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Pick a workspace to select a team, or create a new one.
           </p>

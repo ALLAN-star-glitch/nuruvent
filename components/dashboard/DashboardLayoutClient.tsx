@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { useAppSelector } from '@/lib/store/hooks';
+import { MobileCreateFab } from './MobileCreateFab';
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode;
@@ -41,6 +42,7 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
       </main>
 
       <MobileBottomNav />
+      <MobileCreateFab />
     </div>
   );
 }

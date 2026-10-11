@@ -11,6 +11,8 @@ import {
   X,
   ExternalLink,
   Settings,
+  Building2,
+  ChevronDown,
 } from 'lucide-react';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { UserMenu } from '@/components/layout/UserMenu';
@@ -51,6 +53,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { TeamsNavItem } from '../layout/TeamsNavItem';
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface NavItem {
   segment: string;
@@ -104,6 +113,23 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
+
+  const goCreateEvent = () => {
+  if (!accountId || !teamId) return;
+      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
+    };
+    const goCreateTeam = () => {
+      if (!accountId) return;
+      router.push(`/dashboard/${accountId}/teams/new`);
+    };
+    const goCreateWorkspace = () => {
+      router.push('/accounts/new');
+    };
+
+   const goCreateCertificate = () => {
+  if (!accountId || !teamId) return;
+  router.push(`/dashboard/${accountId}/${teamId}/certificates/create`);
+};
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [pathname]);
@@ -423,14 +449,52 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              <button
-                type="button"
-                onClick={handleCreateEvent}
-                className="hidden sm:flex items-center gap-1.5 md:gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md transition-all px-2.5 sm:px-3 md:px-4 py-1.5 md:py-2 h-8 md:h-9 text-xs md:text-sm font-medium rounded-md cursor-pointer shrink-0"
-              >
-                <PlusCircle className="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" />
-                <span>Create Event</span>
-              </button>
+              <div className="hidden sm:block shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
+                    >
+                      <PlusCircle className="h-4 w-4 shrink-0" />
+                      <span>Create New</span>
+                      <ChevronDown className="h-3 w-3 opacity-80" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onClick={goCreateEvent}
+                      disabled={!hasTeamContext}
+                      className="cursor-pointer"
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Event
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={goCreateTeam}
+                      disabled={!accountId}
+                      className="cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+
+                     <DropdownMenuItem
+                      onClick={goCreateCertificate}
+                      disabled={!hasTeamContext}
+                      className="cursor-pointer"
+                    >
+                      <Award className="mr-2 h-4 w-4" />
+                      Certificate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={goCreateWorkspace} className="cursor-pointer">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Workspace
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+           
 
               <ThemeToggle />
               <UserMenu user={user} onLogout={handleLogout} />

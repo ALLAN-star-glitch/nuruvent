@@ -19,6 +19,7 @@ import {
   Settings,
   User,
   Building2,
+  Layers,
   ChevronRight,
   LogOut,
   type LucideIcon,
@@ -104,6 +105,13 @@ export function MobileBottomNav() {
     { key: 'trash', label: 'Trash', icon: Trash2, segment: 'trash', isTrash: true, section: 'workspace' },
 
     // Account-scoped items
+    {
+      key: 'workspaces',
+      label: 'My Workspaces',
+      icon: Layers,
+      href: '/accounts',
+      section: 'account',
+    },
     {
       key: 'teams',
       label: 'Teams',

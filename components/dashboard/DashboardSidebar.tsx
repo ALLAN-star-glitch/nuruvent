@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useParams } from 'next/navigation';
-import { useState, MouseEvent, useEffect } from 'react';
+import { useState, MouseEvent, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -26,6 +26,7 @@ import {
   Ticket,
   UserPlus,
   Check,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,9 +36,11 @@ import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
 import { LogoutDialog } from '@/components/ui/LogoutDialog';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
+import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
-import { FaLaptopHouse } from 'react-icons/fa';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
+import { accountLabel } from '@/lib/utils/account-label';
+import type { Account } from '@/lib/types/account';
 
 // ============================================================
 // TYPES
@@ -48,6 +51,8 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   isTrash?: boolean;
+  /** Absolute href — bypasses team-scoped URL building. */
+  href?: string;
 }
 
 interface DashboardSidebarProps {
@@ -60,6 +65,7 @@ interface DashboardSidebarProps {
 // ============================================================
 
 const TEAM_NAV_ITEMS: NavItem[] = [
+  { segment: 'workspaces', label: 'My Workspaces', icon: Layers, href: '/accounts' },
   { segment: '', label: 'Dashboard', icon: LayoutDashboard },
   { segment: 'events', label: 'Events', icon: Calendar },
   { segment: 'registrations', label: 'Registrations', icon: ClipboardList },
@@ -110,6 +116,15 @@ export function DashboardSidebar({
   );
   const teams = teamsResponse?.teams ?? [];
 
+  // Accounts — used to resolve each team's parent-account logo.
+  const { data: accounts } = useGetMyAccountsQuery();
+
+  const accountById = useMemo(() => {
+    const map = new Map<string, Account>();
+    accounts?.forEach((a) => map.set(a.id, a));
+    return map;
+  }, [accounts]);
+
   useEffect(() => {
     if (externalCollapsed !== undefined) {
       setInternalCollapsed(externalCollapsed);
@@ -151,9 +166,10 @@ export function DashboardSidebar({
   const teamBase =
     accountId && teamId ? `${accountBase}/${teamId}` : accountBase;
 
-  const buildTeamNavHref = (segment: string) => {
+  const buildTeamNavHref = (item: NavItem) => {
+    if (item.href) return item.href;
     if (!accountId || !teamId) return '/accounts';
-    return segment === '' ? teamBase : `${teamBase}/${segment}`;
+    return item.segment === '' ? teamBase : `${teamBase}/${item.segment}`;
   };
 
   const buildAccountHref = (segment: string) => {
@@ -161,15 +177,18 @@ export function DashboardSidebar({
     return segment === '' ? accountBase : `${accountBase}/${segment}`;
   };
 
- const buildTeamHref = (id: string) => {
-  if (!accountId) return '/accounts';
-  return buildTeamSwitchHref(pathname, accountId, id);
-};
+  const buildTeamHref = (id: string) => {
+    if (!accountId) return '/accounts';
+    return buildTeamSwitchHref(pathname, accountId, id);
+  };
 
-  const isTeamNavActive = (segment: string) => {
+  const isTeamNavActive = (item: NavItem) => {
+    if (item.href) {
+      return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    }
     if (!accountId || !teamId) return false;
-    if (segment === '') return pathname === teamBase;
-    const href = `${teamBase}/${segment}`;
+    if (item.segment === '') return pathname === teamBase;
+    const href = `${teamBase}/${item.segment}`;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -183,6 +202,40 @@ export function DashboardSidebar({
   const isAccountSettingsActive = pathname.startsWith(
     `${accountBase}/settings`,
   );
+
+  // ------------------------------------------------------------
+  // Account logo — matches TeamSwitcher / UserMenu.
+  // ------------------------------------------------------------
+  const renderAccountLogo = (
+    account: Account | null | undefined,
+    size: number = 28,
+  ) => {
+    const personal = (account?.type ?? '').includes('personal');
+    const FallbackIcon = personal ? Home : Building2;
+
+    return (
+      <span
+        style={{ width: size, height: size }}
+        className={cn(
+          'flex shrink-0 items-center justify-center overflow-hidden rounded-md',
+          personal
+            ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
+            : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
+        )}
+      >
+        {account?.logo_url ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={account.logo_url}
+            alt={account.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <FallbackIcon style={{ width: size * 0.5, height: size * 0.5 }} />
+        )}
+      </span>
+    );
+  };
 
   return (
     <>
@@ -221,71 +274,81 @@ export function DashboardSidebar({
           {/* Section 1: team-scoped nav */}
           <nav className="px-3 py-3 space-y-0.5">
             {TEAM_NAV_ITEMS.map((item) => {
-              const isActive = isTeamNavActive(item.segment);
+              const isActive = isTeamNavActive(item);
               const Icon = item.icon;
               const isTrash = item.isTrash;
+              const isWorkspaces = item.segment === 'workspaces';
+              const showDivider = isWorkspaces;
 
               if (collapsed) {
                 return (
+                  <div key={item.segment || 'root'}>
+                    <Link
+                      href={buildTeamNavHref(item)}
+                      prefetch={false}
+                      className={cn(
+                        'flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-all duration-150 group relative cursor-pointer',
+                        isActive
+                          ? isTrash
+                            ? 'bg-destructive/15 text-destructive font-semibold'
+                            : 'bg-primary/15 text-primary font-semibold'
+                          : isTrash
+                            ? 'text-destructive hover:bg-destructive/10'
+                            : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+                      )}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <div className="absolute left-12 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-md font-medium">
+                        {item.label}
+                      </div>
+                    </Link>
+                    {showDivider && (
+                      <div className="my-2 border-t border-border/40" />
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div key={item.segment || 'root'}>
                   <Link
-                    key={item.segment || 'root'}
-                    href={buildTeamNavHref(item.segment)}
-                    prefetch = {false}
+                    href={buildTeamNavHref(item)}
+                    prefetch={false}
                     className={cn(
-                      'flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-all duration-150 group relative cursor-pointer',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
                       isActive
                         ? isTrash
                           ? 'bg-destructive/15 text-destructive font-semibold'
                           : 'bg-primary/15 text-primary font-semibold'
                         : isTrash
                           ? 'text-destructive hover:bg-destructive/10'
-                          : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+                          : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
                     )}
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
-                    <div className="absolute left-12 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-md font-medium">
-                      {item.label}
-                    </div>
-                  </Link>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.segment || 'root'}
-                  href={buildTeamNavHref(item.segment)}
-                  prefetch={false}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
-                    isActive
-                      ? isTrash
-                        ? 'bg-destructive/15 text-destructive font-semibold'
-                        : 'bg-primary/15 text-primary font-semibold'
-                      : isTrash
-                        ? 'text-destructive hover:bg-destructive/10'
-                        : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
-                  )}
-                >
-                  {isActive && (
-                    <div
+                    {isActive && (
+                      <div
+                        className={cn(
+                          'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
+                          isTrash ? 'bg-destructive' : 'bg-primary',
+                        )}
+                      />
+                    )}
+                    <Icon
                       className={cn(
-                        'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
-                        isTrash ? 'bg-destructive' : 'bg-primary',
+                        'h-[18px] w-[18px] shrink-0 transition-colors',
+                        isTrash
+                          ? 'text-destructive'
+                          : isActive
+                            ? 'text-primary'
+                            : 'text-foreground/70 group-hover:text-foreground',
                       )}
                     />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                  {showDivider && (
+                    <div className="my-2 border-t border-border/40" />
                   )}
-                  <Icon
-                    className={cn(
-                      'h-[18px] w-[18px] shrink-0 transition-colors',
-                      isTrash
-                        ? 'text-destructive'
-                        : isActive
-                          ? 'text-primary'
-                          : 'text-foreground/70 group-hover:text-foreground',
-                    )}
-                  />
-                  <span className="truncate">{item.label}</span>
-                </Link>
+                </div>
               );
             })}
           </nav>
@@ -358,8 +421,10 @@ export function DashboardSidebar({
                         >
                           {teams.map((team) => {
                             const isActive = isTeamActive(team.id);
-                            const Icon =
-                              team.type === 'personal' ? Home : Building2;
+                            const teamAccount = accountById.get(team.account_id);
+                            const label = teamAccount
+                              ? accountLabel(teamAccount)
+                              : 'Unknown Account';
                             return (
                               <Link
                                 key={team.id}
@@ -379,17 +444,24 @@ export function DashboardSidebar({
                                   />
                                 )}
 
-                                <Icon
-                                  className={cn(
-                                    'h-4 w-4 shrink-0',
-                                    isActive
-                                      ? 'text-primary'
-                                      : 'text-foreground/60',
-                                  )}
-                                />
-                                <span className="truncate flex-1">
-                                  {team.display_name || team.name}
+                                {renderAccountLogo(teamAccount, 24)}
+
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate">
+                                    {team.display_name || team.name}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'block truncate text-xs',
+                                      isActive
+                                        ? 'text-primary/70'
+                                        : 'text-muted-foreground',
+                                    )}
+                                  >
+                                    {label}
+                                  </span>
                                 </span>
+
                                 {isActive && (
                                   <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
                                 )}
@@ -430,7 +502,7 @@ export function DashboardSidebar({
                           <span>New team</span>
                         </Link>
 
-                       <Link
+                        <Link
                           href="/accounts"
                           className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                         >
