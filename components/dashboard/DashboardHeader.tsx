@@ -34,9 +34,7 @@ import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
 import { LogoutDialog } from '../ui/LogoutDialog';
-import { useState, useEffect, useMemo } from 'react';
-import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
-import type { Account } from '@/lib/types/account';
+import { useState, useEffect } from 'react';
 
 // ============================================================
 // DASHBOARD NAV ITEMS
@@ -104,15 +102,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const router = useRouter();
   const params = useParams<{ accountId?: string; teamId?: string }>();
 
-  // URL-scoped IDs, with the same workspace fallback the sidebar uses.
-  const urlAccountId = params?.accountId ?? null;
-  const urlTeamId = params?.teamId ?? null;
-
-  const workspaceAccountId = useAppSelector((s) => s.workspace.activeAccountId);
-  const workspaceTeamId = useAppSelector((s) => s.workspace.activeTeamId);
-
-  const accountId = urlAccountId ?? workspaceAccountId ?? null;
-  const teamId = urlTeamId ?? workspaceTeamId ?? null;
+  const accountId = params?.accountId;
+  const teamId = params?.teamId;
 
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -122,34 +113,23 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
-  // Accounts — used to resolve the active account's logo for the header.
-  const { data: accounts } = useGetMyAccountsQuery();
-
-  const accountById = useMemo(() => {
-    const map = new Map<string, Account>();
-    accounts?.forEach((a) => map.set(a.id, a));
-    return map;
-  }, [accounts]);
-
-  const activeAccount = accountId ? accountById.get(accountId) : null;
 
   const goCreateEvent = () => {
-    if (!accountId || !teamId) return;
-    router.push(`/dashboard/${accountId}/${teamId}/events/new`);
-  };
-  const goCreateTeam = () => {
-    if (!accountId) return;
-    router.push(`/dashboard/${accountId}/teams/new`);
-  };
-  const goCreateWorkspace = () => {
-    router.push('/accounts/new');
-  };
+  if (!accountId || !teamId) return;
+      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
+    };
+    const goCreateTeam = () => {
+      if (!accountId) return;
+      router.push(`/dashboard/${accountId}/teams/new`);
+    };
+    const goCreateWorkspace = () => {
+      router.push('/accounts/new');
+    };
 
-  const goCreateCertificate = () => {
-    if (!accountId || !teamId) return;
-    router.push(`/dashboard/${accountId}/${teamId}/certificates/create`);
-  };
-
+   const goCreateCertificate = () => {
+  if (!accountId || !teamId) return;
+  router.push(`/dashboard/${accountId}/${teamId}/certificates/create`);
+};
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [pathname]);
@@ -178,6 +158,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
       dispatch(clearAuth());
       dispatch(clearWorkspace());
       router.push('/');
+    }
+  };
+
+  const handleCreateEvent = () => {
+    if (accountId && teamId) {
+      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
+    } else {
+      router.push('/dashboard');
     }
   };
 
@@ -234,87 +222,87 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   <div className="p-3 flex-1 overflow-y-auto space-y-5">
                     <TeamSwitcher variant="drawer" />
 
-                    {hasTeamContext && (
-                      <div>
-                        <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 dark:text-gray-500">
-                          Menu
-                        </p>
-                        <nav className="space-y-0.5">
-                          {/* Dashboard — always first */}
-                          <Link
-                            href="/dashboard"
-                            onClick={() => setIsDrawerOpen(false)}
+                  {hasTeamContext && (
+                    <div>
+                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 dark:text-gray-500">
+                        Menu
+                      </p>
+                      <nav className="space-y-0.5">
+                        {/* Dashboard — always first */}
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsDrawerOpen(false)}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                            isTeamNavActive('')
+                              ? 'bg-primary/10 text-primary dark:bg-primary/20'
+                              : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                          )}
+                        >
+                          <LayoutDashboard
                             className={cn(
-                              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                              'h-5 w-5 shrink-0',
                               isTeamNavActive('')
-                                ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                                : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                                ? 'text-primary'
+                                : 'text-gray-400 dark:text-gray-500',
                             )}
-                          >
-                            <LayoutDashboard
-                              className={cn(
-                                'h-5 w-5 shrink-0',
-                                isTeamNavActive('')
-                                  ? 'text-primary'
-                                  : 'text-gray-400 dark:text-gray-500',
-                              )}
-                            />
-                            <span>Dashboard</span>
-                          </Link>
-
-                          {/* Teams — expandable dropdown */}
-                          <TeamsNavItem
-                            accountId={accountId}
-                            onNavigate={(href) => {
-                              setIsDrawerOpen(false);
-                              router.push(href);
-                            }}
                           />
+                          <span>Dashboard</span>
+                        </Link>
 
-                          {/* Everything else (excluding root & teams) */}
-                          {DASHBOARD_NAV_ITEMS.filter(
-                            (i) => i.segment !== '' && i.segment !== 'teams',
-                          ).map((item) => {
-                            const isActive = isTeamNavActive(item.segment);
-                            const Icon = item.icon;
-                            const isTrash = item.isTrash;
+                        {/* Teams — expandable dropdown */}
+                        <TeamsNavItem
+                          accountId={accountId}
+                          onNavigate={(href) => {
+                            setIsDrawerOpen(false);
+                            router.push(href);
+                          }}
+                        />
 
-                            return (
-                              <Link
-                                key={item.segment}
-                                href={buildTeamNavHref(item.segment)}
-                                prefetch={false}
-                                onClick={() => setIsDrawerOpen(false)}
+                        {/* Everything else (excluding root & teams) */}
+                        {DASHBOARD_NAV_ITEMS.filter(
+                          (i) => i.segment !== '' && i.segment !== 'teams',
+                        ).map((item) => {
+                          const isActive = isTeamNavActive(item.segment);
+                          const Icon = item.icon;
+                          const isTrash = item.isTrash;
+
+                          return (
+                            <Link
+                              key={item.segment}
+                              href={buildTeamNavHref(item.segment)}
+                              prefetch={false}
+                              onClick={() => setIsDrawerOpen(false)}
+                              className={cn(
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                                isActive
+                                  ? isTrash
+                                    ? 'bg-destructive/10 text-destructive dark:bg-destructive/20'
+                                    : 'bg-primary/10 text-primary dark:bg-primary/20'
+                                  : isTrash
+                                    ? 'text-destructive hover:bg-destructive/10'
+                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                              )}
+                            >
+                              <Icon
                                 className={cn(
-                                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                                  'h-5 w-5 shrink-0',
                                   isActive
                                     ? isTrash
-                                      ? 'bg-destructive/10 text-destructive dark:bg-destructive/20'
-                                      : 'bg-primary/10 text-primary dark:bg-primary/20'
+                                      ? 'text-destructive'
+                                      : 'text-primary'
                                     : isTrash
-                                      ? 'text-destructive hover:bg-destructive/10'
-                                      : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                                      ? 'text-destructive'
+                                      : 'text-gray-400 dark:text-gray-500',
                                 )}
-                              >
-                                <Icon
-                                  className={cn(
-                                    'h-5 w-5 shrink-0',
-                                    isActive
-                                      ? isTrash
-                                        ? 'text-destructive'
-                                        : 'text-primary'
-                                      : isTrash
-                                        ? 'text-destructive'
-                                        : 'text-gray-400 dark:text-gray-500',
-                                  )}
-                                />
-                                <span>{item.label}</span>
-                              </Link>
-                            );
-                          })}
-                        </nav>
-                      </div>
-                    )}
+                              />
+                              <span>{item.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </nav>
+                    </div>
+                  )}
 
                     <div>
                       <div className="flex items-center justify-between px-3 mb-2">
@@ -411,29 +399,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-              {/* Brand / active-account logo — hidden on mobile, visible from md upward.
-                  Shows the active account's logo when available, otherwise the
-                  Nuruvent brand logo. */}
+              {/* Nuruvent logo — hidden on mobile, visible from md upward.
+                  On mobile the team switcher takes its place. */}
               <span className="hidden md:inline-flex items-center shrink-0">
-                {activeAccount?.logo_url ? (
-                  <Link
-                    href={accountId ? `/dashboard/${accountId}` : '/dashboard'}
-                    aria-label={activeAccount.name}
-                    className="inline-flex items-center gap-2"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={activeAccount.logo_url}
-                      alt={activeAccount.name}
-                      className="h-8 w-auto max-w-[160px] object-contain"
-                    />
-                  </Link>
-                ) : (
-                  <Logo
-                    width={120}
-                    className="w-22 md:w-25 lg:w-30"
-                  />
-                )}
+                <Logo
+                  width={120}
+                  className="w-22 md:w-25 lg:w-30"
+                />
               </span>
 
               {/* Team switcher — always visible.
@@ -506,7 +478,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       Team
                     </DropdownMenuItem>
 
-                    <DropdownMenuItem
+                     <DropdownMenuItem
                       onClick={goCreateCertificate}
                       disabled={!hasTeamContext}
                       className="cursor-pointer"
@@ -521,6 +493,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+
+           
 
               <ThemeToggle />
               <UserMenu user={user} onLogout={handleLogout} />
