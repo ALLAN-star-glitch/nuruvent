@@ -42,14 +42,17 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
-import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
+import {
+  useGetMyAccountsQuery,
+  useGetAccountMembersQuery,
+} from '@/lib/store/api/accountsApi';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { useGetMyProfileQuery } from '@/lib/store/api/profileApi';
 import { LogoutDialog } from '../ui/LogoutDialog';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { cn } from '@/lib/utils';
 import { accountLabel } from '@/lib/utils/account-label';
-import type { Account } from '@/lib/types/account';
+import type { Account, AccountMember, AccountRole } from '@/lib/types/account';
 import type { Team } from '@/lib/types/team';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 
@@ -60,6 +63,20 @@ interface UserMenuProps {
     avatar?: string;
   };
   onLogout?: () => void;
+}
+
+// ============================================================
+// ROLE LABELS
+// ============================================================
+
+const ROLE_LABELS: Record<string, string> = {
+  account_admin: 'Account Admin',
+  trainer: 'Trainer',
+  learner: 'Learner',
+};
+
+function roleDisplayLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role.replace(/_/g, ' ');
 }
 
 // ============================================================
@@ -225,6 +242,13 @@ export function UserMenu({ user }: UserMenuProps) {
   const { data: accounts } = useGetMyAccountsQuery();
   const { data: teamsData } = useGetUserTeamsQuery();
 
+  // Account-level role: fetch members of the active account and find
+  // the current user's membership record.
+  const { data: accountMembers } = useGetAccountMembersQuery(
+    accountId ?? '',
+    { skip: !accountId },
+  );
+
   const teams = teamsData?.teams ?? [];
 
   const accountById = useMemo(() => {
@@ -236,6 +260,21 @@ export function UserMenu({ user }: UserMenuProps) {
   const avatarUrl = profile?.avatar_url || user?.avatar || undefined;
   const displayName = profile?.display_name || user?.name || 'Account';
   const email = profile?.email || user?.email || '';
+
+  // ------------------------------------------------------------
+  // ROLE RESOLUTION
+  // ------------------------------------------------------------
+  const currentUserId = profile?.id;
+
+  const myMembership = useMemo<AccountMember | undefined>(() => {
+    if (!accountMembers || !currentUserId) return undefined;
+    return accountMembers.find((m) => m.user_id === currentUserId);
+  }, [accountMembers, currentUserId]);
+
+  const roleLabel = useMemo(() => {
+    if (!myMembership?.role) return undefined;
+    return roleDisplayLabel(myMembership.role as AccountRole);
+  }, [myMembership]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -388,6 +427,24 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   // ============================================================
+  // ROLE BADGE (used by mobile header)
+  // ============================================================
+
+  const roleBadge = (size: 'sm' | 'xs' = 'sm') =>
+    roleLabel ? (
+      <span
+        className={cn(
+          'shrink-0 rounded-full bg-primary/10 font-semibold uppercase tracking-wide text-primary',
+          size === 'sm'
+            ? 'px-2 py-0.5 text-[10px]'
+            : 'px-1.5 py-0.5 text-[9px]',
+        )}
+      >
+        {roleLabel}
+      </span>
+    ) : null;
+
+  // ============================================================
   // TEAM ROW — selectable (radio-like)
   // ============================================================
 
@@ -455,10 +512,6 @@ export function UserMenu({ user }: UserMenuProps) {
 
   // ============================================================
   // CONSPICUOUS "YOUR TEAMS" CONTAINER
-  //
-  // Wraps the teams list (and manage-this-team actions) in a tinted,
-  // bordered card so the section reads as a distinct block inside the
-  // user menu panel.
   // ============================================================
 
   const teamsSectionHeader = (
@@ -744,6 +797,7 @@ export function UserMenu({ user }: UserMenuProps) {
       )}
     >
       <div className="w-56 shrink-0 border-r border-border bg-muted/40 p-3">
+        {/* User card: name → role (below) → email (below) */}
         <div className="mb-3 flex items-center gap-3 rounded-xl bg-background p-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={avatarUrl} />
@@ -751,11 +805,16 @@ export function UserMenu({ user }: UserMenuProps) {
               {getUserInitials()}
             </AvatarFallback>
           </Avatar>
-          <div className="flex min-w-0 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <p className="truncate text-sm font-medium leading-none text-foreground">
               {displayName}
             </p>
-            <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
+            {roleLabel && (
+              <span className="w-fit shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                {roleLabel}
+              </span>
+            )}
+            <p className="truncate text-xs leading-none text-muted-foreground">
               {email}
             </p>
           </div>
@@ -847,9 +906,12 @@ export function UserMenu({ user }: UserMenuProps) {
           </Avatar>
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className="truncate text-sm font-semibold leading-none text-foreground">
-              {displayName}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-sm font-semibold leading-none text-foreground">
+                {displayName}
+              </p>
+              {roleBadge('xs')}
+            </div>
             <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
               {email}
             </p>
@@ -1035,8 +1097,15 @@ export function UserMenu({ user }: UserMenuProps) {
               {getUserInitials()}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden text-sm font-medium text-foreground sm:inline">
-            {displayName}
+          <span className="hidden min-w-0 flex-col items-start sm:inline-flex">
+            <span className="truncate text-sm font-medium leading-none text-foreground">
+              {displayName}
+            </span>
+            {roleLabel && (
+              <span className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-wide text-primary">
+                {roleLabel}
+              </span>
+            )}
           </span>
           <ChevronDown
             className={cn(
