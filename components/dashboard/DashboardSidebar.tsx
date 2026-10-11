@@ -41,6 +41,7 @@ import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 import { accountLabel } from '@/lib/utils/account-label';
 import type { Account } from '@/lib/types/account';
+import type { Team } from '@/lib/types/team';
 
 // ============================================================
 // TYPES
@@ -109,11 +110,9 @@ export function DashboardSidebar({
   const [teamsExpanded, setTeamsExpanded] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Teams under the active (URL or workspace) account.
-  const { data: teamsResponse } = useGetUserTeamsQuery(
-    { accountId: accountId ?? undefined },
-    { skip: !accountId },
-  );
+  // Teams — unfiltered so the sidebar can switch across accounts,
+  // matching TeamSwitcher / UserMenu.
+  const { data: teamsResponse } = useGetUserTeamsQuery();
   const teams = teamsResponse?.teams ?? [];
 
   // Accounts — used to resolve each team's parent-account logo.
@@ -177,9 +176,16 @@ export function DashboardSidebar({
     return segment === '' ? accountBase : `${accountBase}/${segment}`;
   };
 
-  const buildTeamHref = (id: string) => {
-    if (!accountId) return '/accounts';
-    return buildTeamSwitchHref(pathname, accountId, id);
+  /**
+   * Build a switch link for a specific team.
+   *
+   * IMPORTANT: uses `team.account_id`, not the currently-active
+   * `accountId`, so switching to a team in another account produces
+   * a correct URL and the header's TeamSwitcher picks up the new
+   * account's logo.
+   */
+  const buildTeamHref = (team: Team) => {
+    return buildTeamSwitchHref(pathname, team.account_id, team.id);
   };
 
   const isTeamNavActive = (item: NavItem) => {
@@ -428,7 +434,7 @@ export function DashboardSidebar({
                             return (
                               <Link
                                 key={team.id}
-                                href={buildTeamHref(team.id)}
+                                href={buildTeamHref(team)}
                                 className={cn(
                                   'relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-all cursor-pointer',
                                   isActive
