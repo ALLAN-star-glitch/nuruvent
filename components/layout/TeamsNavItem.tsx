@@ -18,11 +18,9 @@ import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 
 interface TeamsNavItemProps {
-  accountId?: string;
-  /** Controlled by the parent if desired. Falls back to internal state. */
+  accountId?: string | null;   // ← accept null
   isExpanded?: boolean;
   onToggle?: () => void;
-  /** Called to close the drawer before navigating. */
   onNavigate?: (href: string) => void;
 }
 
