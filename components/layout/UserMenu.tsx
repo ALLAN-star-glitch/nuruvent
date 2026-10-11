@@ -111,6 +111,11 @@ const QUICK_LINKS = [
   { label: 'Trash', segment: 'trash', icon: Trash2, isTrash: true },
 ];
 
+// Mobile keeps Trash off the quick list (matches current mobile behavior).
+const MOBILE_QUICK_LINKS = QUICK_LINKS.filter(
+  (item) => !item.isTrash,
+);
+
 // ============================================================
 // MOBILE SECTION (collapsible)
 // ============================================================
@@ -227,11 +232,11 @@ export function UserMenu({ user }: UserMenuProps) {
   // Mobile menu sections: only Teams collapsed.
   const [mobileSections, setMobileSections] = useState<{
     actions: boolean;
-    teams: boolean;
+    teams: false;
     account: boolean;
   }>({
     actions: true,
-    teams: true, // expanded by default so it's conspicuous
+    teams: false, // expanded by default so it's conspicuous
     account: true,
   });
 
@@ -321,7 +326,7 @@ export function UserMenu({ user }: UserMenuProps) {
   // Reset mobile sections on close: Teams expanded, others expanded.
   useEffect(() => {
     if (!open && isMobile) {
-      setMobileSections({ actions: true, teams: true, account: true });
+      setMobileSections({ actions: true, teams: false, account: true });
     }
   }, [open, isMobile]);
 
@@ -943,38 +948,34 @@ export function UserMenu({ user }: UserMenuProps) {
             <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="text-sm">Dashboard</span>
           </button>
-          <button
-            type="button"
-            onClick={() => navigateTo(buildQuickLink('events'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-          >
-            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">Events</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigateTo(buildQuickLink('registrations'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-          >
-            <ClipboardList className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">Registrations</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigateTo(buildQuickLink('tickets'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-          >
-            <Ticket className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">Tickets</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigateTo(buildQuickLink('attendees'))}
-            className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
-          >
-            <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">Attendees</span>
-          </button>
+
+          {MOBILE_QUICK_LINKS.map((item) => {
+            const Icon = item.icon;
+            const href = buildQuickLink(item.segment);
+            return (
+              <button
+                key={item.segment}
+                type="button"
+                onClick={() => navigateTo(href)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition-colors cursor-pointer',
+                  item.isTrash
+                    ? 'text-destructive hover:bg-destructive/10'
+                    : 'text-foreground hover:bg-accent',
+                )}
+              >
+                <Icon
+                  className={cn(
+                    'h-4 w-4 shrink-0',
+                    item.isTrash
+                      ? 'text-destructive'
+                      : 'text-muted-foreground',
+                  )}
+                />
+                <span className="text-sm">{item.label}</span>
+              </button>
+            );
+          })}
         </MobileSection>
 
         {/* Your Teams — conspicuous treatment via highlight */}
