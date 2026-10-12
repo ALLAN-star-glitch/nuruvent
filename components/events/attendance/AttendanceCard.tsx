@@ -393,12 +393,13 @@ function SessionAttendanceRow({
             attended
           </span>
           <span className="text-border">·</span>
-          <span>
-            avg{' '}
-            <span className="font-medium text-foreground">
-              {formatDuration(session.avg_duration_seconds)}
-            </span>
-          </span>
+         <span>
+          avg{' '}
+          <span className="font-medium text-foreground">
+            {formatDuration(session.avg_duration_seconds)}
+          </span>{' '}
+          <span className="text-muted-foreground">per attendee</span>
+        </span>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground mt-2">

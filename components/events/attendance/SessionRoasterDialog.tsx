@@ -479,11 +479,17 @@ export function SessionRosterDialog({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-muted-foreground tabular-nums hidden sm:inline">
-                        {formatDuration(r.total_duration_seconds)}
-                      </span>
-                      {r.is_host && (
+                  <div className="flex items-center gap-2 shrink-0">
+                  {r.effective_status === 'registered' ? (
+                    <span className="text-xs text-muted-foreground italic hidden sm:inline">
+                      Not yet joined
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground tabular-nums hidden sm:inline">
+                      {formatDuration(r.total_duration_seconds)}
+                    </span>
+                  )}
+                  {r.is_host && (
                         <Badge
                           variant="outline"
                           className="text-[10px] text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30"

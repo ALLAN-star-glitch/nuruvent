@@ -182,6 +182,29 @@ function formatDuration(seconds: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+/**
+ * Duration display for the attendees directory.
+ *
+ * An attendee with no recorded attendance time shows a state-aware
+ * label rather than a dash, so the column never looks like missing
+ * data. The state comes from `effective_status`, not from the
+ * duration itself — a registered attendee who never joined should
+ * read "Not yet joined", not "0 min".
+ */
+function durationDisplay(
+  seconds: number,
+  status: string | undefined,
+): { text: string; italic: boolean } {
+  const normalized = (status ?? '').replace(/_/g, '-');
+  if (normalized === 'registered' && (!seconds || seconds <= 0)) {
+    return { text: 'Not yet joined', italic: true };
+  }
+  if (normalized === 'no-show' && (!seconds || seconds <= 0)) {
+    return { text: 'Did not attend', italic: true };
+  }
+  return { text: formatDuration(seconds), italic: false };
+}
+
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -953,6 +976,10 @@ export default function AttendeesPage() {
                           const s = statusDisplay(a.effective_status);
                           const StatusIcon = s.icon;
                           const isSelected = isRowSelected(a);
+                          const dur = durationDisplay(
+                            a.total_duration_seconds,
+                            a.effective_status,
+                          );
 
                           return (
                             <TableRow
@@ -1048,7 +1075,11 @@ export default function AttendeesPage() {
                                 / {a.sessions_total}
                               </TableCell>
                               <TableCell className="px-4 py-4 text-sm text-muted-foreground">
-                                {formatDuration(a.total_duration_seconds)}
+                                {dur.italic ? (
+                                  <span className="italic">{dur.text}</span>
+                                ) : (
+                                  dur.text
+                                )}
                               </TableCell>
                               <TableCell
                                 className="px-4 py-4 text-right"
@@ -1189,6 +1220,10 @@ export default function AttendeesPage() {
                     const s = statusConfig[a.effective_status];
                     const StatusIcon = s.icon;
                     const isSelected = isRowSelected(a);
+                    const dur = durationDisplay(
+                      a.total_duration_seconds,
+                      a.effective_status,
+                    );
 
                     return (
                       <Card
@@ -1279,7 +1314,11 @@ export default function AttendeesPage() {
                               </span>
                             </span>
                             <span className="text-muted-foreground">
-                              {formatDuration(a.total_duration_seconds)}
+                              {dur.italic ? (
+                                <span className="italic">{dur.text}</span>
+                              ) : (
+                                dur.text
+                              )}
                             </span>
                           </div>
 
@@ -1727,7 +1766,19 @@ export default function AttendeesPage() {
                     Total duration
                   </Label>
                   <p className="text-sm font-medium sm:text-base">
-                    {formatDuration(selectedAttendee.total_duration_seconds)}
+                    {(() => {
+                      const d = durationDisplay(
+                        selectedAttendee.total_duration_seconds,
+                        selectedAttendee.effective_status,
+                      );
+                      return d.italic ? (
+                        <span className="italic font-normal text-muted-foreground">
+                          {d.text}
+                        </span>
+                      ) : (
+                        d.text
+                      );
+                    })()}
                   </p>
                 </div>
               </div>
