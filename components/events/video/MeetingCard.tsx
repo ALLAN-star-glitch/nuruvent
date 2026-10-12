@@ -795,17 +795,17 @@ function SessionRow({
             )}
 
             {isHost && meta?.platform === 'zoom' && onStart && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer h-8 text-xs border-primary/40 text-primary hover:bg-primary/5"
-                onClick={() => onStart(session)}
-                disabled={isRunning}
-              >
-                <Video className="h-3.5 w-3.5 mr-1.5" />
-                Start in Nuruvent
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer h-8 text-xs border-primary/40 text-primary hover:bg-primary/5"
+              onClick={() => window.open('about:blank', '_blank')}
+              disabled={isRunning}
+            >
+              <Video className="h-3.5 w-3.5 mr-1.5" />
+              Start in Nuruvent
+            </Button>
+          )}
 
             <Button
               size="sm"
