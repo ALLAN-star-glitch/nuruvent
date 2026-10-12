@@ -1,129 +1,221 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-'use client'
+// components/PWA/InstallPrompt.tsx
 
-import { useState, useEffect } from 'react'
-import { X, Download } from 'lucide-react'
+/* eslint-disable react-hooks/set-state-in-effect */
+'use client';
+
+import { useState, useEffect } from 'react';
+import { X, Download } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+// ============================================================
+// BROWSER DETECTION
+// ============================================================
+//
+// PWA installation is only supported on:
+//
+//   - Chrome / Edge on Android (fires `beforeinstallprompt`, installs
+//     a WebAPK that runs in standalone mode).
+//   - Safari on iOS (manual "Add to Home Screen" from the Share menu;
+//     no install prompt is fired).
+//
+// Every other mobile browser — Firefox, Opera, Brave, Edge on Android,
+// Chrome/Firefox/Edge on iOS — either doesn't support installation at
+// all or only creates a shortcut icon that opens in the browser.
+//
+// Showing an "Install" button on those browsers leads the user to an
+// alert that tells them to do something their browser can't do. We
+// therefore gate the entire prompt on browser capability.
+
+function isAndroid(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent);
+}
+
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    !('MSStream' in window)
+  );
+}
+
+/**
+ * Chrome on Android — the only browser that reliably fires
+ * `beforeinstallprompt` and installs a WebAPK.
+ *
+ * Note: Edge and Samsung Internet also fire the event, but the
+ * resulting install behaves differently and is not our primary target.
+ * For simplicity we treat Chrome as the only "prompt-capable" browser.
+ */
+function isChromeAndroid(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return isAndroid() && /Chrome/i.test(navigator.userAgent);
+}
+
+/**
+ * Safari on iOS — the only iOS browser that supports "Add to Home
+ * Screen". Chrome, Firefox, and Edge on iOS are all WebKit shells and
+ * do not expose the Share → Add to Home Screen flow in the same way.
+ *
+ * The regex excludes the WebKit-based shells: CriOS (Chrome), FxiOS
+ * (Firefox), EdgiOS (Edge). A user agent matching just "Safari" is
+ * real Safari.
+ */
+function isIOSSafari(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  if (!isIOS()) return false;
+  const ua = navigator.userAgent;
+  if (/CriOS|FxiOS|EdgiOS|OPiOS|mercury/i.test(ua)) return false;
+  return /Safari/i.test(ua);
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
 export function InstallPrompt() {
-  const [isIOS, setIsIOS] = useState(false)
-  const [isStandalone, setIsStandalone] = useState(false)
-  const [isDismissed, setIsDismissed] = useState(false)
-  const [isVisible, setIsVisible] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isDesktop, setIsDesktop] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isPromptCapable, setIsPromptCapable] = useState(false);
+  const [isSafariIOS, setIsSafariIOS] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true)
+    setIsMounted(true);
 
-    // Check if desktop
-    setIsDesktop(window.innerWidth >= 1024)
+    // ---- Environment checks ----
 
-    // Check if user has dismissed this before
-    const dismissed = localStorage.getItem('nuruvent-install-prompt-dismissed')
+    setIsDesktop(window.innerWidth >= 1024);
+
+    const standalone = window.matchMedia(
+      '(display-mode: standalone)',
+    ).matches;
+    setIsStandalone(standalone);
+
+    // Browser capability. Computed once on mount; user agent doesn't
+    // change during a session.
+    const chromeAndroid = isChromeAndroid();
+    const safariIOS = isIOSSafari();
+    setIsPromptCapable(chromeAndroid);
+    setIsSafariIOS(safariIOS);
+
+    // ---- Persist dismissal ----
+
+    const dismissed = localStorage.getItem(
+      'nuruvent-install-prompt-dismissed',
+    );
     if (dismissed === 'true') {
-      setIsDismissed(true)
-      return
+      setIsDismissed(true);
+      return;
     }
 
-    // Check if already installed (standalone mode)
-    const standalone = window.matchMedia('(display-mode: standalone)').matches
-    setIsStandalone(standalone)
-
+    // Don't show if already installed.
     if (standalone) {
-      return
+      return;
     }
 
-    // Check if iOS
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !('MSStream' in window)
-    setIsIOS(ios)
+    // Don't show if the browser can't install. This is the critical
+    // gate — everything below this point assumes installation is
+    // possible.
+    if (!chromeAndroid && !safariIOS) {
+      return;
+    }
 
-    // Listen for the beforeinstallprompt event (Android/Chrome)
+    // ---- Listen for the install prompt (Chrome Android only) ----
+
     const handler = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-      
-      // Show prompt after 5 seconds delay
-      setTimeout(() => {
-        setIsVisible(true)
-      }, 5000)
-    }
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      // Show the prompt after a short delay so it doesn't collide
+      // with page load.
+      setTimeout(() => setIsVisible(true), 5000);
+    };
 
-    window.addEventListener('beforeinstallprompt', handler)
+    window.addEventListener('beforeinstallprompt', handler);
 
-    // If no beforeinstallprompt event, still show after 5 seconds
+    // Safari iOS doesn't fire `beforeinstallprompt`. If we're on iOS
+    // Safari and not installed, show the manual-instructions prompt
+    // after the same delay.
     const timer = setTimeout(() => {
-      if (!isStandalone && !isDismissed) {
-        setIsVisible(true)
-      }
-    }, 5000)
+      setIsVisible(true);
+    }, 5000);
 
-    // Listen for successful installation
+    // ---- Installation completed ----
+
     const installedHandler = () => {
-      setIsVisible(false)
-      setIsDismissed(true)
-      localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
-    }
+      setIsVisible(false);
+      setIsDismissed(true);
+      localStorage.setItem('nuruvent-install-prompt-dismissed', 'true');
+    };
 
-    window.addEventListener('appinstalled', installedHandler)
+    window.addEventListener('appinstalled', installedHandler);
 
-    // Handle resize
+    // ---- Resize (desktop vs mobile layout) ----
+
     const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 1024)
-    }
+      setIsDesktop(window.innerWidth >= 1024);
+    };
 
-    window.addEventListener('resize', handleResize)
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
-      window.removeEventListener('appinstalled', installedHandler)
-      window.removeEventListener('resize', handleResize)
-      clearTimeout(timer)
-    }
-  }, [isDismissed, isStandalone])
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', installedHandler);
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleDismiss = () => {
-    setIsDismissed(true)
-    setIsVisible(false)
-    localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
-  }
+    setIsDismissed(true);
+    setIsVisible(false);
+    localStorage.setItem('nuruvent-install-prompt-dismissed', 'true');
+  };
 
   const handleInstall = async () => {
     if (deferredPrompt) {
-      deferredPrompt.prompt()
-      const result = await deferredPrompt.userChoice
-      setDeferredPrompt(null)
-      setIsVisible(false)
-      
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      setDeferredPrompt(null);
+      setIsVisible(false);
+
       if (result.outcome === 'accepted') {
-        setIsDismissed(true)
-        localStorage.setItem('nuruvent-install-prompt-dismissed', 'true')
+        setIsDismissed(true);
+        localStorage.setItem('nuruvent-install-prompt-dismissed', 'true');
       }
-    } else {
-      if (isIOS) {
-        alert('To install this app on iOS:\n\n1. Tap the Share button (⎋)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"')
-      } else {
-        alert('To install this app:\n\n1. Look for the install icon in your browser address bar\n2. Click "Install" or "Add to Home Screen"\n\nOr use Chrome DevTools:\n1. Press F12\n2. Go to Application tab\n3. Click Manifest in sidebar\n4. Click "Install" button')
-      }
+    } else if (isSafariIOS) {
+      alert(
+        'To install this app on iOS:\n\n1. Tap the Share button (⎋)\n2. Scroll down and tap "Add to Home Screen"\n3. Tap "Add"',
+      );
     }
-  }
+  };
 
-  // Prevent hydration mismatch
+  // Prevent hydration mismatch.
   if (!isMounted) {
-    return null
+    return null;
   }
 
-  // Don't show if already installed or dismissed
-  if (isStandalone || isDismissed || !isVisible) {
-    return null
+  // Don't show if: installed, dismissed, hidden, or unsupported browser.
+  if (
+    isStandalone ||
+    isDismissed ||
+    !isVisible ||
+    (!isPromptCapable && !isSafariIOS)
+  ) {
+    return null;
   }
 
-  // Desktop: Left side, lower position
+  // ------------------------------------------------------------
+  // Desktop: left side, lower position
+  // ------------------------------------------------------------
   if (isDesktop) {
     return (
       <div className="fixed bottom-24 left-4 z-50 bg-white rounded-2xl shadow-2xl p-5 border border-gray-200 max-w-xs w-full animate-in slide-in-from-left-4 duration-300">
@@ -136,12 +228,24 @@ export function InstallPrompt() {
         </button>
         <div className="flex flex-col items-center text-center">
           <div className="bg-gradient-to-br from-[#1A73E8]/10 to-[#FBBC04]/10 p-4 rounded-2xl flex-shrink-0 mb-4">
-            <svg className="w-12 h-12 text-[#1A73E8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            <svg
+              className="w-12 h-12 text-[#1A73E8]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
             </svg>
           </div>
           <div>
-            <h4 className="text-base font-bold text-gray-900">Install Nuruvent App</h4>
+            <h4 className="text-base font-bold text-gray-900">
+              Install Nuruvent App
+            </h4>
             <p className="text-xs text-gray-500 mt-1 leading-relaxed">
               Get the best experience with our native app
             </p>
@@ -155,11 +259,13 @@ export function InstallPrompt() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  // iOS: Top banner
-  if (isIOS) {
+  // ------------------------------------------------------------
+  // iOS Safari: top banner
+  // ------------------------------------------------------------
+  if (isSafariIOS) {
     return (
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 p-4 animate-in slide-in-from-top-4 duration-300">
         <button
@@ -171,12 +277,24 @@ export function InstallPrompt() {
         </button>
         <div className="flex items-center gap-3 pr-8">
           <div className="bg-gradient-to-br from-[#1A73E8]/10 to-[#FBBC04]/10 p-2.5 rounded-xl flex-shrink-0">
-            <svg className="w-7 h-7 text-[#1A73E8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            <svg
+              className="w-7 h-7 text-[#1A73E8]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
             </svg>
           </div>
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-gray-900">Install Nuruvent App</h4>
+            <h4 className="text-sm font-semibold text-gray-900">
+              Install Nuruvent App
+            </h4>
             <p className="text-xs text-gray-500 mt-0.5">
               Tap Share ⎋ then &quot;Add to Home Screen&quot; ➕
             </p>
@@ -189,10 +307,12 @@ export function InstallPrompt() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  // Mobile: Top banner with button
+  // ------------------------------------------------------------
+  // Android Chrome: top banner with install button
+  // ------------------------------------------------------------
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 p-4 animate-in slide-in-from-top-4 duration-300">
       <button
@@ -204,12 +324,24 @@ export function InstallPrompt() {
       </button>
       <div className="flex items-center gap-3 pr-8">
         <div className="bg-gradient-to-br from-[#1A73E8]/10 to-[#FBBC04]/10 p-2.5 rounded-xl flex-shrink-0">
-          <svg className="w-7 h-7 text-[#1A73E8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          <svg
+            className="w-7 h-7 text-[#1A73E8]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
           </svg>
         </div>
         <div className="flex-1">
-          <h4 className="text-sm font-semibold text-gray-900">Install Nuruvent App</h4>
+          <h4 className="text-sm font-semibold text-gray-900">
+            Install Nuruvent App
+          </h4>
           <p className="text-xs text-gray-500 mt-0.5">
             Get the best experience with our native app
           </p>
@@ -223,5 +355,5 @@ export function InstallPrompt() {
         </button>
       </div>
     </div>
-  )
+  );
 }
