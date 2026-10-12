@@ -1,37 +1,44 @@
-// app/_components/MobileAuthRedirect.tsx
-
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAppSelector } from '@/lib/store/hooks';
 import {
   selectIsAuthenticated,
   selectIsHydrated,
 } from '@/lib/store/slices/authSlice';
 
-/**
- * Mobile-only redirect.
- *
- * A logged-in user opening the app on a phone should land in the app,
- * not on the marketing homepage. Desktop users keep the marketing page —
- * showing it at `/` is intentional there.
- *
- * Behaviour:
- *   - Viewport >= 768px     → no-op (desktop).
- *   - Not authenticated     → no-op.
- *   - Redux not yet hydrated → no-op (wait for the persisted state).
- *   - Mobile + auth + hydrated → router.replace to the active workspace.
- *
- * The target mirrors the workspace slice:
- *   - Both account & team set → /dashboard/<accountId>/<teamId>
- *   - Only account set        → /dashboard/<accountId>
- *   - Neither set             → /accounts (workspace picker)
- */
 const MOBILE_BREAKPOINT = 768;
+
+// Public routes from which an authenticated mobile user should be
+// redirected into the app. Any pathname matching one of these (or
+// extending one of these with a segment) triggers the redirect.
+//
+// Exempt routes — anything not in this list, plus anything starting
+// with /dashboard or /profile — pass through untouched. Add or remove
+// entries to change which pages behave as "app entry points."
+const PUBLIC_PREFIXES = [
+  '/',
+  '/how-it-works',
+  '/about',
+  '/contact',
+  '/pricing',
+  '/blog',
+  '/login',
+  '/register',
+];
+
+function isPublicRoute(pathname: string): boolean {
+  if (pathname === '/') return true;
+  return PUBLIC_PREFIXES.some((prefix) => {
+    if (prefix === '/') return false;
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
+  });
+}
 
 export function MobileAuthRedirect() {
   const router = useRouter();
+  const pathname = usePathname();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const isHydrated = useAppSelector(selectIsHydrated);
   const activeAccountId = useAppSelector((s) => s.workspace.activeAccountId);
@@ -42,6 +49,7 @@ export function MobileAuthRedirect() {
     if (!isHydrated) return;
     if (!isAuthenticated) return;
     if (window.innerWidth >= MOBILE_BREAKPOINT) return;
+    if (!isPublicRoute(pathname)) return;
 
     const target =
       activeAccountId && activeTeamId
@@ -52,6 +60,7 @@ export function MobileAuthRedirect() {
 
     router.replace(target);
   }, [
+    pathname,
     isAuthenticated,
     isHydrated,
     activeAccountId,
