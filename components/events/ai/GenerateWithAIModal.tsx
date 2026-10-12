@@ -347,20 +347,30 @@ export function GenerateWithAIModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-foreground">
-            <div className="relative p-1.5 rounded-lg bg-primary/10">
+      <DialogContent
+        className={cn(
+          // Responsive width: hug viewport on mobile, capped on desktop
+          'w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)]',
+          'sm:w-full sm:max-w-2xl',
+          // Height + scroll behavior
+          'max-h-[90vh] overflow-y-auto overflow-x-hidden',
+          // Tighter padding on mobile
+          'p-4 sm:p-6',
+        )}
+      >
+        <DialogHeader className="min-w-0">
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-foreground">
+            <div className="relative p-1.5 rounded-lg bg-primary/10 shrink-0">
               {step === 'generating' && (
                 <span className="absolute inset-0 rounded-lg bg-primary/20 animate-ping opacity-75" />
               )}
               <Wand2 className="h-4 w-4 text-primary relative z-10" />
             </div>
-            Generate event with AI
+            <span className="min-w-0">Generate event with AI</span>
             <Badge
               variant="outline"
               className={cn(
-                'text-[10px] font-medium border-primary/30 text-primary bg-primary/5',
+                'text-[10px] font-medium border-primary/30 text-primary bg-primary/5 shrink-0',
                 step === 'generating' && 'animate-pulse',
               )}
             >
@@ -379,9 +389,9 @@ export function GenerateWithAIModal({
         </DialogHeader>
 
         {step === 'prompt' && (
-          <div className="space-y-5 py-2">
+          <div className="space-y-5 py-2 min-w-0">
             {/* Prompt */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label
                 htmlFor="ai-prompt-input"
                 className="cursor-pointer text-sm font-medium text-foreground"
@@ -393,16 +403,23 @@ export function GenerateWithAIModal({
                 value={form.prompt}
                 onChange={(e) => update('prompt', e.target.value)}
                 placeholder="A two-day Kubernetes workshop in Nairobi for 60 engineers, hybrid, with a virtual stream and both in-person and remote tickets…"
-                className="min-h-[110px] resize-none cursor-text bg-muted/40 placeholder:text-muted-foreground focus-visible:ring-primary/20 transition-all"
+                className={cn(
+                  'min-h-[110px] resize-none cursor-text transition-all',
+                  // Neutral background so the placeholder stays the only soft element
+                  'bg-background',
+                  // Subdued, greyish placeholder — no bright tint
+                  'placeholder:text-muted-foreground/60 placeholder:font-normal',
+                  'focus-visible:ring-primary/20',
+                )}
                 disabled={isGenerating}
               />
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="text-muted-foreground min-w-0 truncate">
                   Describe the content. Use the toggle below for recurrence.
                 </span>
                 <span
                   className={cn(
-                    'tabular-nums font-mono text-[11px]',
+                    'tabular-nums font-mono text-[11px] shrink-0',
                     form.prompt.length > PROMPT_MAX
                       ? 'text-destructive font-semibold'
                       : 'text-muted-foreground',
@@ -414,7 +431,7 @@ export function GenerateWithAIModal({
             </div>
 
             {/* Event type */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="cursor-pointer text-sm font-medium text-foreground">
                 Event Type <span className="text-destructive">*</span>
               </Label>
@@ -422,7 +439,7 @@ export function GenerateWithAIModal({
                 value={form.eventTypeId}
                 onValueChange={(v) => update('eventTypeId', v)}
               >
-                <SelectTrigger className="cursor-pointer bg-muted/40">
+                <SelectTrigger className="cursor-pointer bg-muted/40 w-full">
                   <SelectValue placeholder="Choose event type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -436,11 +453,11 @@ export function GenerateWithAIModal({
             </div>
 
             {/* Ticket types */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="cursor-pointer text-sm font-medium text-foreground">
                 Ticket Types <span className="text-destructive">*</span>
               </Label>
-              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2.5 min-w-0">
                 {ticketTypes.length === 0 && (
                   <p className="text-xs text-muted-foreground animate-pulse py-1">
                     Loading ticket types…
@@ -454,14 +471,16 @@ export function GenerateWithAIModal({
                       type="button"
                       onClick={() => toggleTicketType(tt.id)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/30',
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/30 max-w-full',
                         selected
                           ? 'bg-primary text-primary-foreground border-primary shadow-xs'
                           : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:bg-primary/5 hover:text-foreground',
                       )}
                     >
                       {selected && <Check className="h-3 w-3 shrink-0" />}
-                      <span>{tt.display_name || tt.name}</span>
+                      <span className="truncate">
+                        {tt.display_name || tt.name}
+                      </span>
                     </button>
                   );
                 })}
@@ -474,11 +493,11 @@ export function GenerateWithAIModal({
             {/* ========================================================= */}
             {/* Recurrence                                                */}
             {/* ========================================================= */}
-            <div className="rounded-lg border border-border overflow-hidden">
-              <div className="flex items-center justify-between p-3.5 bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-primary" />
-                  <div>
+            <div className="rounded-lg border border-border overflow-hidden min-w-0">
+              <div className="flex items-center justify-between gap-3 p-3.5 bg-muted/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CalendarClock className="h-4 w-4 text-primary shrink-0" />
+                  <div className="min-w-0">
                     <Label className="text-sm font-medium text-foreground cursor-pointer">
                       This event repeats
                     </Label>
@@ -491,15 +510,15 @@ export function GenerateWithAIModal({
                   checked={recurrence.enabled}
                   onCheckedChange={(c) => updateRec('enabled', c)}
                   disabled={isGenerating}
-                  className="cursor-pointer"
+                  className="cursor-pointer shrink-0"
                 />
               </div>
 
               {recurrence.enabled && (
-                <div className="p-3.5 pt-3 space-y-3 border-t border-border bg-background">
+                <div className="p-3.5 pt-3 space-y-3 border-t border-border bg-background min-w-0">
                   {/* Pattern + interval */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs text-muted-foreground">
                         Pattern
                       </Label>
@@ -513,7 +532,7 @@ export function GenerateWithAIModal({
                         }
                         disabled={isGenerating}
                       >
-                        <SelectTrigger className="cursor-pointer">
+                        <SelectTrigger className="cursor-pointer w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -533,7 +552,7 @@ export function GenerateWithAIModal({
                       </Select>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs text-muted-foreground">
                         Interval
                       </Label>
@@ -549,7 +568,7 @@ export function GenerateWithAIModal({
                           );
                         }}
                         disabled={isGenerating}
-                        className="cursor-text"
+                        className="cursor-text w-full"
                       />
                       <p className="text-[11px] text-muted-foreground">
                         {recurrence.pattern === 'daily'
@@ -566,7 +585,7 @@ export function GenerateWithAIModal({
                   {/* Weekdays */}
                   {(recurrence.pattern === 'weekly' ||
                     recurrence.pattern === 'custom') && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs text-muted-foreground">
                         On days <span className="text-destructive">*</span>
                       </Label>
@@ -604,7 +623,7 @@ export function GenerateWithAIModal({
                   {(recurrence.pattern === 'monthly' ||
                     recurrence.pattern === 'custom') && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 min-w-0">
                         <Label className="text-xs text-muted-foreground">
                           Day of month
                         </Label>
@@ -622,10 +641,10 @@ export function GenerateWithAIModal({
                             );
                           }}
                           disabled={isGenerating}
-                          className="cursor-text"
+                          className="cursor-text w-full"
                         />
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1.5 min-w-0">
                         <Label className="text-xs text-muted-foreground">
                           Or week of month
                         </Label>
@@ -636,7 +655,7 @@ export function GenerateWithAIModal({
                           }
                           disabled={isGenerating}
                         >
-                          <SelectTrigger className="cursor-pointer">
+                          <SelectTrigger className="cursor-pointer w-full">
                             <SelectValue placeholder="None" />
                           </SelectTrigger>
                           <SelectContent>
@@ -655,12 +674,12 @@ export function GenerateWithAIModal({
                   )}
 
                   {/* Ends */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="text-xs text-muted-foreground">
                       Ends <span className="text-destructive">*</span>
                     </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <Label className="text-[11px] text-muted-foreground">
                           On date
                         </Label>
@@ -672,10 +691,10 @@ export function GenerateWithAIModal({
                             if (e.target.value) updateRec('occurrences', null);
                           }}
                           disabled={isGenerating}
-                          className="cursor-text mt-1"
+                          className="cursor-text mt-1 w-full"
                         />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <Label className="text-[11px] text-muted-foreground">
                           After occurrences
                         </Label>
@@ -693,7 +712,7 @@ export function GenerateWithAIModal({
                             if (v) updateRec('endsOn', '');
                           }}
                           disabled={isGenerating}
-                          className="cursor-text mt-1"
+                          className="cursor-text mt-1 w-full"
                         />
                       </div>
                     </div>
@@ -705,15 +724,15 @@ export function GenerateWithAIModal({
               )}
             </div>
 
-            {/* Advanced options (unchanged) */}
-            <details className="group rounded-lg border border-border overflow-hidden transition-all">
-              <summary className="flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-sm font-medium text-foreground hover:bg-muted/50 select-none transition-colors">
-                <span>Advanced options</span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" />
+            {/* Advanced options */}
+            <details className="group rounded-lg border border-border overflow-hidden transition-all min-w-0">
+              <summary className="flex items-center justify-between gap-2 px-3.5 py-2.5 cursor-pointer text-sm font-medium text-foreground hover:bg-muted/50 select-none transition-colors">
+                <span className="min-w-0 truncate">Advanced options</span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180 shrink-0" />
               </summary>
-              <div className="p-3.5 pt-2 space-y-3 border-t border-border bg-muted/20">
+              <div className="p-3.5 pt-2 space-y-3 border-t border-border bg-muted/20 min-w-0">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="cursor-pointer text-xs text-muted-foreground">
                       Language
                     </Label>
@@ -721,10 +740,10 @@ export function GenerateWithAIModal({
                       value={form.language}
                       onChange={(e) => update('language', e.target.value)}
                       placeholder="en"
-                      className="cursor-text bg-background"
+                      className="cursor-text bg-background w-full"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="cursor-pointer text-xs text-muted-foreground">
                       Timezone
                     </Label>
@@ -732,10 +751,10 @@ export function GenerateWithAIModal({
                       value={form.timezone}
                       onChange={(e) => update('timezone', e.target.value)}
                       placeholder="Africa/Nairobi"
-                      className="cursor-text bg-background"
+                      className="cursor-text bg-background w-full"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="cursor-pointer text-xs text-muted-foreground">
                       Currency
                     </Label>
@@ -743,12 +762,12 @@ export function GenerateWithAIModal({
                       value={form.currency}
                       onChange={(e) => update('currency', e.target.value)}
                       placeholder="KES"
-                      className="cursor-text bg-background"
+                      className="cursor-text bg-background w-full"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="cursor-pointer text-xs text-muted-foreground">
                       Min capacity
                     </Label>
@@ -764,10 +783,10 @@ export function GenerateWithAIModal({
                         );
                       }}
                       placeholder="e.g., 10"
-                      className="cursor-text bg-background"
+                      className="cursor-text bg-background w-full"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 min-w-0">
                     <Label className="cursor-pointer text-xs text-muted-foreground">
                       Max capacity
                     </Label>
@@ -783,7 +802,7 @@ export function GenerateWithAIModal({
                         );
                       }}
                       placeholder="e.g., 500"
-                      className="cursor-text bg-background"
+                      className="cursor-text bg-background w-full"
                     />
                   </div>
                 </div>
@@ -812,7 +831,7 @@ export function GenerateWithAIModal({
         )}
 
         {step === 'preview' && draft && (
-          <div className="py-2">
+          <div className="py-2 min-w-0">
             <DraftPreview draft={draft} currency={form.currency || 'KES'} />
           </div>
         )}
@@ -822,25 +841,25 @@ export function GenerateWithAIModal({
             <div className="p-3 rounded-full bg-destructive/10 border border-destructive/20 animate-pulse">
               <AlertCircle className="h-7 w-7 text-destructive" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">
                 Generation failed
               </p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed break-words">
                 {error}
               </p>
             </div>
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="gap-2 sm:gap-2 flex-col-reverse sm:flex-row">
           {step === 'prompt' && (
             <>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="cursor-pointer"
+                className="cursor-pointer w-full sm:w-auto"
               >
                 Cancel
               </Button>
@@ -849,7 +868,7 @@ export function GenerateWithAIModal({
                 onClick={handleGenerate}
                 disabled={!canGenerate || isGenerating}
                 className={cn(
-                  'bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
+                  'bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-primary-foreground font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99] w-full sm:w-auto',
                   isGenerating && 'animate-pulse',
                 )}
               >
@@ -860,7 +879,7 @@ export function GenerateWithAIModal({
           )}
 
           {step === 'generating' && (
-            <Button disabled className="cursor-wait animate-pulse">
+            <Button disabled className="cursor-wait animate-pulse w-full sm:w-auto">
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               Generating…
             </Button>
@@ -873,7 +892,7 @@ export function GenerateWithAIModal({
                 variant="ghost"
                 onClick={handleRetry}
                 disabled={isPublishing}
-                className="cursor-pointer mr-auto disabled:cursor-not-allowed"
+                className="cursor-pointer sm:mr-auto disabled:cursor-not-allowed w-full sm:w-auto"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Try again
@@ -883,7 +902,7 @@ export function GenerateWithAIModal({
                 variant="outline"
                 onClick={handleEditDraft}
                 disabled={isPublishing}
-                className="cursor-pointer disabled:cursor-not-allowed"
+                className="cursor-pointer disabled:cursor-not-allowed w-full sm:w-auto"
               >
                 Edit draft
               </Button>
@@ -892,7 +911,7 @@ export function GenerateWithAIModal({
                 onClick={handlePublishDraft}
                 disabled={isPublishing}
                 className={cn(
-                  'bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99]',
+                  'bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99] w-full sm:w-auto',
                   isPublishing && 'animate-pulse cursor-wait',
                 )}
               >
@@ -917,14 +936,14 @@ export function GenerateWithAIModal({
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
-                className="cursor-pointer"
+                className="cursor-pointer w-full sm:w-auto"
               >
                 Close
               </Button>
               <Button
                 type="button"
                 onClick={handleRetry}
-                className="cursor-pointer"
+                className="cursor-pointer w-full sm:w-auto"
               >
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Try again
@@ -938,7 +957,7 @@ export function GenerateWithAIModal({
 }
 
 // ============================================================
-// DRAFT PREVIEW (unchanged from your version)
+// DRAFT PREVIEW
 // ============================================================
 
 function DraftPreview({
@@ -953,13 +972,13 @@ function DraftPreview({
   const locationLabel = schedule?.location ?? '';
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-semibold text-foreground leading-snug">
+    <div className="space-y-4 min-w-0">
+      <div className="min-w-0">
+        <h3 className="text-lg font-semibold text-foreground leading-snug break-words">
           {draft.name}
         </h3>
         {draft.short_description && (
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed break-words">
             {draft.short_description}
           </p>
         )}
@@ -1006,27 +1025,27 @@ function DraftPreview({
       </div>
 
       {draft.description && (
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <div className="rounded-lg border border-border bg-muted/30 p-3 min-w-0">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             Description
           </p>
-          <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4 leading-relaxed">
+          <p className="text-sm text-foreground whitespace-pre-wrap line-clamp-4 leading-relaxed break-words">
             {draft.description}
           </p>
         </div>
       )}
 
       {locationLabel && (
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-lg border border-border p-3 min-w-0">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             {isVirtual ? 'Location' : 'Venue'}
           </p>
-          <p className="text-sm text-foreground">{locationLabel}</p>
+          <p className="text-sm text-foreground break-words">{locationLabel}</p>
         </div>
       )}
 
       {draft.tickets && draft.tickets.length > 0 && (
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-lg border border-border p-3 min-w-0">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
             Tickets ({draft.tickets.length})
           </p>
@@ -1034,7 +1053,7 @@ function DraftPreview({
             {draft.tickets.map((t, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between text-sm border-t border-border/60 pt-2 first:border-0 first:pt-0"
+                className="flex items-center justify-between gap-3 text-sm border-t border-border/60 pt-2 first:border-0 first:pt-0 min-w-0"
               >
                 <div className="min-w-0 pr-2">
                   <p className="font-medium text-foreground truncate">

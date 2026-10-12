@@ -4,7 +4,15 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, ArrowLeft, CheckCircle, Shield, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import {
+  Mail,
+  ArrowLeft,
+  CheckCircle,
+  Shield,
+  Sparkles,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -12,16 +20,22 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { generateStrongPassword } from '@/lib/utils/password';
 
 // Redux imports
-import { useForgotPasswordMutation, useVerifyResetOTPMutation, useResendOTPMutation } from '@/lib/store/api/authApi';
+import {
+  useForgotPasswordMutation,
+  useVerifyResetOTPMutation,
+  useResendOTPMutation,
+} from '@/lib/store/api/authApi';
 
 export function ForgotPasswordForm() {
   const router = useRouter();
-  
+
   // RTK Query hooks
-  const [forgotPassword, { isLoading: isForgotLoading }] = useForgotPasswordMutation();
-  const [verifyResetOTP, { isLoading: isVerifyLoading }] = useVerifyResetOTPMutation();
+  const [forgotPassword, { isLoading: isForgotLoading }] =
+    useForgotPasswordMutation();
+  const [verifyResetOTP, { isLoading: isVerifyLoading }] =
+    useVerifyResetOTPMutation();
   const [resendOTP, { isLoading: isResendLoading }] = useResendOTPMutation();
-  
+
   // Form state
   const [step, setStep] = useState<'email' | 'otp' | 'success'>('email');
   const [formData, setFormData] = useState({
@@ -35,7 +49,7 @@ export function ForgotPasswordForm() {
   const [resendTimer, setResendTimer] = useState(0);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  // ✅ Ref for OTP
+  // Ref for OTP
   const otpRef = useRef('');
 
   // Resend timer countdown
@@ -65,7 +79,7 @@ export function ForgotPasswordForm() {
     if (error) setError(null);
   };
 
-  // ✅ Only updates state - NO API call
+  // Only updates state — NO API call.
   const handleOtpChange = (value: string) => {
     otpRef.current = value;
     setOtp(value);
@@ -73,7 +87,6 @@ export function ForgotPasswordForm() {
     setSuccessMessage(null);
   };
 
-  // ✅ Generate strong password
   const handleGeneratePassword = () => {
     const newPassword = generateStrongPassword();
     setFormData({
@@ -88,17 +101,17 @@ export function ForgotPasswordForm() {
     e.preventDefault();
     setError(null);
     setPasswordError(null);
-    
+
     if (!formData.email) {
       setError('Email is required');
       return;
     }
-    
+
     if (formData.newPassword.length < 8) {
       setPasswordError('Password must be at least 8 characters');
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -106,7 +119,7 @@ export function ForgotPasswordForm() {
         email: formData.email,
         new_password: formData.newPassword,
       }).unwrap();
-      
+
       setStep('otp');
       setResendTimer(60);
       setSuccessMessage('OTP sent to your email');
@@ -121,7 +134,7 @@ export function ForgotPasswordForm() {
     }
   };
 
-  // ✅ Step 2: Verify OTP - ONLY called when button is clicked
+  // Step 2: Verify OTP — only called on button click.
   const handleVerifyOTP = async () => {
     const code = otpRef.current;
     if (code.length !== 6) {
@@ -138,7 +151,7 @@ export function ForgotPasswordForm() {
         email: formData.email,
         otp: code,
       }).unwrap();
-      
+
       setStep('success');
     } catch (err: any) {
       setError(err.data?.message || 'Invalid OTP. Please try again.');
@@ -151,13 +164,13 @@ export function ForgotPasswordForm() {
   const handleResendOTP = async () => {
     setError(null);
     setSuccessMessage(null);
-    
+
     try {
       await resendOTP({
         email: formData.email,
         purpose: 'password_reset',
       }).unwrap();
-      
+
       setSuccessMessage('New OTP sent to your email');
       setResendTimer(60);
       setOtp('');
@@ -171,21 +184,36 @@ export function ForgotPasswordForm() {
     }
   };
 
-  const isLoadingCombined = isLoading || isForgotLoading || isVerifyLoading || isResendLoading;
+  const isLoadingCombined =
+    isLoading || isForgotLoading || isVerifyLoading || isResendLoading;
 
   // ============================================================
   // STEP 3: SUCCESS
   // ============================================================
   if (step === 'success') {
     return (
-      <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/registration-bg.jpeg')" }} />
-        <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
-        
+      <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-background">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/registration-bg.jpeg')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
+
         <div className="absolute inset-0 pointer-events-none">
-          <svg className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
-            <pattern id="dotPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <circle cx="10" cy="10" r="2" fill="#1A73E8" opacity="0.3" />
+          <svg
+            className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40"
+            viewBox="0 0 200 200"
+            fill="none"
+          >
+            <pattern
+              id="dotPattern"
+              x="0"
+              y="0"
+              width="20"
+              height="20"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="10" cy="10" r="2" fill="currentColor" className="text-primary" opacity="0.3" />
             </pattern>
             <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern)" />
           </svg>
@@ -193,30 +221,37 @@ export function ForgotPasswordForm() {
 
         <div className="relative z-10 w-full max-w-md">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mt-2">Password Reset</h1>
-            <p className="text-sm text-gray-600 mt-0.5">Your password has been reset successfully</p>
+            <h1 className="text-2xl font-bold text-foreground mt-2">
+              Password Reset
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Your password has been reset successfully
+            </p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500/10 rounded-full mb-4">
-              <CheckCircle className="h-8 w-8 text-green-500" />
+          <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-border/60 p-6 md:p-8 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
+              <CheckCircle className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Password Reset Complete!</h3>
-            <p className="text-sm text-gray-600 mb-6">
-              Your password has been successfully reset. You can now sign in with your new password.
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Password Reset Complete!
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Your password has been successfully reset. You can now sign in
+              with your new password.
             </p>
             <Link href="/signin">
-              <Button className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer">
+              <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 text-base rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 cursor-pointer">
                 Back to Sign In
               </Button>
             </Link>
           </div>
 
           <div className="text-center mt-6">
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
               <Shield className="h-3 w-3" />
               <span>Secure & encrypted</span>
-              <span className="w-px h-3 bg-gray-300" />
+              <span className="w-px h-3 bg-border" />
               <Sparkles className="h-3 w-3" />
               <span>Powered by Nuruvent</span>
             </div>
@@ -231,46 +266,65 @@ export function ForgotPasswordForm() {
   // ============================================================
   if (step === 'otp') {
     return (
-      <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
-        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/registration-bg.jpeg')" }} />
-        <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
-        
+      <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-background">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/registration-bg.jpeg')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
+
         <div className="absolute inset-0 pointer-events-none">
-          <svg className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
-            <pattern id="dotPattern2" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <circle cx="10" cy="10" r="2" fill="#1A73E8" opacity="0.3" />
+          <svg
+            className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40"
+            viewBox="0 0 200 200"
+            fill="none"
+          >
+            <pattern
+              id="dotPattern2"
+              x="0"
+              y="0"
+              width="20"
+              height="20"
+              patternUnits="userSpaceOnUse"
+            >
+              <circle cx="10" cy="10" r="2" fill="currentColor" className="text-primary" opacity="0.3" />
             </pattern>
             <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern2)" />
           </svg>
         </div>
 
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/3 left-12 w-96 h-96 bg-[#1A73E8]/5 rounded-full blur-3xl -translate-y-1/2" />
-          <div className="absolute bottom-12 left-1/4 w-80 h-80 bg-[#FBBC04]/5 rounded-full blur-3xl" />
+          <div className="absolute top-1/3 left-12 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2" />
+          <div className="absolute bottom-12 left-1/4 w-80 h-80 bg-secondary/5 rounded-full blur-3xl" />
         </div>
 
         <div className="relative z-10 w-full max-w-md">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 mt-2">Verify OTP</h1>
-            <p className="text-sm text-gray-600 mt-0.5">Enter the 6-digit code sent to your email</p>
-            <p className="text-xs text-[#1A73E8] font-medium mt-1 break-all">{formData.email}</p>
+            <h1 className="text-2xl font-bold text-foreground mt-2">
+              Verify OTP
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Enter the 6-digit code sent to your email
+            </p>
+            <p className="text-xs text-primary font-medium mt-1 break-all">
+              {formData.email}
+            </p>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8">
+          <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-border/60 p-6 md:p-8">
             <div className="space-y-6 text-center">
               {successMessage && (
-                <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-2 rounded-xl text-sm">
+                <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-2 rounded-xl text-sm">
                   {successMessage}
                 </div>
               )}
-              
+
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-xl text-sm">
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 rounded-xl text-sm">
                   {error}
                 </div>
               )}
 
-              {/* ✅ OTP Input - ONLY updates state, NO API call */}
               <OtpInput
                 id="reset-otp-input"
                 value={otp}
@@ -280,11 +334,10 @@ export function ForgotPasswordForm() {
                 disabled={isLoadingCombined}
                 error={error}
                 autoFocus={true}
-                // ✅ NO onComplete - API only called on button click
               />
 
               <div className="flex flex-col xs:flex-row items-center justify-center gap-2 xs:gap-4 text-sm">
-                <span className="text-gray-500">
+                <span className="text-muted-foreground">
                   Code expires in {resendTimer > 0 ? resendTimer : 0}s
                 </span>
                 <button
@@ -292,10 +345,10 @@ export function ForgotPasswordForm() {
                   onClick={handleResendOTP}
                   disabled={resendTimer > 0 || isResendLoading}
                   className={cn(
-                    "flex items-center gap-1.5 font-medium transition-colors cursor-pointer",
+                    'flex items-center gap-1.5 font-medium transition-colors cursor-pointer',
                     resendTimer > 0 || isResendLoading
-                      ? "text-gray-400 cursor-not-allowed"
-                      : "text-[#1A73E8] hover:underline"
+                      ? 'text-muted-foreground/50 cursor-not-allowed'
+                      : 'text-primary hover:underline',
                   )}
                 >
                   {isResendLoading ? (
@@ -309,11 +362,10 @@ export function ForgotPasswordForm() {
                 </button>
               </div>
 
-              {/* ✅ Verify Button - ONLY API call on click */}
               <Button
                 onClick={handleVerifyOTP}
                 disabled={isLoadingCombined || otp.length !== 6}
-                className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 text-base rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isLoadingCombined ? (
                   <span className="flex items-center gap-2">
@@ -334,7 +386,7 @@ export function ForgotPasswordForm() {
                   setError(null);
                   setSuccessMessage(null);
                 }}
-                className="text-sm text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 ← Back to email
               </button>
@@ -342,10 +394,10 @@ export function ForgotPasswordForm() {
           </div>
 
           <div className="text-center mt-6">
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
               <Shield className="h-3 w-3" />
               <span>Secure & encrypted</span>
-              <span className="w-px h-3 bg-gray-300" />
+              <span className="w-px h-3 bg-border" />
               <Sparkles className="h-3 w-3" />
               <span>Powered by Nuruvent</span>
             </div>
@@ -359,51 +411,69 @@ export function ForgotPasswordForm() {
   // STEP 1: EMAIL & PASSWORD
   // ============================================================
   return (
-    <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-white">
-      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/registration-bg.jpeg')" }} />
-      <div className="absolute inset-0 bg-gradient-to-r from-white/100 via-white/80 to-white/60" />
-      
+    <div className="relative min-h-screen flex items-center justify-center py-12 px-4 overflow-hidden bg-background">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/registration-bg.jpeg')" }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
+
       <div className="absolute inset-0 pointer-events-none">
-        <svg className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
-          <pattern id="dotPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="10" cy="10" r="2" fill="#1A73E8" opacity="0.3" />
+        <svg
+          className="absolute left-8 top-8 h-64 w-64 lg:h-80 lg:w-80 opacity-40"
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <pattern
+            id="dotPattern"
+            x="0"
+            y="0"
+            width="20"
+            height="20"
+            patternUnits="userSpaceOnUse"
+          >
+            <circle cx="10" cy="10" r="2" fill="currentColor" className="text-primary" opacity="0.3" />
           </pattern>
           <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern)" />
         </svg>
       </div>
 
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-12 w-96 h-96 bg-[#1A73E8]/5 rounded-full blur-3xl -translate-y-1/2" />
-        <div className="absolute bottom-12 left-1/4 w-80 h-80 bg-[#FBBC04]/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-12 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2" />
+        <div className="absolute bottom-12 left-1/4 w-80 h-80 bg-secondary/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mt-2">Reset Password</h1>
-          <p className="text-sm text-gray-600 mt-0.5">Enter your email and new password</p>
+          <h1 className="text-2xl font-bold text-foreground mt-2">
+            Reset Password
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Enter your email and new password
+          </p>
         </div>
 
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-6 md:p-8">
+        <div className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-border/60 p-6 md:p-8">
           <form onSubmit={handleSubmitEmail} className="space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
             {passwordError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-xl text-sm">
                 {passwordError}
               </div>
             )}
 
             {/* Email Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email Address <span className="text-[#EA4335]">*</span>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Email Address <span className="text-destructive">*</span>
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <input
                   type="email"
                   name="email"
@@ -412,22 +482,22 @@ export function ForgotPasswordForm() {
                   placeholder="you@example.com"
                   required
                   disabled={isLoadingCombined}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border transition-all bg-white focus:bg-white focus:border-[#1A73E8] focus:ring-2 focus:ring-[#1A73E8]/20 border-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border transition-all bg-background text-foreground focus:bg-background focus:border-primary focus:ring-2 focus:ring-primary/20 border-border placeholder:text-muted-foreground disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
-            {/* ✅ Password Field with Generate Button */}
+            {/* Password Field with Generate Button */}
             <div>
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  New Password <span className="text-[#EA4335]">*</span>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  New Password <span className="text-destructive">*</span>
                 </label>
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={handleGeneratePassword}
-                  className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs font-medium text-[#1A73E8] hover:text-[#1557B0] hover:bg-[#1A73E8]/10 flex items-center gap-1 cursor-pointer"
+                  className="h-7 sm:h-8 px-2 sm:px-3 text-[10px] sm:text-xs font-medium text-primary hover:text-primary/80 hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
                 >
                   <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Generate
@@ -448,7 +518,7 @@ export function ForgotPasswordForm() {
             <Button
               type="submit"
               disabled={isLoadingCombined}
-              className="w-full bg-[#1A73E8] hover:bg-[#1557B0] text-white font-semibold py-6 text-base rounded-xl shadow-lg shadow-[#1A73E8]/25 hover:shadow-[#1A73E8]/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 text-base rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLoadingCombined ? (
                 <span className="flex items-center gap-2">
@@ -462,7 +532,7 @@ export function ForgotPasswordForm() {
 
             <Link
               href="/signin"
-              className="flex items-center justify-center gap-2 text-sm text-gray-600 hover:text-[#1A73E8] transition-colors mt-4"
+              className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mt-4"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Sign In
@@ -471,10 +541,10 @@ export function ForgotPasswordForm() {
         </div>
 
         <div className="text-center mt-6">
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
             <Shield className="h-3 w-3" />
             <span>Secure & encrypted</span>
-            <span className="w-px h-3 bg-gray-300" />
+            <span className="w-px h-3 bg-border" />
             <Sparkles className="h-3 w-3" />
             <span>Powered by Nuruvent</span>
           </div>
