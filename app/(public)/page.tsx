@@ -18,6 +18,7 @@ import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from '@/lib/constants';
 import { InstallPrompt } from '@/components/PWA/InstallPrompt';
 import { PushNotificationManager } from '@/components/PWA/PushNotificationManager';
 import { EventCategories } from '@/components/home/EventsCategories';
+import { MobileAuthRedirect } from '../_components/MobileAuthRedirect';
 
 export const metadata: Metadata = {
   title: `${SITE_NAME} — Professional Events & Online Courses Platform`,
@@ -68,6 +69,7 @@ export const revalidate = 3600;
 export default function HomePage() {
   return (
     <>
+      <MobileAuthRedirect />
       <InstallPrompt />
       <PushNotificationManager />
 
