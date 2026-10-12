@@ -78,6 +78,7 @@ import {
 } from '@/lib/store/api/teamsApi';
 import {
   useGetAccountByIdQuery,
+  useGetMyAccountsQuery,
   useGetMyMembershipQuery,
   useUpdateAccountMemberRoleMutation,
 } from '@/lib/store/api/accountsApi';
@@ -205,10 +206,11 @@ export default function TeamSettingsPage() {
   const teamId = params.teamId;
 
   const currentUserId = useAppSelector(selectUser)?.id ?? null;
-
-  const { data: account } = useGetAccountByIdQuery(accountId, {
-    skip: !accountId,
-  });
+  // The account is used only for the breadcrumb. Read it from the
+  // caller's own accounts (self-service) rather than fetching the
+  // account detail, which is admin-only.
+  const { data: myAccounts } = useGetMyAccountsQuery();
+  const account = myAccounts?.find((a) => a.id === accountId);
 
   const {
     data: team,

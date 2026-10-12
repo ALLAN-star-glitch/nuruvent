@@ -31,7 +31,7 @@ import {
   useCreatePersonalTeamMutation,
   useCreateInstitutionTeamMutation,
 } from '@/lib/store/api/teamsApi';
-import { useGetAccountByIdQuery } from '@/lib/store/api/accountsApi';
+import { useGetAccountByIdQuery, useGetMyAccountsQuery, useGetMyMembershipQuery } from '@/lib/store/api/accountsApi';
 import { cn } from '@/lib/utils';
 
 // ============================================================
@@ -43,10 +43,17 @@ export default function NewTeamPage() {
   const params = useParams<{ accountId: string }>();
   const accountId = params.accountId;
 
-  const { data: account, isLoading: accountLoading } = useGetAccountByIdQuery(
-    accountId,
-    { skip: !accountId },
-  );
+  // Caller's role in this account. Self-service endpoint — works for
+  // every role.
+  const { data: myMembership, isLoading: membershipLoading } =
+    useGetMyMembershipQuery(accountId, { skip: !accountId });
+  const isAdmin = myMembership?.role === 'account_admin';
+
+  // Account is used only for the breadcrumb. Read it from the caller's
+  // own accounts (self-service) rather than fetching account detail,
+  // which is admin-only on the backend.
+  const { data: myAccounts } = useGetMyAccountsQuery();
+  const account = myAccounts?.find((a) => a.id === accountId);
 
   const [mode, setMode] = useState<'personal' | 'institution'>('personal');
 
@@ -102,11 +109,41 @@ export default function NewTeamPage() {
     }
   };
 
-  // ---- Loading state ----
-  if (accountLoading) {
+   // ---- Loading state ----
+  if (membershipLoading || !account) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // ---- Non-admins cannot create teams ----
+  // Only `account_admin` holds `team:create`. Trainers and learners
+  // land here only by direct URL (the nav hides the entry), but we
+  // render a clear denial rather than letting them hit a 403 on submit.
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center px-4">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <AlertCircle className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <h2 className="mb-1 text-lg font-semibold text-foreground">
+            Admin access required
+          </h2>
+          <p className="mb-6 text-sm text-muted-foreground">
+            Only account admins can create teams. Ask an admin of{' '}
+            <strong>{account.display_name || account.name}</strong> to create
+            one for you.
+          </p>
+          <Button
+            className="cursor-pointer"
+            onClick={() => router.push(`/dashboard/${accountId}`)}
+          >
+            Back to account
+          </Button>
+        </div>
       </div>
     );
   }

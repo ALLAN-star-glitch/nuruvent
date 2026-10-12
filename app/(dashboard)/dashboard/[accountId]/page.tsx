@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   useGetAccountByIdQuery,
   useGetMyAccountsQuery,
+  useGetMyMembershipQuery,
 } from '@/lib/store/api/accountsApi';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { useAppDispatch } from '@/lib/store/hooks';
@@ -72,19 +73,42 @@ function TeamPicker({ accountId }: { accountId: string }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
 
+  // Caller's role in this account. Self-service endpoint — works for
+  // every role including learners.
+  const { data: myMembership } = useGetMyMembershipQuery(accountId, {
+    skip: !accountId,
+  });
+  const isAdmin = myMembership?.role === 'account_admin';
+
+  // The account detail endpoint requires `account:read`, which only
+  // admins hold. Skip it for non-admins — the accounts list (self-
+  // service) already carries everything the picker displays.
   const {
-    data: account,
-    isLoading: accountLoading,
-    error: accountError,
-  } = useGetAccountByIdQuery(accountId);
+    data: accountDetail,
+    isLoading: accountDetailLoading,
+    error: accountDetailError,
+  } = useGetAccountByIdQuery(accountId, {
+    skip: !accountId || !isAdmin,
+  });
+
+  const { data: accounts, isLoading: accountsLoading } =
+    useGetMyAccountsQuery();
+
+  // The account object we render from. Prefer the detail fetch when it
+  // succeeded (admin); otherwise read from the accounts list.
+  const account = useMemo<PickerAccount | undefined>(() => {
+    if (accountDetail) return accountDetail;
+    return accounts?.find((a) => a.id === accountId);
+  }, [accountDetail, accounts, accountId]);
+
+  const accountLoading = accountDetailLoading || accountsLoading;
+  const accountError = isAdmin ? accountDetailError : undefined;
 
   const {
     data: teamsResponse,
     isLoading: teamsLoading,
     error: teamsError,
   } = useGetUserTeamsQuery({ accountId });
-
-  const { data: accounts } = useGetMyAccountsQuery();
 
   const teams = useMemo(
     () => (teamsResponse?.teams ?? []).filter((t) => t.account_id === accountId),

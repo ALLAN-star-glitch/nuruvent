@@ -11,7 +11,6 @@ import {
   Building2,
   Check,
   Home,
-  Info,
   Loader2,
   Trash2,
   Upload,
@@ -49,6 +48,8 @@ import {
   useUpdateAccountMutation,
   useUploadAccountLogoMutation,
   useDeleteAccountLogoMutation,
+  useGetMyAccountsQuery,
+  useGetMyMembershipQuery,
 } from '@/lib/store/api/accountsApi';
 import { cn } from '@/lib/utils';
 
@@ -67,6 +68,10 @@ const SETTINGS_SECTIONS: Array<{
   { key: 'status', label: 'Status', hint: 'Read-only information' },
   { key: 'danger', label: 'Danger Zone', hint: 'Irreversible actions' },
 ];
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 function getInitials(name: string): string {
   if (!name) return 'A';
@@ -87,10 +92,25 @@ export default function AccountSettingsPage() {
   const params = useParams<{ accountId: string }>();
   const accountId = params.accountId;
 
+  // Caller's role in this account. Self-service endpoint — works for
+  // every role.
+  const { data: myMembership, isLoading: membershipLoading } =
+    useGetMyMembershipQuery(accountId, { skip: !accountId });
+
+  const isAdmin = myMembership?.role === 'account_admin';
+
+  // The account detail fetch requires `account:read`, which only admins
+  // hold. The whole page is admin-only anyway, so gate the query on the
+  // same condition.
   const { data: account, isLoading: accountLoading } = useGetAccountByIdQuery(
     accountId,
-    { skip: !accountId },
+    { skip: !accountId || !isAdmin },
   );
+
+  // Fall back to the accounts list (self-service) so we can render the
+  // "not allowed" state with the account's name.
+  const { data: accounts } = useGetMyAccountsQuery();
+  const fallbackAccount = accounts?.find((a) => a.id === accountId);
 
   const [updateAccount, { isLoading: saving }] = useUpdateAccountMutation();
   const [uploadLogo, { isLoading: uploadingLogo }] =
@@ -189,8 +209,7 @@ export default function AccountSettingsPage() {
       toast.error('Failed to delete account');
     }
   };
-
-  if (accountLoading) {
+  if (membershipLoading || (accountLoading && isAdmin)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -198,9 +217,39 @@ export default function AccountSettingsPage() {
     );
   }
 
+  // Non-admins cannot manage the account. Render a clear denial rather
+  // than a broken page. This handles the direct-URL case — the sidebar
+  // should hide the item, but a typed URL bypasses that.
+  if (!isAdmin) {
+    return (
+      <div className="w-full py-16">
+        <div className="mx-auto max-w-sm text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <AlertCircle className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">
+            Admin access required
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Only account admins can manage this account&apos;s settings.
+            {fallbackAccount
+              ? ` You're a member of ${fallbackAccount.display_name || fallbackAccount.name}.`
+              : ''}
+          </p>
+          <Button
+            className="mt-6 cursor-pointer"
+            onClick={() => router.push(`/dashboard/${accountId}`)}
+          >
+            Back to account
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!account) {
     return (
-      <div className="mx-auto w-full max-w-3xl px-4 py-16">
+      <div className="w-full py-16">
         <div className="mx-auto max-w-sm text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
             <AlertCircle className="h-7 w-7 text-destructive" />
@@ -223,13 +272,10 @@ export default function AccountSettingsPage() {
   }
 
   const personal = account.type.includes('personal');
-  const Icon = personal ? Home : Building2;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-16 sm:px-6">
-      {/* ============================================================
-          HEADER
-      ============================================================ */}
+    <div className="w-full space-y-6">
+      {/* HEADER */}
       <div className="flex items-start gap-3">
         <Link
           href={`/dashboard/${accountId}`}
@@ -265,14 +311,10 @@ export default function AccountSettingsPage() {
         </div>
       </div>
 
-      {/* ============================================================
-          TWO-COLUMN LAYOUT
-          - Mobile: single column, nav becomes a horizontal strip
-          - Desktop: 240px nav rail on left, content on right
-      ============================================================ */}
-      <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+      {/* TWO-COLUMN LAYOUT */}
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* Left rail */}
-        <aside className="lg:sticky lg:top-24 lg:h-fit">
+        <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
           <nav className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
             {SETTINGS_SECTIONS.map((s) => {
               const isActive = section === s.key;
@@ -289,10 +331,7 @@ export default function AccountSettingsPage() {
                   )}
                 >
                   <span
-                    className={cn(
-                      'text-sm',
-                      isActive ? 'font-medium' : '',
-                    )}
+                    className={cn('text-sm', isActive ? 'font-medium' : '')}
                   >
                     {s.label}
                   </span>
@@ -305,13 +344,11 @@ export default function AccountSettingsPage() {
           </nav>
         </aside>
 
-        {/* Right panel */}
+        {/* Right panel — cards cap at max-w-2xl */}
         <div className="min-w-0 space-y-6">
-          {/* ============================================================
-              GENERAL
-          ============================================================ */}
+          {/* GENERAL */}
           {section === 'general' && (
-            <Card className="border-border/70 shadow-sm">
+            <Card className="border-border/70 shadow-sm max-w-2xl">
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
                   General
@@ -400,6 +437,7 @@ export default function AccountSettingsPage() {
 
                 <Separator />
 
+                {/* Name row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="account-name">Name</Label>
@@ -425,12 +463,15 @@ export default function AccountSettingsPage() {
                   </div>
                 </div>
 
+                {/* Contact row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="account-email">Contact email</Label>
                     <Input
                       id="account-email"
-                      type="email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="email"
                       value={form.email}
                       onChange={(e) => handleChange('email', e.target.value)}
                       className="h-11 rounded-xl"
@@ -440,6 +481,9 @@ export default function AccountSettingsPage() {
                     <Label htmlFor="account-phone">Contact phone</Label>
                     <Input
                       id="account-phone"
+                      type="text"
+                      inputMode="tel"
+                      autoComplete="tel"
                       value={form.phone}
                       onChange={(e) => handleChange('phone', e.target.value)}
                       placeholder="+254 ..."
@@ -452,7 +496,9 @@ export default function AccountSettingsPage() {
                   <Label htmlFor="account-website">Website</Label>
                   <Input
                     id="account-website"
-                    type="url"
+                    type="text"
+                    inputMode="url"
+                    autoComplete="url"
                     value={form.website}
                     onChange={(e) => handleChange('website', e.target.value)}
                     placeholder="https://example.com"
@@ -522,11 +568,9 @@ export default function AccountSettingsPage() {
             </Card>
           )}
 
-          {/* ============================================================
-              STATUS
-          ============================================================ */}
+          {/* STATUS */}
           {section === 'status' && (
-            <Card className="border-border/70 shadow-sm">
+            <Card className="border-border/70 shadow-sm max-w-2xl">
               <CardHeader>
                 <CardTitle className="text-base font-semibold">
                   Status
@@ -572,11 +616,9 @@ export default function AccountSettingsPage() {
             </Card>
           )}
 
-          {/* ============================================================
-              DANGER ZONE
-          ============================================================ */}
+          {/* DANGER ZONE */}
           {section === 'danger' && (
-            <Card className="border-destructive/30 shadow-sm">
+            <Card className="border-destructive/30 shadow-sm max-w-2xl">
               <CardHeader className="bg-destructive/5">
                 <CardTitle className="flex items-center gap-2 text-base font-semibold text-destructive">
                   <AlertCircle className="h-4 w-4" />

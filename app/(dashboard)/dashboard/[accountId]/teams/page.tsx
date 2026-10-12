@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
-import { useGetAccountByIdQuery } from '@/lib/store/api/accountsApi';
+import { useGetAccountByIdQuery, useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
 import { cn } from '@/lib/utils';
 
 export default function TeamsListPage() {
@@ -25,9 +25,11 @@ export default function TeamsListPage() {
   const params = useParams<{ accountId: string }>();
   const accountId = params.accountId;
 
-  const { data: account } = useGetAccountByIdQuery(accountId, {
-    skip: !accountId,
-  });
+  // Account is used for the breadcrumb and the fallback icon. Read it
+  // from the caller's own accounts (self-service) rather than fetching
+  // the account detail, which is admin-only.
+  const { data: myAccounts, isLoading: accountsLoading } = useGetMyAccountsQuery();
+  const account = myAccounts?.find((a) => a.id === accountId);
 
   const { data, isLoading, isError } = useGetUserTeamsQuery();
 
@@ -101,7 +103,8 @@ export default function TeamsListPage() {
       </div>
 
       {/* LIST */}
-      {isLoading ? (
+            {/* LIST */}
+      {isLoading || accountsLoading ? (
         <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-border/70 bg-card">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
