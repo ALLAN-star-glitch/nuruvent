@@ -36,7 +36,11 @@ type ZoomMtgGlobal = {
     userName: string;
     userEmail?: string;
     customerKey?: string;
-    zak?: string;
+    // zak is REQUIRED for both hosts and attendees in Client View.
+    // Zoom's SDK reads this field unconditionally and crashes with
+    // "Cannot read properties of undefined (reading 'toString')"
+    // when the key is absent. Attendees should pass an empty string.
+    zak: string;
     tk?: string;
     success: () => void;
     error: (err: unknown) => void;
@@ -110,6 +114,11 @@ export function ZoomMeetingClient({
         const customerKey =
           (user as { username?: string } | null)?.username || undefined;
 
+        // zak is required by the SDK. Hosts get a real ZAK from the
+        // backend; attendees do not. Always send a string — empty for
+        // attendees — to avoid the SDK's undefined.toString() crash.
+        const zakToken = typeof zak === 'string' ? zak : '';
+
         // Debug log — remove once the join flow is verified.
         console.log('[zoom] join payload', {
           signature_len: String(signature).length,
@@ -118,7 +127,8 @@ export function ZoomMeetingClient({
           role: (payload as Record<string, unknown>).role,
           displayName,
           hasCustomerKey: !!customerKey,
-          hasZak: typeof zak === 'string' && zak.length > 0,
+          hasZak: zakToken.length > 0,
+          zakTokenLen: zakToken.length,
         });
 
         // Required setup, in order (per Client View docs):
@@ -139,13 +149,14 @@ export function ZoomMeetingClient({
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
-              // Client View uses passWord (capital W). This is the
-              // parameter name Zoom's SDK reads.
+              // Client View parameter name — capital W.
               passWord: String(password ?? ''),
               userName: displayName,
               userEmail: (user as { email?: string } | null)?.email,
               ...(customerKey ? { customerKey } : {}),
-              ...(zak && typeof zak === 'string' ? { zak } : {}),
+              // Always present. Empty string for attendees. This is
+              // the fix for the SDK crash on role-0 joins.
+              zak: zakToken,
               success: () => {
                 if (!cancelled) setStatus('Joined');
               },
