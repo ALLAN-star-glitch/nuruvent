@@ -29,19 +29,12 @@ type ZoomMtgGlobal = {
   join: (opts: {
     signature: string;
     meetingNumber: string;
-    // Client View uses passWord (capital W). Component View uses
-    // password (lowercase). Passing the wrong case causes Zoom to
-    // reject the join with "password are invalid".
+    // Client View parameter name — capital W.
     passWord: string;
     userName: string;
     userEmail?: string;
-    customerKey?: string;
-    // zak is REQUIRED for both hosts and attendees in Client View.
-    // Zoom's SDK reads this field unconditionally and crashes with
-    // "Cannot read properties of undefined (reading 'toString')"
-    // when the key is absent. Attendees should pass an empty string.
+    // Always present. Empty string for attendees.
     zak: string;
-    tk?: string;
     success: () => void;
     error: (err: unknown) => void;
   }) => void;
@@ -108,15 +101,10 @@ export function ZoomMeetingClient({
           (user as { email?: string } | null)?.email?.split('@')[0] ||
           'Attendee';
 
-        // Deterministic matching key. Sent to Zoom as customerKey,
-        // echoed back in webhooks as participant.customer_key. Not
-        // shown to other participants.
-        const customerKey =
-          (user as { username?: string } | null)?.username || undefined;
+        const userEmail =
+          (user as { email?: string } | null)?.email ?? '';
 
-        // zak is required by the SDK. Hosts get a real ZAK from the
-        // backend; attendees do not. Always send a string — empty for
-        // attendees — to avoid the SDK's undefined.toString() crash.
+        // Always a string — empty for attendees.
         const zakToken = typeof zak === 'string' ? zak : '';
 
         // Debug log — remove once the join flow is verified.
@@ -126,9 +114,8 @@ export function ZoomMeetingClient({
           passWord: String(password ?? ''),
           role: (payload as Record<string, unknown>).role,
           displayName,
-          hasCustomerKey: !!customerKey,
+          userEmail,
           hasZak: zakToken.length > 0,
-          zakTokenLen: zakToken.length,
         });
 
         // Required setup, in order (per Client View docs):
@@ -146,16 +133,17 @@ export function ZoomMeetingClient({
           success: () => {
             if (cancelled) return;
 
+            // Stripped to the documented Client View minimum. Extra
+            // fields (customerKey, tk, role) previously caused the SDK
+            // to crash in its lazy loader with
+            //   "Cannot read properties of undefined (reading 'toString')"
+            // before user-facing validation could run.
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
-              // Client View parameter name — capital W.
               passWord: String(password ?? ''),
               userName: displayName,
-              userEmail: (user as { email?: string } | null)?.email,
-              ...(customerKey ? { customerKey } : {}),
-              // Always present. Empty string for attendees. This is
-              // the fix for the SDK crash on role-0 joins.
+              userEmail,
               zak: zakToken,
               success: () => {
                 if (!cancelled) setStatus('Joined');
