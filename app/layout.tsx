@@ -47,7 +47,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Zoom Meeting SDK — Client View. */}
+        {/* Zoom Meeting SDK — Client View.
+            Client View must be loaded from source.zoom.us. The SDK
+            resolves the meeting's actual region internally. Do NOT
+            attempt to load it from a regional host — that breaks the
+            internal schema registry and produces cryptic errors. */}
         <Script
           src="https://source.zoom.us/6.2.0/lib/vendor/react.min.js"
           strategy="beforeInteractive"

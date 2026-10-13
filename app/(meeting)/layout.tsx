@@ -21,7 +21,10 @@ export default function MeetingRootLayout({
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
         />
-        {/* Minimal reset. No Tailwind. No globals.css. */}
+        {/* Minimal reset. No Tailwind. No globals.css.
+            Per Zoom docs, Client View must be mounted on a route that
+            does NOT load the host app's global CSS. This layout is that
+            route. */}
         <style>{`
           html, body {
             margin: 0;
@@ -38,7 +41,9 @@ export default function MeetingRootLayout({
           }
         `}</style>
 
-        {/* Zoom Meeting SDK — Client View (per docs). */}
+        {/* Zoom Meeting SDK — Client View.
+            Loaded from the standard Zoom CDN. The SDK handles regional
+            routing internally; do not swap this for a regional host. */}
         <Script
           src="https://source.zoom.us/6.2.0/lib/vendor/react.min.js"
           strategy="beforeInteractive"
