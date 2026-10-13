@@ -29,8 +29,7 @@ type ZoomMtgGlobal = {
   join: (opts: {
     signature: string;
     meetingNumber: string;
-    password: string;      // SDK 6.x — lowercase only
-    sdkKey?: string;       // required in SDK 6.x
+    password: string;
     userName: string;
     userEmail?: string;
     customerKey?: string;
@@ -87,12 +86,25 @@ export function ZoomMeetingClient({
         const payload = res?.data ?? res;
         if (!payload) throw new Error('Invalid response received from backend.');
 
-        const { meeting_number, signature, password, sdk_key, zak } =
+        const { meeting_number, signature, password, zak, web_endpoint } =
           payload as Record<string, unknown>;
 
         if (!signature || !meeting_number) {
           throw new Error('Backend did not return meeting credentials.');
         }
+
+        // Region-matched SDK CDN. Zoom's per-region SDK loads are
+        // required when the meeting lives on a non-universal region
+        // (us04web, us02web, eu01web, etc.). Loading from
+        // source.zoom.us for a us04web meeting causes Zoom's internal
+        // schema loader to fail with:
+        //   "Cannot read properties of undefined (reading 'M_ID')"
+        // which in turn makes Zoom's server reject the join with a
+        // misleading "password are invalid" error.
+        const cdnHost =
+          typeof web_endpoint === 'string' && web_endpoint
+            ? web_endpoint
+            : 'source.zoom.us';
 
         // Visible name for the video tile. Falls back through display
         // name → name → email local part → generic.
@@ -113,15 +125,15 @@ export function ZoomMeetingClient({
           signature_len: String(signature).length,
           meetingNumber: String(meeting_number),
           password: String(password ?? ''),
-          sdkKey: sdk_key ? String(sdk_key) : '',
           role: (payload as Record<string, unknown>).role,
           displayName,
           hasCustomerKey: !!customerKey,
           hasZak: typeof zak === 'string' && zak.length > 0,
+          cdnHost,
         });
 
         // Required setup, in order (per docs):
-        ZoomMtg.setZoomJSLib('https://source.zoom.us/6.2.0/lib', '/av');
+        ZoomMtg.setZoomJSLib(`https://${cdnHost}/6.2.0/lib`, '/av');
         ZoomMtg.preLoadWasm();
         ZoomMtg.prepareWebSDK();
         ZoomMtg.i18n.load('en-US');
@@ -139,9 +151,11 @@ export function ZoomMeetingClient({
               signature: String(signature),
               meetingNumber: String(meeting_number),
               password: String(password ?? ''),
-              sdkKey: sdk_key ? String(sdk_key) : '',
               userName: displayName,
               userEmail: (user as { email?: string } | null)?.email,
+              // sdkKey intentionally omitted — it is embedded in the
+              // signature JWT since SDK v4.0.0. Passing it separately
+              // logs a warning and can interfere with the join.
               ...(customerKey ? { customerKey } : {}),
               ...(zak && typeof zak === 'string' ? { zak } : {}),
               success: () => {
@@ -209,8 +223,6 @@ export function ZoomMeetingClient({
     );
   }
 
-
-  
   return (
     <div
       style={{
