@@ -30,6 +30,8 @@ type ZoomMtgGlobal = {
     signature: string;
     meetingNumber: string;
     passWord: string;
+    password?: string;      // ← NEW: SDK 6.x also accepts lowercase
+    sdkKey?: string;        // ← NEW: required in SDK 6.x
     userName: string;
     userEmail?: string;
     customerKey?: string;
@@ -86,10 +88,8 @@ export function ZoomMeetingClient({
         const payload = res?.data ?? res;
         if (!payload) throw new Error('Invalid response received from backend.');
 
-        const { meeting_number, signature, password, zak } = payload as Record<
-          string,
-          unknown
-        >;
+        const { meeting_number, signature, password, sdk_key, zak } =
+          payload as Record<string, unknown>;
 
         if (!signature || !meeting_number) {
           throw new Error('Backend did not return meeting credentials.');
@@ -127,7 +127,9 @@ export function ZoomMeetingClient({
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
-              passWord: String(password ?? ''),   // ← capital W per docs
+              passWord: String(password ?? ''),
+              password: String(password ?? ''),        // SDK 6.x also accepts this
+              sdkKey: sdk_key ? String(sdk_key) : '',  // required in SDK 6.x
               userName: displayName,
               userEmail: (user as { email?: string } | null)?.email,
               ...(customerKey ? { customerKey } : {}),
