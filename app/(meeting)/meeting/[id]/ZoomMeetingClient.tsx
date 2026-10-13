@@ -86,16 +86,26 @@ export function ZoomMeetingClient({
         const payload = res?.data ?? res;
         if (!payload) throw new Error('Invalid response received from backend.');
 
-        const { meeting_number, signature, password, zak } =
-          payload as Record<string, unknown>;
+        const {
+          meeting_number,
+          signature,
+          password,
+          zak,
+          display_name,
+        } = payload as Record<string, unknown>;
 
         if (!signature || !meeting_number) {
           throw new Error('Backend did not return meeting credentials.');
         }
 
-        // Visible name for the video tile. Falls back through display
-        // name → name → email local part → generic.
+        // Prefer the display name resolved by the backend — this is
+        // the only source that works for guests, whose browser session
+        // has no auth slice. Fall back to the logged-in user's identity
+        // for backward compatibility, then to a generic label.
         const displayName =
+          (typeof display_name === 'string' && display_name.trim() !== ''
+            ? display_name
+            : '') ||
           (user as { displayName?: string } | null)?.displayName ||
           (user as { name?: string } | null)?.name ||
           (user as { email?: string } | null)?.email?.split('@')[0] ||
@@ -114,6 +124,7 @@ export function ZoomMeetingClient({
           passWord: String(password ?? ''),
           role: (payload as Record<string, unknown>).role,
           displayName,
+          backendDisplayName: display_name,
           userEmail,
           hasZak: zakToken.length > 0,
         });
