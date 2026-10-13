@@ -33,6 +33,12 @@ type ZoomMtgGlobal = {
     passWord: string;
     userName: string;
     userEmail?: string;
+    // Zoom echoes this back in the join webhook as
+    // participant.customer_key. The attendance module matches it
+    // against attendee.Username or attendee.Email to record the join.
+    // Omitting the key entirely on empty prevents the SDK's
+    // undefined.toString() crash.
+    customerKey?: string;
     // Always present. Empty string for attendees.
     zak: string;
     success: () => void;
@@ -92,30 +98,47 @@ export function ZoomMeetingClient({
           password,
           zak,
           display_name,
+          email: backendEmail,
         } = payload as Record<string, unknown>;
 
         if (!signature || !meeting_number) {
           throw new Error('Backend did not return meeting credentials.');
         }
 
-        // Prefer the display name resolved by the backend — this is
-        // the only source that works for guests, whose browser session
-        // has no auth slice. Fall back to the logged-in user's identity
-        // for backward compatibility, then to a generic label.
+        // Prefer the display name resolved by the backend — the only
+        // source that works for guests, whose browser session has no
+        // auth slice. Fall back to the logged-in user's identity for
+        // backward compatibility, then to a generic label.
         const displayName =
           (typeof display_name === 'string' && display_name.trim() !== ''
             ? display_name
             : '') ||
           (user as { displayName?: string } | null)?.displayName ||
           (user as { name?: string } | null)?.name ||
-          (user as { email?: string } | null)?.email?.split('@')[0] ||
           'Attendee';
 
+        // Prefer the backend's email — again, the only source for
+        // guests. Falls back to the auth slice for logged-in users.
         const userEmail =
-          (user as { email?: string } | null)?.email ?? '';
+          (typeof backendEmail === 'string' && backendEmail.trim() !== ''
+            ? backendEmail
+            : '') ||
+          (user as { email?: string } | null)?.email ||
+          '';
 
         // Always a string — empty for attendees.
         const zakToken = typeof zak === 'string' ? zak : '';
+
+        // The customer key is what Zoom echoes back in the join
+        // webhook as participant.customer_key. The attendance module
+        // uses it (and the participant email) to match the Zoom
+        // participant to a Nuruvent attendee. Without it, guests' joins
+        // are recorded as unmatched and never appear on the attendance
+        // page.
+        //
+        // Only include the field when non-empty — the SDK crashes on
+        // undefined.toString() when the key is present with no value.
+        const customerKey = userEmail;
 
         // Debug log — remove once the join flow is verified.
         console.log('[zoom] join payload', {
@@ -126,6 +149,8 @@ export function ZoomMeetingClient({
           displayName,
           backendDisplayName: display_name,
           userEmail,
+          backendEmail,
+          customerKey,
           hasZak: zakToken.length > 0,
         });
 
@@ -145,16 +170,16 @@ export function ZoomMeetingClient({
             if (cancelled) return;
 
             // Stripped to the documented Client View minimum. Extra
-            // fields (customerKey, tk, role) previously caused the SDK
-            // to crash in its lazy loader with
-            //   "Cannot read properties of undefined (reading 'toString')"
-            // before user-facing validation could run.
+            // fields previously caused the SDK's lazy loader to crash
+            // with "Cannot read properties of undefined (reading
+            // 'toString')" before user-facing validation could run.
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
               passWord: String(password ?? ''),
               userName: displayName,
               userEmail,
+              ...(customerKey ? { customerKey } : {}),
               zak: zakToken,
               success: () => {
                 if (!cancelled) setStatus('Joined');
