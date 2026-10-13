@@ -29,9 +29,8 @@ type ZoomMtgGlobal = {
   join: (opts: {
     signature: string;
     meetingNumber: string;
-    passWord: string;
-    password?: string;      // ← NEW: SDK 6.x also accepts lowercase
-    sdkKey?: string;        // ← NEW: required in SDK 6.x
+    password: string;      // SDK 6.x — lowercase only
+    sdkKey?: string;       // required in SDK 6.x
     userName: string;
     userEmail?: string;
     customerKey?: string;
@@ -109,6 +108,18 @@ export function ZoomMeetingClient({
         const customerKey =
           (user as { username?: string } | null)?.username || undefined;
 
+        // Debug log — remove once the join flow is verified.
+        console.log('[zoom] join payload', {
+          signature_len: String(signature).length,
+          meetingNumber: String(meeting_number),
+          password: String(password ?? ''),
+          sdkKey: sdk_key ? String(sdk_key) : '',
+          role: (payload as Record<string, unknown>).role,
+          displayName,
+          hasCustomerKey: !!customerKey,
+          hasZak: typeof zak === 'string' && zak.length > 0,
+        });
+
         // Required setup, in order (per docs):
         ZoomMtg.setZoomJSLib('https://source.zoom.us/6.2.0/lib', '/av');
         ZoomMtg.preLoadWasm();
@@ -127,9 +138,8 @@ export function ZoomMeetingClient({
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
-              passWord: String(password ?? ''),
-              password: String(password ?? ''),        // SDK 6.x also accepts this
-              sdkKey: sdk_key ? String(sdk_key) : '',  // required in SDK 6.x
+              password: String(password ?? ''),
+              sdkKey: sdk_key ? String(sdk_key) : '',
               userName: displayName,
               userEmail: (user as { email?: string } | null)?.email,
               ...(customerKey ? { customerKey } : {}),
