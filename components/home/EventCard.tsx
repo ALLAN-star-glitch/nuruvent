@@ -32,7 +32,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
 import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 
 import type { Event } from '@/lib/types/events';
@@ -88,9 +87,13 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  // ---- Ownership resolution (event → team → account) ----
+  // ---- Ownership resolution (event → team) ----
+  //
+  // We only need the viewer's team list to know whether they're a
+  // member of the owning team, which decides where "View details"
+  // navigates (dashboard vs public). This does NOT determine what
+  // logo is shown — that comes from the event payload itself.
   const { data: teamsData } = useGetUserTeamsQuery();
-  const { data: accounts } = useGetMyAccountsQuery();
 
   const memberTeamIds = useMemo(
     () => new Set((teamsData?.teams ?? []).map((t) => t.id)),
@@ -107,13 +110,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
     [teamsData, event.team_id],
   );
 
-  const eventAccountId =
-    owningTeam?.account_id ?? event.account_id ?? null;
-
-  const eventAccount = useMemo(() => {
-    if (!eventAccountId || !accounts) return null;
-    return accounts.find((a) => a.id === eventAccountId) ?? null;
-  }, [accounts, eventAccountId]);
+  const eventAccountId = owningTeam?.account_id ?? null;
 
   // ---- Display helpers ----
   const typeName = getEventTypeName(event);
@@ -215,15 +212,24 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const glow = getGlowColor();
 
-  // ---- Account logo ----
-  const accountIsPersonal = (eventAccount?.type ?? '').includes('personal');
-  const AccountFallbackIcon = accountIsPersonal ? Home : Building2;
+  // ---- Organizer logo ----
+  //
+  // The logo comes from the event payload's organizer object, which
+  // the backend exposes publicly alongside every event. It does NOT
+  // depend on the viewer's membership — an anonymous visitor sees
+  // the same logo a member does.
+  const organizerLogoUrl = event.organizer?.avatar_url ?? null;
 
-  const accountLogo = eventAccount?.logo_url ? (
+  const organizerIsPersonal = (event.organizer?.type ?? '').includes(
+    'personal',
+  );
+  const AccountFallbackIcon = organizerIsPersonal ? Home : Building2;
+
+  const accountLogo = organizerLogoUrl ? (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={eventAccount.logo_url}
-      alt={eventAccount.name}
+      src={organizerLogoUrl}
+      alt={event.organizer?.display_name ?? hostName}
       className="h-full w-full object-cover"
     />
   ) : (
@@ -434,7 +440,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                   <span
                     className={cn(
                       'flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md',
-                      accountIsPersonal
+                      organizerIsPersonal
                         ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
                         : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
                     )}
@@ -528,13 +534,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           )}
 
           {/* ---- Actions ---- */}
-          {/*
-            Mobile: full-width buttons stacked vertically, 44px tall,
-            comfortable tap targets. Text grows to text-sm for legibility.
-
-            sm+: back to the compact side-by-side pill buttons, h-10,
-            text-xs, rounded-full.
-          */}
           <div className="mt-auto pt-2 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
             {/* View details — always present */}
             <Button
@@ -546,9 +545,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               }}
               className={cn(
                 'cursor-pointer gap-1.5 font-semibold transition-all duration-300',
-                // Mobile
                 'h-11 w-full rounded-xl text-sm',
-                // Desktop
                 'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
                 'border-border hover:bg-accent',
               )}
@@ -564,9 +561,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 onClick={handleRegisterClick}
                 className={cn(
                   'cursor-pointer gap-1.5 font-semibold shadow-md hover:shadow-lg transition-all duration-300',
-                  // Mobile
                   'h-11 w-full rounded-xl text-sm',
-                  // Desktop
                   'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
                   isFree
                     ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600 hover:from-tertiary-600 hover:to-tertiary-700 text-white'
