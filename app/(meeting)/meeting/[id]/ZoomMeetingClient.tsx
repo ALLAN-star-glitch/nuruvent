@@ -243,61 +243,74 @@ export function ZoomMeetingClient({
   return (
     <>
       {/* Nuruvent brand overlay — appears once the SDK has joined.
-          Larger clickable badge, top-center, above Zoom's DOM.
-          The wrapper has pointer-events: none so clicks pass through
-          everywhere except the link itself. */}
+          Top-center, above Zoom's DOM, clickable to nuruvent.com.
+          Shrinks to a compact pill on mobile so it doesn't cover
+          Zoom's controls. */}
       {joined && (
         <div
           style={{
             position: 'fixed',
-            top: 16,
+            top: 10,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 2147483647,
             pointerEvents: 'none',
           }}
         >
+          <style>{`
+            .nuruvent-badge {
+              display: inline-flex;
+              align-items: center;
+              gap: 12px;
+              padding: 10px 18px;
+              background: rgba(11, 13, 18, 0.55);
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              border-radius: 9999px;
+              backdrop-filter: blur(10px);
+              -webkit-backdrop-filter: blur(10px);
+              color: #fff;
+              font-size: 14px;
+              font-weight: 600;
+              font-family: system-ui, -apple-system, sans-serif;
+              letter-spacing: 0.2px;
+              box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+              white-space: nowrap;
+              text-decoration: none;
+              pointer-events: auto;
+              cursor: pointer;
+              transition: background 0.2s ease, transform 0.2s ease;
+            }
+            .nuruvent-badge:hover {
+              background: rgba(11, 13, 18, 0.75);
+              transform: scale(1.03);
+            }
+            .nuruvent-badge img {
+              height: 28px;
+              width: auto;
+              display: block;
+            }
+            /* Compact on small screens */
+            @media (max-width: 640px) {
+              .nuruvent-badge {
+                gap: 8px;
+                padding: 6px 12px;
+                font-size: 11px;
+                letter-spacing: 0.1px;
+              }
+              .nuruvent-badge img {
+                height: 18px;
+              }
+            }
+          `}</style>
+
           <a
             href="https://nuruvent.com"
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 18px',
-              background: 'rgba(11, 13, 18, 0.55)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 9999,
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              letterSpacing: 0.2,
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
-              whiteSpace: 'nowrap',
-              textDecoration: 'none',
-              pointerEvents: 'auto',
-              cursor: 'pointer',
-              transition: 'background 0.2s ease, transform 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(11, 13, 18, 0.75)';
-              e.currentTarget.style.transform = 'scale(1.03)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(11, 13, 18, 0.55)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
+            className="nuruvent-badge"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/dark-theme-logo.png"
-              alt="Nuruvent"
-              style={{ height: 28, width: 'auto', display: 'block' }}
-            />
+            <img src="/dark-theme-logo.png" alt="Nuruvent" />
             <span>Powered by Nuruvent</span>
           </a>
         </div>
