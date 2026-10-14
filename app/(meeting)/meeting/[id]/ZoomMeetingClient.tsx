@@ -55,6 +55,7 @@ export function ZoomMeetingClient({
   const didInitRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('Preparing meeting…');
+  const [joined, setJoined] = useState(false);
 
   const [fetchJoinInfo] = useLazyGetMeetingJoinInfoQuery();
 
@@ -182,7 +183,9 @@ export function ZoomMeetingClient({
               ...(customerKey ? { customerKey } : {}),
               zak: zakToken,
               success: () => {
-                if (!cancelled) setStatus('Joined');
+                if (cancelled) return;
+                setStatus('Joined');
+                setJoined(true);
               },
               error: (err: unknown) => {
                 console.error('[zoom] join failed', err);
@@ -247,19 +250,71 @@ export function ZoomMeetingClient({
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: '#000',
-        color: '#fff',
-        fontFamily: 'system-ui, sans-serif',
-      }}
-    >
-      {status}
-    </div>
+    <>
+      {/* Nuruvent brand overlay — appears only after the Zoom SDK has
+          actually joined the meeting. Positioned top-center, above
+          Zoom's own DOM (max z-index) with pointer-events disabled so
+          it never blocks clicks. */}
+      {joined && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2147483647,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 14px',
+              background: 'rgba(11, 13, 18, 0.55)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 9999,
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              letterSpacing: 0.2,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt=""
+              style={{ height: 16, width: 'auto', display: 'block' }}
+              aria-hidden
+            />
+            <span>Powered by Nuruvent</span>
+          </div>
+        </div>
+      )}
+
+      {/* Loading / status overlay — visible until joined. */}
+      {!joined && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#000',
+            color: '#fff',
+            fontFamily: 'system-ui, sans-serif',
+          }}
+        >
+          {status}
+        </div>
+      )}
+    </>
   );
 }
