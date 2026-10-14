@@ -304,13 +304,14 @@ export default function AttendeesPage() {
     { skip: !teamId || !team },
   );
 
-  const events = useMemo(() => {
-    const list = eventsResponse?.data?.data ?? [];
-    return list.map((e) => ({
-      id: e.id,
-      title: e.display_name || e.name || 'Untitled event',
-    }));
-  }, [eventsResponse]);
+const events = useMemo(() => {
+  const list = eventsResponse?.data?.data ?? [];
+  return list.map((e) => ({
+    id: e.id,
+    title: e.display_name || e.name || 'Untitled event',
+    organizer: e.organizer,
+  }));
+}, [eventsResponse]);
 
   const rawEvents = useMemo(
     () => eventsResponse?.data?.data ?? [],
@@ -566,15 +567,16 @@ export default function AttendeesPage() {
         exportToJSON(attendees, `${filenameBase}.json`);
       } else if (format === 'xlsx') {
         await exportToExcel(attendees, `${filenameBase}.xlsx`);
-      } else if (format === 'pdf') {
-        await exportToPDF(attendees, {
-          title,
-          subtitle,
-          filtersSummary,
-          platforms: exportPlatforms,
-          filename: `${filenameBase}.pdf`,
-        });
-      }
+     } else if (format === 'pdf') {
+  await exportToPDF(attendees, {
+    title,
+    subtitle,
+    hostName: scopedEvent?.organizer?.display_name ?? '',
+    filtersSummary,
+    platforms: exportPlatforms,
+    filename: `${filenameBase}.pdf`,
+  });
+}
     } finally {
       setIsExporting(false);
     }
