@@ -15,25 +15,23 @@ interface BeforeInstallPromptEvent extends Event {
 // BROWSER DETECTION
 // ============================================================
 //
-// PWA installation is only supported on:
+// The install prompt is shown only where installation reliably
+// works. Excluded:
 //
-//   - Chrome / Edge on Android (fires `beforeinstallprompt`, installs
-//     a WebAPK that runs in standalone mode).
-//   - Safari on iOS (manual "Add to Home Screen" from the Share menu;
-//     no install prompt is fired).
+//   - Firefox (all platforms) — does not support PWA installation.
+//   - Safari on macOS — no install prompt API.
+//   - Chrome / Firefox / Edge / Opera on iOS — WebKit shells that
+//     don't expose the Add to Home Screen flow the same way Safari
+//     does.
+//   - Brave — has its own install flow and the beforeinstallprompt
+//     event behaves inconsistently.
 //
-// Every other mobile browser — Firefox, Opera, Brave, Edge on Android,
-// Chrome/Firefox/Edge on iOS — either doesn't support installation at
-// all or only creates a shortcut icon that opens in the browser.
+// Included:
 //
-// Showing an "Install" button on those browsers leads the user to an
-// alert that tells them to do something their browser can't do. We
-// therefore gate the entire prompt on browser capability.
-
-function isAndroid(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /Android/i.test(navigator.userAgent);
-}
+//   - Chrome on desktop and Android.
+//   - Edge on desktop and Android.
+//   - Opera on desktop and Android.
+//   - Safari on iOS — manual instructions (no install event).
 
 function isIOS(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -44,26 +42,75 @@ function isIOS(): boolean {
 }
 
 /**
- * Chrome on Android — the only browser that reliably fires
- * `beforeinstallprompt` and installs a WebAPK.
- *
- * Note: Edge and Samsung Internet also fire the event, but the
- * resulting install behaves differently and is not our primary target.
- * For simplicity we treat Chrome as the only "prompt-capable" browser.
+ * Firefox on any platform. Firefox does not support PWA
+ * installation and does not fire `beforeinstallprompt`.
  */
-function isChromeAndroid(): boolean {
+function isFirefox(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return isAndroid() && /Chrome/i.test(navigator.userAgent);
+  return /Firefox|FxiOS/i.test(navigator.userAgent);
 }
 
 /**
- * Safari on iOS — the only iOS browser that supports "Add to Home
- * Screen". Chrome, Firefox, and Edge on iOS are all WebKit shells and
- * do not expose the Share → Add to Home Screen flow in the same way.
+ * Brave exposes `navigator.brave` and has a different install flow.
+ * The `beforeinstallprompt` event fires inconsistently, so we skip it
+ * to avoid showing a button that leads to a confusing path.
+ */
+function isBrave(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    typeof (navigator as unknown as { brave?: unknown }).brave !== 'undefined'
+  );
+}
+
+/**
+ * Safari on macOS. Safari does not fire `beforeinstallprompt` and
+ * offers no programmatic install. macOS users install via the
+ * "Add to Dock" menu instead — not surfaced here.
+ */
+function isMacSafari(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  const isMac = /Macintosh|Mac OS X/.test(ua);
+  const isSafari =
+    /Safari/i.test(ua) &&
+    !/Chrome|Chromium|CriOS|Edg\//.test(ua);
+  return isMac && isSafari;
+}
+
+/**
+ * Chromium-based browser that supports PWA install: Chrome, Edge,
+ * Opera, on desktop or Android.
  *
- * The regex excludes the WebKit-based shells: CriOS (Chrome), FxiOS
- * (Firefox), EdgiOS (Edge). A user agent matching just "Safari" is
- * real Safari.
+ * Excludes Brave (own flow), legacy Edge (EdgeHTML), Firefox,
+ * Safari.
+ */
+function isSupportedChromium(): boolean {
+  if (typeof navigator === 'undefined') return false;
+
+  if (isFirefox()) return false;
+  if (isBrave()) return false;
+
+  const ua = navigator.userAgent;
+
+  // Legacy Edge (EdgeHTML, pre-2020) — no PWA install support.
+  if (/Edge\//.test(ua)) return false;
+
+  // Real Chromium signals.
+  const hasChromiumSignals =
+    typeof (window as unknown as { chrome?: unknown }).chrome !== 'undefined' ||
+    typeof (navigator as unknown as { userAgentData?: unknown })
+      .userAgentData !== 'undefined';
+
+  if (!hasChromiumSignals) return false;
+
+  // Match Chrome / Chromium / Edge (Chromium) / Opera.
+  return /Chrome|Chromium|Edg\//.test(ua);
+}
+
+/**
+ * Safari on iOS — the only iOS browser that supports Add to Home
+ * Screen. Chrome, Firefox, Edge, Opera on iOS are WebKit shells and
+ * are excluded.
  */
 function isIOSSafari(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -91,8 +138,6 @@ export function InstallPrompt() {
   useEffect(() => {
     setIsMounted(true);
 
-    // ---- Environment checks ----
-
     setIsDesktop(window.innerWidth >= 1024);
 
     const standalone = window.matchMedia(
@@ -100,11 +145,10 @@ export function InstallPrompt() {
     ).matches;
     setIsStandalone(standalone);
 
-    // Browser capability. Computed once on mount; user agent doesn't
-    // change during a session.
-    const chromeAndroid = isChromeAndroid();
+    // Browser capability. Computed once on mount.
+    const chromium = isSupportedChromium();
     const safariIOS = isIOSSafari();
-    setIsPromptCapable(chromeAndroid);
+    setIsPromptCapable(chromium);
     setIsSafariIOS(safariIOS);
 
     // ---- Persist dismissal ----
@@ -117,38 +161,34 @@ export function InstallPrompt() {
       return;
     }
 
-    // Don't show if already installed.
     if (standalone) {
       return;
     }
 
-    // Don't show if the browser can't install. This is the critical
-    // gate — everything below this point assumes installation is
-    // possible.
-    if (!chromeAndroid && !safariIOS) {
+    // Not a supported browser. Includes Firefox, Brave, macOS Safari,
+    // iOS Chrome / Firefox / Edge / Opera.
+    if (!chromium && !safariIOS) {
       return;
     }
 
-    // ---- Listen for the install prompt (Chrome Android only) ----
+    // ---- Listen for the install prompt (supported Chromium only) ----
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      // Show the prompt after a short delay so it doesn't collide
-      // with page load.
       setTimeout(() => setIsVisible(true), 5000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Safari iOS doesn't fire `beforeinstallprompt`. If we're on iOS
-    // Safari and not installed, show the manual-instructions prompt
-    // after the same delay.
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 5000);
-
-    // ---- Installation completed ----
+    // Safari iOS doesn't fire `beforeinstallprompt`. Show the manual
+    // instructions prompt after the same delay.
+    let safariTimer: ReturnType<typeof setTimeout> | null = null;
+    if (safariIOS) {
+      safariTimer = setTimeout(() => {
+        setIsVisible(true);
+      }, 5000);
+    }
 
     const installedHandler = () => {
       setIsVisible(false);
@@ -157,8 +197,6 @@ export function InstallPrompt() {
     };
 
     window.addEventListener('appinstalled', installedHandler);
-
-    // ---- Resize (desktop vs mobile layout) ----
 
     const handleResize = () => {
       setIsDesktop(window.innerWidth >= 1024);
@@ -170,7 +208,7 @@ export function InstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', installedHandler);
       window.removeEventListener('resize', handleResize);
-      clearTimeout(timer);
+      if (safariTimer) clearTimeout(safariTimer);
     };
   }, []);
 
@@ -198,12 +236,10 @@ export function InstallPrompt() {
     }
   };
 
-  // Prevent hydration mismatch.
   if (!isMounted) {
     return null;
   }
 
-  // Don't show if: installed, dismissed, hidden, or unsupported browser.
   if (
     isStandalone ||
     isDismissed ||
@@ -214,7 +250,7 @@ export function InstallPrompt() {
   }
 
   // ------------------------------------------------------------
-  // Desktop: left side, lower position
+  // Desktop: bottom-left card
   // ------------------------------------------------------------
   if (isDesktop) {
     return (
@@ -263,7 +299,7 @@ export function InstallPrompt() {
   }
 
   // ------------------------------------------------------------
-  // iOS Safari: top banner
+  // iOS Safari: top banner with instructions
   // ------------------------------------------------------------
   if (isSafariIOS) {
     return (
@@ -311,7 +347,7 @@ export function InstallPrompt() {
   }
 
   // ------------------------------------------------------------
-  // Android Chrome: top banner with install button
+  // Android (supported Chromium): top banner with install button
   // ------------------------------------------------------------
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 p-4 animate-in slide-in-from-top-4 duration-300">

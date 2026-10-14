@@ -46,11 +46,21 @@ function isAuthEndpoint(url: string): boolean {
   }
 }
 
+// Shared in-flight refresh promise. Concurrent 401s all await the
+// same refresh call instead of firing N parallel refresh requests.
 let refreshPromise: Promise<boolean> | null = null;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 type RtkExtraOptions = {};
 
+/**
+ * Attempts POST /auth/refresh. Returns true when the refresh succeeded
+ * (a fresh access_token cookie is now set), false otherwise.
+ *
+ * Deduplicates concurrent calls via refreshPromise. Additionally
+ * retries once after a short delay to tolerate transient network
+ * failures — a single blip should not log the user out.
+ */
 async function runRefresh(
   api: BaseQueryApi,
   extraOptions: RtkExtraOptions,
@@ -58,12 +68,31 @@ async function runRefresh(
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const result = await rawBaseQuery(
+        // First attempt.
+        const first = await rawBaseQuery(
           { url: '/auth/refresh', method: 'POST' },
           api,
           extraOptions,
         );
-        return !('error' in result);
+        if (!('error' in first)) return true;
+
+        // Only retry on network-level errors (status FETCH_ERROR /
+        // TIMEOUT_ERROR), never on 4xx. A 4xx means the refresh token
+        // is genuinely invalid — retrying wastes a round trip.
+        const status = first.error?.status;
+        if (status !== 'FETCH_ERROR' && status !== 'TIMEOUT_ERROR') {
+          return false;
+        }
+
+        // Wait briefly so we don't hammer a flapping server.
+        await new Promise((r) => setTimeout(r, 400));
+
+        const second = await rawBaseQuery(
+          { url: '/auth/refresh', method: 'POST' },
+          api,
+          extraOptions,
+        );
+        return !('error' in second);
       } finally {
         refreshPromise = null;
       }
