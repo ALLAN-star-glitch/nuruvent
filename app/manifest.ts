@@ -1,35 +1,34 @@
-import type { MetadataRoute } from 'next'
+// app/manifest.ts
+
+import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Nuruvent — Where Professionals Grow',
     short_name: 'Nuruvent',
-    description: 'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
+    description:
+      'The global platform where training providers and learners connect. Illuminate your training, empower your future.',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#2563EB',
     orientation: 'portrait',
     scope: '/',
-    categories: ['education', 'training', 'events', 'professional-development', 'career', 'learning'],
+    categories: [
+      'education',
+      'training',
+      'events',
+      'professional-development',
+      'career',
+      'learning',
+    ],
     lang: 'en',
     icons: [
       {
-        src: '/favicon.ico',
-        sizes: 'any',
-        type: 'image/x-icon',
-      },
-      {
         src: '/icon-192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
-      },
-      {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'maskable',
       },
       {
         src: '/icon-512.png',
@@ -42,12 +41,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
-      },
-      {
-        src: '/icon-192.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'monochrome',
       },
     ],
     prefer_related_applications: false,
@@ -93,19 +86,5 @@ export default function manifest(): MetadataRoute.Manifest {
         ],
       },
     ],
-    screenshots: [
-      {
-        src: '/screenshot-home.png',
-        sizes: '1280x720',
-        type: 'image/png',
-        label: 'Nuruvent Homepage',
-      },
-      {
-        src: '/screenshot-events.png',
-        sizes: '1280x720',
-        type: 'image/png',
-        label: 'Browse Training Events',
-      },
-    ],
-  }
+  };
 }
