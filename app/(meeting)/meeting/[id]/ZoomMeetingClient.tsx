@@ -133,12 +133,7 @@ export function ZoomMeetingClient({
         // The customer key is what Zoom echoes back in the join
         // webhook as participant.customer_key. The attendance module
         // uses it (and the participant email) to match the Zoom
-        // participant to a Nuruvent attendee. Without it, guests' joins
-        // are recorded as unmatched and never appear on the attendance
-        // page.
-        //
-        // Only include the field when non-empty — the SDK crashes on
-        // undefined.toString() when the key is present with no value.
+        // participant to a Nuruvent attendee.
         const customerKey = userEmail;
 
         // Debug log — remove once the join flow is verified.
@@ -170,10 +165,6 @@ export function ZoomMeetingClient({
           success: () => {
             if (cancelled) return;
 
-            // Stripped to the documented Client View minimum. Extra
-            // fields previously caused the SDK's lazy loader to crash
-            // with "Cannot read properties of undefined (reading
-            // 'toString')" before user-facing validation could run.
             ZoomMtg.join({
               signature: String(signature),
               meetingNumber: String(meeting_number),
@@ -251,50 +242,64 @@ export function ZoomMeetingClient({
 
   return (
     <>
-      {/* Nuruvent brand overlay — appears only after the Zoom SDK has
-          actually joined the meeting. Positioned top-center, above
-          Zoom's own DOM (max z-index) with pointer-events disabled so
-          it never blocks clicks. */}
+      {/* Nuruvent brand overlay — appears once the SDK has joined.
+          Larger clickable badge, top-center, above Zoom's DOM.
+          The wrapper has pointer-events: none so clicks pass through
+          everywhere except the link itself. */}
       {joined && (
         <div
           style={{
             position: 'fixed',
-            top: 12,
+            top: 16,
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 2147483647,
             pointerEvents: 'none',
           }}
         >
-          <div
+          <a
+            href="https://nuruvent.com"
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
-              padding: '6px 14px',
+              gap: 12,
+              padding: '10px 18px',
               background: 'rgba(11, 13, 18, 0.55)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: 9999,
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
               color: '#fff',
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 600,
               fontFamily: 'system-ui, -apple-system, sans-serif',
               letterSpacing: 0.2,
               boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
               whiteSpace: 'nowrap',
+              textDecoration: 'none',
+              pointerEvents: 'auto',
+              cursor: 'pointer',
+              transition: 'background 0.2s ease, transform 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(11, 13, 18, 0.75)';
+              e.currentTarget.style.transform = 'scale(1.03)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(11, 13, 18, 0.55)';
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.png"
-              alt=""
-              style={{ height: 16, width: 'auto', display: 'block' }}
-              aria-hidden
+              src="/dark-theme-logo.png"
+              alt="Nuruvent"
+              style={{ height: 28, width: 'auto', display: 'block' }}
             />
             <span>Powered by Nuruvent</span>
-          </div>
+          </a>
         </div>
       )}
 
