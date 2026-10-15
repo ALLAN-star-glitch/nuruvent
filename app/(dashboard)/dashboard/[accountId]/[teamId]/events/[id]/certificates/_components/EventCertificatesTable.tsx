@@ -18,7 +18,7 @@ import {
 import { EventCertificateRow } from './EventCertificateRow';
 
 import { Certificate } from '@/lib/types/certificates';
-import { SortDirection, SortField } from '../types';
+import { SortDirection, SortField } from './types';
 
 
 interface Props {
