@@ -1,0 +1,329 @@
+// app/(dashboard)/dashboard/[accountId]/[teamId]/events/[id]/certificates/page.tsx
+
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { Grid3x3, List, Search, X } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useGetEventAttendeesQuery } from '@/lib/store/api/attendanceApi';
+import { useListAccountCertificatesQuery } from '@/lib/store/api/certificatesApi';
+
+
+import { EventCertificatesEmpty } from './_components/EventCertificatesEmpty';
+import { EventCertificatesGrid } from './_components/EventCertificatesGrid';
+import { EventCertificatesHeader } from './_components/EventCertificatesHeader';
+import { EventCertificatesSkeleton } from './_components/EventCertificatesSkeleton';
+import { EventCertificatesStats } from './_components/EventCertificatesStats';
+import { EventCertificatesTable } from './_components/EventCertificatesTable';
+import { IssueBatchDialog } from './_components/IssueBatchDialog';
+import { RevokeCertificateDialog } from './_components/RevokeCertificateDialog';
+import { SendCertificateDialog } from './_components/SendCertificateDialog';
+
+import { Certificate } from '@/lib/types/certificates';
+import { SortDirection, SortField, ViewMode } from './_components/types';
+
+export default function EventCertificatesPage() {
+  const params = useParams<{
+    accountId: string;
+    teamId: string;
+    id: string;
+  }>();
+  const accountId = params.accountId;
+  const teamId = params.teamId;
+  const eventId = params.id;
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [sortField, setSortField] = useState<SortField>('issued_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const [issueDialogOpen, setIssueDialogOpen] = useState(false);
+  const [sendTarget, setSendTarget] = useState<Certificate | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<Certificate | null>(null);
+
+  const {
+    data: listData,
+    isLoading: listLoading,
+    isFetching: listFetching,
+    refetch: refetchList,
+  } = useListAccountCertificatesQuery({
+    accountId,
+    params: { context_id: eventId, limit: 500 },
+  });
+
+ const { data: attendeesData } = useGetEventAttendeesQuery({
+  eventId,
+  params: {
+    status: 'confirmed,full,partial,joined',  // ← add joined
+    page: 1,
+    page_size: 100,
+  },
+});
+
+  const certificates = listData?.data?.certificates ?? [];
+  const attendeeCount = attendeesData?.data?.total ?? 0;
+  const canIssue = attendeeCount > 0;
+
+  const stats = useMemo(() => {
+    const total = certificates.length;
+    const active = certificates.filter((c) => c.status === 'active').length;
+    const revoked = total - active;
+    const verified = 0;
+    return { total, active, revoked, verified };
+  }, [certificates]);
+
+  const filtered = useMemo(() => {
+    let list = [...certificates];
+
+    if (statusFilter !== 'all') {
+      list = list.filter((c) => c.status === statusFilter);
+    }
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (c) =>
+          c.recipient_name.toLowerCase().includes(q) ||
+          c.recipient_email.toLowerCase().includes(q) ||
+          c.verification_code.toLowerCase().includes(q),
+      );
+    }
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'recipient_name':
+          cmp = a.recipient_name.localeCompare(b.recipient_name);
+          break;
+        case 'issued_at':
+          cmp =
+            new Date(a.issued_at).getTime() - new Date(b.issued_at).getTime();
+          break;
+        case 'status':
+          cmp = a.status.localeCompare(b.status);
+          break;
+        case 'verification_code':
+          cmp = a.verification_code.localeCompare(b.verification_code);
+          break;
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+
+    return list;
+  }, [certificates, statusFilter, search, sortField, sortDirection]);
+
+  const hasFilters = search.trim().length > 0 || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+  };
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const handleDownload = async (cert: Certificate) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+      const res = await fetch(
+        `${apiBase}/api/v1/certificates/${cert.id}/download`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${cert.verification_code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download certificate');
+    }
+  };
+
+  const backHref = `/dashboard/${accountId}/${teamId}/events/${eventId}`;
+
+  const emptyNode = (
+    <EventCertificatesEmpty
+      hasFilters={hasFilters}
+      onClearFilters={clearFilters}
+      onIssue={() => setIssueDialogOpen(true)}
+      canIssue={canIssue}
+    />
+  );
+
+  return (
+    <div className="space-y-6 pb-20">
+      <EventCertificatesHeader
+        eventTitle=""
+        eventDate=""
+        backHref={backHref}
+        isFetching={listFetching}
+        canIssue={canIssue}
+        onRefresh={() => refetchList()}
+        onIssue={() => setIssueDialogOpen(true)}
+      />
+
+      {listLoading ? (
+        <EventCertificatesSkeleton
+          view={viewMode}
+          rows={6}
+        />
+      ) : (
+        <>
+          <EventCertificatesStats
+            total={stats.total}
+            active={stats.active}
+            revoked={stats.revoked}
+            verified={stats.verified}
+          />
+
+          {certificates.length > 0 && (
+            <Card className="border-border">
+              <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search recipients or codes…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9 pr-9"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full hover:bg-muted"
+                    >
+                      <X className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+
+                <Select
+                  value={statusFilter}
+                  onValueChange={(v) =>
+                    setStatusFilter(v as 'all' | 'active' | 'revoked')
+                  }
+                >
+                  <SelectTrigger className="w-full cursor-pointer sm:w-[150px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All statuses
+                    </SelectItem>
+                    <SelectItem value="active" className="cursor-pointer">
+                      Active
+                    </SelectItem>
+                    <SelectItem value="revoked" className="cursor-pointer">
+                      Revoked
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                      viewMode === 'table'
+                        ? 'bg-background text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Table view"
+                  >
+                    <List className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={`cursor-pointer rounded-md p-1.5 transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-background text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title="Grid view"
+                  >
+                    <Grid3x3 className="h-4 w-4" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {viewMode === 'table' ? (
+            <EventCertificatesTable
+              certificates={filtered}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={toggleSort}
+              onSend={(c) => setSendTarget(c)}
+              onRevoke={(c) => setRevokeTarget(c)}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          ) : (
+            <EventCertificatesGrid
+              certificates={filtered}
+              onSend={(c) => setSendTarget(c)}
+              onRevoke={(c) => setRevokeTarget(c)}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          )}
+        </>
+      )}
+
+      <IssueBatchDialog
+        open={issueDialogOpen}
+        onOpenChange={setIssueDialogOpen}
+        accountId={accountId}
+        teamId={teamId}
+        eventId={eventId}
+        eventTitle=""
+        eventDate={new Date().toISOString()}
+        onIssued={() => refetchList()}
+      />
+
+      <SendCertificateDialog
+        cert={sendTarget}
+        onOpenChange={(v) => !v && setSendTarget(null)}
+        onSent={() => refetchList()}
+      />
+
+      <RevokeCertificateDialog
+        cert={revokeTarget}
+        onOpenChange={(v) => !v && setRevokeTarget(null)}
+        onRevoked={() => refetchList()}
+      />
+    </div>
+  );
+}

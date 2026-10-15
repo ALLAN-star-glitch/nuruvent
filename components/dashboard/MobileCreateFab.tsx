@@ -45,7 +45,7 @@ export function MobileCreateFab() {
   disabled: !hasTeamContext,
   href:
     accountId && teamId
-      ? `/dashboard/${accountId}/${teamId}/certificates/create`
+      ? `/dashboard/${accountId}/certificates/templates/new`
       : undefined,
   hint: !hasTeamContext ? 'Pick a team first' : undefined,
 },

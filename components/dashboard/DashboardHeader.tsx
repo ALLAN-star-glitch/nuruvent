@@ -128,7 +128,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
    const goCreateCertificate = () => {
   if (!accountId || !teamId) return;
-  router.push(`/dashboard/${accountId}/${teamId}/certificates/create`);
+  router.push(`/dashboard/${accountId}/certificates/templates/new`);
 };
   useEffect(() => {
     setIsDrawerOpen(false);

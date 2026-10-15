@@ -384,3 +384,24 @@
     animation: none;
   }
 }
+
+/* ============================================================
+   GLOBAL INTERACTIVE CURSORS
+   ============================================================ */
+
+button:not(:disabled),
+[role='button']:not(:disabled),
+a[href],
+label[for],
+select:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button']:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}

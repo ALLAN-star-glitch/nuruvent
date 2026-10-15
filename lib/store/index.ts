@@ -34,6 +34,7 @@ import './api/attendanceApi';
 import './api/registrationsApi';
 import './api/paymentsApi';
 import './api/videoApi';
+import './api/certificatesApi';
 // Add any remaining API modules you have in lib/store/api/.
 
 // ============================================================

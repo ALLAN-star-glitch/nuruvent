@@ -49,7 +49,9 @@ export const api = createApi({
     'Attendance',
     'VideoMeeting',
     'SessionRoster',
-    'Teams'
+    'Teams',
+    'Certificates',          // ← NEW
+    'CertificateTemplates',  // ← NEW
   ],
   endpoints: () => ({}),
 });

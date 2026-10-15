@@ -32,6 +32,7 @@ import {
   Link2,
   DollarSign,
   Users,
+  Award,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -1244,6 +1245,19 @@ export default function EventDetailPage({
                     >
                       <Users className="h-4 w-4 mr-2" />
                       View Attendees
+                    </Button>
+                  </Link>
+
+                  <Link
+                    href={`/dashboard/${accountId}/${teamId}/events/${event.id}/certificates`}
+                    className="block"
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start cursor-pointer px-4 py-2.5 h-auto"
+                    >
+                      <Award className="h-4 w-4 mr-2" />
+                      Certificates
                     </Button>
                   </Link>
 
