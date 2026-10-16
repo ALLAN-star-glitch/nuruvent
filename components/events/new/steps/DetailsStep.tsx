@@ -16,11 +16,10 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 import { AccessField } from '@/components/events/fields/AccessField';
-
+import { CertificateTierField } from '@/components/events/fields/CertificateTierField';
 import { RecurrenceField } from '@/components/events/fields/RecurrenceField';
 
 import type { EventFormData, FormErrors } from '../../types';
-import { CertificateTierField } from '../../fields/CertificateTierField';
 
 // ============================================================
 // DETAILS STEP (Step 3)
@@ -32,11 +31,6 @@ import { CertificateTierField } from '../../fields/CertificateTierField';
 //   - Access & Privacy
 //   - Promotion (Featured toggle)
 //   - Event image
-//
-// Virtual / In-person info moved to the schedule (step 1). Each
-// session carries its own is_virtual flag, location, and (optionally)
-// manual meeting links. The backend derives event-level virtual/hybrid
-// flags from the schedules.
 
 interface DetailsStepProps {
   formData: EventFormData;
@@ -67,23 +61,29 @@ export function DetailsStep({
       {/* ====================================================
           Certificate
          ==================================================== */}
-      <Card className="border border-neutral-light">
+      <Card className="border border-border">
         <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center justify-between p-3 bg-amber-50/60 rounded-lg border border-amber-100">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/40">
             <div>
-              <Label className="text-sm font-medium text-neutral-dark">
+              <Label className="text-sm font-medium text-foreground">
                 Issue Certificates for This Event
               </Label>
-              <p className="text-xs text-neutral-gray">
+              <p className="text-xs text-muted-foreground">
                 Attendees receive a certificate of completion after the event.
               </p>
             </div>
             <Switch
               checked={formData.certificate_enabled}
-              onCheckedChange={(c) =>
-                onFieldChange('certificate_enabled', c)
-              }
-              className="cursor-pointer data-[state=checked]:bg-amber-500"
+              onCheckedChange={(c) => {
+                onFieldChange('certificate_enabled', c);
+                // Clear the tier when the toggle is turned off so a
+                // stale template ID doesn't linger in the payload.
+                // Toggling back on re-defaults via the picker's effect.
+                if (!c) {
+                  onFieldChange('certificate_template_id', '');
+                }
+              }}
+              className="cursor-pointer"
             />
           </div>
 
@@ -102,7 +102,7 @@ export function DetailsStep({
       {/* ====================================================
           Recurrence
          ==================================================== */}
-      <Card className="border border-neutral-light">
+      <Card className="border border-border">
         <CardContent className="pt-6">
           <RecurrenceField
             enabled={formData.is_recurring}
@@ -119,7 +119,7 @@ export function DetailsStep({
       {/* ====================================================
           Access & Privacy
          ==================================================== */}
-      <Card className="border border-neutral-light">
+      <Card className="border border-border">
         <CardContent className="pt-6">
           <AccessField
             value={{
@@ -142,30 +142,30 @@ export function DetailsStep({
       {/* ====================================================
           Promotion
          ==================================================== */}
-      <Card className="border border-neutral-light">
+      <Card className="border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             Promotion
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             Control how your event appears in listings
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg border border-secondary-100">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/40">
             <div>
-              <Label className="text-sm font-medium text-neutral-dark flex items-center gap-2">
+              <Label className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Star className="h-4 w-4 text-secondary-500" />
                 Featured Event
               </Label>
-              <p className="text-xs text-neutral-gray">
+              <p className="text-xs text-muted-foreground">
                 Featured events appear prominently on the homepage
               </p>
             </div>
             <Switch
               checked={formData.is_featured}
               onCheckedChange={(c) => onFieldChange('is_featured', c)}
-              className="cursor-pointer data-[state=checked]:bg-secondary-500"
+              className="cursor-pointer"
             />
           </div>
         </CardContent>
@@ -174,10 +174,10 @@ export function DetailsStep({
       {/* ====================================================
           Event Image
          ==================================================== */}
-      <Card className="border border-neutral-light">
+      <Card className="border border-border">
         <CardContent className="pt-6">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-neutral-dark">
+            <Label className="text-sm font-medium text-foreground">
               Event Image
             </Label>
 
@@ -192,7 +192,7 @@ export function DetailsStep({
                 <button
                   type="button"
                   onClick={onImageRemove}
-                  className="absolute top-2 right-2 p-1 bg-error-500 text-white rounded-full hover:bg-error-600 transition-colors cursor-pointer"
+                  className="absolute top-2 right-2 p-1 bg-destructive text-white rounded-full hover:bg-destructive/90 transition-colors cursor-pointer"
                   aria-label="Remove image"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -203,28 +203,28 @@ export function DetailsStep({
                 className={cn(
                   'flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
                   errors.image
-                    ? 'border-error-500 bg-error-50'
-                    : 'border-neutral-light hover:border-primary-300 hover:bg-primary-50',
+                    ? 'border-destructive bg-destructive/5'
+                    : 'border-border hover:border-primary/40 hover:bg-muted/40',
                 )}
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Upload
                     className={cn(
                       'h-10 w-10',
-                      errors.image ? 'text-error-500' : 'text-neutral-gray',
+                      errors.image ? 'text-destructive' : 'text-muted-foreground',
                     )}
                   />
                   <p
                     className={cn(
                       'text-sm mt-2',
                       errors.image
-                        ? 'text-error-500'
-                        : 'text-neutral-gray',
+                        ? 'text-destructive'
+                        : 'text-muted-foreground',
                     )}
                   >
                     {errors.image || 'Click to upload event image'}
                   </p>
-                  <p className="text-xs text-neutral-gray">
+                  <p className="text-xs text-muted-foreground">
                     PNG, JPG, WEBP up to 5MB
                   </p>
                 </div>
@@ -238,7 +238,7 @@ export function DetailsStep({
             )}
 
             {errors.image && (
-              <p className="text-sm text-error-500 flex items-center gap-1">
+              <p className="text-sm text-destructive flex items-center gap-1">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {errors.image}
               </p>

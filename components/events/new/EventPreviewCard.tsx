@@ -3,6 +3,7 @@
 'use client';
 
 import {
+  Award,
   Calendar,
   Clock,
   DollarSign,
@@ -14,6 +15,8 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { useListCertificateTemplatesQuery } from '@/lib/store/api/certificatesApi';
+import { useParams } from 'next/navigation';
 import type { EventType as EventTypeModel } from '@/lib/types/events';
 
 import type { EventFormData } from '../types';
@@ -21,9 +24,6 @@ import type { EventFormData } from '../types';
 // ============================================================
 // EVENT PREVIEW CARD
 // ============================================================
-//
-// Live preview shown during the wizard. Event-level fields
-// (is_virtual, location) are derived from the primary schedule.
 
 interface EventPreviewCardProps {
   data: EventFormData;
@@ -51,7 +51,29 @@ function durationMinutes(start: string, end: string): number | null {
   return mins > 0 ? mins : null;
 }
 
+/** Correct price label computed across ALL usable tickets. */
+function computePriceLabel(
+  tickets: EventFormData['tickets'],
+): string {
+  const usable = (tickets ?? []).filter(
+    (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
+  );
+  if (usable.length === 0) return 'No tickets';
+
+  const prices = usable.map((t) => t.price ?? 0);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+
+  if (min === 0 && max === 0) return 'Free';
+  if (min === max) return `${min} KES`;
+  if (min === 0) return `Free – ${max} KES`;
+  return `From ${min} KES`;
+}
+
 export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
+  const params = useParams<{ accountId: string }>();
+  const accountId = params.accountId;
+
   const primarySchedule = data.schedules?.[0];
   const startDate = primarySchedule?.start_date ?? '';
   const startTime = primarySchedule?.start_time ?? '';
@@ -59,29 +81,23 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
   const duration =
     startTime && endTime ? durationMinutes(startTime, endTime) : null;
 
-  // Derived from the primary schedule — event-level timing and venue
-  // are computed by the backend from schedules. Here we only need a
-  // cheap projection for the preview.
   const isVirtual = primarySchedule?.is_virtual ?? false;
   const locationText = primarySchedule?.location || 'Location TBD';
 
-  const firstTicket = data.tickets?.find(
-    (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
-  );
-  const ticketPrice = firstTicket?.price ?? null;
-  const ticketCount =
-    data.tickets?.filter(
-      (t) => t.ticket_type_id && (t.quantity ?? 0) > 0,
-    ).length ?? 0;
+  const priceLabel = computePriceLabel(data.tickets);
 
-  let priceLabel: string;
-  if (!firstTicket) {
-    priceLabel = 'Free';
-  } else if (ticketPrice === 0 || ticketPrice === null) {
-    priceLabel = ticketCount > 1 ? 'Free–Paid' : 'Free';
-  } else {
-    priceLabel = `${ticketPrice} KES${ticketCount > 1 ? '+' : ''}`;
-  }
+  // Look up the certificate tier by ID so the preview can show the
+  // tier's display name and price to the organizer (not attendees).
+  const { data: templatesRes } = useListCertificateTemplatesQuery(
+    accountId,
+    { skip: !accountId || !data.certificate_enabled },
+  );
+
+  const tier = data.certificate_enabled
+    ? (templatesRes?.data?.templates ?? []).find(
+        (t) => t.id === data.certificate_template_id,
+      )
+    : undefined;
 
   return (
     <div className="border border-border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow">
@@ -156,7 +172,7 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
           </div>
         )}
 
-        {/* Location / virtual — derived from the primary schedule */}
+        {/* Location / virtual */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {isVirtual ? (
             <Video className="h-4 w-4 flex-shrink-0" />
@@ -165,6 +181,25 @@ export function EventPreviewCard({ data, eventType }: EventPreviewCardProps) {
           )}
           <span>{isVirtual ? 'Virtual Event' : locationText}</span>
         </div>
+
+        {/* Certificate tier — organizer-facing preview */}
+        {data.certificate_enabled && (
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-2.5">
+            <Award className="h-4 w-4 mt-0.5 flex-shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-foreground">
+                {tier
+                  ? `${tier.name} — KES ${(
+                      (tier.price_minor ?? 0) / 100
+                    ).toFixed(0)} per certificate`
+                  : 'Certificate included — select a tier'}
+              </p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                You pay this. Attendees don&apos;t see it.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Price + capacity */}
         <div className="flex items-center justify-between pt-2 border-t border-border">

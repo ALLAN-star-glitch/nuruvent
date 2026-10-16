@@ -2,6 +2,7 @@
 
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { AlertCircle, Check } from 'lucide-react';
 
@@ -16,9 +17,14 @@ interface Props {
 }
 
 /**
- * Card-style tier picker for the event wizard. Shows Nuruvent's
- * system templates as selectable cards. Sends back the tier's ID,
- * price, and system slug so the parent can store all three.
+ * Card-style tier picker for the event wizard.
+ *
+ * Behaviour:
+ *   - Shows all system templates sorted by price ascending.
+ *   - Preselects the tier whose ID matches `value`.
+ *   - When `value` is empty on mount, defaults to the "Standard" tier
+ *     (system slug `default`) once. Subsequent renders never re-default,
+ *     so a user who clears the field is not fought by the effect.
  */
 export function CertificateTierField({
   value,
@@ -36,6 +42,27 @@ export function CertificateTierField({
   const tiers = (data?.data?.templates ?? [])
     .filter((t) => t.is_system)
     .sort((a, b) => (a.price_minor ?? 0) - (b.price_minor ?? 0));
+
+  const defaultedRef = useRef(false);
+
+  useEffect(() => {
+    if (defaultedRef.current) return;
+    if (disabled) return;
+    if (value) return;
+    if (tiers.length === 0) return;
+
+    const standard =
+      tiers.find((t) => t.system_slug === 'default') ?? tiers[0];
+    if (!standard) return;
+
+    defaultedRef.current = true;
+    onChange(
+      standard.id,
+      standard.price_minor ?? 0,
+      standard.system_slug ?? '',
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, disabled, tiers.length]);
 
   if (isLoading) {
     return (
@@ -81,8 +108,8 @@ export function CertificateTierField({
                 !disabled && 'cursor-pointer',
               )}
             >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">
                   {t.name}
                 </p>
                 {t.description && (
@@ -91,8 +118,8 @@ export function CertificateTierField({
                   </p>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="text-sm font-semibold text-primary">
+              <div className="ml-3 flex shrink-0 items-center gap-2">
+                <span className="text-sm font-bold text-primary">
                   KES {priceKes}
                 </span>
                 {selected && <Check className="h-4 w-4 text-primary" />}

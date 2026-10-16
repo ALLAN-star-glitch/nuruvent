@@ -13,7 +13,6 @@ import {
   Building2,
   CalendarDays,
   Clock as ClockIcon,
-  FileText,
   GraduationCap,
   Handshake,
   Heart,
@@ -38,7 +37,6 @@ import type { Event } from '@/lib/types/events';
 import {
   formatEventDateBadge,
   formatPrice,
-  getCertificatePrice,
   getEventFillRate,
   getEventHostName,
   getEventLocation,
@@ -87,12 +85,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  // ---- Ownership resolution (event → team) ----
-  //
-  // We only need the viewer's team list to know whether they're a
-  // member of the owning team, which decides where "View details"
-  // navigates (dashboard vs public). This does NOT determine what
-  // logo is shown — that comes from the event payload itself.
   const { data: teamsData } = useGetUserTeamsQuery();
 
   const memberTeamIds = useMemo(
@@ -112,7 +104,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const eventAccountId = owningTeam?.account_id ?? null;
 
-  // ---- Display helpers ----
   const typeName = getEventTypeName(event);
   const typeColor = getEventTypeColor(event);
   const typeIcon = getEventTypeIcon(event.event_type?.slug);
@@ -124,7 +115,11 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const price = getEventMinPrice(event);
   const isFree = isEventFree(event);
-  const certificatePrice = getCertificatePrice(event);
+
+  // Certificate is shown as an informational strip — no price.
+  // Uses the boolean, not a price check, because the tier-based
+  // model keeps certificate_price at 0 for organizer-paid events.
+  const hasCertificate = event.certificate_enabled === true;
 
   const isPast = isEventPast(event);
   const isFullyBooked = isEventFullyBooked(event);
@@ -132,18 +127,9 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const isLowAvailability =
     spotsLeft !== null && spotsLeft > 0 && spotsLeft <= 5;
 
-  const hasCertificate = certificatePrice > 0;
   const fillRate = getEventFillRate(event);
   const location = getEventLocation(event);
 
-  // ---- Destinations ----
-  //
-  // detailHref     — where the card (and "View details") navigates.
-  //                  Dashboard for owned teams, public slug otherwise.
-  //
-  // registerHref   — where "Register" / "Get Ticket" navigates.
-  //                  Always the public event page. The page itself
-  //                  handles the registration flow.
   const isDashboardDestination = isPrivate || isMemberOfOwningTeam;
 
   const publicDetailHref = `/events/${event.slug}`;
@@ -157,7 +143,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const canInteract = !isPast && !isFullyBooked;
 
-  // ---- Handlers ----
   const handleCardClick = (e?: React.MouseEvent | React.KeyboardEvent) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -212,14 +197,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
   const glow = getGlowColor();
 
-  // ---- Organizer logo ----
-  //
-  // The logo comes from the event payload's organizer object, which
-  // the backend exposes publicly alongside every event. It does NOT
-  // depend on the viewer's membership — an anonymous visitor sees
-  // the same logo a member does.
   const organizerLogoUrl = event.organizer?.avatar_url ?? null;
-
   const organizerIsPersonal = (event.organizer?.type ?? '').includes(
     'personal',
   );
@@ -263,7 +241,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             'ring-2 ring-secondary-400/40 shadow-lg shadow-secondary-100/50 dark:shadow-secondary-900/20',
         )}
       >
-        {/* Glow effect container */}
+        {/* Glow containers */}
         <div
           className={cn(
             'absolute inset-0 opacity-0 transition-opacity duration-500 pointer-events-none rounded-2xl',
@@ -280,7 +258,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           />
         </div>
 
-        {/* Inner glow border */}
         <div
           className={cn(
             'absolute inset-0 rounded-2xl transition-opacity duration-500 pointer-events-none',
@@ -319,7 +296,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Hover gradient */}
           <div
             className={cn(
               'absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent transition-opacity duration-500 pointer-events-none',
@@ -503,7 +479,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
           <div className="h-px bg-border my-1" />
 
-          {/* Price */}
+          {/* Price — one number, ticket-derived, certificate cost included */}
           <div className="flex flex-col">
             <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Registration Fee
@@ -520,20 +496,18 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </span>
           </div>
 
-          {/* Certificate fee */}
+          {/* Certificate included — informational, no price */}
           {hasCertificate && (
-            <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/80 to-amber-100/40 dark:from-amber-950/30 dark:to-amber-950/10 rounded-lg px-3 py-1.5 sm:py-2 border border-amber-200/60 dark:border-amber-900/40">
-              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-              <span className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
-                Certificate Included
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200/60 bg-emerald-50/60 px-3 py-1.5 sm:py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+              <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                Certificate of completion included
               </span>
-            
             </div>
           )}
 
           {/* ---- Actions ---- */}
           <div className="mt-auto pt-2 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
-            {/* View details — always present */}
             <Button
               type="button"
               variant="outline"
@@ -552,7 +526,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
             </Button>
 
-            {/* Register / Get Ticket — the public event page */}
             {canInteract && (
               <Button
                 type="button"
