@@ -30,17 +30,6 @@ import {
 // Inverse of transform.ts. Takes the API's `Event` response and
 // produces the wizard's `EventFormData`. Used by the edit wizard to
 // hydrate its form state.
-//
-// Notes:
-//   - Schedules are mapped 1:1 from the API's `schedules[]`.
-//   - Tickets are mapped 1:1 from the API's `tickets[]`.
-//   - The API's `Ticket.ticket_type` is a full object; we extract its
-//     `id` into `TicketForm.ticket_type_id`.
-//   - The API's `Material.type` is a display string, not the ID we
-//     need for `MaterialForm.material_type_id`. We leave that field
-//     empty — the user re-selects the type if they care.
-//   - Recurrence maps what the API returns; missing optional fields
-//     default to null/empty so the UI doesn't receive undefined.
 
 let keyCounter = 0;
 function nextKey(prefix: string): string {
@@ -57,7 +46,6 @@ function nextKey(prefix: string): string {
 /** "2026-11-15T00:00:00Z" → "2026-11-15". Returns "" on bad input. */
 function toDateInput(value: string | undefined | null): string {
   if (!value) return '';
-  // If it's already YYYY-MM-DD, keep it.
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const d = new Date(value);
   if (isNaN(d.getTime())) return '';
@@ -90,7 +78,7 @@ function mapSchedule(s: ScheduleModel): ScheduleForm {
     session_number: s.session_number ?? null,
     location: s.location ?? '',
     is_virtual: s.is_virtual ?? true,
-    platform: s.platform ?? null,   // ← add this
+    platform: s.platform ?? null,
     zoom_link: s.zoom_link ?? '',
     meet_link: s.meet_link ?? '',
     max_attendees: s.max_attendees ?? null,
@@ -145,7 +133,6 @@ function mapMaterial(m: MaterialModel): MaterialForm {
 function mapSEO(seo: SEOModel | undefined): SEOForm | null {
   if (!seo) return null;
 
-  // If everything is empty, treat it as "no SEO".
   const hasAny =
     seo.meta_title ||
     seo.meta_description ||
@@ -203,31 +190,20 @@ function mapRecurrence(
 // ============================================================
 
 export function mapEventToForm(event: EventModel): EventFormData {
-  // ---- Schedules ----
   const schedules: ScheduleForm[] =
     event.schedules && event.schedules.length > 0
       ? event.schedules.map(mapSchedule)
       : [makeEmptySchedule()];
 
-  // ---- Tickets ----
   const tickets: TicketForm[] =
     event.tickets && event.tickets.length > 0
       ? event.tickets.map(mapTicket)
       : [makeEmptyTicket()];
 
-  // ---- Speakers ----
   const speakers: SpeakerForm[] = (event.speakers ?? []).map(mapSpeaker);
-
-  // ---- Materials ----
   const materials: MaterialForm[] = (event.materials ?? []).map(mapMaterial);
-
-  // ---- SEO ----
   const seo = mapSEO(event.seo);
-
-  // ---- Recurrence ----
   const recurrence = mapRecurrence(event.recurrence);
-
-
 
   return {
     // ---- Basic ----
@@ -253,13 +229,23 @@ export function mapEventToForm(event: EventModel): EventFormData {
     waitlist_enabled: event.waitlist_enabled ?? false,
 
     // ---- Certificate ----
+    //
+    // The wizard no longer collects a certificate price. Pricing is
+    // determined server-side from the chosen tier's price_minor. We
+    // only carry the tier's template ID.
+    //
+    // The API may return the ID either as `certificate_template_id`
+    // or as a nested `certificate_template.id` object — accept both.
     certificate_enabled: event.certificate_enabled ?? false,
-    certificate_price: event.certificate_price ?? null,
-    certificate_template_id: event.certificate_template?.id ?? '',
+    certificate_template_id:
+      (event as unknown as { certificate_template_id?: string })
+        .certificate_template_id ??
+      event.certificate_template?.id ??
+      '',
 
     // ---- Access & privacy ----
     is_private: event.is_private ?? event.visibility === 'private',
-    password: '', // API doesn't return the password
+    password: '',
     invite_only: event.invite_only ?? false,
     invited_emails: event.invited_emails ?? [],
 

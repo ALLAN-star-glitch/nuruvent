@@ -22,10 +22,6 @@ import type {
 // ============================================================
 // SCHEDULES
 // ============================================================
-//
-// Schedules are the single source of truth for timing, venue, and
-// virtual/hybrid info. The backend derives event-level fields from
-// them. This module never sends event-level derived fields.
 
 function schedulesToRequest(schedules: ScheduleForm[]) {
   const usable = schedules.filter(
@@ -44,9 +40,6 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
     is_virtual: s.is_virtual,
-    // Only send platform when auto-creating. If a manual link is
-    // present, the backend ignores the platform anyway; omitting it
-    // keeps the request clean and unambiguous.
     platform:
       s.is_virtual && !s.zoom_link && !s.meet_link && s.platform
         ? s.platform
@@ -60,16 +53,6 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
 // ============================================================
 // RECURRENCE
 // ============================================================
-//
-// The backend publish-readiness check requires:
-//   - pattern weekly  -> days_of_week must be non-empty
-//   - pattern monthly -> day_of_month OR week_of_month must be set
-//   - pattern custom  -> days_of_week must be non-empty
-//
-// If those conditions aren't met, we drop the recurrence entirely
-// rather than send `days_of_week: []` (which the backend rejects).
-// Dropping is preferable to a 400 because the event can still be
-// published as a non-recurring event.
 
 function recurrenceToRequest(recurrence: RecurrenceForm | null) {
   if (!recurrence || !recurrence.pattern) return undefined;
@@ -219,8 +202,6 @@ function buildCommonFields(form: EventFormData) {
   const is_free = deriveIsFree(form.tickets);
 
   const recurrence = recurrenceToRequest(form.recurrence);
-  // If the recurrence was dropped (invalid config), the event is
-  // effectively non-recurring — keep is_recurring in lockstep.
   const is_recurring = recurrence ? !!form.is_recurring : false;
 
   return {
@@ -233,12 +214,35 @@ function buildCommonFields(form: EventFormData) {
 }
 
 // ============================================================
-// DRAFT PAYLOAD
+// CERTIFICATE FIELDS
 // ============================================================
 //
-// Event-level timing, venue, and virtual/hybrid fields are NOT sent.
-// The backend derives them from `schedules`. The client still carries
-// them in the form for UI display, but they are omitted here.
+// The event wizard no longer collects a free-form certificate price.
+// The organizer picks a system tier (Basic / Professional / Premium),
+// and its ID is stored on the event. Pricing is resolved server-side
+// from that tier's price_minor when certificates are issued.
+//
+// `certificate_price` is only kept in the payload for backward
+// compatibility with older backend versions that still require it.
+// It is always derived from the tier's snapshot — never typed by the
+// user.
+
+function certificateFields(form: EventFormData) {
+  if (!form.certificate_enabled) {
+    return {
+      certificate_enabled: false,
+      certificate_template_id: undefined,
+    };
+  }
+  return {
+    certificate_enabled: true,
+    certificate_template_id: form.certificate_template_id || undefined,
+  };
+}
+
+// ============================================================
+// DRAFT PAYLOAD
+// ============================================================
 
 export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
   const { schedules, tickets, is_free, recurrence, is_recurring } =
@@ -265,11 +269,7 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
       ? form.invited_emails
       : undefined,
     is_featured: form.is_featured,
-    certificate_enabled: form.certificate_enabled,
-    certificate_price: form.certificate_enabled
-      ? (form.certificate_price ?? 0)
-      : undefined,
-    certificate_template_id: form.certificate_template_id || undefined,
+    ...certificateFields(form),
     speakers: speakersToRequest(form.speakers),
     materials: materialsToRequest(form.materials),
     seo: seoToRequest(form.seo),
@@ -301,11 +301,7 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
     capacity: form.capacity ?? undefined,
     waitlist_enabled: form.waitlist_enabled || undefined,
     is_featured: form.is_featured,
-    certificate_enabled: form.certificate_enabled,
-    certificate_price: form.certificate_enabled
-      ? (form.certificate_price ?? 0)
-      : undefined,
-    certificate_template_id: form.certificate_template_id || undefined,
+    ...certificateFields(form),
     password: form.password || undefined,
     invite_only: form.invite_only || undefined,
     invited_emails: form.invited_emails.length
@@ -320,12 +316,6 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
 // ============================================================
 // UPDATE PAYLOAD
 // ============================================================
-//
-// Update semantics are pointer-based: `undefined` means "leave as-is".
-// We therefore send `is_recurring` as the derived boolean (not
-// `|| undefined`) so clearing a recurrence actually clears it
-// server-side, and `recurrence: undefined` alone means "keep the
-// existing recurrence".
 
 export function buildUpdatePayload(
   form: EventFormData,
@@ -355,11 +345,7 @@ export function buildUpdatePayload(
       ? form.invited_emails
       : undefined,
     is_featured: form.is_featured,
-    certificate_enabled: form.certificate_enabled,
-    certificate_price: form.certificate_enabled
-      ? (form.certificate_price ?? 0)
-      : undefined,
-    certificate_template_id: form.certificate_template_id || undefined,
+    ...certificateFields(form),
     speakers: speakersToRequest(form.speakers),
     materials: materialsToRequest(form.materials),
     seo: seoToRequest(form.seo),
@@ -369,16 +355,6 @@ export function buildUpdatePayload(
 // ============================================================
 // AI DRAFT → FORM MAPPING
 // ============================================================
-//
-// The AI draft (v8+) carries only identity, discovery, pricing,
-// policy, and ONE canonical schedule. Event-level timing, venue, and
-// virtual/hybrid flags are NOT part of the AI's output — they are
-// derived from schedules by the backend.
-//
-// We populate only what the form still owns: identity fields,
-// schedules, recurrence, and tickets. Event-level derived fields are
-// computed on the fly by preview components via the derive* helpers
-// in ./types.
 
 export function mapAIDraftToForm(
   draft: GeneratedEventDraft,
@@ -398,8 +374,6 @@ export function mapAIDraftToForm(
         session_number: s.session_number ?? null,
         location: s.location ?? '',
         is_virtual: s.is_virtual ?? false,
-        // The AI does not choose a platform; the host does. Leave
-        // it empty so the picker prompts on first edit.
         platform: null,
         zoom_link: '',
         meet_link: '',
@@ -440,29 +414,18 @@ export function mapAIDraftToForm(
     : undefined;
 
   return {
-    // ---- Basic ----
     name: draft.name ?? undefined,
     description: draft.description ?? undefined,
     short_description: draft.short_description ?? undefined,
     tags: draft.tags ?? undefined,
     language: draft.language ?? undefined,
-
-    // ---- Schedule ----
     schedules,
-
-    // ---- Recurrence ----
     is_recurring: !!draft.is_recurring,
     recurrence,
-
-    // ---- Tickets ----
     tickets,
     capacity: draft.capacity ?? undefined,
-
-    // ---- Access ----
     invite_only: draft.invite_only ?? undefined,
     is_private: draft.visibility === 'private' ? true : undefined,
-
-    // ---- Monetization ----
     is_featured: draft.is_featured ?? undefined,
     certificate_enabled: draft.certificate_enabled ?? undefined,
   };
