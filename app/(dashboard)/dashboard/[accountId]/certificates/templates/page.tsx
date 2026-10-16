@@ -19,7 +19,6 @@ import {
   useSetDefaultCertificateTemplateMutation,
 } from '@/lib/store/api/certificatesApi';
 
-
 import { DeleteTemplateDialog } from './_components/DeleteTemplateDialog';
 import { TemplateEmpty } from './_components/TemplateEmpty';
 import { TemplatesGrid } from './_components/TemplatesGrid';
@@ -53,14 +52,9 @@ export default function TemplatesPage() {
 
   const filtered = useMemo(() => {
     let list = allTemplates;
+    if (tab === 'mine') list = list.filter((t) => !t.is_system);
+    else if (tab === 'system') list = list.filter((t) => t.is_system);
 
-    if (tab === 'mine') {
-      list = list.filter((t) => !t.is_system);
-    } else if (tab === 'system') {
-      list = list.filter((t) => t.is_system);
-    }
-
-    // Sort: account templates first, then system; defaults first
     return [...list].sort((a, b) => {
       if (a.is_default && !b.is_default) return -1;
       if (!a.is_default && b.is_default) return 1;
@@ -74,12 +68,12 @@ export default function TemplatesPage() {
   const systemCount = allTemplates.filter((t) => t.is_system).length;
 
   const handleEdit = (t: CertificateTemplate) => {
-    router.push(
-      `/dashboard/${accountId}/certificates/templates/${t.id}`,
-    );
+    if (t.is_system) return; // system templates are immutable
+    router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
   };
 
   const handleSetDefault = async (t: CertificateTemplate) => {
+    if (t.is_system) return;
     setSettingDefaultId(t.id);
     try {
       await setDefault(t.id).unwrap();
@@ -103,7 +97,6 @@ export default function TemplatesPage() {
         onRefresh={() => refetch()}
       />
 
-      {/* Filter tabs */}
       {!isLoading && allTemplates.length > 0 && (
         <Card className="border-border">
           <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -148,7 +141,6 @@ export default function TemplatesPage() {
         </Card>
       )}
 
-      {/* Content */}
       {isLoading ? (
         <TemplatesSkeleton count={6} />
       ) : filtered.length === 0 ? (
@@ -165,7 +157,9 @@ export default function TemplatesPage() {
         <TemplatesGrid
           templates={filtered}
           onEdit={handleEdit}
-          onDelete={(t) => setDeleteTarget(t)}
+          onDelete={(t) => {
+            if (!t.is_system) setDeleteTarget(t);
+          }}
           onSetDefault={handleSetDefault}
           settingDefaultId={settingDefaultId}
         />

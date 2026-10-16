@@ -42,10 +42,11 @@ export function TemplatesHeader({
           />
           Refresh
         </Button>
+
         <Link href={`/dashboard/${accountId}/certificates/templates/new`}>
           <Button size="sm" className="cursor-pointer">
             <Plus className="mr-2 h-4 w-4" />
-            New template
+            New Template
           </Button>
         </Link>
       </div>

@@ -74,6 +74,12 @@ export interface CertificateTemplateDesign {
   footer_text?: string;
 
   qr_position?: string;
+
+  border_style?: string;
+border_color?: string;
+signature_line?: boolean;
+watermark_text?: string;
+verify_badge?: boolean;
 }
 
 export interface CertificateTemplate {

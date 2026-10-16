@@ -327,8 +327,17 @@ export interface EventFormData {
   waitlist_enabled: boolean;
 
   // ---- Certificate ----
+  //
+  // certificate_enabled  — whether this event issues certificates.
+  // certificate_template_id — the system tier the organizer picked.
+  //                          Determines the price charged to the
+  //                          organizer at issuance. Empty means the
+  //                          backend falls back to the account default.
+  //
+  // The legacy certificate_price field has been removed. Pricing is
+  // now derived from the template's price_minor — Nuruvent sets
+  // prices, organizers pick a tier.
   certificate_enabled: boolean;
-  certificate_price: number | null;
   certificate_template_id: string;
 
   // ---- Access & privacy ----
@@ -362,7 +371,7 @@ export interface FormErrors {
   schedules?: string;
   tickets?: string;
   capacity?: string;
-  certificate_price?: string;
+  certificate_template_id?: string;
   image?: string;
   recurrence?: string;
   speakers?: string;
@@ -399,7 +408,6 @@ export const defaultFormData: EventFormData = {
 
   // Certificate
   certificate_enabled: false,
-  certificate_price: null,
   certificate_template_id: '',
 
   // Access & privacy
@@ -530,6 +538,3 @@ export function deriveVirtualPlatform(schedules: ScheduleForm[]): string {
 export function derivePrimaryLocation(schedules: ScheduleForm[]): string {
   return schedules[0]?.location ?? '';
 }
-
-
-

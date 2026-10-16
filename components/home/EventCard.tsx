@@ -525,11 +525,9 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/80 to-amber-100/40 dark:from-amber-950/30 dark:to-amber-950/10 rounded-lg px-3 py-1.5 sm:py-2 border border-amber-200/60 dark:border-amber-900/40">
               <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
               <span className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
-                Certificate Fee:
+                Certificate Included
               </span>
-              <span className="text-sm sm:text-base font-bold text-amber-800 dark:text-amber-200">
-                {formatPrice(certificatePrice)}
-              </span>
+            
             </div>
           )}
 

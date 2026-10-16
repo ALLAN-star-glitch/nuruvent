@@ -608,17 +608,15 @@ export function EventDetailClient({ slug }: Props) {
                   <span>Duration: {duration}</span>
                 </div>
               )}
-              {hasCertificate && (
-                <>
-                  <span className="h-1 w-1 rounded-full bg-border" />
-                  <div className="flex items-center gap-1.5">
-                    <FileText className="h-4 w-4" />
-                    <span>
-                      Certificate Fee: {formatPrice(certificatePrice)}
-                    </span>
-                  </div>
-                </>
-              )}
+            {hasCertificate && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-border" />
+                <div className="flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" />
+                  <span>Certificate of completion included</span>
+                </div>
+              </>
+            )}
               <span className="h-1 w-1 rounded-full bg-border" />
               <div className="flex items-center gap-1.5">
                 <Tag className="h-4 w-4" />

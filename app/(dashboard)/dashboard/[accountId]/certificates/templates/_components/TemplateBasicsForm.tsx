@@ -5,10 +5,12 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { CertificateTierSelect } from '@/components/events/fields/CertificateTierSelect';
 
 import type { TemplateFormState } from './types';
 
 interface Props {
+  accountId: string;
   form: TemplateFormState;
   onChange: <K extends keyof TemplateFormState>(
     key: K,
@@ -17,7 +19,12 @@ interface Props {
   disabled?: boolean;
 }
 
-export function TemplateBasicsForm({ form, onChange, disabled }: Props) {
+export function TemplateBasicsForm({
+  accountId,
+  form,
+  onChange,
+  disabled,
+}: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -52,25 +59,16 @@ export function TemplateBasicsForm({ form, onChange, disabled }: Props) {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="tpl-price" className="text-sm">
-          Price per certificate (KES)
-        </Label>
-        <Input
-          id="tpl-price"
-          type="number"
-          min="0"
-          step="1"
-          value={form.priceKes}
-          onChange={(e) => onChange('priceKes', e.target.value)}
-          placeholder="0"
-          disabled={disabled}
-        />
-        <p className="text-[11px] text-muted-foreground">
-          Set to <strong>0</strong> for free certificates. This is charged to
-          the organizer per certificate issued.
-        </p>
-      </div>
+      <CertificateTierSelect
+        accountId={accountId}
+        value={form.tierTemplateId}
+        onChange={(tierId, priceMinor, slug) => {
+          onChange('tierTemplateId', tierId);
+          onChange('priceMinor', priceMinor);
+          onChange('tierSlug', slug);
+        }}
+        disabled={disabled}
+      />
     </div>
   );
 }

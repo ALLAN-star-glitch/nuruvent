@@ -16,17 +16,18 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
 import { AccessField } from '@/components/events/fields/AccessField';
+
 import { RecurrenceField } from '@/components/events/fields/RecurrenceField';
-import { NumberField } from '@/components/form';
 
 import type { EventFormData, FormErrors } from '../../types';
+import { CertificateTierField } from '../../fields/CertificateTierField';
 
 // ============================================================
 // DETAILS STEP (Step 3)
 // ============================================================
 //
 // Fields rendered:
-//   - Certificate toggle + price
+//   - Certificate toggle + tier selector
 //   - Recurrence
 //   - Access & Privacy
 //   - Promotion (Featured toggle)
@@ -71,10 +72,10 @@ export function DetailsStep({
           <div className="flex items-center justify-between p-3 bg-amber-50/60 rounded-lg border border-amber-100">
             <div>
               <Label className="text-sm font-medium text-neutral-dark">
-                Certificate Available
+                Issue Certificates for This Event
               </Label>
               <p className="text-xs text-neutral-gray">
-                Attendees can purchase a certificate of completion
+                Attendees receive a certificate of completion after the event.
               </p>
             </div>
             <Switch
@@ -87,17 +88,12 @@ export function DetailsStep({
           </div>
 
           {formData.certificate_enabled && (
-            <NumberField
-              name="certificate_price"
-              label="Certificate Price"
-              suffix="KES"
-              placeholder="0"
-              value={formData.certificate_price}
-              onChange={(v) => onFieldChange('certificate_price', v)}
-              min={0}
-              decimal
-              step="0.01"
-              error={validationErrors.certificate_price}
+            <CertificateTierField
+              value={formData.certificate_template_id}
+              onChange={(id) =>
+                onFieldChange('certificate_template_id', id)
+              }
+              error={validationErrors.certificate_template_id}
             />
           )}
         </CardContent>
