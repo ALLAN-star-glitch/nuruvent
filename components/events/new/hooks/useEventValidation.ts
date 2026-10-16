@@ -26,17 +26,14 @@ import type {
 // Steps (5-step wizard):
 //   1  Basic Info   name, event type, first schedule, description
 //   2  Tickets      at least one usable ticket, capacity vs quantities
-//   3  Details      recurrence, certificate, invite-only
+//   3  Details      recurrence, certificate tier, invite-only
 //   4  Content      nothing required
 //   5  Review       nothing required
 //
-// Schedule-level checks live in validateSchedule() and run on step 1
-// and during publish readiness. Meeting-link and location validation
-// are per-session: a session is either virtual (needs a link or a
-// connected host) or in-person (needs a location label).
-//
-// Rules mirror the backend's ValidateForPublish. When the backend
-// adds a rule, add it here too.
+// Certificate pricing is no longer user-entered — the organizer picks
+// a system tier and the backend resolves the price from that tier. The
+// only check here is that a tier was chosen when certificates are
+// enabled.
 
 export interface UseEventValidationResult {
   validateStep: (step: number) => FormErrors;
@@ -53,17 +50,6 @@ function isUsableSchedule(s: ScheduleForm): boolean {
   return !!(s.start_date && s.start_time && s.end_time);
 }
 
-/**
- * Validate a single schedule row. Returns an error string or null.
- *
- * Rules:
- *   - start_date, start_time, end_time required
- *   - end_time > start_time
- *   - end_date >= start_date when set
- *   - if virtual: no link is required (backend auto-creates), but if a
- *     link IS provided it must be a plausible URL
- *   - if not virtual: location label required
- */
 function validateSchedule(s: ScheduleForm, index: number): string | null {
   const prefix = `Session ${index + 1}`;
 
@@ -78,7 +64,6 @@ function validateSchedule(s: ScheduleForm, index: number): string | null {
   }
 
   if (s.is_virtual) {
-    // Manual links are optional. If provided, they must look like URLs.
     const zoom = s.zoom_link?.trim();
     if (zoom && !/^https?:\/\//i.test(zoom)) {
       return `${prefix}: Zoom link must start with http:// or https://`;
@@ -99,14 +84,12 @@ function validateSchedule(s: ScheduleForm, index: number): string | null {
 export function useEventValidation(
   formData: EventFormData,
 ): UseEventValidationResult {
-  // ---- Per-step validation ----
   const validateStep = useCallback(
     (step: number): FormErrors => {
       const newErrors: FormErrors = {};
 
       switch (step) {
         case 1: {
-          // ---- Basic info ----
           if (!formData.name?.trim()) {
             newErrors.name = 'Event name is required';
           } else if (formData.name.length > 100) {
@@ -117,9 +100,6 @@ export function useEventValidation(
             newErrors.event_type_id = 'Event type is required';
           }
 
-          // ---- Schedules ----
-          // Every schedule must validate. The first message wins so the
-          // form shows one actionable error at a time.
           if (!formData.schedules || formData.schedules.length === 0) {
             newErrors.schedules = 'Add at least one schedule';
           } else {
@@ -140,14 +120,11 @@ export function useEventValidation(
         }
 
         case 2: {
-          // ---- Tickets ----
           const usable = formData.tickets.filter(isUsableTicket);
           if (usable.length === 0) {
             newErrors.tickets =
               'Add at least one ticket with a type and quantity';
           } else {
-            // Capacity check: sum of usable ticket quantities must not
-            // exceed the event-wide capacity (when set).
             if (formData.capacity !== null && formData.capacity > 0) {
               const totalQty = usable.reduce(
                 (sum, t) => sum + (t.quantity ?? 0),
@@ -158,7 +135,6 @@ export function useEventValidation(
               }
             }
 
-            // Each ticket's quantity must be positive.
             const badIndex = formData.tickets.findIndex(
               (t) => t.ticket_type_id && (t.quantity ?? 0) <= 0,
             );
@@ -167,7 +143,6 @@ export function useEventValidation(
             }
           }
 
-          // Waitlist requires capacity.
           if (
             formData.waitlist_enabled &&
             (formData.capacity === null || formData.capacity === 0)
@@ -180,17 +155,15 @@ export function useEventValidation(
         }
 
         case 3: {
-          // ---- Details: recurrence + certificate ----
-          // Location and meeting-link validation moved to step 1
-          // (they are per-schedule now).
-
+          // ---- Certificate tier ----
+          // When certificates are enabled, a tier must be chosen. The
+          // tier determines the price charged to the organizer.
           if (
             formData.certificate_enabled &&
-            formData.certificate_price !== null &&
-            formData.certificate_price < 0
+            !formData.certificate_template_id
           ) {
-            newErrors.certificate_price =
-              'Certificate price cannot be negative';
+            newErrors.certificate_template_id =
+              'Select a certificate tier.';
           }
 
           if (formData.is_recurring && formData.recurrence) {
@@ -219,11 +192,9 @@ export function useEventValidation(
         }
 
         case 4:
-          // ---- Content: nothing required ----
           break;
 
         case 5:
-          // ---- Review: nothing required ----
           break;
       }
 
@@ -232,14 +203,11 @@ export function useEventValidation(
     [formData],
   );
 
-  // ---- Publish readiness ----
   const isPublishReady = useMemo(() => {
-    // ---- Field-level checks ----
     const hasName = !!formData.name?.trim();
     const hasEventType = !!formData.event_type_id;
     const hasDescription = !!formData.description?.trim();
 
-    // All schedules must be usable and validate cleanly.
     const schedules = formData.schedules ?? [];
     const hasSchedules = schedules.length > 0;
     const allSchedulesValid =
@@ -270,10 +238,10 @@ export function useEventValidation(
         (!!formData.recurrence.ends_on ||
           !!formData.recurrence.occurrences));
 
+    // Certificate: when enabled, a tier must be chosen.
     const certificateOk =
       !formData.certificate_enabled ||
-      formData.certificate_price === null ||
-      formData.certificate_price >= 0;
+      !!formData.certificate_template_id;
 
     const fieldChecksPass =
       hasName &&
@@ -288,8 +256,6 @@ export function useEventValidation(
 
     if (!fieldChecksPass) return false;
 
-    // ---- Step-level checks ----
-    // Every step with required fields must validate cleanly.
     return (
       Object.keys(validateStep(1)).length === 0 &&
       Object.keys(validateStep(2)).length === 0 &&

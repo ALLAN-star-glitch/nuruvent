@@ -223,15 +223,14 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
                 </div>
               )}
 
-              {/* Certificate */}
+                           {/* Certificate */}
               {formData.certificate_enabled && (
                 <div className="col-span-2">
                   <p className="text-neutral-gray">Certificate</p>
                   <p className="font-medium text-neutral-dark">
-                    Available
-                    {formData.certificate_price &&
-                      formData.certificate_price > 0 &&
-                      ` — ${formData.certificate_price} KES`}
+                    {formData.certificate_template_id
+                      ? 'Included — attendees receive a certificate'
+                      : 'Included — select a tier in Details'}
                   </p>
                 </div>
               )}
