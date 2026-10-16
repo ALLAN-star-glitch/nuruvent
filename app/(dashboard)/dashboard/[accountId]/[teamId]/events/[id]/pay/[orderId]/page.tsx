@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useDispatch } from 'react-redux';
 import { ArrowLeft, Loader2, Lock, ShieldCheck } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,12 @@ import {
   useGetPaymentQuery,
   useInitiatePaymentMutation,
 } from '@/lib/store/api/paymentsApi';
+import { certificatesApi } from '@/lib/store/api/certificatesApi';
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectUser } from '@/lib/store/slices/authSlice';
 
 import { CardForm } from './_components/CardForm';
 import { MpesaForm } from './_components/MpesaForm';
-
-
 import { PaymentMethodPicker } from './_components/PaymentMethodPicker';
 import { PollingView } from './_components/PollingView';
 import { ErrorState, LoadingState, SuccessState } from './_components/PaymentState';
@@ -68,12 +70,23 @@ export default function CertificatePaymentPage() {
   }>();
   const { accountId, teamId, id: eventId, orderId } = params;
 
+  const dispatch = useDispatch();
+
   const [method, setMethod] = useState<'mpesa' | 'card'>('mpesa');
   const [phone, setPhone] = useState('');
+  const [payerEmail, setPayerEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
+
+  const user = useAppSelector(selectUser);
+  const authEmail = user?.email ?? '';
+
+  // Prefill payer email from auth once it hydrates.
+  useEffect(() => {
+    if (authEmail) setPayerEmail((prev) => prev || authEmail);
+  }, [authEmail]);
 
   const {
     data: orderRes,
@@ -121,20 +134,41 @@ export default function CertificatePaymentPage() {
   }, [order]);
 
   // ---- Handle payment status ----
+  //
+  // On success, the backend webhook runs asynchronously to issue the
+  // certificate batch. Fire the certificate-list invalidation immediately
+  // and again after a short delay — the first refetch may land before
+  // the webhook finishes; the retries catch it.
   useEffect(() => {
     const payment = paymentRes?.data;
     if (!payment) return;
 
     if (payment.status === 'succeeded') {
+      const invalidate = () =>
+        dispatch(
+          certificatesApi.util.invalidateTags([
+            { type: 'Certificates', id: `ACCOUNT_${accountId}` },
+          ]),
+        );
+
+      invalidate();
+      const t1 = setTimeout(invalidate, 3000);
+      const t2 = setTimeout(invalidate, 6000);
+
       setSucceeded(true);
       setPaymentId(null);
       setSubmitting(false);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     } else if (payment.status === 'failed') {
       setError(payment.failure_reason || 'Payment failed. Please try again.');
       setPaymentId(null);
       setSubmitting(false);
     }
-  }, [paymentRes]);
+  }, [paymentRes, dispatch, accountId]);
 
   // ---- Guards ----
   if (orderLoading || !order) {
@@ -176,6 +210,11 @@ export default function CertificatePaymentPage() {
       return;
     }
 
+    if (method === 'card' && !payerEmail.trim()) {
+      setError('Please enter an email address for your card receipt.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
@@ -183,7 +222,8 @@ export default function CertificatePaymentPage() {
       const payRes = await initiatePayment({
         order_id: order.id,
         method,
-        payer_phone: method === 'mpesa' ? phone : undefined,
+        payer_phone: method === 'mpesa' ? phone.trim() : undefined,
+        payer_email: method === 'card' ? payerEmail.trim() : undefined,
         idempotency_key:
           typeof crypto !== 'undefined' && 'randomUUID' in crypto
             ? crypto.randomUUID()
@@ -222,7 +262,8 @@ export default function CertificatePaymentPage() {
         const popup = new PaystackPop();
         popup.resumeTransaction(payment.access_code, {
           onSuccess: () => {
-            setSucceeded(true);
+            // Wait for the webhook to confirm — start polling.
+            setPaymentId(payment.id);
             setSubmitting(false);
           },
           onCancel: () => {
@@ -306,7 +347,16 @@ export default function CertificatePaymentPage() {
                   />
                 )}
 
-                {method === 'card' && <CardForm />}
+                {method === 'card' && (
+                  <CardForm
+                    email={payerEmail}
+                    onEmailChange={(v) => {
+                      setPayerEmail(v);
+                      setError('');
+                    }}
+                    disabled={submitting}
+                  />
+                )}
 
                 {error && (
                   <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">

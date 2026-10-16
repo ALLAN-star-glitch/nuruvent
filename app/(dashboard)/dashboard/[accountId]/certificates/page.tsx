@@ -8,8 +8,10 @@ import { FileBadge } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { useListAccountCertificatesQuery } from '@/lib/store/api/certificatesApi';
-
+import {
+  useDownloadCertificateMutation,
+  useListAccountCertificatesQuery,
+} from '@/lib/store/api/certificatesApi';
 
 import { AccountCertificatesFilters } from './_components/AccountCertificatesFilters';
 import { AccountCertificatesHeader } from './_components/AccountCertificatesHeader';
@@ -39,6 +41,8 @@ export default function AccountCertificatesPage() {
     accountId,
     params: { limit: 500 },
   });
+
+  const [downloadCertificate] = useDownloadCertificateMutation();
 
   const certificates = data?.data?.certificates ?? [];
 
@@ -77,7 +81,6 @@ export default function AccountCertificatesPage() {
       );
     }
 
-    // newest first
     return [...list].sort(
       (a, b) =>
         new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime(),
@@ -97,32 +100,31 @@ export default function AccountCertificatesPage() {
     setEventFilter('all');
   };
 
-  const handleDownload = async (cert: Certificate) => {
-    try {
-      const token = localStorage.getItem('access_token');
-      const apiBase =
-        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
-      const res = await fetch(
-        `${apiBase}/api/v1/certificates/${cert.id}/download`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+const handleDownload = async (cert: Certificate) => {
+  try {
+    const result = await downloadCertificate(cert.id).unwrap();
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate-${cert.verification_code}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to download certificate');
+    // JSON response: { success, message, data: { url } } → open the URL
+    if (result && typeof result === 'object' && 'data' in result) {
+      const url = (result as { data: { url: string } }).data.url;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
     }
-  };
+
+    // Blob → trigger browser download
+    const blob = result as Blob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certificate-${cert.verification_code}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Failed to download certificate');
+  }
+};
 
   const emptyNode = (
     <Card className="border-0 border-b border-border">

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useGetEventAttendeesQuery } from '@/lib/store/api/attendanceApi';
-import { useListAccountCertificatesQuery } from '@/lib/store/api/certificatesApi';
+import { useDownloadCertificateMutation, useListAccountCertificatesQuery } from '@/lib/store/api/certificatesApi';
 
 
 import { EventCertificatesEmpty } from './_components/EventCertificatesEmpty';
@@ -141,32 +141,31 @@ export default function EventCertificatesPage() {
     }
   };
 
-  const handleDownload = async (cert: Certificate) => {
-    try {
-      const token = localStorage.getItem('access_token');
-      const apiBase =
-        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
-      const res = await fetch(
-        `${apiBase}/api/v1/certificates/${cert.id}/download`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+const [downloadCertificate] = useDownloadCertificateMutation();
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate-${cert.verification_code}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to download certificate');
+const handleDownload = async (cert: Certificate) => {
+  try {
+    const result = await downloadCertificate(cert.id).unwrap();
+
+    if (result && typeof result === 'object' && 'data' in result) {
+      const url = (result as { data: { url: string } }).data.url;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
     }
-  };
+
+    const blob = result as Blob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certificate-${cert.verification_code}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    toast.error('Failed to download certificate');
+  }
+};
 
   const backHref = `/dashboard/${accountId}/${teamId}/events/${eventId}`;
 

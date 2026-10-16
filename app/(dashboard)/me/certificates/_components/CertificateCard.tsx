@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   Copy,
   Download,
-  ExternalLink,
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
@@ -24,9 +23,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useDownloadCertificateMutation } from '@/lib/store/api/certificatesApi';
 import { Certificate } from '@/lib/types/certificates';
-
-
 
 // ============================================================
 // HELPERS
@@ -51,67 +49,43 @@ function formatDate(value: string): string {
 
 export function CertificateCard({ cert }: { cert: Certificate }) {
   const [downloading, setDownloading] = useState(false);
+  const [downloadCertificate] = useDownloadCertificateMutation();
 
   const title = cert.metadata?.context_title ?? 'Certificate';
   const issuer = cert.metadata?.issuer_name ?? 'Nuruvent';
   const isRevoked = cert.status === 'revoked';
 
-  // ---- Download handler ----
-  // Uses the public signed-token endpoint if we have a token,
-  // otherwise falls back to the authenticated endpoint. Since the
-  // API response doesn't include the signed token (it's only in the
-  // email), we always use the authenticated download endpoint here.
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const token = localStorage.getItem('access_token');
-      const apiBase =
-        process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+ const handleDownload = async () => {
+  setDownloading(true);
+  try {
+    const result = await downloadCertificate(cert.id).unwrap();
 
-      const res = await fetch(
-        `${apiBase}/api/v1/certificates/${cert.id}/download`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
-
-      if (!res.ok) {
-        throw new Error(`Download failed (${res.status})`);
-      }
-
-      // If the backend redirects, the browser will have followed it.
-      // If it returns JSON with a url, navigate to it.
-      const contentType = res.headers.get('content-type') ?? '';
-      if (contentType.includes('application/json')) {
-        const data = await res.json();
-        const url = data?.data?.url ?? data?.url;
-        if (url) {
-          window.open(url, '_blank', 'noopener,noreferrer');
-        } else {
-          throw new Error('No download URL returned');
-        }
-      } else {
-        // Binary PDF — trigger download
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `certificate-${cert.verification_code}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(blobUrl);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to download certificate';
-      toast.error(message);
-    } finally {
-      setDownloading(false);
+    // JSON response: { success, message, data: { url } } → open the URL
+    if (result && typeof result === 'object' && 'data' in result) {
+      const url = (result as { data: { url: string } }).data.url;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
     }
-  };
 
-  // ---- Copy verification code ----
+    // Blob → trigger browser download
+    const blob = result as Blob;
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `certificate-${cert.verification_code}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to download certificate';
+    toast.error(message);
+  } finally {
+    setDownloading(false);
+  }
+};
+
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(cert.verification_code);
@@ -121,7 +95,6 @@ export function CertificateCard({ cert }: { cert: Certificate }) {
     }
   };
 
-  // ---- Open verify page ----
   const handleVerify = () => {
     const base =
       process.env.NEXT_PUBLIC_APP_URL ??
