@@ -76,10 +76,10 @@ export interface CertificateTemplateDesign {
   qr_position?: string;
 
   border_style?: string;
-border_color?: string;
-signature_line?: boolean;
-watermark_text?: string;
-verify_badge?: boolean;
+  border_color?: string;
+  signature_line?: boolean;
+  watermark_text?: string;
+  verify_badge?: boolean;
 }
 
 export interface CertificateTemplate {
@@ -101,19 +101,34 @@ export interface CertificateTemplateListResponse {
   templates: CertificateTemplate[];
 }
 
+/**
+ * Create certificate template request (account-scoped).
+ *
+ * `tier_template_id` links this template to a system tier. When set,
+ * the backend snapshots the tier's price into `price_minor` and
+ * restricts the design fields accordingly.
+ */
 export interface CreateCertificateTemplateRequest {
   account_id: string;
   name: string;
   description?: string;
   design: CertificateTemplateDesign;
   price_minor?: number;
+  tier_template_id?: string;
 }
 
+/**
+ * Update certificate template request.
+ *
+ * Same fields as Create, but all optional. `tier_template_id` can be
+ * re-sent to re-resolve the tier on update.
+ */
 export interface UpdateCertificateTemplateRequest {
   name?: string;
   description?: string;
   design?: CertificateTemplateDesign;
   price_minor?: number;
+  tier_template_id?: string;
 }
 
 // ============================================================

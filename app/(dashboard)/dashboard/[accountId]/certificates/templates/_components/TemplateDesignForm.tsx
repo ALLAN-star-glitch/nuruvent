@@ -2,7 +2,8 @@
 
 'use client';
 
-import { Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Lock, Sparkles } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { FileUploadInput } from '@/components/ui/file-upload-input';
 
 import type { TemplateFormState } from './types';
 import { CertificateTemplateDesign } from '@/lib/types/certificates';
@@ -31,14 +42,8 @@ interface Props {
   disabled?: boolean;
 }
 
-// ============================================================
-// TIER FEATURE GATING
-// ============================================================
-//
-// Mirrors the backend's domain/tier_features.go. The UI disables
-// fields the tier doesn't permit; the backend strips them regardless.
-
 type Tier = 'default' | 'professional' | 'premium' | '';
+type Feature = 'logo' | 'signature' | 'seal' | 'background' | 'watermark' | 'double_border';
 
 const TIER_LABEL: Record<Exclude<Tier, ''>, string> = {
   default: 'Basic',
@@ -46,8 +51,8 @@ const TIER_LABEL: Record<Exclude<Tier, ''>, string> = {
   premium: 'Premium',
 };
 
-function canUse(tier: Tier, feature: 'logo' | 'signature' | 'seal' | 'background' | 'watermark' | 'double_border'): boolean {
-  if (!tier) return true; // no tier → no restrictions
+function canUse(tier: Tier, feature: Feature): boolean {
+  if (!tier) return true;
   switch (feature) {
     case 'logo':
     case 'signature':
@@ -62,7 +67,7 @@ function canUse(tier: Tier, feature: 'logo' | 'signature' | 'seal' | 'background
   }
 }
 
-function requiredTier(feature: 'logo' | 'signature' | 'seal' | 'background' | 'watermark' | 'double_border'): Tier {
+function requiredTier(feature: Feature): Tier {
   switch (feature) {
     case 'logo':
     case 'signature':
@@ -98,31 +103,41 @@ function ColorInput({
   value,
   onChange,
   disabled,
+  locked,
+  onLockedClick,
 }: {
   label: string;
   value: string | undefined;
   onChange: (v: string) => void;
   disabled?: boolean;
+  locked?: boolean;
+  onLockedClick?: () => void;
 }) {
-  const v = value ?? '#000000';
+  const v = value || '#000000';
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+    <div className="space-y-1.5 relative">
+      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+        {label}
+        {locked && <Lock className="h-3 w-3 text-amber-600" />}
+      </Label>
       <div className="flex items-center gap-2">
         <input
           type="color"
           value={v}
           onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
+          disabled={disabled || locked}
           className="h-9 w-9 cursor-pointer rounded-md border border-border"
         />
         <Input
           value={v}
           onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
+          disabled={disabled || locked}
           className="h-9 flex-1 font-mono text-xs"
         />
       </div>
+      {locked && onLockedClick && (
+        <div className="absolute inset-0 top-5 z-10 cursor-pointer" onClick={onLockedClick} />
+      )}
     </div>
   );
 }
@@ -134,16 +149,28 @@ export function TemplateDesignForm({
 }: Props) {
   const d = form.design;
   const tier = form.tierSlug as Tier;
-
   const allDisabled = disabled ?? false;
 
-  // Per-feature disabled state
-  const lockLogo = allDisabled || !canUse(tier, 'logo');
-  const lockSignature = allDisabled || !canUse(tier, 'signature');
-  const lockSeal = allDisabled || !canUse(tier, 'seal');
-  const lockBackground = allDisabled || !canUse(tier, 'background');
-  const lockWatermark = allDisabled || !canUse(tier, 'watermark');
-  const lockDoubleBorder = !canUse(tier, 'double_border');
+  const [lockedFeature, setLockedFeature] = useState<Feature | null>(null);
+
+  const isLocked = (feature: Feature) => !canUse(tier, feature);
+
+  const handleLockedClick = (feature: Feature) => {
+    setLockedFeature(feature);
+  };
+
+  const scrollToTier = () => {
+    setLockedFeature(null);
+    const el = document.getElementById('tpl-tier');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+      el.classList.add('ring-4', 'ring-primary/50', 'animate-pulse');
+      setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-primary/50', 'animate-pulse');
+      }, 2000);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -178,7 +205,7 @@ export function TemplateDesignForm({
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">Font family</Label>
         <Select
-          value={d.font_family ?? 'Georgia'}
+          value={d.font_family || 'Georgia'}
           onValueChange={(v) => onDesignChange('font_family', v)}
           disabled={allDisabled}
         >
@@ -201,33 +228,40 @@ export function TemplateDesignForm({
           Border
         </p>
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Border style</Label>
+          <div className="space-y-1.5 relative">
+            <Label className="text-xs text-muted-foreground flex items-center justify-between">
+              Border style
+              {isLocked('double_border') && (
+                <span className="text-[10px] text-amber-600 flex items-center gap-1">
+                  <Lock className="h-3 w-3" /> Premium required for Double
+                </span>
+              )}
+            </Label>
             <Select
-              value={d.border_style ?? 'none'}
-              onValueChange={(v) => onDesignChange('border_style', v)}
-              disabled={allDisabled}
+              value={d.border_style || 'none'}
+              onValueChange={(v) => {
+                if (v === 'double' && isLocked('double_border')) {
+                  handleLockedClick('double_border');
+                  return;
+                }
+                onDesignChange('border_style', v);
+              }}
+              disabled={allDisabled || isLocked('double_border')}
             >
               <SelectTrigger className="cursor-pointer">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none" className="cursor-pointer">
-                  None
-                </SelectItem>
-                <SelectItem value="single" className="cursor-pointer">
-                  Single line
-                </SelectItem>
-                <SelectItem value="double" disabled={lockDoubleBorder} className="cursor-pointer">
+                <SelectItem value="none" className="cursor-pointer">None</SelectItem>
+                <SelectItem value="single" className="cursor-pointer">Single line</SelectItem>
+                <SelectItem value="double" className="cursor-pointer">
                   Double line
-                  {lockDoubleBorder && (
-                    <span className="ml-2 text-[10px] text-muted-foreground">
-                      🔒 {TIER_LABEL[requiredTier('double_border') as Exclude<Tier, ''>]}
-                    </span>
-                  )}
                 </SelectItem>
               </SelectContent>
             </Select>
+            {isLocked('double_border') && (
+              <div className="absolute inset-0 top-5 z-10 cursor-pointer" onClick={() => handleLockedClick('double_border')} />
+            )}
           </div>
 
           {(d.border_style === 'single' || d.border_style === 'double') && (
@@ -247,53 +281,41 @@ export function TemplateDesignForm({
           Images
         </p>
         <div className="space-y-3">
-          <ImageInput
-            label="Logo URL"
+          <FileUploadInput
+            label="Logo"
             value={d.logo_url ?? ''}
             onChange={(v) => onDesignChange('logo_url', v)}
-            placeholder="https://…/logo.png"
-            disabled={lockLogo}
-            lockHint={
-              lockLogo && !allDisabled
-                ? `${TIER_LABEL[requiredTier('logo') as Exclude<Tier, ''>]} tier required`
-                : undefined
-            }
+            templateId={form.templateId || form.tierTemplateId || ''}
+            disabled={allDisabled}
+            locked={isLocked('logo')}
+            onLockedClick={() => handleLockedClick('logo')}
           />
-          <ImageInput
-            label="Signature image URL"
+          <FileUploadInput
+            label="Signature image"
             value={d.signature_url ?? ''}
             onChange={(v) => onDesignChange('signature_url', v)}
-            placeholder="https://…/signature.png"
-            disabled={lockSignature}
-            lockHint={
-              lockSignature && !allDisabled
-                ? `${TIER_LABEL[requiredTier('signature') as Exclude<Tier, ''>]} tier required`
-                : undefined
-            }
+            templateId={form.templateId || form.tierTemplateId || ''}
+            disabled={allDisabled}
+            locked={isLocked('signature')}
+            onLockedClick={() => handleLockedClick('signature')}
           />
-          <ImageInput
-            label="Seal URL"
+          <FileUploadInput
+            label="Seal"
             value={d.seal_url ?? ''}
             onChange={(v) => onDesignChange('seal_url', v)}
-            placeholder="https://…/seal.png"
-            disabled={lockSeal}
-            lockHint={
-              lockSeal && !allDisabled
-                ? `${TIER_LABEL[requiredTier('seal') as Exclude<Tier, ''>]} tier required`
-                : undefined
-            }
+            templateId={form.templateId || form.tierTemplateId || ''}
+            disabled={allDisabled}
+            locked={isLocked('seal')}
+            onLockedClick={() => handleLockedClick('seal')}
           />
-          <ImageInput
-            label="Background image URL"
+          <FileUploadInput
+            label="Background image"
             value={d.background_url ?? ''}
             onChange={(v) => onDesignChange('background_url', v)}
-            placeholder="https://…/background.jpg"
-            disabled={lockBackground}
-            lockHint={
-              lockBackground && !allDisabled
-                ? `${TIER_LABEL[requiredTier('background') as Exclude<Tier, ''>]} tier required`
-                : undefined
-            }
+            templateId={form.templateId || form.tierTemplateId || ''}
+            disabled={allDisabled}
+            locked={isLocked('background')}
+            onLockedClick={() => handleLockedClick('background')}
           />
         </div>
       </div>
@@ -304,27 +326,33 @@ export function TemplateDesignForm({
           Signatory
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <Label className="text-xs text-muted-foreground">Name</Label>
             <Input
               value={d.signatory_name ?? ''}
               onChange={(e) => onDesignChange('signatory_name', e.target.value)}
               placeholder="Dr. Alice Mwangi"
-              disabled={lockSignature}
+              disabled={allDisabled}
             />
+            {isLocked('signature') && (
+              <div className="absolute inset-0 top-5 z-10 cursor-pointer" onClick={() => handleLockedClick('signature')} />
+            )}
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <Label className="text-xs text-muted-foreground">Title</Label>
             <Input
               value={d.signatory_title ?? ''}
               onChange={(e) => onDesignChange('signatory_title', e.target.value)}
               placeholder="Program Director"
-              disabled={lockSignature}
+              disabled={allDisabled}
             />
+            {isLocked('signature') && (
+              <div className="absolute inset-0 top-5 z-10 cursor-pointer" onClick={() => handleLockedClick('signature')} />
+            )}
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3 relative">
           <div>
             <Label className="text-sm">Show signature line</Label>
             <p className="text-[11px] text-muted-foreground">
@@ -334,9 +362,12 @@ export function TemplateDesignForm({
           <Switch
             checked={d.signature_line ?? false}
             onCheckedChange={(v) => onDesignChange('signature_line', v)}
-            disabled={lockSignature}
+            disabled={allDisabled}
             className="cursor-pointer"
           />
+          {isLocked('signature') && (
+            <div className="absolute inset-0 z-10 cursor-pointer" onClick={() => handleLockedClick('signature')} />
+          )}
         </div>
       </div>
 
@@ -347,7 +378,7 @@ export function TemplateDesignForm({
         </p>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3 relative">
             <div>
               <Label className="text-sm">Show &quot;Verified&quot; badge</Label>
               <p className="text-[11px] text-muted-foreground">
@@ -357,24 +388,24 @@ export function TemplateDesignForm({
             <Switch
               checked={d.verify_badge ?? false}
               onCheckedChange={(v) => onDesignChange('verify_badge', v)}
-              disabled={lockSignature}
+              disabled={allDisabled}
               className="cursor-pointer"
             />
+             {isLocked('signature') && (
+              <div className="absolute inset-0 z-10 cursor-pointer" onClick={() => handleLockedClick('signature')} />
+            )}
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative">
             <Label className="text-xs text-muted-foreground">Watermark text</Label>
             <Input
               value={d.watermark_text ?? ''}
               onChange={(e) => onDesignChange('watermark_text', e.target.value)}
               placeholder="Official Certificate"
-              disabled={lockWatermark}
+              disabled={allDisabled}
             />
-            {lockWatermark && !allDisabled && (
-              <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Lock className="h-3 w-3" />
-                {TIER_LABEL[requiredTier('watermark') as Exclude<Tier, ''>]} tier required
-              </p>
+            {isLocked('watermark') && (
+              <div className="absolute inset-0 top-5 z-10 cursor-pointer" onClick={() => handleLockedClick('watermark')} />
             )}
           </div>
         </div>
@@ -384,7 +415,7 @@ export function TemplateDesignForm({
       <div className="space-y-1.5">
         <Label className="text-xs text-muted-foreground">QR code position</Label>
         <Select
-          value={d.qr_position ?? 'bottom-right'}
+          value={d.qr_position || 'bottom-right'}
           onValueChange={(v) => onDesignChange('qr_position', v)}
           disabled={allDisabled}
         >
@@ -400,60 +431,34 @@ export function TemplateDesignForm({
           </SelectContent>
         </Select>
       </div>
-    </div>
-  );
-}
 
-// ============================================================
-// IMAGE INPUT
-// ============================================================
-
-function ImageInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  lockHint,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  disabled?: boolean;
-  lockHint?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      <div className="flex items-start gap-2">
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          disabled={disabled}
-          className="flex-1 text-xs"
-        />
-        {value && (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={value}
-              alt=""
-              className="h-full w-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
-      </div>
-      {lockHint && (
-        <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <Lock className="h-3 w-3" />
-          {lockHint}
-        </p>
-      )}
+      {/* Locked Feature Dialog */}
+      <Dialog open={!!lockedFeature} onOpenChange={(open) => !open && setLockedFeature(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <Lock className="h-5 w-5" />
+              Upgrade Required
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-foreground">
+              The <strong className="text-foreground">
+                {lockedFeature && TIER_LABEL[requiredTier(lockedFeature) as Exclude<Tier, ''>]}
+              </strong> tier is required to use this feature.
+              <br /><br />
+              Your current tier (<strong className="capitalize">{TIER_LABEL[tier as Exclude<Tier, ''>] || 'Basic'}</strong>) does not support it.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setLockedFeature(null)}>
+              Cancel
+            </Button>
+            <Button onClick={scrollToTier} className="bg-primary text-primary-foreground">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Switch Tier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

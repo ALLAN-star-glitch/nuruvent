@@ -55,72 +55,17 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   isTrash?: boolean;
-  /** Absolute href — bypasses team-scoped URL building. */
   href?: string;
-  /**
-   * Only shown to account admins and trainers.
-   *
-   * Registrations, Attendees, and Trash are organizer views.
-   * Learners see their own registrations via /tickets instead.
-   */
+  exact?: boolean;
   organizersOnly?: boolean;
-  /**
-   * Only shown to account admins.
-   *
-   * Payments are owner data — an invited trainer is here to run
-   * events, not to audit the account's money. If a trainer owns their
-   * own account, they see payments there as the account_admin.
-   */
   adminsOnly?: boolean;
+  children?: NavItem[];
 }
 
 interface DashboardSidebarProps {
   onCollapseChange?: (collapsed: boolean) => void;
   collapsed?: boolean;
 }
-
-// ============================================================
-// TEAM-SCOPED NAV
-// ============================================================
-
-const TEAM_NAV_ITEMS: NavItem[] = [
-  {
-    segment: 'workspaces',
-    label: 'My Workspaces',
-    icon: Layers,
-    href: '/accounts',
-  },
-  { segment: '', label: 'Dashboard', icon: LayoutDashboard },
-  { segment: 'events', label: 'Team Events', icon: Calendar },
-  {
-    segment: 'registrations',
-    label: 'Registrations',
-    icon: ClipboardList,
-    organizersOnly: true,
-  },
-  { segment: 'tickets', label: 'My Tickets', icon: Ticket },
-  {
-    segment: 'attendees',
-    label: 'Attendees',
-    icon: Users,
-    organizersOnly: true,
-  },
-  {
-    segment: 'payments',
-    label: 'Payments',
-    icon: CreditCard,
-    adminsOnly: true,
-  },
-  { segment: 'certificates', label: 'Certificates', icon: Award },
-  { segment: 'replays', label: 'Replays', icon: Clapperboard },
-  {
-    segment: 'trash',
-    label: 'Trash',
-    icon: Trash2,
-    isTrash: true,
-    organizersOnly: true,
-  },
-];
 
 // ============================================================
 // COMPONENT
@@ -134,13 +79,9 @@ export function DashboardSidebar({
   const router = useRouter();
   const params = useParams();
 
-  // URL-scoped IDs (present only on /dashboard/:accountId/:teamId/*).
   const urlAccountId = (params?.accountId as string) ?? null;
   const urlTeamId = (params?.teamId as string) ?? null;
 
-  // Fall back to the last-used workspace when the URL has no
-  // account/team. This keeps the sidebar fully populated on
-  // /profile, /accounts, and /dashboard.
   const workspaceAccountId = useAppSelector((s) => s.workspace.activeAccountId);
   const workspaceTeamId = useAppSelector((s) => s.workspace.activeTeamId);
 
@@ -152,17 +93,14 @@ export function DashboardSidebar({
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [teamsExpanded, setTeamsExpanded] = useState(false);
+  const [certificatesExpanded, setCertificatesExpanded] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Teams — unfiltered so the sidebar can switch across accounts.
   const { data: teamsResponse } = useGetUserTeamsQuery();
   const teams = teamsResponse?.teams ?? [];
 
-  // Accounts — used to resolve each team's parent-account logo.
   const { data: accounts } = useGetMyAccountsQuery();
 
-  // The caller's role in the active account. Self-service endpoint —
-  // works for every role.
   const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
     skip: !accountId,
   });
@@ -173,14 +111,6 @@ export function DashboardSidebar({
     return map;
   }, [accounts]);
 
-  // Role-derived visibility flags.
-  //
-  //   isAdmin      → account_admin
-  //   isOrganizer  → account_admin OR trainer
-  //
-  // When the role hasn't loaded yet, both are false — organizer and
-  // admin items stay hidden to avoid a flash before the real role
-  // arrives.
   const isAdmin = useMemo(() => {
     const role = myMembership?.role as AccountRole | undefined;
     return role === 'account_admin';
@@ -191,6 +121,73 @@ export function DashboardSidebar({
     return role === 'account_admin' || role === 'trainer';
   }, [myMembership]);
 
+  const TEAM_NAV_ITEMS = useMemo<NavItem[]>(
+    () => [
+      {
+        segment: 'workspaces',
+        label: 'My Workspaces',
+        icon: Layers,
+        href: '/accounts',
+      },
+      { segment: '', label: 'Dashboard', icon: LayoutDashboard },
+      { segment: 'events', label: 'Team Events', icon: Calendar },
+      {
+        segment: 'registrations',
+        label: 'Registrations',
+        icon: ClipboardList,
+        organizersOnly: true,
+      },
+      { segment: 'tickets', label: 'My Tickets', icon: Ticket },
+      {
+        segment: 'attendees',
+        label: 'Attendees',
+        icon: Users,
+        organizersOnly: true,
+      },
+      {
+        segment: 'payments',
+        label: 'Payments',
+        icon: CreditCard,
+        adminsOnly: true,
+      },
+        {
+      segment: 'certificates',
+      label: 'Certificates',
+      icon: Award,
+      organizersOnly: true,
+      href: accountId ? `/dashboard/${accountId}/certificates` : undefined,
+      children: [
+        {
+          segment: '',
+          label: 'Issued Certificates',
+          icon: Award,
+          href: accountId
+            ? `/dashboard/${accountId}/certificates`
+            : undefined,
+          exact: true,
+        },
+        {
+          segment: '',
+          label: 'Templates', // <-- RENAMED
+          icon: Award,
+          href: accountId
+            ? `/dashboard/${accountId}/certificates/templates`
+            : undefined,
+        },
+      ],
+    },
+      { segment: 'replays', label: 'Replays', icon: Clapperboard },
+      {
+        segment: 'trash',
+        label: 'Trash',
+        icon: Trash2,
+        isTrash: true,
+        organizersOnly: true,
+      },
+    ],
+    [accountId],
+  );
+
   const visibleNavItems = useMemo(
     () =>
       TEAM_NAV_ITEMS.filter((item) => {
@@ -198,7 +195,7 @@ export function DashboardSidebar({
         if (item.organizersOnly) return isOrganizer;
         return true;
       }),
-    [isAdmin, isOrganizer],
+    [TEAM_NAV_ITEMS, isAdmin, isOrganizer],
   );
 
   useEffect(() => {
@@ -235,9 +232,6 @@ export function DashboardSidebar({
     setShowLogoutDialog(true);
   };
 
-  // ------------------------------------------------------------
-  // URL builders — scoped to /dashboard/:accountId/:teamId
-  // ------------------------------------------------------------
   const accountBase = accountId ? `/dashboard/${accountId}` : '/accounts';
   const teamBase =
     accountId && teamId ? `${accountBase}/${teamId}` : accountBase;
@@ -259,11 +253,27 @@ export function DashboardSidebar({
 
   const isTeamNavActive = (item: NavItem) => {
     if (item.href) {
+      if (item.exact) return pathname === item.href;
       return pathname === item.href || pathname.startsWith(`${item.href}/`);
     }
     if (!accountId || !teamId) return false;
     if (item.segment === '') return pathname === teamBase;
+
+    if (item.children) {
+      return item.children.some((child) => isChildActive(child));
+    }
+
     const href = `${teamBase}/${item.segment}`;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const isChildActive = (child: NavItem) => {
+    if (child.href) {
+      if (child.exact) return pathname === child.href;
+      return pathname === child.href || pathname.startsWith(`${child.href}/`);
+    }
+    if (!accountId || !teamId) return false;
+    const href = `${teamBase}/${child.segment}`;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
@@ -276,9 +286,6 @@ export function DashboardSidebar({
     `${accountBase}/settings`,
   );
 
-  // ------------------------------------------------------------
-  // Account logo
-  // ------------------------------------------------------------
   const renderAccountLogo = (
     account: Account | null | undefined,
     size: number = 28,
@@ -322,7 +329,6 @@ export function DashboardSidebar({
           'top-[140px] h-[calc(100vh-200px)]',
         )}
       >
-        {/* Toggle header */}
         <div
           onClick={toggleSidebar}
           className={cn(
@@ -342,9 +348,7 @@ export function DashboardSidebar({
           )}
         </div>
 
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none">
-          {/* Section 1: team-scoped nav */}
           <nav className="px-3 py-3 space-y-0.5">
             {visibleNavItems.map((item) => {
               const isActive = isTeamNavActive(item);
@@ -352,10 +356,13 @@ export function DashboardSidebar({
               const isTrash = item.isTrash;
               const isWorkspaces = item.segment === 'workspaces';
               const showDivider = isWorkspaces;
+              const hasChildren = !!item.children && item.children.length > 0;
+              const isCertGroup = item.segment === 'certificates';
+              const childrenExpanded = isCertGroup && certificatesExpanded;
 
               if (collapsed) {
                 return (
-                  <div key={item.segment || 'root'}>
+                  <div key={item.segment || item.label}>
                     <Link
                       href={buildTeamNavHref(item)}
                       prefetch={false}
@@ -383,41 +390,129 @@ export function DashboardSidebar({
               }
 
               return (
-                <div key={item.segment || 'root'}>
-                  <Link
-                    href={buildTeamNavHref(item)}
-                    prefetch={false}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
-                      isActive
-                        ? isTrash
-                          ? 'bg-destructive/15 text-destructive font-semibold'
-                          : 'bg-primary/15 text-primary font-semibold'
-                        : isTrash
-                          ? 'text-destructive hover:bg-destructive/10'
-                          : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
-                    )}
-                  >
-                    {isActive && (
+                <div key={item.segment || item.label}>
+                  {hasChildren ? (
+                    <div className="space-y-0.5">
                       <div
                         className={cn(
-                          'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
-                          isTrash ? 'bg-destructive' : 'bg-primary',
+                          'flex items-center gap-1 rounded-lg text-sm font-medium transition-all duration-150 group relative',
+                          isActive
+                            ? isTrash
+                              ? 'bg-destructive/15 text-destructive font-semibold'
+                              : 'bg-primary/15 text-primary font-semibold'
+                            : isTrash
+                              ? 'text-destructive hover:bg-destructive/10'
+                              : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
+                        )}
+                      >
+                        {isActive && (
+                          <div
+                            className={cn(
+                              'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
+                              isTrash ? 'bg-destructive' : 'bg-primary',
+                            )}
+                          />
+                        )}
+
+                        <Link
+                          href={buildTeamNavHref(item)}
+                          prefetch={false}
+                          className="flex flex-1 items-center gap-3 px-3 py-2.5 cursor-pointer truncate"
+                        >
+                          <Icon
+                            className={cn(
+                              'h-[18px] w-[18px] shrink-0 transition-colors',
+                              isTrash
+                                ? 'text-destructive'
+                                : isActive
+                                  ? 'text-primary'
+                                  : 'text-foreground/70 group-hover:text-foreground',
+                            )}
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (isCertGroup)
+                              setCertificatesExpanded((v) => !v);
+                          }}
+                          className="pr-3 py-2.5 cursor-pointer hover:text-primary transition-colors"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              'h-4 w-4 shrink-0 transition-transform',
+                              childrenExpanded
+                                ? 'rotate-180 text-primary'
+                                : 'text-foreground/60',
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {childrenExpanded && (
+                        <div className="mt-1 ml-4 pl-3 border-l border-border/40 space-y-0.5">
+                          {item.children!.map((child) => {
+                            const ChildIcon = child.icon;
+                            const childActive = isChildActive(child);
+                            return (
+                              <Link
+                                key={child.label}
+                                href={buildTeamNavHref(child)}
+                                prefetch={false}
+                                className={cn(
+                                  'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all cursor-pointer',
+                                  childActive
+                                    ? 'bg-primary/10 text-primary font-semibold'
+                                    : 'text-foreground/75 hover:bg-accent/60 hover:text-foreground',
+                                )}
+                              >
+                                <ChildIcon className="h-[16px] w-[16px] shrink-0" />
+                                <span className="truncate">{child.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Link
+                      href={buildTeamNavHref(item)}
+                      prefetch={false}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
+                        isActive
+                          ? isTrash
+                            ? 'bg-destructive/15 text-destructive font-semibold'
+                            : 'bg-primary/15 text-primary font-semibold'
+                          : isTrash
+                            ? 'text-destructive hover:bg-destructive/10'
+                            : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
+                      )}
+                    >
+                      {isActive && (
+                        <div
+                          className={cn(
+                            'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
+                            isTrash ? 'bg-destructive' : 'bg-primary',
+                          )}
+                        />
+                      )}
+                      <Icon
+                        className={cn(
+                          'h-[18px] w-[18px] shrink-0 transition-colors',
+                          isTrash
+                            ? 'text-destructive'
+                            : isActive
+                              ? 'text-primary'
+                              : 'text-foreground/70 group-hover:text-foreground',
                         )}
                       />
-                    )}
-                    <Icon
-                      className={cn(
-                        'h-[18px] w-[18px] shrink-0 transition-colors',
-                        isTrash
-                          ? 'text-destructive'
-                          : isActive
-                            ? 'text-primary'
-                            : 'text-foreground/70 group-hover:text-foreground',
-                      )}
-                    />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  )}
                   {showDivider && (
                     <div className="my-2 border-t border-border/40" />
                   )}
@@ -426,13 +521,9 @@ export function DashboardSidebar({
             })}
           </nav>
 
-          {/* ============================================================
-              Section 2: Teams dropdown
-          ============================================================ */}
           {accountId && (
             <>
               <div className="border-t border-border/50" />
-
               {!collapsed && (
                 <div className="py-3 px-3">
                   <button
@@ -452,7 +543,6 @@ export function DashboardSidebar({
                       )}
                     />
                     <span className="flex-1">Teams</span>
-
                     {teams.length > 0 && (
                       <span
                         className={cn(
@@ -465,7 +555,6 @@ export function DashboardSidebar({
                         {teams.length}
                       </span>
                     )}
-
                     <ChevronDown
                       className={cn(
                         'h-4 w-4 shrink-0 transition-transform',
@@ -511,9 +600,7 @@ export function DashboardSidebar({
                                     className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary"
                                   />
                                 )}
-
                                 {renderAccountLogo(teamAccount, 24)}
-
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate">
                                     {team.display_name || team.name}
@@ -529,7 +616,6 @@ export function DashboardSidebar({
                                     {label}
                                   </span>
                                 </span>
-
                                 {isActive && (
                                   <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
                                 )}
@@ -549,7 +635,6 @@ export function DashboardSidebar({
                             <span>Team settings</span>
                           </Link>
                         )}
-
                         {teamId && (
                           <button
                             type="button"
@@ -560,7 +645,6 @@ export function DashboardSidebar({
                             <span>Invite member</span>
                           </button>
                         )}
-
                         <Link
                           href={`${accountBase}/teams/new`}
                           className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
@@ -568,7 +652,6 @@ export function DashboardSidebar({
                           <Plus className="h-4 w-4 shrink-0" />
                           <span>New team</span>
                         </Link>
-
                         <Link
                           href="/accounts"
                           className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
@@ -603,9 +686,6 @@ export function DashboardSidebar({
             </>
           )}
 
-          {/* ============================================================
-              Section 3: global actions
-          ============================================================ */}
           <div className="border-t border-border/50" />
           <div className={cn('py-3 space-y-0.5', collapsed ? 'px-2' : 'px-3')}>
             {accountId && (

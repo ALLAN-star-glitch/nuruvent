@@ -29,15 +29,13 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
         onCollapseChange={setCollapsed}
       />
 
-      {/* Spacer that adjusts based on sidebar state */}
       <div
         className={`hidden md:block flex-shrink-0 transition-all duration-300 ${
           collapsed ? 'w-[110px]' : 'w-[270px]'
         }`}
       />
 
-      {/* Single source of padding for every page under (dashboard) */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 pb-20 md:px-8 md:py-8">
+      <main className="flex-1 min-w-0 px-4 py-6 pb-20 md:px-8 md:py-8">
         {children}
       </main>
 

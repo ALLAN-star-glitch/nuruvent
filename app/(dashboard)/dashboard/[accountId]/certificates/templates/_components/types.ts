@@ -7,26 +7,26 @@ export interface TemplateFormState {
   description: string;
 
   /**
+   * The template's actual ID when editing, or a temporary client-side
+   * UUID when creating a new template. Used to build upload paths so
+   * files can be associated with the template before it's saved.
+   */
+  templateId: string;
+
+  /**
    * ID of the chosen system-tier template. Determines the certificate
-   * price. The organizer picks from Nuruvent's tiers — they cannot
-   * enter a custom price.
+   * price.
    */
   tierTemplateId: string;
 
   /**
    * System slug of the chosen tier ('default' | 'professional' |
-   * 'premium'), or '' when no tier is set. Drives UI gating: fields
-   * not permitted by the tier are disabled in the editor. The backend
-   * enforces the same rules on save.
+   * 'premium'), or '' when no tier is set.
    */
   tierSlug: string;
 
   /**
-   * Snapshot of the chosen tier's price in minor units, taken at the
-   * moment the organizer selects the tier. Sent to the API as
-   * price_minor. Snapshotting (rather than referencing the tier
-   * template) means a later tier-price change doesn't retroactively
-   * alter what an existing template costs.
+   * Snapshot of the chosen tier's price in minor units.
    */
   priceMinor: number;
 
@@ -70,6 +70,7 @@ export const EMPTY_DESIGN: CertificateTemplateDesign = {
 export const EMPTY_FORM: TemplateFormState = {
   name: '',
   description: '',
+  templateId: '',
   tierTemplateId: '',
   tierSlug: '',
   priceMinor: 0,

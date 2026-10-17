@@ -1,11 +1,11 @@
-// app/(dashboard)/dashboard/[accountId]/certificates/templates/page.tsx
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
@@ -18,6 +18,7 @@ import {
   useListCertificateTemplatesQuery,
   useSetDefaultCertificateTemplateMutation,
 } from '@/lib/store/api/certificatesApi';
+import { useGetMyMembershipQuery } from '@/lib/store/api/accountsApi';
 
 import { DeleteTemplateDialog } from './_components/DeleteTemplateDialog';
 import { TemplateEmpty } from './_components/TemplateEmpty';
@@ -39,12 +40,15 @@ export default function TemplatesPage() {
   );
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useListCertificateTemplatesQuery(accountId);
+  const { data, isLoading, isFetching, refetch } = useListCertificateTemplatesQuery(accountId);
+  
+  // Get the current user's role in this account.
+  // If they are an account_admin, we allow them to SEE the "New System Template" button.
+  // The backend will ultimately block non-platform-admins anyway.
+  const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
+    skip: !accountId,
+  });
+  const isAccountAdmin = myMembership?.role === 'account_admin';
 
   const [setDefault] = useSetDefaultCertificateTemplateMutation();
 
@@ -68,7 +72,6 @@ export default function TemplatesPage() {
   const systemCount = allTemplates.filter((t) => t.is_system).length;
 
   const handleEdit = (t: CertificateTemplate) => {
-    if (t.is_system) return; // system templates are immutable
     router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
   };
 
@@ -121,22 +124,39 @@ export default function TemplatesPage() {
               />
             </div>
 
-            <Select value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
-              <SelectTrigger className="hidden cursor-pointer sm:flex">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">
-                  All templates
-                </SelectItem>
-                <SelectItem value="mine" className="cursor-pointer">
-                  My templates
-                </SelectItem>
-                <SelectItem value="system" className="cursor-pointer">
-                  System templates
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              {/* Show button if on System tab AND they are an account admin */}
+              {tab === 'system' && isAccountAdmin && (
+                <Button
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/${accountId}/certificates/templates/new-system`,
+                    )
+                  }
+                  className="cursor-pointer"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New System Template
+                </Button>
+              )}
+
+              <Select value={tab} onValueChange={(v) => setTab(v as FilterTab)}>
+                <SelectTrigger className="hidden cursor-pointer sm:flex">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="cursor-pointer">
+                    All templates
+                  </SelectItem>
+                  <SelectItem value="mine" className="cursor-pointer">
+                    My templates
+                  </SelectItem>
+                  <SelectItem value="system" className="cursor-pointer">
+                    System templates
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -173,10 +193,6 @@ export default function TemplatesPage() {
     </div>
   );
 }
-
-// ============================================================
-// TAB BUTTON
-// ============================================================
 
 function TabButton({
   active,

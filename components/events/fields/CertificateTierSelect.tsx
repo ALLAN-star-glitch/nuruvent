@@ -2,8 +2,7 @@
 
 'use client';
 
-import { AlertCircle } from 'lucide-react';
-
+import { AlertCircle, Sparkles } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -17,27 +16,19 @@ import { useListCertificateTemplatesQuery } from '@/lib/store/api/certificatesAp
 interface Props {
   accountId: string;
   value: string | undefined;
-  /**
-   * Called with the chosen tier's system-template ID, price (minor
-   * units), and system slug. The slug drives UI gating in the design
-   * form — 'default' | 'professional' | 'premium'.
-   */
   onChange: (systemTemplateId: string, priceMinor: number, slug: string) => void;
   error?: string;
   disabled?: boolean;
+  fallbackPriceMinor?: number;
 }
 
-/**
- * Dropdown over Nuruvent's system tiers. Used by the template editor.
- * The organizer chooses a tier; the tier's price is what they'll pay
- * per certificate. They cannot enter a custom price.
- */
 export function CertificateTierSelect({
   accountId,
   value,
   onChange,
   error,
   disabled,
+  fallbackPriceMinor,
 }: Props) {
   const { data, isLoading } = useListCertificateTemplatesQuery(accountId, {
     skip: !accountId,
@@ -47,54 +38,54 @@ export function CertificateTierSelect({
     .filter((t) => t.is_system)
     .sort((a, b) => (a.price_minor ?? 0) - (b.price_minor ?? 0));
 
-  if (isLoading) {
-    return (
-      <p className="text-xs text-muted-foreground">Loading tiers…</p>
-    );
-  }
+  if (isLoading) return <p className="text-xs text-muted-foreground">Loading tiers…</p>;
+  if (tiers.length === 0) return <p className="text-xs text-muted-foreground">No certificate tiers available.</p>;
 
-  if (tiers.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        No certificate tiers available. Contact support.
-      </p>
-    );
+  let displayValue = value;
+  if (!displayValue && fallbackPriceMinor) {
+    const matched = tiers.find((t) => t.price_minor === fallbackPriceMinor);
+    if (matched) displayValue = matched.id;
   }
 
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor="tpl-tier" className="text-sm">
-        Certificate tier
-      </Label>
+    <div className="space-y-3">
+      <div>
+        <Label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Step 1: Choose a Tier
+        </Label>
+      </div>
+      
       <Select
-        value={value ?? ''}
+        value={displayValue ?? ''}
         disabled={disabled}
         onValueChange={(id) => {
           const tier = tiers.find((t) => t.id === id);
           if (tier) {
-            onChange(
-              id,
-              tier.price_minor ?? 0,
-              tier.system_slug ?? '',
-            );
+            onChange(id, tier.price_minor ?? 0, tier.system_slug ?? '');
           }
         }}
       >
-        <SelectTrigger id="tpl-tier" className="cursor-pointer">
-          <SelectValue placeholder="Choose a tier" />
+        <SelectTrigger 
+          id="tpl-tier" 
+          className={`cursor-pointer h-12 rounded-xl text-base ${displayValue ? 'border-primary/50 bg-primary/5' : 'border-primary/30'}`}
+        >
+          <SelectValue placeholder="Choose a tier to continue..." />
         </SelectTrigger>
         <SelectContent>
           {tiers.map((t) => (
-            <SelectItem key={t.id} value={t.id} className="cursor-pointer">
-              {t.name} — KES {((t.price_minor ?? 0) / 100).toFixed(0)}
+            <SelectItem key={t.id} value={t.id} className="cursor-pointer py-3">
+              <div className="flex w-full items-center justify-between gap-8">
+                <span className="font-medium">{t.name}</span>
+                <span className="font-bold text-primary">
+                  KES {((t.price_minor ?? 0) / 100).toFixed(0)}
+                </span>
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <p className="text-[11px] text-muted-foreground">
-        Charged to you per certificate issued. Attendees don&apos;t see
-        this — include it in your ticket price.
-      </p>
+      
       {error && (
         <p className="flex items-center gap-1 text-xs text-destructive">
           <AlertCircle className="h-3 w-3" />

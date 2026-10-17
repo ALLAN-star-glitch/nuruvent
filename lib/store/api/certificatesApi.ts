@@ -1,9 +1,17 @@
 // lib/store/api/certificatesApi.ts
 
-import { IssueCertificatesResponse, IssueCertificatesRequest, CertificateListResponse, ListCertificatesParams, VerifyCertificateResponse, CertificateTemplateListResponse, CreateCertificateTemplateRequest, UpdateCertificateTemplateRequest } from '@/lib/types/certificates';
+import { 
+  IssueCertificatesResponse, 
+  IssueCertificatesRequest, 
+  CertificateListResponse, 
+  ListCertificatesParams, 
+  VerifyCertificateResponse, 
+  CertificateTemplateListResponse, 
+  CreateCertificateTemplateRequest, 
+  UpdateCertificateTemplateRequest 
+} from '@/lib/types/certificates';
 import { api } from './baseApi';
 import type { BaseResponse, CertificateTemplate } from '@/lib/types/events';
-
 
 export const certificatesApi = api.injectEndpoints({
   overrideExisting: true,
@@ -186,7 +194,7 @@ export const certificatesApi = api.injectEndpoints({
     }),
 
     // ============================================================
-    // TEMPLATES
+    // TEMPLATES (Account-scoped)
     // ============================================================
 
     /** GET /certificate-templates?account_id=... */
@@ -271,6 +279,110 @@ export const certificatesApi = api.injectEndpoints({
       }),
       invalidatesTags: ['CertificateTemplates'],
     }),
+
+    // ============================================================
+    // TEMPLATES (System/Admin scoped)
+    // ============================================================
+
+    /** GET /admin/certificate-templates */
+    listSystemTemplates: builder.query<
+      BaseResponse<CertificateTemplateListResponse>,
+      void
+    >({
+      query: () => ({
+        url: '/admin/certificate-templates',
+        method: 'GET',
+      }),
+      providesTags: (result) => {
+        const base: { type: 'CertificateTemplates'; id: string }[] = [
+          { type: 'CertificateTemplates', id: 'SYSTEM' },
+        ];
+        if (result?.data?.templates) {
+          return [
+            ...base,
+            ...result.data.templates.map((t) => ({
+              type: 'CertificateTemplates' as const,
+              id: t.id,
+            })),
+          ];
+        }
+        return base;
+      },
+    }),
+
+    /** POST /admin/certificate-templates */
+    createSystemTemplate: builder.mutation<
+      BaseResponse<CertificateTemplate>,
+      Omit<CreateCertificateTemplateRequest, 'account_id'>
+    >({
+      query: (body) => ({
+        url: '/admin/certificate-templates',
+        method: 'POST',
+        body: { ...body, is_system: true },
+      }),
+      invalidatesTags: [{ type: 'CertificateTemplates', id: 'SYSTEM' }],
+    }),
+
+    /** PUT /admin/certificate-templates/:id */
+    updateSystemTemplate: builder.mutation<
+      BaseResponse<CertificateTemplate>,
+      { templateId: string; body: UpdateCertificateTemplateRequest }
+    >({
+      query: ({ templateId, body }) => ({
+        url: `/admin/certificate-templates/${templateId}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: (_r, _e, { templateId }) => [
+        { type: 'CertificateTemplates', id: 'SYSTEM' },
+        { type: 'CertificateTemplates', id: templateId },
+      ],
+    }),
+
+    /** DELETE /admin/certificate-templates/:id */
+    deleteSystemTemplate: builder.mutation<
+      BaseResponse<void>,
+      string
+    >({
+      query: (templateId) => ({
+        url: `/admin/certificate-templates/${templateId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: (_r, _e, templateId) => [
+        { type: 'CertificateTemplates', id: 'SYSTEM' },
+        { type: 'CertificateTemplates', id: templateId },
+      ],
+    }),
+
+    // ============================================================
+    // MEDIA (Upload / Delete)
+    // ============================================================
+
+    uploadTemplateImage: builder.mutation<
+      { success: boolean; message: string; data: { url: string } },
+      { templateId: string; file: File }
+    >({
+      query: ({ templateId, file }) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return {
+          url: `/certificate-templates/${templateId}/upload`,
+          method: 'POST',
+          body: formData,
+        };
+      },
+    }),
+
+    deleteTemplateImage: builder.mutation<
+      { success: boolean; message: string },
+      { url: string }
+    >({
+      query: ({ url }) => ({
+        url: `/certificate-templates/media`,
+        method: 'DELETE',
+        body: { url },
+      }),
+    }),
   }),
 });
 
@@ -297,10 +409,20 @@ export const {
   useRevokeCertificateMutation,
   useDownloadCertificateMutation,
 
-  // Templates
+  // Templates (Account)
   useListCertificateTemplatesQuery,
   useCreateCertificateTemplateMutation,
   useUpdateCertificateTemplateMutation,
   useDeleteCertificateTemplateMutation,
   useSetDefaultCertificateTemplateMutation,
+
+  // Templates (Admin/System)
+  useListSystemTemplatesQuery,
+  useCreateSystemTemplateMutation,
+  useUpdateSystemTemplateMutation,
+  useDeleteSystemTemplateMutation,
+
+  // Media
+  useUploadTemplateImageMutation,
+  useDeleteTemplateImageMutation,
 } = certificatesApi;

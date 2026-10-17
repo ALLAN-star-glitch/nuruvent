@@ -7,8 +7,8 @@ import { QrCode } from 'lucide-react';
 
 interface Props {
   design: CertificateTemplateDesign;
-  /** Optional — pass `sm` for the compact card mini-preview. */
   size?: 'sm' | 'md' | 'lg';
+  tier?: string; // <-- ADD THIS
 }
 
 const SAMPLE = {
@@ -87,13 +87,13 @@ const SIZES = {
   },
 } as const;
 
-export function TemplatePreview({ design, size = 'md' }: Props) {
+export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
   const s = SIZES[size];
 
-  const bg = design.background_color ?? '#FFFFFF';
-  const text = design.text_color ?? '#1A1A1A';
-  const accent = design.accent_color ?? '#0A6EBD';
-  const borderColor = design.border_color ?? accent;
+  const bg = design.background_color || '#FFFFFF';
+  const text = design.text_color || '#1A1A1A';
+  const accent = design.accent_color || '#0A6EBD';
+  const borderColor = design.border_color || accent;
   const muted = '#808080';
 
   const title = substitute(design.title_text, SAMPLE) || 'Certificate of Completion';
@@ -103,11 +103,27 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
     `has successfully completed ${SAMPLE.context_title} on ${SAMPLE.context_date}.`;
   const footer = substitute(design.footer_text, SAMPLE) || 'Verify at nuruvent.com/verify';
   const watermark = substitute(design.watermark_text, SAMPLE);
+  
   const signatoryName = design.signatory_name ?? '';
   const signatoryTitle = design.signatory_title ?? '';
 
-  const hasBorder = design.border_style === 'single' || design.border_style === 'double';
-  const isDouble = design.border_style === 'double';
+  // TIER FILTERING LOGIC
+  const isPremium = tier === 'premium' || tier === '';
+  const isPro = tier === 'professional' || isPremium;
+
+  const showLogo = isPro && !!design.logo_url;
+  const showSignature = isPro && !!design.signature_url;
+  const showSigLine = isPro && !!design.signature_line;
+  const showSigName = isPro && !!signatoryName;
+  const showSigTitle = isPro && !!signatoryTitle;
+  const showVerifyBadge = isPro && !!design.verify_badge;
+
+  const showSeal = isPremium && !!design.seal_url;
+  const showWatermark = isPremium && !!watermark;
+  const showBackground = isPremium && !!design.background_url;
+
+  const hasBorder = isPremium && (design.border_style === 'single' || design.border_style === 'double');
+  const isDouble = isPremium && design.border_style === 'double';
 
   return (
     <div
@@ -119,7 +135,7 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
       }}
     >
       {/* Background image (premium) */}
-      {design.background_url && (
+      {showBackground && (
         <div
           className="absolute inset-0 bg-cover bg-center opacity-15"
           style={{ backgroundImage: `url(${design.background_url})` }}
@@ -142,35 +158,24 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
         </>
       )}
 
-      {/* Flow content — no justify-center, so nothing overlaps */}
-      <div
-        className={`relative flex h-full flex-col items-center ${s.gap} ${s.pad}`}
-      >
+      <div className={`relative flex h-full flex-col items-center ${s.gap} ${s.pad}`}>
         {/* Logo + seal */}
-        {(design.logo_url || design.seal_url) && (
+        {(showLogo || showSeal) && (
           <div className="absolute inset-x-6 top-4 flex items-start justify-between">
-            {design.logo_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
+            {showLogo ? (
               <img
                 src={design.logo_url}
                 alt="Logo"
                 className={`${s.logo} w-auto max-w-[100px] object-contain`}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
               />
             ) : (
               <span />
             )}
-            {design.seal_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
+            {showSeal ? (
               <img
                 src={design.seal_url}
                 alt="Seal"
                 className={`${s.logo} w-auto max-w-[100px] object-contain`}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
               />
             ) : (
               <span />
@@ -178,7 +183,6 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
           </div>
         )}
 
-        {/* Top spacer — pushes content down from logo */}
         <div className="h-2" />
 
         {/* Title */}
@@ -196,7 +200,7 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
         <p className={`${s.subtitle} text-center`}>{subtitle}</p>
 
         {/* Watermark (premium) */}
-        {watermark && (
+        {showWatermark && (
           <p
             className={`${s.watermark} text-center uppercase tracking-widest opacity-60`}
             style={{ color: text }}
@@ -221,33 +225,29 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
           {body}
         </p>
 
-        {/* Bottom block — pushed to the bottom by mt-auto */}
+        {/* Bottom block */}
         <div className="mt-auto w-full flex items-end justify-between pt-2">
           {/* Left: signature */}
           <div className="flex flex-col items-start">
-            {design.signature_url && (
-              /* eslint-disable-next-line @next/next/no-img-element */
+            {showSignature && (
               <img
                 src={design.signature_url}
                 alt="Signature"
                 className={`${s.sig} mb-1 w-auto object-contain`}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
               />
             )}
-            {design.signature_line && (
+            {showSigLine && (
               <div
                 className="mb-1 w-16 sm:w-20 border-t"
                 style={{ borderColor: text + '60' }}
               />
             )}
-            {signatoryName && (
+            {showSigName && (
               <p className={`${s.sigName} font-semibold leading-tight`}>
                 {signatoryName}
               </p>
             )}
-            {signatoryTitle && (
+            {showSigTitle && (
               <p className={`${s.sigTitle} leading-tight`} style={{ color: muted }}>
                 {signatoryTitle}
               </p>
@@ -262,7 +262,7 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
             >
               <QrCode className={s.qrIcon} style={{ color: accent }} />
             </div>
-            {design.verify_badge && (
+            {showVerifyBadge && (
               <span
                 className={`${s.verified} font-bold uppercase tracking-wide`}
                 style={{ color: accent }}
@@ -273,7 +273,7 @@ export function TemplatePreview({ design, size = 'md' }: Props) {
           </div>
         </div>
 
-        {/* Footer — in flow, not absolute */}
+        {/* Footer */}
         {footer && (
           <p className={`text-center ${s.footer} pt-1`} style={{ color: muted }}>
             {footer}
