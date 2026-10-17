@@ -8,7 +8,7 @@ import { QrCode } from 'lucide-react';
 interface Props {
   design: CertificateTemplateDesign;
   size?: 'sm' | 'md' | 'lg';
-  tier?: string; // <-- ADD THIS
+  tier?: string;
 }
 
 const SAMPLE = {
@@ -45,7 +45,7 @@ const SIZES = {
     qrIcon: 'h-5 w-5',
     gap: 'gap-1',
     verified: 'text-[6px]',
-    watermark: 'text-[7px]',
+    watermark: 'text-5xl',
   },
   md: {
     pad: 'p-6',
@@ -64,7 +64,7 @@ const SIZES = {
     qrIcon: 'h-8 w-8',
     gap: 'gap-2',
     verified: 'text-[9px]',
-    watermark: 'text-[11px]',
+    watermark: 'text-7xl',
   },
   lg: {
     pad: 'p-8 sm:p-10',
@@ -83,7 +83,7 @@ const SIZES = {
     qrIcon: 'h-8 sm:h-11 w-8 sm:w-11',
     gap: 'gap-2 sm:gap-3',
     verified: 'text-[10px] sm:text-xs',
-    watermark: 'text-xs sm:text-sm',
+    watermark: 'text-8xl',
   },
 } as const;
 
@@ -103,11 +103,10 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
     `has successfully completed ${SAMPLE.context_title} on ${SAMPLE.context_date}.`;
   const footer = substitute(design.footer_text, SAMPLE) || 'Verify at nuruvent.com/verify';
   const watermark = substitute(design.watermark_text, SAMPLE);
-  
   const signatoryName = design.signatory_name ?? '';
   const signatoryTitle = design.signatory_title ?? '';
 
-  // TIER FILTERING LOGIC
+  // Tier filtering (matches the backend's tier restrictions)
   const isPremium = tier === 'premium' || tier === '';
   const isPro = tier === 'professional' || isPremium;
 
@@ -119,10 +118,12 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
   const showVerifyBadge = isPro && !!design.verify_badge;
 
   const showSeal = isPremium && !!design.seal_url;
-  const showWatermark = isPremium && !!watermark;
   const showBackground = isPremium && !!design.background_url;
+  const showWatermark = isPremium && !!watermark;
 
-  const hasBorder = isPremium && (design.border_style === 'single' || design.border_style === 'double');
+  const hasBorder =
+    isPremium &&
+    (design.border_style === 'single' || design.border_style === 'double');
   const isDouble = isPremium && design.border_style === 'double';
 
   return (
@@ -134,6 +135,28 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
         fontFamily: design.font_family || 'Georgia',
       }}
     >
+      {/* ============================================ */}
+      {/* WATERMARK — absolute, diagonal, faint         */}
+      {/* ============================================ */}
+      {showWatermark && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          style={{ zIndex: 0 }}
+        >
+          <span
+            className={`${s.watermark} whitespace-nowrap font-bold uppercase tracking-[0.15em]`}
+            style={{
+              color: accent,
+              opacity: 0.06,
+              transform: 'rotate(-25deg)',
+              fontFamily: "'Playfair Display', Georgia, serif",
+            }}
+          >
+            {watermark}
+          </span>
+        </div>
+      )}
+
       {/* Background image (premium) */}
       {showBackground && (
         <div
@@ -158,24 +181,36 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
         </>
       )}
 
-      <div className={`relative flex h-full flex-col items-center ${s.gap} ${s.pad}`}>
+      {/* Flow content */}
+      <div
+        className={`relative flex h-full flex-col items-center ${s.gap} ${s.pad}`}
+        style={{ zIndex: 2 }}
+      >
         {/* Logo + seal */}
         {(showLogo || showSeal) && (
           <div className="absolute inset-x-6 top-4 flex items-start justify-between">
             {showLogo ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={design.logo_url}
                 alt="Logo"
                 className={`${s.logo} w-auto max-w-[100px] object-contain`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             ) : (
               <span />
             )}
             {showSeal ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={design.seal_url}
                 alt="Seal"
                 className={`${s.logo} w-auto max-w-[100px] object-contain`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             ) : (
               <span />
@@ -199,16 +234,6 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
         {/* Subtitle */}
         <p className={`${s.subtitle} text-center`}>{subtitle}</p>
 
-        {/* Watermark (premium) */}
-        {showWatermark && (
-          <p
-            className={`${s.watermark} text-center uppercase tracking-widest opacity-60`}
-            style={{ color: text }}
-          >
-            {watermark}
-          </p>
-        )}
-
         {/* Recipient name */}
         <p
           className={`${s.name} text-center font-bold leading-tight`}
@@ -227,13 +252,16 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
 
         {/* Bottom block */}
         <div className="mt-auto w-full flex items-end justify-between pt-2">
-          {/* Left: signature */}
           <div className="flex flex-col items-start">
             {showSignature && (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={design.signature_url}
                 alt="Signature"
                 className={`${s.sig} mb-1 w-auto object-contain`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             )}
             {showSigLine && (
@@ -254,7 +282,6 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
             )}
           </div>
 
-          {/* Right: QR + verified badge */}
           <div className="flex flex-col items-center gap-1">
             <div
               className={`${s.qr} flex items-center justify-center rounded bg-white shadow-sm`}
@@ -273,7 +300,6 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
           </div>
         </div>
 
-        {/* Footer */}
         {footer && (
           <p className={`text-center ${s.footer} pt-1`} style={{ color: muted }}>
             {footer}
