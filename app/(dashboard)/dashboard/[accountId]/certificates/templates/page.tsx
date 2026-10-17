@@ -1,3 +1,5 @@
+// app/(dashboard)/dashboard/[accountId]/certificates/templates/page.tsx
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -17,6 +19,7 @@ import {
 import {
   useListCertificateTemplatesQuery,
   useSetDefaultCertificateTemplateMutation,
+  useDeleteSystemTemplateMutation,
 } from '@/lib/store/api/certificatesApi';
 import { useGetMyMembershipQuery } from '@/lib/store/api/accountsApi';
 
@@ -35,22 +38,19 @@ export default function TemplatesPage() {
   const router = useRouter();
 
   const [tab, setTab] = useState<FilterTab>('all');
-  const [deleteTarget, setDeleteTarget] = useState<CertificateTemplate | null>(
-    null,
-  );
+  const [deleteTarget, setDeleteTarget] = useState<CertificateTemplate | null>(null);
+  const [systemDeleteTarget, setSystemDeleteTarget] = useState<CertificateTemplate | null>(null);
   const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useListCertificateTemplatesQuery(accountId);
-  
-  // Get the current user's role in this account.
-  // If they are an account_admin, we allow them to SEE the "New System Template" button.
-  // The backend will ultimately block non-platform-admins anyway.
+
   const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
     skip: !accountId,
   });
   const isAccountAdmin = myMembership?.role === 'account_admin';
 
   const [setDefault] = useSetDefaultCertificateTemplateMutation();
+  const [deleteSystem, { isLoading: isDeletingSystem }] = useDeleteSystemTemplateMutation();
 
   const allTemplates = data?.data?.templates ?? [];
 
@@ -92,6 +92,24 @@ export default function TemplatesPage() {
     }
   };
 
+  const handleDeleteSystem = async () => {
+    if (!systemDeleteTarget) return;
+    try {
+      await deleteSystem(systemDeleteTarget.id).unwrap();
+      toast.success(`"${systemDeleteTarget.name}" deleted`);
+      setSystemDeleteTarget(null);
+      refetch();
+    } catch (err) {
+      const msg =
+        (err as { data?: { message?: string } })?.data?.message ??
+        'Failed to delete system template';
+      toast.error(msg);
+    }
+  };
+
+  // Pass admin context down to the grid so it can render admin-only actions.
+  const adminMode = isAccountAdmin && tab === 'system';
+
   return (
     <div className="space-y-6 pb-20">
       <TemplatesHeader
@@ -125,7 +143,6 @@ export default function TemplatesPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Show button if on System tab AND they are an account admin */}
               {tab === 'system' && isAccountAdmin && (
                 <Button
                   onClick={() =>
@@ -178,18 +195,63 @@ export default function TemplatesPage() {
           templates={filtered}
           onEdit={handleEdit}
           onDelete={(t) => {
-            if (!t.is_system) setDeleteTarget(t);
+            if (t.is_system) {
+              if (adminMode) setSystemDeleteTarget(t);
+            } else {
+              setDeleteTarget(t);
+            }
           }}
           onSetDefault={handleSetDefault}
           settingDefaultId={settingDefaultId}
+          adminMode={adminMode}
         />
       )}
 
+      {/* Existing delete dialog for account templates */}
       <DeleteTemplateDialog
         template={deleteTarget}
         onOpenChange={(v) => !v && setDeleteTarget(null)}
         onDeleted={() => refetch()}
       />
+
+      {/* Confirmation dialog for system template deletion */}
+      {systemDeleteTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !isDeletingSystem && setSystemDeleteTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-lg font-semibold">
+              Delete &quot;{systemDeleteTarget.name}&quot;?
+            </h2>
+            <p className="mb-6 text-sm text-muted-foreground">
+              This will remove the system template from every organizer&apos;s tier picker.
+              Existing certificates issued with this template are not affected.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setSystemDeleteTarget(null)}
+                disabled={isDeletingSystem}
+                className="cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSystem}
+                disabled={isDeletingSystem}
+                className="cursor-pointer"
+              >
+                {isDeletingSystem ? 'Deleting…' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

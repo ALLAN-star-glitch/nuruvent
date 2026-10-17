@@ -42,6 +42,8 @@ interface Props {
   onDelete: (t: CertificateTemplate) => void;
   onSetDefault: (t: CertificateTemplate) => void;
   isSettingDefault?: boolean;
+  /** When true, system templates get edit/delete actions too. */
+  adminMode?: boolean;
 }
 
 function formatPrice(minor: number | null | undefined): string {
@@ -56,10 +58,19 @@ export function TemplateCard({
   onDelete,
   onSetDefault,
   isSettingDefault = false,
+  adminMode = false,
 }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const design = template.design ?? {};
+
+  // Whether the current user can edit/delete this specific template.
+  // - Account templates: yes, if the caller is in an account-admin context
+  //   (which is what TemplatesPage already guarantees by only rendering
+  //   these actions in "mine" tab for admins — see page.tsx).
+  // - System templates: only in adminMode.
+  const canEdit = template.is_system ? adminMode : true;
+  const canDelete = template.is_system ? adminMode : true;
 
   return (
     <>
@@ -125,7 +136,7 @@ export function TemplateCard({
 
           {/* Actions */}
           <div className="mt-auto flex items-center gap-2 pt-1">
-            {template.is_system ? (
+            {!canEdit && !canDelete ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -137,15 +148,17 @@ export function TemplateCard({
               </Button>
             ) : (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 cursor-pointer"
-                  onClick={() => onEdit(template)}
-                >
-                  <Pencil className="mr-2 h-3.5 w-3.5" />
-                  Edit
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 cursor-pointer"
+                    onClick={() => onEdit(template)}
+                  >
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                )}
 
                 <Button
                   variant="ghost"
@@ -157,7 +170,7 @@ export function TemplateCard({
                   <Eye className="h-4 w-4" />
                 </Button>
 
-                {!template.is_default && (
+                {!template.is_system && !template.is_default && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -183,7 +196,7 @@ export function TemplateCard({
                   <DropdownMenuContent align="end" className="w-48">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    {!template.is_default && (
+                    {!template.is_system && !template.is_default && (
                       <DropdownMenuItem
                         className="cursor-pointer"
                         onClick={() => onSetDefault(template)}
@@ -192,21 +205,27 @@ export function TemplateCard({
                         Set as default
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem
-                      className="cursor-pointer"
-                      onClick={() => onEdit(template)}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="cursor-pointer text-destructive focus:text-destructive"
-                      onClick={() => onDelete(template)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
+                    {canEdit && (
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={() => onEdit(template)}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                          onClick={() => onDelete(template)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
@@ -214,7 +233,7 @@ export function TemplateCard({
           </div>
 
           {/* System note */}
-          {template.is_system && (
+          {template.is_system && !adminMode && (
             <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Check className="h-3 w-3" />
               Provided by Nuruvent — read-only
@@ -223,7 +242,7 @@ export function TemplateCard({
         </CardContent>
       </Card>
 
-      {/* Preview dialog — explicit wide width, overrides sm:max-w-sm */}
+      {/* Preview dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-h-[92vh] w-[min(95vw,1100px)] max-w-none overflow-y-auto p-6 sm:max-w-[1100px]">
           <DialogHeader>
@@ -234,7 +253,7 @@ export function TemplateCard({
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 w-full">
-            <TemplatePreview design={design} size="lg" />
+            <TemplatePreview design={design} size="lg" tier={template.is_system ? 'premium' : undefined} />
           </div>
         </DialogContent>
       </Dialog>

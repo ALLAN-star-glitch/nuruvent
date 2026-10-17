@@ -1,10 +1,7 @@
 // app/(dashboard)/dashboard/[accountId]/certificates/templates/_components/TemplatesGrid.tsx
 
-'use client';
-
-
-import { CertificateTemplate } from '@/lib/types/certificates';
 import { TemplateCard } from './TemplateCard';
+import { CertificateTemplate } from '@/lib/types/certificates';
 
 interface Props {
   templates: CertificateTemplate[];
@@ -12,6 +9,7 @@ interface Props {
   onDelete: (t: CertificateTemplate) => void;
   onSetDefault: (t: CertificateTemplate) => void;
   settingDefaultId?: string | null;
+  adminMode?: boolean;
 }
 
 export function TemplatesGrid({
@@ -20,9 +18,10 @@ export function TemplatesGrid({
   onDelete,
   onSetDefault,
   settingDefaultId,
+  adminMode = false,
 }: Props) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {templates.map((t) => (
         <TemplateCard
           key={t.id}
@@ -31,6 +30,7 @@ export function TemplatesGrid({
           onDelete={onDelete}
           onSetDefault={onSetDefault}
           isSettingDefault={settingDefaultId === t.id}
+          adminMode={adminMode}
         />
       ))}
     </div>
