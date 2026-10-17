@@ -44,6 +44,10 @@ export default function TemplatesPage() {
 
   const { data, isLoading, isFetching, refetch } = useListCertificateTemplatesQuery(accountId);
 
+  // Get the current user's role in this account.
+  // Account admins are also platform admins in our setup; non-admin
+  // organizers (trainers/learners) will get the customize flow instead
+  // of the direct edit flow.
   const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
     skip: !accountId,
   });
@@ -72,6 +76,20 @@ export default function TemplatesPage() {
   const systemCount = allTemplates.filter((t) => t.is_system).length;
 
   const handleEdit = (t: CertificateTemplate) => {
+    if (t.is_system) {
+      if (isAccountAdmin) {
+        // Admin: edit the system template in place
+        router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
+      } else {
+        // Organizer: fork to their own copy via customize flow
+        router.push(
+          `/dashboard/${accountId}/certificates/templates/customize-system/${t.id}`,
+        );
+      }
+      return;
+    }
+
+    // Account-owned template: normal edit
     router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
   };
 
@@ -214,7 +232,7 @@ export default function TemplatesPage() {
         onDeleted={() => refetch()}
       />
 
-      {/* Confirmation dialog for system template deletion */}
+      {/* Confirmation dialog for system template deletion (admin only) */}
       {systemDeleteTarget && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -228,8 +246,9 @@ export default function TemplatesPage() {
               Delete &quot;{systemDeleteTarget.name}&quot;?
             </h2>
             <p className="mb-6 text-sm text-muted-foreground">
-              This will remove the system template from every organizer&apos;s tier picker.
-              Existing certificates issued with this template are not affected.
+              This will remove the system template from every organizer&apos;s
+              tier picker. Existing certificates issued with this template
+              are not affected.
             </p>
             <div className="flex justify-end gap-2">
               <Button
