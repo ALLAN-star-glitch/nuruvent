@@ -266,44 +266,50 @@ export function TemplateEditor({
                     />
                   </div>
                 </div>
-              ) : forceTier ? (
-                /* Organizer customizing a system template: name + description only, tier locked */
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-primary mb-1">
+            ) : forceTier ? (
+              <div className="space-y-4">
+                {/* Locked tier — greyed out */}
+                <div className="rounded-lg border border-border bg-muted/40 p-4 select-none">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Tier (locked)
                     </p>
-                    <p className="text-lg font-semibold text-foreground capitalize">
-                      {forceTier.tierSlug || 'Custom'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Price: KES {(forceTier.priceMinor / 100).toFixed(2)}
-                    </p>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tpl-name">
-                      Template Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="tpl-name"
-                      value={form.name}
-                      onChange={(e) => setField('name', e.target.value)}
-                      placeholder="e.g. My Premium Template"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tpl-desc">Description</Label>
-                    <Textarea
-                      id="tpl-desc"
-                      value={form.description}
-                      onChange={(e) => setField('description', e.target.value)}
-                      placeholder="Optional description"
-                      rows={2}
-                    />
-                  </div>
+                  <p className="text-lg font-semibold text-foreground capitalize">
+                    {forceTier.tierSlug || 'Custom'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Price: KES {(forceTier.priceMinor / 100).toFixed(2)}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Inherited from the system template and cannot be changed.
+                  </p>
                 </div>
-              ) : (
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="tpl-name">
+                    Template Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="tpl-name"
+                    value={form.name}
+                    onChange={(e) => setField('name', e.target.value)}
+                    placeholder="e.g. My Premium Template"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="tpl-desc">Description</Label>
+                  <Textarea
+                    id="tpl-desc"
+                    value={form.description}
+                    onChange={(e) => setField('description', e.target.value)}
+                    placeholder="Optional description"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            ) : (
                 /* Normal account template: full tier picker */
                 <TemplateBasicsForm
                   accountId={accountId}

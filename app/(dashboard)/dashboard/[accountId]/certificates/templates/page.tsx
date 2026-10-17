@@ -76,22 +76,16 @@ export default function TemplatesPage() {
   const systemCount = allTemplates.filter((t) => t.is_system).length;
 
   const handleEdit = (t: CertificateTemplate) => {
-    if (t.is_system) {
-      if (isAccountAdmin) {
-        // Admin: edit the system template in place
-        router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
-      } else {
-        // Organizer: fork to their own copy via customize flow
-        router.push(
-          `/dashboard/${accountId}/certificates/templates/customize-system/${t.id}`,
-        );
-      }
-      return;
-    }
-
-    // Account-owned template: normal edit
-    router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
-  };
+  if (t.is_system) {
+    // Always go to customize. The customize page redirects admins to
+    // the in-place edit page if they turn out to be platform admins.
+    router.push(
+      `/dashboard/${accountId}/certificates/templates/customize-system/${t.id}`,
+    );
+    return;
+  }
+  router.push(`/dashboard/${accountId}/certificates/templates/${t.id}`);
+};
 
   const handleSetDefault = async (t: CertificateTemplate) => {
     if (t.is_system) return;

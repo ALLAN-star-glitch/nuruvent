@@ -2,17 +2,37 @@
 
 'use client';
 
-import { useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useMemo, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { useListCertificateTemplatesQuery } from '@/lib/store/api/certificatesApi';
+import {
+  useListCertificateTemplatesQuery,
+  useListSystemTemplatesQuery,
+} from '@/lib/store/api/certificatesApi';
 import { TemplateEditor } from '../../_components/TemplateEditor';
 
 export default function CustomizeSystemTemplatePage() {
   const params = useParams<{ accountId: string; templateId: string }>();
   const { accountId, templateId } = params;
+  const router = useRouter();
+
+  // Detect platform admin: if this succeeds, the user is a super_admin.
+  // If it 403s, they're an organizer → show the customize editor.
+  const { isSuccess: isPlatformAdmin, isLoading: isCheckingAdmin } =
+    useListSystemTemplatesQuery(undefined, {
+      refetchOnMountOrArgChange: false,
+    });
+
+  useEffect(() => {
+    if (isPlatformAdmin) {
+      // Admins edit system templates in place
+      router.replace(
+        `/dashboard/${accountId}/certificates/templates/${templateId}`,
+      );
+    }
+  }, [isPlatformAdmin, accountId, templateId, router]);
 
   const { data, isLoading } = useListCertificateTemplatesQuery(accountId, {
     refetchOnFocus: false,
@@ -25,13 +45,13 @@ export default function CustomizeSystemTemplatePage() {
     [data, templateId],
   );
 
-  if (isLoading && !data) {
+  if (isCheckingAdmin || (isLoading && !data)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Card className="border-border">
           <CardContent className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading template…
+            Loading…
           </CardContent>
         </Card>
       </div>
@@ -50,10 +70,6 @@ export default function CustomizeSystemTemplatePage() {
     );
   }
 
-  // Pre-fill the editor with a copy of the system template.
-  // - No `templateId` prop → saves as a NEW template
-  // - No `isAdmin` prop → saves as an account-owned template
-  // - `forceTier` → locks the tier selection to this system template
   return (
     <TemplateEditor
       key={`customize-${templateId}`}
