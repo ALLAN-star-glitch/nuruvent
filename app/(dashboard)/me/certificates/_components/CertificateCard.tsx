@@ -55,36 +55,47 @@ export function CertificateCard({ cert }: { cert: Certificate }) {
   const issuer = cert.metadata?.issuer_name ?? 'Nuruvent';
   const isRevoked = cert.status === 'revoked';
 
- const handleDownload = async () => {
-  setDownloading(true);
-  try {
-    const result = await downloadCertificate(cert.id).unwrap();
+  const handleDownload = async () => {
+    if (downloading) return;
 
-    // JSON response: { success, message, data: { url } } → open the URL
-    if (result && typeof result === 'object' && 'data' in result) {
-      const url = (result as { data: { url: string } }).data.url;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return;
+    // Open a blank tab synchronously — bypasses popup blockers
+    const popup = window.open('', '_blank');
+
+    setDownloading(true);
+    try {
+      let finalUrl: string | null = null;
+
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const result = await downloadCertificate(cert.id).unwrap();
+
+        if (result.status === 'ready' && result.url) {
+          finalUrl = result.url;
+          break;
+        }
+
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      if (!finalUrl) {
+        popup?.close();
+        toast.error('Certificate is taking too long. Try again in a moment.');
+        return;
+      }
+
+      if (popup && !popup.closed) {
+        popup.location.href = finalUrl;
+      } else {
+        window.open(finalUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      popup?.close();
+      const message =
+        err instanceof Error ? err.message : 'Failed to download certificate';
+      toast.error(message);
+    } finally {
+      setDownloading(false);
     }
-
-    // Blob → trigger browser download
-    const blob = result as Blob;
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = `certificate-${cert.verification_code}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(blobUrl);
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Failed to download certificate';
-    toast.error(message);
-  } finally {
-    setDownloading(false);
-  }
-};
+  };
 
   const handleCopyCode = async () => {
     try {
@@ -192,11 +203,16 @@ export function CertificateCard({ cert }: { cert: Certificate }) {
             disabled={downloading || isRevoked}
           >
             {downloading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Preparing…
+              </>
             ) : (
-              <Download className="mr-2 h-4 w-4" />
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </>
             )}
-            Download
           </Button>
           <TooltipProvider delayDuration={300}>
             <Tooltip>
