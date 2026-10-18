@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Grid3x3, List, Search, X } from 'lucide-react';
+import { Grid3X3, List, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,21 +18,26 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useGetEventAttendeesQuery } from '@/lib/store/api/attendanceApi';
-import { useDownloadCertificateMutation, useListAccountCertificatesQuery } from '@/lib/store/api/certificatesApi';
+import {
+  useDownloadCertificateMutation,
+  useListAccountCertificatesQuery,
+  useListCertificateTemplatesQuery,
+} from '@/lib/store/api/certificatesApi';
 
+// Reuse account-level components for consistent layout
 
 import { EventCertificatesEmpty } from './_components/EventCertificatesEmpty';
-import { EventCertificatesGrid } from './_components/EventCertificatesGrid';
 import { EventCertificatesHeader } from './_components/EventCertificatesHeader';
 import { EventCertificatesSkeleton } from './_components/EventCertificatesSkeleton';
 import { EventCertificatesStats } from './_components/EventCertificatesStats';
-import { EventCertificatesTable } from './_components/EventCertificatesTable';
 import { IssueBatchDialog } from './_components/IssueBatchDialog';
 import { RevokeCertificateDialog } from './_components/RevokeCertificateDialog';
 import { SendCertificateDialog } from './_components/SendCertificateDialog';
 
-import { Certificate } from '@/lib/types/certificates';
+import { Certificate, CertificateTemplate } from '@/lib/types/certificates';
 import { SortDirection, SortField, ViewMode } from './_components/types';
+import { AccountCertificatesGrid } from '../../../../certificates/_components/AccountCertificatesGrid';
+import { AccountCertificatesTable } from '../../../../certificates/_components/AccountCertificatesTable';
 
 export default function EventCertificatesPage() {
   const params = useParams<{
@@ -46,9 +51,10 @@ export default function EventCertificatesPage() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortField, setSortField] = useState<SortField>('issued_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [issueDialogOpen, setIssueDialogOpen] = useState(false);
   const [sendTarget, setSendTarget] = useState<Certificate | null>(null);
@@ -64,14 +70,24 @@ export default function EventCertificatesPage() {
     params: { context_id: eventId, limit: 500 },
   });
 
- const { data: attendeesData } = useGetEventAttendeesQuery({
-  eventId,
-  params: {
-    status: 'confirmed,full,partial,joined',  // ← add joined
-    page: 1,
-    page_size: 100,
-  },
-});
+  // Fetch templates for the grid previews
+  const { data: templatesData } = useListCertificateTemplatesQuery(accountId);
+  const templates = templatesData?.data?.templates ?? [];
+
+  const templatesById = useMemo(() => {
+    const map = new Map<string, CertificateTemplate>();
+    templates.forEach((t) => map.set(t.id, t));
+    return map;
+  }, [templates]);
+
+  const { data: attendeesData } = useGetEventAttendeesQuery({
+    eventId,
+    params: {
+      status: 'confirmed,full,partial,joined',
+      page: 1,
+      page_size: 100,
+    },
+  });
 
   const certificates = listData?.data?.certificates ?? [];
   const attendeeCount = attendeesData?.data?.total ?? 0;
@@ -141,31 +157,35 @@ export default function EventCertificatesPage() {
     }
   };
 
-const [downloadCertificate] = useDownloadCertificateMutation();
+  const [downloadCertificate] = useDownloadCertificateMutation();
 
-const handleDownload = async (cert: Certificate) => {
-  try {
-    const result = await downloadCertificate(cert.id).unwrap();
+  const handleDownload = async (cert: Certificate) => {
+    if (downloadingId) return;
+    setDownloadingId(cert.id);
+    try {
+      const result = await downloadCertificate(cert.id).unwrap();
 
-    if (result && typeof result === 'object' && 'data' in result) {
-      const url = (result as { data: { url: string } }).data.url;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return;
+      if (result && typeof result === 'object' && 'data' in result) {
+        const url = (result as { data: { url: string } }).data.url;
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      const blob = result as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${cert.verification_code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download certificate');
+    } finally {
+      setDownloadingId(null);
     }
-
-    const blob = result as Blob;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `certificate-${cert.verification_code}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch {
-    toast.error('Failed to download certificate');
-  }
-};
+  };
 
   const backHref = `/dashboard/${accountId}/${teamId}/events/${eventId}`;
 
@@ -191,10 +211,7 @@ const handleDownload = async (cert: Certificate) => {
       />
 
       {listLoading ? (
-        <EventCertificatesSkeleton
-          view={viewMode}
-          rows={6}
-        />
+        <EventCertificatesSkeleton view={viewMode} rows={6} />
       ) : (
         <>
           <EventCertificatesStats
@@ -207,6 +224,35 @@ const handleDownload = async (cert: Certificate) => {
           {certificates.length > 0 && (
             <Card className="border-border">
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                {/* View toggle (Grid / Table) — LEFT */}
+                <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'grid'
+                        ? 'bg-background text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Grid3X3 className="h-3.5 w-3.5" />
+                    Grid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                      viewMode === 'table'
+                        ? 'bg-background text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                    Table
+                  </button>
+                </div>
+
+                {/* Search */}
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -226,6 +272,7 @@ const handleDownload = async (cert: Certificate) => {
                   )}
                 </div>
 
+                {/* Status filter */}
                 <Select
                   value={statusFilter}
                   onValueChange={(v) =>
@@ -247,51 +294,26 @@ const handleDownload = async (cert: Certificate) => {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-
-                <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('table')}
-                    className={`cursor-pointer rounded-md p-1.5 transition-colors ${
-                      viewMode === 'table'
-                        ? 'bg-background text-primary shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                    title="Table view"
-                  >
-                    <List className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('grid')}
-                    className={`cursor-pointer rounded-md p-1.5 transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-background text-primary shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                    title="Grid view"
-                  >
-                    <Grid3x3 className="h-4 w-4" />
-                  </button>
-                </div>
               </CardContent>
             </Card>
           )}
 
           {viewMode === 'table' ? (
-            <EventCertificatesTable
+            <AccountCertificatesTable
               certificates={filtered}
-              sortField={sortField}
-              sortDirection={sortDirection}
-              onSort={toggleSort}
+              accountId={accountId}
+              downloadingId={downloadingId}
               onSend={(c) => setSendTarget(c)}
               onRevoke={(c) => setRevokeTarget(c)}
               onDownload={handleDownload}
               emptyState={emptyNode}
             />
           ) : (
-            <EventCertificatesGrid
+            <AccountCertificatesGrid
               certificates={filtered}
+              templatesById={templatesById}
+              accountId={accountId}
+              downloadingId={downloadingId}
               onSend={(c) => setSendTarget(c)}
               onRevoke={(c) => setRevokeTarget(c)}
               onDownload={handleDownload}

@@ -19,6 +19,9 @@ import {
   useUpdateSystemTemplateMutation,
 } from '@/lib/store/api/certificatesApi';
 
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectActiveAccount } from '@/lib/store/slices/authSlice';
+
 import { TemplateBasicsForm } from './TemplateBasicsForm';
 import { TemplateDesignForm } from './TemplateDesignForm';
 import { TemplateEditorHeader } from './TemplateEditorHeader';
@@ -62,6 +65,11 @@ export function TemplateEditor({
 }: Props) {
   const router = useRouter();
   const isEditing = !!templateId;
+
+  // Get the active account to show the organizer's name in the preview
+  const activeAccount = useAppSelector(selectActiveAccount);
+  const organizerName =
+    activeAccount?.displayName || activeAccount?.name || 'Your Organization';
 
   // Account hooks
   const [createTemplate, { isLoading: creating }] = useCreateCertificateTemplateMutation();
@@ -396,6 +404,9 @@ export function TemplateEditor({
                     design={form.design}
                     size="md"
                     tier={isAdmin ? 'premium' : form.tierSlug}
+                    sampleData={{
+                      issuer_name: organizerName,
+                    }}
                   />
                 )}
 

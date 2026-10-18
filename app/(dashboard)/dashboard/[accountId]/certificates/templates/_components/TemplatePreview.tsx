@@ -9,9 +9,16 @@ interface Props {
   design: CertificateTemplateDesign;
   size?: 'sm' | 'md' | 'lg';
   tier?: string;
+  sampleData?: {
+    recipient_name?: string;
+    context_title?: string;
+    context_date?: string;
+    context_duration?: string;
+    issuer_name?: string;
+  };
 }
 
-const SAMPLE = {
+const DEFAULT_SAMPLE = {
   recipient_name: 'Jane Doe',
   context_title: 'Advanced Go Workshop',
   context_date: '15 October 2026',
@@ -87,8 +94,17 @@ const SIZES = {
   },
 } as const;
 
-export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
+export function TemplatePreview({ design, size = 'md', tier = '', sampleData }: Props) {
   const s = SIZES[size];
+
+  // Merge the passed sample data with the default SAMPLE object
+  const SAMPLE = {
+    recipient_name: sampleData?.recipient_name || DEFAULT_SAMPLE.recipient_name,
+    context_title: sampleData?.context_title || DEFAULT_SAMPLE.context_title,
+    context_date: sampleData?.context_date || DEFAULT_SAMPLE.context_date,
+    context_duration: sampleData?.context_duration || DEFAULT_SAMPLE.context_duration,
+    issuer_name: sampleData?.issuer_name || DEFAULT_SAMPLE.issuer_name,
+  };
 
   const bg = design.background_color || '#FFFFFF';
   const text = design.text_color || '#1A1A1A';
@@ -157,11 +173,15 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
         </div>
       )}
 
-      {/* Background image (premium) */}
+      {/* Background image (premium) — opacity matches PDF (0.08) */}
       {showBackground && (
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-15"
-          style={{ backgroundImage: `url(${design.background_url})` }}
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `url(${design.background_url})`,
+            opacity: 0.08,
+            zIndex: 0,
+          }}
         />
       )}
 
@@ -170,12 +190,12 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
         <>
           <div
             className="pointer-events-none absolute inset-2 rounded"
-            style={{ border: `1px solid ${borderColor}` }}
+            style={{ border: `1px solid ${borderColor}`, zIndex: 1 }}
           />
           {isDouble && (
             <div
               className="pointer-events-none absolute inset-3 rounded"
-              style={{ border: `1px solid ${borderColor}` }}
+              style={{ border: `1px solid ${borderColor}`, zIndex: 1 }}
             />
           )}
         </>
@@ -183,7 +203,7 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
 
       {/* Flow content */}
       <div
-        className={`relative flex h-full flex-col items-center ${s.gap} ${s.pad}`}
+        className={`relative flex h-full flex-col items-center ${s.pad}`}
         style={{ zIndex: 2 }}
       >
         {/* Logo + seal */}
@@ -218,40 +238,45 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
           </div>
         )}
 
-        <div className="h-2" />
+        {/* ============================================ */}
+        {/* CENTERED TEXT BLOCK                          */}
+        {/* ============================================ */}
+        <div className={`flex flex-col items-center justify-center flex-grow ${s.gap} pb-4`}>
+          {/* Title */}
+          <h1
+            className={`${s.title} text-center font-bold uppercase tracking-wider drop-shadow-sm`}
+            style={{ color: accent }}
+          >
+            {title}
+          </h1>
 
-        {/* Title */}
-        <h1
-          className={`${s.title} text-center font-bold uppercase tracking-wider`}
-          style={{ color: accent }}
-        >
-          {title}
-        </h1>
+          {/* Accent rule */}
+          <div className={s.rule} style={{ backgroundColor: accent }} />
 
-        {/* Accent rule */}
-        <div className={s.rule} style={{ backgroundColor: accent }} />
+          {/* Subtitle */}
+          <p className={`${s.subtitle} text-center drop-shadow-sm`}>{subtitle}</p>
 
-        {/* Subtitle */}
-        <p className={`${s.subtitle} text-center`}>{subtitle}</p>
+          {/* Recipient name */}
+          <p
+            className={`${s.name} text-center font-bold leading-tight drop-shadow-sm`}
+            style={{ color: accent }}
+          >
+            {SAMPLE.recipient_name}
+          </p>
 
-        {/* Recipient name */}
-        <p
-          className={`${s.name} text-center font-bold leading-tight`}
-          style={{ color: accent }}
-        >
-          {SAMPLE.recipient_name}
-        </p>
+          {/* Name underline */}
+          <div className={s.nameRule} style={{ backgroundColor: accent }} />
 
-        {/* Name underline */}
-        <div className={s.nameRule} style={{ backgroundColor: accent }} />
+          {/* Body */}
+          <p className={`${s.body} max-w-[85%] text-center leading-snug drop-shadow-sm`}>
+            {body}
+          </p>
+        </div>
 
-        {/* Body */}
-        <p className={`${s.body} max-w-[85%] text-center leading-snug`}>
-          {body}
-        </p>
-
-        {/* Bottom block */}
-        <div className="mt-auto w-full flex items-end justify-between pt-2">
+        {/* ============================================ */}
+        {/* BOTTOM ROW (SIGNATURE + QR)                  */}
+        {/* ============================================ */}
+        <div className="w-full flex items-end justify-between pt-2">
           <div className="flex flex-col items-start">
             {showSignature && (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -271,12 +296,12 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
               />
             )}
             {showSigName && (
-              <p className={`${s.sigName} font-semibold leading-tight`}>
+              <p className={`${s.sigName} font-semibold leading-tight drop-shadow-sm`}>
                 {signatoryName}
               </p>
             )}
             {showSigTitle && (
-              <p className={`${s.sigTitle} leading-tight`} style={{ color: muted }}>
+              <p className={`${s.sigTitle} leading-tight drop-shadow-sm`} style={{ color: muted }}>
                 {signatoryTitle}
               </p>
             )}
@@ -300,8 +325,11 @@ export function TemplatePreview({ design, size = 'md', tier = '' }: Props) {
           </div>
         </div>
 
+        {/* ============================================ */}
+        {/* FOOTER                                       */}
+        {/* ============================================ */}
         {footer && (
-          <p className={`text-center ${s.footer} pt-1`} style={{ color: muted }}>
+          <p className={`text-center ${s.footer} pt-2 mt-2 drop-shadow-sm`} style={{ color: muted }}>
             {footer}
           </p>
         )}

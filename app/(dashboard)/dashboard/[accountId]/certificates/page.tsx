@@ -4,23 +4,34 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { FileBadge } from 'lucide-react';
+import { FileBadge, Grid3X3, List, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   useDownloadCertificateMutation,
   useListAccountCertificatesQuery,
+  useListCertificateTemplatesQuery,
 } from '@/lib/store/api/certificatesApi';
 
 import { AccountCertificatesFilters } from './_components/AccountCertificatesFilters';
 import { AccountCertificatesHeader } from './_components/AccountCertificatesHeader';
 import { AccountCertificatesSkeleton } from './_components/AccountCertificatesSkeleton';
 import { AccountCertificatesStats } from './_components/AccountCertificatesStats';
+import { AccountCertificatesGrid } from './_components/AccountCertificatesGrid';
 import { AccountCertificatesTable } from './_components/AccountCertificatesTable';
+import { SelectEventDialog } from './_components/SelectEventDialog';
+
+// Reuse the existing event-level dialog
+import { IssueBatchDialog } from '../[teamId]/events/[id]/certificates/_components/IssueBatchDialog';
 import { RevokeCertificateDialog } from '../[teamId]/events/[id]/certificates/_components/RevokeCertificateDialog';
 import { SendCertificateDialog } from '../[teamId]/events/[id]/certificates/_components/SendCertificateDialog';
-import { Certificate } from '@/lib/types/certificates';
+
+import { Certificate, CertificateTemplate } from '@/lib/types/certificates';
+import type { Event } from '@/lib/types/events';
+
+type ViewMode = 'grid' | 'table';
 
 export default function AccountCertificatesPage() {
   const params = useParams<{ accountId: string; teamId?: string }>();
@@ -29,24 +40,34 @@ export default function AccountCertificatesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
   const [eventFilter, setEventFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Event-selection flow
+  const [selectEventOpen, setSelectEventOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
   const [sendTarget, setSendTarget] = useState<Certificate | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<Certificate | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useListAccountCertificatesQuery({
+  const { data, isLoading, isFetching, refetch } = useListAccountCertificatesQuery({
     accountId,
     params: { limit: 500 },
   });
 
+  const { data: templatesData } = useListCertificateTemplatesQuery(accountId);
+
   const [downloadCertificate] = useDownloadCertificateMutation();
 
   const certificates = data?.data?.certificates ?? [];
+  const templates = templatesData?.data?.templates ?? [];
 
-  // Unique events in the list, keyed by context_id
+  const templatesById = useMemo(() => {
+    const map = new Map<string, CertificateTemplate>();
+    templates.forEach((t) => map.set(t.id, t));
+    return map;
+  }, [templates]);
+
   const eventOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const c of certificates) {
@@ -82,8 +103,7 @@ export default function AccountCertificatesPage() {
     }
 
     return [...list].sort(
-      (a, b) =>
-        new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime(),
+      (a, b) => new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime(),
     );
   }, [certificates, statusFilter, eventFilter, search]);
 
@@ -100,31 +120,33 @@ export default function AccountCertificatesPage() {
     setEventFilter('all');
   };
 
-const handleDownload = async (cert: Certificate) => {
-  try {
-    const result = await downloadCertificate(cert.id).unwrap();
+  const handleDownload = async (cert: Certificate) => {
+    if (downloadingId) return;
+    setDownloadingId(cert.id);
+    try {
+      const result = await downloadCertificate(cert.id).unwrap();
 
-    // JSON response: { success, message, data: { url } } → open the URL
-    if (result && typeof result === 'object' && 'data' in result) {
-      const url = (result as { data: { url: string } }).data.url;
-      window.open(url, '_blank', 'noopener,noreferrer');
-      return;
+      if (result && typeof result === 'object' && 'data' in result) {
+        const url = (result as { data: { url: string } }).data.url;
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      const blob = result as Blob;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${cert.verification_code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download certificate');
+    } finally {
+      setDownloadingId(null);
     }
-
-    // Blob → trigger browser download
-    const blob = result as Blob;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `certificate-${cert.verification_code}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch {
-    toast.error('Failed to download certificate');
-  }
-};
+  };
 
   const emptyNode = (
     <Card className="border-0 border-b border-border">
@@ -150,11 +172,20 @@ const handleDownload = async (cert: Certificate) => {
 
   return (
     <div className="space-y-6 pb-20">
-      <AccountCertificatesHeader
-        accountId={accountId}
-        isFetching={isFetching}
-        onRefresh={() => refetch()}
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <AccountCertificatesHeader
+          accountId={accountId}
+          isFetching={isFetching}
+          onRefresh={() => refetch()}
+        />
+        <Button
+          onClick={() => setSelectEventOpen(true)}
+          className="cursor-pointer shrink-0"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Issue Certificates
+        </Button>
+      </div>
 
       {isLoading ? (
         <AccountCertificatesSkeleton rows={8} />
@@ -168,30 +199,105 @@ const handleDownload = async (cert: Certificate) => {
           />
 
           {certificates.length > 0 && (
-            <AccountCertificatesFilters
-              search={search}
-              onSearchChange={setSearch}
-              statusFilter={statusFilter}
-              onStatusChange={setStatusFilter}
-              eventFilter={eventFilter}
-              onEventChange={setEventFilter}
-              events={eventOptions}
-              onReset={resetFilters}
-              resultCount={filtered.length}
-              totalCount={certificates.length}
-            />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 shrink-0 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'grid'
+                      ? 'bg-background text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Grid3X3 className="h-3.5 w-3.5" />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'table'
+                      ? 'bg-background text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <List className="h-3.5 w-3.5" />
+                  Table
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <AccountCertificatesFilters
+                  search={search}
+                  onSearchChange={setSearch}
+                  statusFilter={statusFilter}
+                  onStatusChange={setStatusFilter}
+                  eventFilter={eventFilter}
+                  onEventChange={setEventFilter}
+                  events={eventOptions}
+                  onReset={resetFilters}
+                  resultCount={filtered.length}
+                  totalCount={certificates.length}
+                />
+              </div>
+            </div>
           )}
 
-          <AccountCertificatesTable
-            certificates={filtered}
-            accountId={accountId}
-            onSend={(c) => setSendTarget(c)}
-            onRevoke={(c) => setRevokeTarget(c)}
-            onDownload={handleDownload}
-            emptyState={emptyNode}
-          />
+          {viewMode === 'grid' ? (
+            <AccountCertificatesGrid
+              certificates={filtered}
+              templatesById={templatesById}
+              accountId={accountId}
+              downloadingId={downloadingId}
+              onSend={(c) => setSendTarget(c)}
+              onRevoke={(c) => setRevokeTarget(c)}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          ) : (
+            <AccountCertificatesTable
+              certificates={filtered}
+              accountId={accountId}
+              downloadingId={downloadingId}
+              onSend={(c) => setSendTarget(c)}
+              onRevoke={(c) => setRevokeTarget(c)}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          )}
         </>
       )}
+
+      {/* Step 1: pick an event */}
+      <SelectEventDialog
+        open={selectEventOpen}
+        accountId={accountId}
+        onOpenChange={setSelectEventOpen}
+        onSelect={(event) => {
+          setSelectEventOpen(false);
+          setSelectedEvent(event);
+        }}
+      />
+
+      {/* Step 2: reuse the existing IssueBatchDialog with the selected event */}
+     {selectedEvent && (
+      <IssueBatchDialog
+        open={!!selectedEvent}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEvent(null);
+        }}
+        accountId={accountId}
+        teamId={selectedEvent.team_id ?? ''}
+        eventId={selectedEvent.id}
+        eventTitle={selectedEvent.display_name || selectedEvent.name || 'Untitled event'}
+        eventDate={selectedEvent.start_date || new Date().toISOString()}
+        onIssued={() => {
+          setSelectedEvent(null);
+          refetch();
+        }}
+      />
+    )}
 
       <SendCertificateDialog
         cert={sendTarget}

@@ -12,8 +12,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-
-
 import { Certificate } from '@/lib/types/certificates';
 import { AccountCertificateRow } from './AccountCertificateRow';
 
@@ -21,6 +19,7 @@ interface Props {
   certificates: Certificate[];
   accountId: string;
   teamId?: string;
+  downloadingId?: string | null;
   onSend: (cert: Certificate) => void;
   onRevoke: (cert: Certificate) => void;
   onDownload: (cert: Certificate) => void;
@@ -31,6 +30,7 @@ export function AccountCertificatesTable({
   certificates,
   accountId,
   teamId,
+  downloadingId,
   onSend,
   onRevoke,
   onDownload,
@@ -77,6 +77,7 @@ export function AccountCertificatesTable({
                     cert={cert}
                     accountId={accountId}
                     teamId={teamId}
+                    isDownloading={downloadingId === cert.id}
                     onSend={onSend}
                     onRevoke={onRevoke}
                     onDownload={onDownload}
