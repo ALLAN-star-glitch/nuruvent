@@ -311,7 +311,7 @@ export function IssueBatchDialog({
                         value={t.id}
                         className="cursor-pointer"
                       >
-                        {t.name}
+                        <span>{t.display_name || t.name}</span>
                         {' — '}
                         {price === 0
                           ? 'Free'

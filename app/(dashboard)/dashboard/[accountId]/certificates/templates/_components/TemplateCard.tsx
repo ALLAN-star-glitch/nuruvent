@@ -108,7 +108,7 @@ export function TemplateCard({
           {/* Name + description */}
           <div className="min-w-0">
             <h3 className="truncate text-base font-semibold text-foreground">
-              {template.name}
+              {template.display_name || template.name || 'Untitled Template'}
             </h3>
             {template.description && (
               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">

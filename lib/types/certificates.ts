@@ -86,6 +86,7 @@ export interface CertificateTemplate {
   id: string;
   account_id?: string;
   name: string;
+  display_name?: string;
   description?: string;
   design: CertificateTemplateDesign;
   price_minor?: number | null;

@@ -76,7 +76,7 @@ export function CertificateTierSelect({
           {tiers.map((t) => (
             <SelectItem key={t.id} value={t.id} className="cursor-pointer py-3">
               <div className="flex w-full items-center justify-between gap-8">
-                <span className="font-medium">{t.name}</span>
+                <span className="font-medium">{t.display_name || t.name}</span>
                 <span className="font-bold text-primary">
                   KES {((t.price_minor ?? 0) / 100).toFixed(0)}
                 </span>
