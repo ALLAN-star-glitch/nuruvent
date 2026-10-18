@@ -55,47 +55,59 @@ export function CertificateCard({ cert }: { cert: Certificate }) {
   const issuer = cert.metadata?.issuer_name ?? 'Nuruvent';
   const isRevoked = cert.status === 'revoked';
 
-  const handleDownload = async () => {
-    if (downloading) return;
+ const handleDownload = async () => {
+  if (downloading) return;
 
-    // Open a blank tab synchronously — bypasses popup blockers
-    const popup = window.open('', '_blank');
+  setDownloading(true);
+  const toastId = toast.loading('Preparing your certificate…');
 
-    setDownloading(true);
-    try {
-      let finalUrl: string | null = null;
+  try {
+    let finalUrl: string | null = null;
 
-      for (let attempt = 0; attempt < 40; attempt++) {
-        const result = await downloadCertificate(cert.id).unwrap();
+    // Poll until the worker has cached the PDF
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const result = await downloadCertificate(cert.id).unwrap();
 
-        if (result.status === 'ready' && result.url) {
-          finalUrl = result.url;
-          break;
-        }
-
-        await new Promise((r) => setTimeout(r, 1500));
+      if (result.status === 'ready' && result.url) {
+        finalUrl = result.url;
+        break;
       }
-
-      if (!finalUrl) {
-        popup?.close();
-        toast.error('Certificate is taking too long. Try again in a moment.');
-        return;
-      }
-
-      if (popup && !popup.closed) {
-        popup.location.href = finalUrl;
-      } else {
-        window.open(finalUrl, '_blank', 'noopener,noreferrer');
-      }
-    } catch (err) {
-      popup?.close();
-      const message =
-        err instanceof Error ? err.message : 'Failed to download certificate';
-      toast.error(message);
-    } finally {
-      setDownloading(false);
+      await new Promise((r) => setTimeout(r, 1500));
     }
-  };
+
+    if (!finalUrl) {
+      toast.error('Certificate is taking too long. Try again in a moment.', {
+        id: toastId,
+      });
+      return;
+    }
+
+    // Fetch the PDF as a blob and trigger an in-page download (no new tab)
+    const res = await fetch(finalUrl);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `${cert.recipient_name.replace(/\s+/g, '_')}_certificate.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+
+    toast.success('Certificate downloaded', { id: toastId });
+  } catch (err) {
+    console.error('[download] error', err);
+    const message =
+      err instanceof Error ? err.message : 'Failed to download certificate';
+    toast.error(message, { id: toastId });
+  } finally {
+    setDownloading(false);
+  }
+};
 
   const handleCopyCode = async () => {
     try {

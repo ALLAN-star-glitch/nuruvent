@@ -158,16 +158,16 @@ const [downloadCertificate] = useDownloadCertificateMutation();
 const handleDownload = async (cert: Certificate) => {
   if (downloadingId) return;
 
-  // Open a blank tab synchronously — this is user-initiated
-  const popup = window.open('', '_blank');
-
   setDownloadingId(cert.id);
+
+  const toastId = toast.loading('Preparing your certificate…');
+
   try {
     let finalUrl: string | null = null;
 
+    // Poll until the worker has cached the PDF
     for (let attempt = 0; attempt < 40; attempt++) {
       const result = await downloadCertificate(cert.id).unwrap();
-      console.log('[download] poll', attempt, result);
 
       if (result.status === 'ready' && result.url) {
         finalUrl = result.url;
@@ -177,21 +177,32 @@ const handleDownload = async (cert: Certificate) => {
     }
 
     if (!finalUrl) {
-      popup?.close();
-      toast.error('Certificate is taking too long. Try again in a moment.');
+      toast.error('Certificate is taking too long. Try again in a moment.', {
+        id: toastId,
+      });
       return;
     }
 
-    if (popup && !popup.closed) {
-      popup.location.href = finalUrl;
-    } else {
-      // Fallback if popup was blocked or closed
-      window.open(finalUrl, '_blank', 'noopener,noreferrer');
-    }
+    // Fetch the PDF as a blob and trigger an in-page download (no new tab)
+    const res = await fetch(finalUrl);
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `${cert.recipient_name.replace(/\s+/g, '_')}_certificate.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+
+    toast.success('Certificate downloaded', { id: toastId });
   } catch (err) {
     console.error('[download] error', err);
-    popup?.close();
-    toast.error('Failed to download certificate');
+    toast.error('Failed to download certificate', { id: toastId });
   } finally {
     setDownloadingId(null);
   }
