@@ -59,6 +59,7 @@ interface NavItem {
   exact?: boolean;
   organizersOnly?: boolean;
   adminsOnly?: boolean;
+  disabled?: boolean;
   children?: NavItem[];
 }
 
@@ -150,33 +151,38 @@ export function DashboardSidebar({
         icon: CreditCard,
         adminsOnly: true,
       },
-        {
-      segment: 'certificates',
-      label: 'Certificates',
-      icon: Award,
-      organizersOnly: true,
-      href: accountId ? `/dashboard/${accountId}/certificates` : undefined,
-      children: [
-        {
-          segment: '',
-          label: 'Issued Certificates',
-          icon: Award,
-          href: accountId
-            ? `/dashboard/${accountId}/certificates`
-            : undefined,
-          exact: true,
-        },
-        {
-          segment: '',
-          label: 'Templates', // <-- RENAMED
-          icon: Award,
-          href: accountId
-            ? `/dashboard/${accountId}/certificates/templates`
-            : undefined,
-        },
-      ],
-    },
-      { segment: 'replays', label: 'Replays', icon: Clapperboard },
+      {
+        segment: 'certificates',
+        label: 'Certificates',
+        icon: Award,
+        organizersOnly: true,
+        href: accountId ? `/dashboard/${accountId}/certificates` : undefined,
+        children: [
+          {
+            segment: '',
+            label: 'Issued Certificates',
+            icon: Award,
+            href: accountId
+              ? `/dashboard/${accountId}/certificates`
+              : undefined,
+            exact: true,
+          },
+          {
+            segment: '',
+            label: 'Templates',
+            icon: Award,
+            href: accountId
+              ? `/dashboard/${accountId}/certificates/templates`
+              : undefined,
+          },
+        ],
+      },
+      { 
+        segment: 'replays', 
+        label: 'Replays', 
+        icon: Clapperboard,
+        disabled: true,
+      },
       {
         segment: 'trash',
         label: 'Trash',
@@ -252,6 +258,7 @@ export function DashboardSidebar({
   };
 
   const isTeamNavActive = (item: NavItem) => {
+    if (item.disabled) return false;
     if (item.href) {
       if (item.exact) return pathname === item.href;
       return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -268,6 +275,7 @@ export function DashboardSidebar({
   };
 
   const isChildActive = (child: NavItem) => {
+    if (child.disabled) return false;
     if (child.href) {
       if (child.exact) return pathname === child.href;
       return pathname === child.href || pathname.startsWith(`${child.href}/`);
@@ -360,6 +368,38 @@ export function DashboardSidebar({
               const isCertGroup = item.segment === 'certificates';
               const childrenExpanded = isCertGroup && certificatesExpanded;
 
+              // 🚨 Disabled Item Renderer
+              if (item.disabled) {
+                if (collapsed) {
+                  return (
+                    <div key={item.segment || item.label}>
+                      <div
+                        className="flex items-center justify-center h-10 w-10 mx-auto rounded-lg text-foreground/40 opacity-50 cursor-not-allowed group relative"
+                        title={`${item.label} (Coming Soon)`}
+                      >
+                        <Icon className="h-5 w-5 shrink-0" />
+                        <div className="absolute left-12 ml-2 px-2.5 py-1.5 bg-popover text-popover-foreground border border-border text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-md font-medium">
+                          {item.label} (Coming Soon)
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={item.segment || item.label}>
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-foreground/40 opacity-50 cursor-not-allowed">
+                      <Icon className="h-[18px] w-[18px] shrink-0" />
+                      <span className="truncate flex-1">{item.label}</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                        Soon
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Standard Item Renderer
               if (collapsed) {
                 return (
                   <div key={item.segment || item.label}>

@@ -105,20 +105,9 @@ interface QuickLink {
   segment: string;
   icon: typeof Calendar;
   isTrash?: boolean;
-  /**
-   * Only shown to account admins and trainers.
-   *
-   * Registrations, Attendees, and Trash are organizer views. Learners
-   * see their own registrations via /tickets instead.
-   */
   organizersOnly?: boolean;
-  /**
-   * Only shown to account admins.
-   *
-   * Payments are owner data — an invited trainer is here to run
-   * events, not to audit the account's money.
-   */
   adminsOnly?: boolean;
+  disabled?: boolean;
 }
 
 const QUICK_LINKS: QuickLink[] = [
@@ -137,13 +126,24 @@ const QUICK_LINKS: QuickLink[] = [
     organizersOnly: true,
   },
   { label: 'Certificates', segment: 'certificates', icon: Award },
+  { 
+    label: 'Templates', 
+    segment: 'certificates/templates', 
+    icon: Award, 
+    organizersOnly: true 
+  },
   {
     label: 'Payments',
     segment: 'payments',
     icon: CreditCard,
     adminsOnly: true,
   },
-  { label: 'Replays', segment: 'replays', icon: Video },
+  { 
+    label: 'Replays', 
+    segment: 'replays', 
+    icon: Video,
+    disabled: true,
+  },
   {
     label: 'Trash',
     segment: 'trash',
@@ -172,7 +172,6 @@ function MobileSection({
   expanded: boolean;
   onToggle: () => void;
   badge?: number;
-  /** Conspicuous treatment — tinted background, primary-tinted border. */
   highlight?: boolean;
   children: React.ReactNode;
 }) {
@@ -272,7 +271,7 @@ export function UserMenu({ user }: UserMenuProps) {
     account: boolean;
   }>({
     actions: true,
-    teams: false, // expanded by default so it's conspicuous
+    teams: false,
     account: true,
   });
 
@@ -283,14 +282,6 @@ export function UserMenu({ user }: UserMenuProps) {
   const { data: accounts } = useGetMyAccountsQuery();
   const { data: teamsData } = useGetUserTeamsQuery();
 
-  // Account-level role: fetch the caller's own membership in the active
-  // account.
-  //
-  // Self-service endpoint — no member-list permission required. This is
-  // what makes the role badge render for every role, including learners.
-  // Do not swap this back to useGetAccountMembersQuery: learners do not
-  // hold `member:read`, so the member-list call returns 403 and the
-  // badge disappears.
   const { data: myMembership } = useGetMyMembershipQuery(
     accountId ?? '',
     { skip: !accountId },
@@ -316,14 +307,6 @@ export function UserMenu({ user }: UserMenuProps) {
     return roleDisplayLabel(myMembership.role as AccountRole);
   }, [myMembership]);
 
-  // Role-derived visibility flags.
-  //
-  //   isAdmin      → account_admin
-  //   isOrganizer  → account_admin OR trainer
-  //
-  // When the role hasn't loaded yet, both are false — organizer and
-  // admin items stay hidden to avoid a flash before the real role
-  // arrives.
   const isAdmin = useMemo(() => {
     const role = myMembership?.role as AccountRole | undefined;
     return role === 'account_admin';
@@ -397,14 +380,12 @@ export function UserMenu({ user }: UserMenuProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  // Reset mobile sections on close: Teams expanded, others expanded.
   useEffect(() => {
     if (!open && isMobile) {
       setMobileSections({ actions: true, teams: false, account: true });
     }
   }, [open, isMobile]);
 
-  // Reset desktop "Manage this team" collapse on close.
   useEffect(() => {
     if (!open && !isMobile) {
       setDesktopManageCollapsed(true);
@@ -458,9 +439,6 @@ export function UserMenu({ user }: UserMenuProps) {
   const teamBase =
     accountId && teamId ? `/dashboard/${accountId}/${teamId}` : null;
 
-  const buildQuickLink = (segment: string) =>
-    teamBase ? `${teamBase}/${segment}` : '/accounts';
-
   const dashboardHref = teamBase ?? '/dashboard';
   const settingsHref = accountId
     ? `/dashboard/${accountId}/settings`
@@ -469,6 +447,27 @@ export function UserMenu({ user }: UserMenuProps) {
     ? `/dashboard/${accountId}/teams/new`
     : '/accounts';
   const teamSettingsHref = teamBase ? `${teamBase}/settings` : null;
+
+  // ------------------------------------------------------------
+  // DYNAMIC ROUTING FOR QUICK LINKS
+  // ------------------------------------------------------------
+  const getQuickLinkHref = (item: QuickLink) => {
+    // 1. Certificates: Learners go to their own, Admins/Organizers go to account management
+    if (item.segment === 'certificates') {
+      if (isOrganizer) {
+        return accountId ? `/dashboard/${accountId}/certificates` : '/accounts';
+      }
+      return '/me/certificates';
+    }
+
+    // 2. Templates: Account level (organizers/admins only)
+    if (item.segment === 'certificates/templates') {
+      return accountId ? `/dashboard/${accountId}/certificates/templates` : '/accounts';
+    }
+
+    // 3. Standard team-scoped routes
+    return teamBase ? `${teamBase}/${item.segment}` : '/accounts';
+  };
 
   // ============================================================
   // ACCOUNT LOGO (reused in team rows)
@@ -553,7 +552,6 @@ export function UserMenu({ user }: UserMenuProps) {
             : 'text-foreground hover:bg-accent',
         )}
       >
-        {/* Left accent bar on the active team */}
         {isActive && (
           <span
             aria-hidden
@@ -646,7 +644,24 @@ export function UserMenu({ user }: UserMenuProps) {
 
             {visibleQuickLinks.map((item) => {
               const Icon = item.icon;
-              const href = buildQuickLink(item.segment);
+              const href = getQuickLinkHref(item);
+
+              // 🚨 Disabled Item Renderer
+              if (item.disabled) {
+                return (
+                  <div
+                    key={item.segment}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-foreground/40 opacity-50 cursor-not-allowed"
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="text-sm flex-1">{item.label}</span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                      Soon
+                    </span>
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={item.segment}
@@ -677,10 +692,8 @@ export function UserMenu({ user }: UserMenuProps) {
       case 'teams':
         return (
           <div className="space-y-1">
-            {/* Conspicuous Your Teams card */}
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
               {teamsSectionHeader}
-
               {teams.length === 0 ? (
                 <p className="px-1 py-2 text-xs text-muted-foreground">
                   No teams yet
@@ -696,11 +709,9 @@ export function UserMenu({ user }: UserMenuProps) {
               )}
             </div>
 
-            {/* ---- Manage this team (collapsible) ---- */}
             {teamId && accountId && teamSettingsHref && (
               <>
                 <div className="my-2 h-px bg-border" />
-
                 <button
                   type="button"
                   onClick={() => setDesktopManageCollapsed((v) => !v)}
@@ -722,37 +733,28 @@ export function UserMenu({ user }: UserMenuProps) {
                   <div className="space-y-0.5 pt-1">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigateTo(`${teamSettingsHref}#general`)
-                      }
+                      onClick={() => navigateTo(`${teamSettingsHref}#general`)}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
                     >
                       <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="text-sm">Team settings</span>
                     </button>
-
                     <button
                       type="button"
-                      onClick={() =>
-                        navigateTo(`${teamSettingsHref}#members`)
-                      }
+                      onClick={() => navigateTo(`${teamSettingsHref}#members`)}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
                     >
                       <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="text-sm">Members</span>
                     </button>
-
                     <button
                       type="button"
-                      onClick={() =>
-                        navigateTo(`${teamSettingsHref}#invitations`)
-                      }
+                      onClick={() => navigateTo(`${teamSettingsHref}#invitations`)}
                       className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-foreground transition-colors hover:bg-accent cursor-pointer"
                     >
                       <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="text-sm">Invitations</span>
                     </button>
-
                     <button
                       type="button"
                       onClick={openInviteDialog}
@@ -876,7 +878,6 @@ export function UserMenu({ user }: UserMenuProps) {
       )}
     >
       <div className="w-56 shrink-0 border-r border-border bg-muted/40 p-3">
-        {/* User card: name → role (below) → email (below) */}
         <div className="mb-3 flex items-center gap-3 rounded-xl bg-background p-3">
           <Avatar className="h-10 w-10">
             <AvatarImage src={avatarUrl} />
@@ -925,7 +926,6 @@ export function UserMenu({ user }: UserMenuProps) {
                 <span className={cn('text-sm', isActive && 'font-medium')}>
                   {section.label}
                 </span>
-                {/* Small count badge on the Teams nav item */}
                 {isTeams && teams.length > 0 && (
                   <span
                     className={cn(
@@ -975,7 +975,6 @@ export function UserMenu({ user }: UserMenuProps) {
       )}
     >
       <div className="max-h-[calc(100vh-5rem)] overflow-y-auto">
-        {/* ---- Sticky header ---- */}
         <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-popover/95 p-4 backdrop-blur-sm">
           <Avatar className="h-10 w-10 shrink-0">
             <AvatarImage src={avatarUrl} />
@@ -1006,9 +1005,6 @@ export function UserMenu({ user }: UserMenuProps) {
           </button>
         </div>
 
-        {/* ---- Sections ---- */}
-
-        {/* Quick Actions */}
         <MobileSection
           title="Quick Actions"
           expanded={mobileSections.actions}
@@ -1025,7 +1021,23 @@ export function UserMenu({ user }: UserMenuProps) {
 
           {visibleMobileQuickLinks.map((item) => {
             const Icon = item.icon;
-            const href = buildQuickLink(item.segment);
+            const href = getQuickLinkHref(item);
+
+            if (item.disabled) {
+              return (
+                <div
+                  key={item.segment}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-3 text-foreground/40 opacity-50 cursor-not-allowed"
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="text-sm flex-1">{item.label}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                    Soon
+                  </span>
+                </div>
+              );
+            }
+
             return (
               <button
                 key={item.segment}
@@ -1052,7 +1064,6 @@ export function UserMenu({ user }: UserMenuProps) {
           })}
         </MobileSection>
 
-        {/* Your Teams — conspicuous treatment via highlight */}
         <MobileSection
           title="Your Teams"
           expanded={mobileSections.teams}
@@ -1109,7 +1120,6 @@ export function UserMenu({ user }: UserMenuProps) {
           </button>
         </MobileSection>
 
-        {/* Account */}
         <MobileSection
           title="Account"
           expanded={mobileSections.account}
@@ -1144,15 +1154,10 @@ export function UserMenu({ user }: UserMenuProps) {
           </button>
         </MobileSection>
 
-        {/* Bottom breathing room */}
         <div className="h-2" />
       </div>
     </div>
   );
-
-  // ============================================================
-  // RENDER
-  // ============================================================
 
   return (
     <>

@@ -58,20 +58,9 @@ interface MoreNavItem {
   segment?: string;
   isTrash?: boolean;
   section?: 'workspace' | 'account';
-  /**
-   * Only shown to account admins and trainers.
-   *
-   * Registrations, Attendees, and Trash are organizer views. Learners
-   * use /tickets for their own registrations.
-   */
   organizersOnly?: boolean;
-  /**
-   * Only shown to account admins.
-   *
-   * Payments are owner data — an invited trainer is here to run
-   * events, not to audit the account's money.
-   */
   adminsOnly?: boolean;
+  disabled?: boolean;
 }
 
 const PRIMARY_ITEMS: PrimaryNavItem[] = [
@@ -106,21 +95,11 @@ export function MobileBottomNav() {
 
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
-  // Caller's role in the active account. Self-service endpoint — works
-  // for every role.
   const { data: myMembership } = useGetMyMembershipQuery(
     accountId ?? '',
     { skip: !accountId },
   );
 
-  // Role-derived visibility flags.
-  //
-  //   isAdmin      → account_admin
-  //   isOrganizer  → account_admin OR trainer
-  //
-  // When the role hasn't loaded yet, both are false — organizer and
-  // admin items stay hidden to avoid a flash before the real role
-  // arrives.
   const isAdmin = useMemo(() => {
     const role = myMembership?.role as AccountRole | undefined;
     return role === 'account_admin';
@@ -131,12 +110,34 @@ export function MobileBottomNav() {
     return role === 'account_admin' || role === 'trainer';
   }, [myMembership]);
 
-  // Hook rules: all hooks are called before any early return. The
-  // early return for unauthenticated users is placed after the hooks.
   if (!isAuthenticated) return null;
 
   const teamBase =
     accountId && teamId ? `/dashboard/${accountId}/${teamId}` : null;
+
+  // ------------------------------------------------------------
+  // DYNAMIC ROUTING FOR MORE ITEMS
+  // ------------------------------------------------------------
+  const getMoreItemHref = (item: MoreNavItem) => {
+    // 1. Certificates: Learners go to their own, Admins/Organizers go to account management
+    if (item.key === 'certificates') {
+      if (isOrganizer) {
+        return accountId ? `/dashboard/${accountId}/certificates` : '/accounts';
+      }
+      return '/me/certificates';
+    }
+
+    // 2. Templates: Account level (organizers/admins only)
+    if (item.key === 'templates') {
+      return accountId ? `/dashboard/${accountId}/certificates/templates` : '/accounts';
+    }
+
+    // 3. Standard routing
+    if (item.href) return item.href;
+    if (!item.segment) return '/accounts';
+    if (!teamBase) return '/accounts';
+    return item.segment === '' ? teamBase : `${teamBase}/${item.segment}`;
+  };
 
   const allMoreItems: MoreNavItem[] = [
     // Team-scoped items
@@ -172,11 +173,20 @@ export function MobileBottomNav() {
       section: 'workspace',
     },
     {
+      key: 'templates',
+      label: 'Templates',
+      icon: Award,
+      segment: 'certificates/templates',
+      section: 'workspace',
+      organizersOnly: true,
+    },
+    {
       key: 'replays',
       label: 'Replays',
       icon: Clapperboard,
       segment: 'replays',
       section: 'workspace',
+      disabled: true,
     },
     {
       key: 'trash',
@@ -219,24 +229,23 @@ export function MobileBottomNav() {
     },
   ];
 
-  // Filter by role. adminsOnly is checked first so an item marked
-  // adminsOnly is never shown to a trainer who happens to hold an
-  // organizer flag.
   const moreItems = allMoreItems.filter((item) => {
     if (item.adminsOnly) return isAdmin;
     if (item.organizersOnly) return isOrganizer;
     return true;
   });
 
-  const buildHref = (item: MoreNavItem) => {
-    if (item.href) return item.href;
-    if (!item.segment) return '/accounts';
-    if (!teamBase) return '/accounts';
-    return item.segment === '' ? teamBase : `${teamBase}/${item.segment}`;
-  };
-
   const isActive = (item: MoreNavItem) => {
-    const href = buildHref(item);
+    if (item.disabled) return false;
+    const href = getMoreItemHref(item);
+    
+    // Match exactly if it's a custom/account-level route
+    if (item.key === 'certificates' && isOrganizer) {
+      return pathname === href;
+    }
+    if (item.key === 'templates') {
+      return pathname === href || pathname.startsWith(`${href}/`);
+    }
     if (item.href) {
       return pathname === href || pathname.startsWith(`${href}/`);
     }
@@ -455,10 +464,27 @@ export function MobileBottomNav() {
     const active = isActive(item);
     const isTrash = item.isTrash;
 
+    // 🚨 Disabled Item Renderer
+    if (item.disabled) {
+      return (
+        <li key={item.key}>
+          <div className="flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-foreground/40 opacity-50 cursor-not-allowed">
+            <div className="flex items-center gap-3.5">
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="text-sm flex-1">{item.label}</span>
+            </div>
+            <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+              Soon
+            </span>
+          </div>
+        </li>
+      );
+    }
+
     return (
       <li key={item.key}>
         <Link
-          href={buildHref(item)}
+          href={getMoreItemHref(item)}
           prefetch={false}
           onClick={() => setIsMoreOpen(false)}
           aria-current={active ? 'page' : undefined}

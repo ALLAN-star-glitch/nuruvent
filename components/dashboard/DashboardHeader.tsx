@@ -33,8 +33,9 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { useLogoutMutation } from '@/lib/store/api/authApi';
 import { clearAuth } from '@/lib/store/slices/authSlice';
 import { clearWorkspace } from '@/lib/store/slices/workspaceSlice';
+import { useGetMyMembershipQuery } from '@/lib/store/api/accountsApi';
 import { LogoutDialog } from '../ui/LogoutDialog';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 // ============================================================
 // DASHBOARD NAV ITEMS
@@ -53,6 +54,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { TeamsNavItem } from '../layout/TeamsNavItem';
+import type { AccountRole } from '@/lib/types/account';
 
 import {
   DropdownMenu,
@@ -66,17 +68,20 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   isTrash?: boolean;
+  organizersOnly?: boolean;
+  disabled?: boolean;
 }
 
 const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { segment: '', label: 'Dashboard', icon: LayoutDashboard },
-  { segment: 'events', label: 'Events', icon: Calendar },
-  { segment: 'registrations', label: 'Registrations', icon: ClipboardList },
+  { segment: 'events', label: 'Team Events', icon: Calendar },
+  { segment: 'registrations', label: 'Registrations', icon: ClipboardList, organizersOnly: true },
   { segment: 'tickets', label: 'My Tickets', icon: TicketCheckIcon },
-  { segment: 'attendees', label: 'Attendees', icon: Users },
+  { segment: 'attendees', label: 'Attendees', icon: Users, organizersOnly: true },
   { segment: 'payments', label: 'Payments', icon: CreditCard },
   { segment: 'certificates', label: 'Certificates', icon: Award },
-  { segment: 'replays', label: 'Replays', icon: Clapperboard },
+  { segment: 'certificates/templates', label: 'Templates', icon: Award, organizersOnly: true },
+  { segment: 'replays', label: 'Replays', icon: Clapperboard, disabled: true },
   { segment: 'trash', label: 'Trash', icon: Trash2, isTrash: true },
   { segment: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -113,23 +118,35 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
+  const { data: myMembership } = useGetMyMembershipQuery(
+    accountId ?? '',
+    { skip: !accountId },
+  );
+
+  const isOrganizer = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'account_admin' || role === 'trainer';
+  }, [myMembership]);
 
   const goCreateEvent = () => {
-  if (!accountId || !teamId) return;
-      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
-    };
-    const goCreateTeam = () => {
-      if (!accountId) return;
-      router.push(`/dashboard/${accountId}/teams/new`);
-    };
-    const goCreateWorkspace = () => {
-      router.push('/accounts/new');
-    };
+    if (!accountId || !teamId) return;
+    router.push(`/dashboard/${accountId}/${teamId}/events/new`);
+  };
+  
+  const goCreateTeam = () => {
+    if (!accountId) return;
+    router.push(`/dashboard/${accountId}/teams/new`);
+  };
+  
+  const goCreateWorkspace = () => {
+    router.push('/accounts/new');
+  };
 
-   const goCreateCertificate = () => {
-  if (!accountId || !teamId) return;
-  router.push(`/dashboard/${accountId}/certificates/templates/new`);
-};
+  const goCreateCertificate = () => {
+    if (!accountId) return;
+    router.push(`/dashboard/${accountId}/certificates/templates/new`);
+  };
+
   useEffect(() => {
     setIsDrawerOpen(false);
   }, [pathname]);
@@ -172,12 +189,38 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const buildTeamNavHref = (segment: string) => {
     if (segment === '') return '/dashboard';
     if (!accountId || !teamId) return '/accounts';
+    
+    // Role-aware routing for certificates
+    if (segment === 'certificates') {
+      if (isOrganizer) {
+        return `/dashboard/${accountId}/certificates`;
+      }
+      return '/me/certificates';
+    }
+    
+    // Account-level templates
+    if (segment === 'certificates/templates') {
+      return `/dashboard/${accountId}/certificates/templates`;
+    }
+
     return `/dashboard/${accountId}/${teamId}/${segment}`;
   };
 
   const isTeamNavActive = (segment: string) => {
     if (segment === '') return pathname === '/dashboard';
     if (!accountId || !teamId) return false;
+
+    if (segment === 'certificates') {
+      if (isOrganizer) {
+        return pathname === `/dashboard/${accountId}/certificates`;
+      }
+      return pathname.startsWith('/me/certificates');
+    }
+
+    if (segment === 'certificates/templates') {
+      return pathname.startsWith(`/dashboard/${accountId}/certificates/templates`);
+    }
+
     const href = `/dashboard/${accountId}/${teamId}/${segment}`;
     return pathname === href || pathname.startsWith(`${href}/`);
   };
@@ -261,11 +304,28 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                         {/* Everything else (excluding root & teams) */}
                         {DASHBOARD_NAV_ITEMS.filter(
-                          (i) => i.segment !== '' && i.segment !== 'teams',
+                          (i) => i.segment !== '' && i.segment !== 'teams' && (!i.organizersOnly || isOrganizer),
                         ).map((item) => {
                           const isActive = isTeamNavActive(item.segment);
                           const Icon = item.icon;
                           const isTrash = item.isTrash;
+
+                          if (item.disabled) {
+                            return (
+                              <div
+                                key={item.segment}
+                                className="flex items-center justify-between px-3 py-2.5 text-gray-400/60 dark:text-gray-500/60 cursor-not-allowed select-none"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Icon className="h-5 w-5 shrink-0" />
+                                  <span className="text-sm font-medium">{item.label}</span>
+                                </div>
+                                <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                  Soon
+                                </span>
+                              </div>
+                            );
+                          }
 
                           return (
                             <Link
@@ -480,7 +540,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                      <DropdownMenuItem
                       onClick={goCreateCertificate}
-                      disabled={!hasTeamContext}
+                      disabled={!accountId}
                       className="cursor-pointer"
                     >
                       <Award className="mr-2 h-4 w-4" />
@@ -493,8 +553,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-
-           
 
               <ThemeToggle />
               <UserMenu user={user} onLogout={handleLogout} />
