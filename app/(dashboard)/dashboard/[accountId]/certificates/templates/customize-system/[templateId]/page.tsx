@@ -18,23 +18,29 @@ export default function CustomizeSystemTemplatePage() {
   const { accountId, templateId } = params;
   const router = useRouter();
 
-  // Detect platform admin: if this succeeds, the user is a super_admin.
-  // If it 403s, they're an organizer → show the customize editor.
- const {
-  data: adminData,
-  isSuccess: isPlatformAdmin,
-  isLoading: isCheckingAdmin,
-} = useListSystemTemplatesQuery(undefined, {
-  refetchOnMountOrArgChange: false,
-});
+  // Detect platform admin: if this succeeds AND returns templates,
+  // the user is a super_admin. A trainer may still get a 200 with
+  // an empty list (depending on backend authz), so we also check the
+  // length before redirecting.
+  const {
+    data: adminData,
+    isSuccess: isPlatformAdmin,
+    isLoading: isCheckingAdmin,
+  } = useListSystemTemplatesQuery(undefined, {
+    refetchOnMountOrArgChange: false,
+  });
 
-useEffect(() => {
-  // Only redirect if we actually got templates back. Trainers may get
-  // a 200 with an empty list, which would otherwise fire the redirect.
-  if (isPlatformAdmin && (adminData?.data?.templates?.length ?? 0) > 0) {
-    router.replace(`/dashboard/${accountId}/certificates/templates/${templateId}`);
-  }
-}, [isPlatformAdmin, adminData, accountId, templateId, router]);
+  useEffect(() => {
+    // Only redirect if the user is a real admin AND actually got
+    // templates back. Otherwise a trainer hitting this page would be
+    // redirected to the admin editor, which uses the wrong mutation
+    // (createSystemTemplate instead of createCertificateTemplate).
+    if (isPlatformAdmin && (adminData?.data?.templates?.length ?? 0) > 0) {
+      router.replace(
+        `/dashboard/${accountId}/certificates/templates/${templateId}`,
+      );
+    }
+  }, [isPlatformAdmin, adminData, accountId, templateId, router]);
 
   const { data, isLoading } = useListCertificateTemplatesQuery(accountId, {
     refetchOnFocus: false,
@@ -88,9 +94,6 @@ useEffect(() => {
     );
   }
 
-  // The parent's tier slug comes from system_slug. It's the invariant
-  // that drives the locked tier card, the design form field-locking,
-  // and the backend's tier re-resolution on save.
   const parentSlug = template.system_slug ?? '';
   const parentPrice = template.price_minor ?? 0;
 
@@ -99,11 +102,7 @@ useEffect(() => {
       key={`customize-${templateId}`}
       accountId={accountId}
       initial={{
-        // Preserve the parent's design and text so the user starts from
-        // the real template, not a blank canvas.
         ...template,
-        // Clone semantics: new account template, new name, not a system
-        // template, not the default.
         id: '',
         name: `${template.name} (My Copy)`,
         is_default: false,
