@@ -35,9 +35,9 @@ interface Props {
     key: K,
     value: TemplateFormState[K],
   ) => void;
-  onDesignChange: (
-    key: keyof CertificateTemplateDesign,
-    value: string | boolean,
+  onDesignChange: <K extends keyof CertificateTemplateDesign>(
+    key: K,
+    value: CertificateTemplateDesign[K],
   ) => void;
   disabled?: boolean;
 }
@@ -97,6 +97,20 @@ const QR_POSITIONS = [
   { value: 'top-right', label: 'Top right' },
   { value: 'top-left', label: 'Top left' },
 ];
+
+const BG_SIZES = [
+  { value: 'cover', label: 'Cover (fill)' },
+  { value: 'contain', label: 'Contain (fit)' },
+  { value: 'auto', label: 'Auto (original size)' },
+] as const;
+
+const BG_POSITIONS = [
+  { value: 'center', label: 'Center' },
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+] as const;
+
+const DEFAULT_BG_OPACITY = 8;
 
 function ColorInput({
   label,
@@ -171,6 +185,11 @@ export function TemplateDesignForm({
       }, 2000);
     }
   };
+
+  // Background image opacity state (never below 1 in UI to avoid invisible)
+  const bgOpacity = d.background_opacity && d.background_opacity > 0
+    ? d.background_opacity
+    : DEFAULT_BG_OPACITY;
 
   return (
     <div className="space-y-5">
@@ -308,6 +327,21 @@ export function TemplateDesignForm({
             locked={isLocked('seal')}
             onLockedClick={() => handleLockedClick('seal')}
           />
+        </div>
+      </div>
+
+      {/* Background image + controls */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center justify-between">
+          Background
+          {isLocked('background') && (
+            <span className="text-[10px] text-amber-600 flex items-center gap-1">
+              <Lock className="h-3 w-3" /> Premium required
+            </span>
+          )}
+        </p>
+
+        <div className="space-y-3">
           <FileUploadInput
             label="Background image"
             value={d.background_url ?? ''}
@@ -317,6 +351,100 @@ export function TemplateDesignForm({
             locked={isLocked('background')}
             onLockedClick={() => handleLockedClick('background')}
           />
+
+          {/* Controls only when image is set and not locked */}
+          {d.background_url && !isLocked('background') && (
+            <>
+              {/* Opacity slider */}
+              <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="bg-opacity" className="text-xs">
+                    Image opacity
+                  </Label>
+                  <span className="text-xs font-mono tabular-nums text-muted-foreground">
+                    {bgOpacity}%
+                  </span>
+                </div>
+                <input
+                  id="bg-opacity"
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={bgOpacity}
+                  onChange={(e) =>
+                    onDesignChange('background_opacity', Number(e.target.value))
+                  }
+                  disabled={allDisabled}
+                  className="w-full cursor-pointer accent-primary"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Keep it low (5–15%) so text stays readable.
+                </p>
+              </div>
+
+              {/* Size + Position */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Size</Label>
+                  <Select
+                    value={d.background_size || 'cover'}
+                    onValueChange={(v) =>
+                      onDesignChange(
+                        'background_size',
+                        v as 'cover' | 'contain' | 'auto',
+                      )
+                    }
+                    disabled={allDisabled}
+                  >
+                    <SelectTrigger className="cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BG_SIZES.map((o) => (
+                        <SelectItem
+                          key={o.value}
+                          value={o.value}
+                          className="cursor-pointer"
+                        >
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Position</Label>
+                  <Select
+                    value={d.background_position || 'center'}
+                    onValueChange={(v) =>
+                      onDesignChange(
+                        'background_position',
+                        v as 'center' | 'top' | 'bottom',
+                      )
+                    }
+                    disabled={allDisabled}
+                  >
+                    <SelectTrigger className="cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BG_POSITIONS.map((o) => (
+                        <SelectItem
+                          key={o.value}
+                          value={o.value}
+                          className="cursor-pointer"
+                        >
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

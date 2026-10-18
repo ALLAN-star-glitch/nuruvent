@@ -32,6 +32,7 @@ export function CertificateTierSelect({
 }: Props) {
   const { data, isLoading } = useListCertificateTemplatesQuery(accountId, {
     skip: !accountId,
+    refetchOnMountOrArgChange: true, 
   });
 
   const tiers = (data?.data?.templates ?? [])

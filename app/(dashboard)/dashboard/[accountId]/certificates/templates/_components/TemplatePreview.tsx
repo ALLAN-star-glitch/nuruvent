@@ -94,6 +94,8 @@ const SIZES = {
   },
 } as const;
 
+const DEFAULT_BG_OPACITY = 8;
+
 export function TemplatePreview({ design, size = 'md', tier = '', sampleData }: Props) {
   const s = SIZES[size];
 
@@ -121,6 +123,14 @@ export function TemplatePreview({ design, size = 'md', tier = '', sampleData }: 
   const watermark = substitute(design.watermark_text, SAMPLE);
   const signatoryName = design.signatory_name ?? '';
   const signatoryTitle = design.signatory_title ?? '';
+
+  // Background controls — match backend defaults (opacity 8, cover, center)
+  const bgOpacityPct =
+    design.background_opacity && design.background_opacity > 0
+      ? design.background_opacity
+      : DEFAULT_BG_OPACITY;
+  const bgSize = design.background_size || 'cover';
+  const bgPosition = design.background_position || 'center';
 
   // Tier filtering (matches the backend's tier restrictions)
   const isPremium = tier === 'premium' || tier === '';
@@ -173,13 +183,15 @@ export function TemplatePreview({ design, size = 'md', tier = '', sampleData }: 
         </div>
       )}
 
-      {/* Background image (premium) — opacity matches PDF (0.08) */}
+      {/* Background image (premium) — own layer, user-controlled opacity */}
       {showBackground && (
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage: `url(${design.background_url})`,
-            opacity: 0.08,
+            backgroundSize: bgSize,
+            backgroundPosition: bgPosition,
+            opacity: bgOpacityPct / 100,
             zIndex: 0,
           }}
         />

@@ -13,6 +13,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   useCreateCertificateTemplateMutation,
   useUpdateCertificateTemplateMutation,
   useCreateSystemTemplateMutation,
@@ -38,10 +45,6 @@ interface Props {
   templateId?: string;
   initial?: CertificateTemplate;
   isAdmin?: boolean;
-  /**
-   * Used when an organizer "customizes" a system template: locks the
-   * tier to the parent system template and pre-fills price.
-   */
   forceTier?: {
     tierTemplateId: string;
     tierSlug: string;
@@ -49,10 +52,48 @@ interface Props {
   };
 }
 
+const TIER_OPTIONS = [
+  { slug: 'default', label: 'Default', priceMinor: 2000 },
+  { slug: 'professional', label: 'Professional', priceMinor: 4000 },
+  { slug: 'premium', label: 'Premium', priceMinor: 6000 },
+] as const;
+
+type TierSlug = (typeof TIER_OPTIONS)[number]['slug'];
+
+function priceForSlug(slug: string): number {
+  const found = TIER_OPTIONS.find((t) => t.slug === slug);
+  return found?.priceMinor ?? 0;
+}
+
 function tierSlugFromPrice(priceMinor: number | null | undefined): string {
   if (priceMinor === 2000) return 'default';
   if (priceMinor === 4000) return 'professional';
   if (priceMinor === 6000) return 'premium';
+  return '';
+}
+
+// Resolves the tier slug from all available sources, treating empty
+// strings as "not provided" (unlike ??, which only falls through on
+// null/undefined). Order:
+//   1. forceTier.tierSlug (customize flow — parent's system_slug)
+//   2. initial.system_slug (system template hydration)
+//   3. derived from initial.price_minor (legacy fallback)
+function resolveTierSlug(
+  forceTier: Props['forceTier'],
+  initial: CertificateTemplate | undefined,
+  isAdmin: boolean,
+): string {
+  const forced = (forceTier?.tierSlug ?? '').trim();
+  if (forced) return forced;
+
+  const fromInitial = ((initial as unknown as { system_slug?: string })?.system_slug ?? '').trim();
+  if (fromInitial) return fromInitial;
+
+  if (isAdmin) return '';
+
+  const fromPrice = tierSlugFromPrice(initial?.price_minor);
+  if (fromPrice) return fromPrice;
+
   return '';
 }
 
@@ -66,28 +107,32 @@ export function TemplateEditor({
   const router = useRouter();
   const isEditing = !!templateId;
 
-  // Get the active account to show the organizer's name in the preview
   const activeAccount = useAppSelector(selectActiveAccount);
   const organizerName =
     activeAccount?.displayName || activeAccount?.name || 'Your Organization';
 
-  // Account hooks
   const [createTemplate, { isLoading: creating }] = useCreateCertificateTemplateMutation();
   const [updateTemplate, { isLoading: updating }] = useUpdateCertificateTemplateMutation();
 
-  // Admin hooks
   const [createSystemTemplate, { isLoading: creatingSystem }] = useCreateSystemTemplateMutation();
   const [updateSystemTemplate, { isLoading: updatingSystem }] = useUpdateSystemTemplateMutation();
 
   const isSaving = creating || updating || creatingSystem || updatingSystem;
 
-  const [form, setForm] = useState<TemplateFormState>(() => ({
-    ...EMPTY_FORM,
-    templateId: templateId ?? crypto.randomUUID(),
-    tierTemplateId: forceTier?.tierTemplateId ?? '',
-    tierSlug: forceTier?.tierSlug ?? '',
-    priceMinor: forceTier?.priceMinor ?? 0,
-  }));
+  const [form, setForm] = useState<TemplateFormState>(() => {
+    const initialSlug = resolveTierSlug(forceTier, initial, isAdmin);
+    const initialPrice =
+      forceTier?.priceMinor ??
+      (isAdmin ? priceForSlug(initialSlug) : initial?.price_minor ?? 0);
+
+    return {
+      ...EMPTY_FORM,
+      templateId: templateId ?? crypto.randomUUID(),
+      tierTemplateId: forceTier?.tierTemplateId ?? '',
+      tierSlug: initialSlug,
+      priceMinor: initialPrice,
+    };
+  });
 
   const hydratedForRef = useRef<string | null>(null);
 
@@ -95,6 +140,8 @@ export function TemplateEditor({
     if (!initial) return;
     const key = templateId ?? '__new__';
     if (hydratedForRef.current === key) return;
+
+    const resolvedSlug = resolveTierSlug(forceTier, initial, isAdmin);
 
     setForm({
       name: initial.name,
@@ -104,12 +151,14 @@ export function TemplateEditor({
         forceTier?.tierTemplateId ??
         ((initial as unknown as { tier_template_id?: string }).tier_template_id) ??
         '',
-      tierSlug: forceTier?.tierSlug ?? tierSlugFromPrice(initial.price_minor),
-      priceMinor: forceTier?.priceMinor ?? initial.price_minor ?? 0,
+      tierSlug: resolvedSlug,
+      priceMinor:
+        forceTier?.priceMinor ??
+        (isAdmin ? priceForSlug(resolvedSlug) : initial.price_minor ?? 0),
       design: { ...initial.design },
     });
     hydratedForRef.current = key;
-  }, [initial, templateId, forceTier]);
+  }, [initial, templateId, forceTier, isAdmin]);
 
   const setField = <K extends keyof TemplateFormState>(
     key: K,
@@ -118,9 +167,9 @@ export function TemplateEditor({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const setDesignField = (
-    key: keyof CertificateTemplateDesign,
-    value: string | boolean,
+  const setDesignField = <K extends keyof CertificateTemplateDesign>(
+    key: K,
+    value: CertificateTemplateDesign[K],
   ) => {
     setForm((prev) => ({
       ...prev,
@@ -131,7 +180,6 @@ export function TemplateEditor({
   const handleTierChange = (tierId: string, priceMinor: number, slug: string) => {
     setForm((prev) => {
       if (prev.tierTemplateId === tierId && prev.tierSlug === slug) return prev;
-      
       return {
         ...prev,
         tierTemplateId: tierId,
@@ -141,54 +189,69 @@ export function TemplateEditor({
     });
   };
 
-  // Tier is selected via the dropdown, forced from the parent system
-  // template (customize flow), or auto-selected for admins.
+  const handleAdminTierChange = (slug: TierSlug) => {
+    setForm((prev) => ({
+      ...prev,
+      tierSlug: slug,
+      priceMinor: priceForSlug(slug),
+    }));
+  };
+
   const isTierSelected =
     isAdmin || !!forceTier || !!form.tierSlug || !!form.tierTemplateId;
 
   const canSave =
     form.name.trim().length > 0 &&
-    (isAdmin || isEditing || !!forceTier || form.tierTemplateId.length > 0);
+    (isAdmin
+      ? !!form.tierSlug
+      : isEditing || !!forceTier || form.tierTemplateId.length > 0);
 
   const handleSave = async () => {
     if (!canSave) {
       toast.error(
         form.name.trim().length === 0
           ? 'Template name is required'
-          : 'Please select a certificate tier',
+          : isAdmin
+            ? 'Please select a tier'
+            : 'Please select a certificate tier',
       );
       return;
     }
 
-    const body = {
+    const adminBody = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      design: form.design,
+      system_slug: form.tierSlug,
+      price_minor: form.priceMinor,
+      is_system: true,
+    };
+
+    const accountBody = {
       name: form.name.trim(),
       description: form.description.trim(),
       design: form.design,
       price_minor: form.priceMinor,
-      // Admin templates don't have a parent tier.
-      // Account templates use their tier_template_id, or the forced tier
-      // from the customize flow.
-      tier_template_id: isAdmin
-        ? undefined
-        : form.tierTemplateId || forceTier?.tierTemplateId || undefined,
+      tier_template_id:
+        form.tierTemplateId || forceTier?.tierTemplateId || undefined,
     };
 
     try {
       if (isAdmin) {
         if (isEditing && templateId) {
-          await updateSystemTemplate({ templateId, body }).unwrap();
+          await updateSystemTemplate({ templateId, body: adminBody }).unwrap();
           toast.success('System template updated');
         } else {
-          await createSystemTemplate(body).unwrap();
+          await createSystemTemplate(adminBody).unwrap();
           toast.success('System template created');
         }
         router.push(`/dashboard/${accountId}/certificates/templates`);
       } else {
         if (isEditing && templateId) {
-          await updateTemplate({ templateId, body }).unwrap();
+          await updateTemplate({ templateId, body: accountBody }).unwrap();
           toast.success('Template updated');
         } else {
-          await createTemplate({ account_id: accountId, ...body }).unwrap();
+          await createTemplate({ account_id: accountId, ...accountBody }).unwrap();
           toast.success('Template created');
         }
         router.push(`/dashboard/${accountId}/certificates/templates`);
@@ -235,8 +298,40 @@ export function TemplateEditor({
               </h2>
 
               {isAdmin ? (
-                /* Admin: custom name + price, no tier selector */
                 <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tpl-tier-admin">
+                      Tier <span className="text-destructive">*</span>
+                    </Label>
+                    <Select
+                      value={form.tierSlug}
+                      onValueChange={(v) => handleAdminTierChange(v as TierSlug)}
+                      disabled={isSaving}
+                    >
+                      <SelectTrigger id="tpl-tier-admin" className="cursor-pointer">
+                        <SelectValue placeholder="Select a tier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIER_OPTIONS.map((t) => (
+                          <SelectItem
+                            key={t.slug}
+                            value={t.slug}
+                            className="cursor-pointer"
+                          >
+                            <span className="capitalize">{t.label}</span>
+                            <span className="ml-2 text-muted-foreground">
+                              — KES {(t.priceMinor / 100).toFixed(2)}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      Price is derived from the tier: default = KES 20.00,
+                      professional = KES 40.00, premium = KES 60.00.
+                    </p>
+                  </div>
+
                   <div className="space-y-1.5">
                     <Label htmlFor="tpl-name">
                       Template Name <span className="text-destructive">*</span>
@@ -245,9 +340,11 @@ export function TemplateEditor({
                       id="tpl-name"
                       value={form.name}
                       onChange={(e) => setField('name', e.target.value)}
-                      placeholder="e.g. Premium Tier"
+                      placeholder="e.g. Premium Certificate"
+                      disabled={isSaving}
                     />
                   </div>
+
                   <div className="space-y-1.5">
                     <Label htmlFor="tpl-desc">Description</Label>
                     <Textarea
@@ -256,69 +353,67 @@ export function TemplateEditor({
                       onChange={(e) => setField('description', e.target.value)}
                       placeholder="Optional description for organizers"
                       rows={2}
+                      disabled={isSaving}
+                    />
+                  </div>
+
+                  <div className="rounded-lg border border-border bg-muted/30 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-foreground">
+                        Price
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">
+                        KES {(form.priceMinor / 100).toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Derived from the selected tier. Cannot be edited directly.
+                    </p>
+                  </div>
+                </div>
+              ) : forceTier ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-border bg-muted/40 p-4 select-none">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Tier (locked)
+                      </p>
+                    </div>
+                    <p className="text-lg font-semibold text-foreground capitalize">
+                      {form.tierSlug || forceTier.tierSlug || 'Custom'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Price: KES {(form.priceMinor / 100).toFixed(2)}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Inherited from the system template and cannot be changed.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tpl-name">
+                      Template Name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="tpl-name"
+                      value={form.name}
+                      onChange={(e) => setField('name', e.target.value)}
+                      placeholder="e.g. My Premium Template"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="tpl-price">
-                      Price (KES) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="tpl-price"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={form.priceMinor / 100}
-                      onChange={(e) =>
-                        setField('priceMinor', Number(e.target.value) * 100)
-                      }
+                    <Label htmlFor="tpl-desc">Description</Label>
+                    <Textarea
+                      id="tpl-desc"
+                      value={form.description}
+                      onChange={(e) => setField('description', e.target.value)}
+                      placeholder="Optional description"
+                      rows={2}
                     />
                   </div>
                 </div>
-            ) : forceTier ? (
-              <div className="space-y-4">
-                {/* Locked tier — greyed out */}
-                <div className="rounded-lg border border-border bg-muted/40 p-4 select-none">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Tier (locked)
-                    </p>
-                  </div>
-                  <p className="text-lg font-semibold text-foreground capitalize">
-                    {forceTier.tierSlug || 'Custom'}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Price: KES {(forceTier.priceMinor / 100).toFixed(2)}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Inherited from the system template and cannot be changed.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="tpl-name">
-                    Template Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="tpl-name"
-                    value={form.name}
-                    onChange={(e) => setField('name', e.target.value)}
-                    placeholder="e.g. My Premium Template"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="tpl-desc">Description</Label>
-                  <Textarea
-                    id="tpl-desc"
-                    value={form.description}
-                    onChange={(e) => setField('description', e.target.value)}
-                    placeholder="Optional description"
-                    rows={2}
-                  />
-                </div>
-              </div>
-            ) : (
-                /* Normal account template: full tier picker */
+              ) : (
                 <TemplateBasicsForm
                   accountId={accountId}
                   form={form}
@@ -403,7 +498,7 @@ export function TemplateEditor({
                   <TemplatePreview
                     design={form.design}
                     size="md"
-                    tier={isAdmin ? 'premium' : form.tierSlug}
+                    tier={isAdmin ? form.tierSlug || 'premium' : form.tierSlug}
                     sampleData={{
                       issuer_name: organizerName,
                     }}

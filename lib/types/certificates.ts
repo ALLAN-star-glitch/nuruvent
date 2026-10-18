@@ -64,6 +64,9 @@ export interface CertificateTemplateDesign {
   seal_url?: string;
   signature_url?: string;
   background_url?: string;
+  background_opacity?: number;      // 0–100, 0 = use default
+  background_size?: 'cover' | 'contain' | 'auto';
+  background_position?: 'center' | 'top' | 'bottom';
 
   signatory_name?: string;
   signatory_title?: string;
@@ -80,6 +83,9 @@ export interface CertificateTemplateDesign {
   signature_line?: boolean;
   watermark_text?: string;
   verify_badge?: boolean;
+
+
+  
 }
 
 export interface CertificateTemplate {

@@ -1,14 +1,14 @@
 // lib/store/api/certificatesApi.ts
 
-import { 
-  IssueCertificatesResponse, 
-  IssueCertificatesRequest, 
-  CertificateListResponse, 
-  ListCertificatesParams, 
-  VerifyCertificateResponse, 
-  CertificateTemplateListResponse, 
-  CreateCertificateTemplateRequest, 
-  UpdateCertificateTemplateRequest 
+import {
+  IssueCertificatesResponse,
+  IssueCertificatesRequest,
+  CertificateListResponse,
+  ListCertificatesParams,
+  VerifyCertificateResponse,
+  CertificateTemplateListResponse,
+  CreateCertificateTemplateRequest,
+  UpdateCertificateTemplateRequest,
 } from '@/lib/types/certificates';
 import { api } from './baseApi';
 import type { BaseResponse, CertificateTemplate } from '@/lib/types/events';
@@ -169,25 +169,25 @@ export const certificatesApi = api.injectEndpoints({
     }),
 
     /** GET /certificates/:id/download
- *
- * Returns one of two shapes:
- *   - { status: "ready", url }      → PDF is cached, ready to open
- *   - { status: "rendering" }        → background render in progress, poll again
- */
-downloadCertificate: builder.mutation<
-  { status: 'ready' | 'rendering'; url?: string; poll_url?: string },
-  string
->({
-  query: (certificateId) => ({
-    url: `/certificates/${certificateId}/download`,
-    method: 'GET',
-  }),
-  transformResponse: (res: {
-    success: boolean;
-    message: string;
-    data: { status: 'ready' | 'rendering'; url?: string; poll_url?: string };
-  }) => res.data,
-}),
+     *
+     * Returns one of two shapes:
+     *   - { status: "ready", url }      → PDF is cached, ready to open
+     *   - { status: "rendering" }        → background render in progress, poll again
+     */
+    downloadCertificate: builder.mutation<
+      { status: 'ready' | 'rendering'; url?: string; poll_url?: string },
+      string
+    >({
+      query: (certificateId) => ({
+        url: `/certificates/${certificateId}/download`,
+        method: 'GET',
+      }),
+      transformResponse: (res: {
+        success: boolean;
+        message: string;
+        data: { status: 'ready' | 'rendering'; url?: string; poll_url?: string };
+      }) => res.data,
+    }),
 
     // ============================================================
     // TEMPLATES (Account-scoped)
@@ -206,6 +206,7 @@ downloadCertificate: builder.mutation<
       providesTags: (result, _e, accountId) => {
         const base: { type: 'CertificateTemplates'; id: string }[] = [
           { type: 'CertificateTemplates', id: `ACCOUNT_${accountId}` },
+          { type: 'CertificateTemplates', id: 'LIST' },
         ];
         if (result?.data?.templates) {
           return [
@@ -232,6 +233,7 @@ downloadCertificate: builder.mutation<
       }),
       invalidatesTags: (_r, _e, { account_id }) => [
         { type: 'CertificateTemplates', id: `ACCOUNT_${account_id}` },
+        { type: 'CertificateTemplates', id: 'LIST' },
       ],
     }),
 
@@ -247,28 +249,24 @@ downloadCertificate: builder.mutation<
       }),
       invalidatesTags: (_r, _e, { templateId }) => [
         { type: 'CertificateTemplates', id: templateId },
+        { type: 'CertificateTemplates', id: 'LIST' },
       ],
     }),
 
     /** DELETE /certificate-templates/:id */
-    deleteCertificateTemplate: builder.mutation<
-      BaseResponse<void>,
-      string
-    >({
+    deleteCertificateTemplate: builder.mutation<BaseResponse<void>, string>({
       query: (templateId) => ({
         url: `/certificate-templates/${templateId}`,
         method: 'DELETE',
       }),
       invalidatesTags: (_r, _e, templateId) => [
         { type: 'CertificateTemplates', id: templateId },
+        { type: 'CertificateTemplates', id: 'LIST' },
       ],
     }),
 
     /** POST /certificate-templates/:id/default */
-    setDefaultCertificateTemplate: builder.mutation<
-      BaseResponse<void>,
-      string
-    >({
+    setDefaultCertificateTemplate: builder.mutation<BaseResponse<void>, string>({
       query: (templateId) => ({
         url: `/certificate-templates/${templateId}/default`,
         method: 'POST',
@@ -292,6 +290,7 @@ downloadCertificate: builder.mutation<
       providesTags: (result) => {
         const base: { type: 'CertificateTemplates'; id: string }[] = [
           { type: 'CertificateTemplates', id: 'SYSTEM' },
+          { type: 'CertificateTemplates', id: 'LIST' },
         ];
         if (result?.data?.templates) {
           return [
@@ -316,7 +315,10 @@ downloadCertificate: builder.mutation<
         method: 'POST',
         body: { ...body, is_system: true },
       }),
-      invalidatesTags: [{ type: 'CertificateTemplates', id: 'SYSTEM' }],
+      invalidatesTags: [
+        { type: 'CertificateTemplates', id: 'SYSTEM' },
+        { type: 'CertificateTemplates', id: 'LIST' },
+      ],
     }),
 
     /** PUT /admin/certificate-templates/:id */
@@ -332,14 +334,12 @@ downloadCertificate: builder.mutation<
       invalidatesTags: (_r, _e, { templateId }) => [
         { type: 'CertificateTemplates', id: 'SYSTEM' },
         { type: 'CertificateTemplates', id: templateId },
+        { type: 'CertificateTemplates', id: 'LIST' },
       ],
     }),
 
     /** DELETE /admin/certificate-templates/:id */
-    deleteSystemTemplate: builder.mutation<
-      BaseResponse<void>,
-      string
-    >({
+    deleteSystemTemplate: builder.mutation<BaseResponse<void>, string>({
       query: (templateId) => ({
         url: `/admin/certificate-templates/${templateId}`,
         method: 'DELETE',
@@ -347,6 +347,7 @@ downloadCertificate: builder.mutation<
       invalidatesTags: (_r, _e, templateId) => [
         { type: 'CertificateTemplates', id: 'SYSTEM' },
         { type: 'CertificateTemplates', id: templateId },
+        { type: 'CertificateTemplates', id: 'LIST' },
       ],
     }),
 
