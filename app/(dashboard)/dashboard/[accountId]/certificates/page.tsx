@@ -23,7 +23,6 @@ import { AccountCertificatesGrid } from './_components/AccountCertificatesGrid';
 import { AccountCertificatesTable } from './_components/AccountCertificatesTable';
 import { SelectEventDialog } from './_components/SelectEventDialog';
 
-// Reuse the existing event-level dialog
 import { IssueBatchDialog } from '../[teamId]/events/[id]/certificates/_components/IssueBatchDialog';
 import { RevokeCertificateDialog } from '../[teamId]/events/[id]/certificates/_components/RevokeCertificateDialog';
 import { SendCertificateDialog } from '../[teamId]/events/[id]/certificates/_components/SendCertificateDialog';
@@ -43,7 +42,6 @@ export default function AccountCertificatesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  // Event-selection flow
   const [selectEventOpen, setSelectEventOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
@@ -56,8 +54,6 @@ export default function AccountCertificatesPage() {
   });
 
   const { data: templatesData } = useListCertificateTemplatesQuery(accountId);
-
-  const [downloadCertificate] = useDownloadCertificateMutation();
 
   const certificates = data?.data?.certificates ?? [];
   const templates = templatesData?.data?.templates ?? [];
@@ -120,33 +116,49 @@ export default function AccountCertificatesPage() {
     setEventFilter('all');
   };
 
-  const handleDownload = async (cert: Certificate) => {
-    if (downloadingId) return;
-    setDownloadingId(cert.id);
-    try {
+const [downloadCertificate] = useDownloadCertificateMutation();
+
+const handleDownload = async (cert: Certificate) => {
+  if (downloadingId) return;
+
+  // Open a blank tab synchronously — this is user-initiated
+  const popup = window.open('', '_blank');
+
+  setDownloadingId(cert.id);
+  try {
+    let finalUrl: string | null = null;
+
+    for (let attempt = 0; attempt < 40; attempt++) {
       const result = await downloadCertificate(cert.id).unwrap();
+      console.log('[download] poll', attempt, result);
 
-      if (result && typeof result === 'object' && 'data' in result) {
-        const url = (result as { data: { url: string } }).data.url;
-        window.open(url, '_blank', 'noopener,noreferrer');
-        return;
+      if (result.status === 'ready' && result.url) {
+        finalUrl = result.url;
+        break;
       }
-
-      const blob = result as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate-${cert.verification_code}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to download certificate');
-    } finally {
-      setDownloadingId(null);
+      await new Promise((r) => setTimeout(r, 1500));
     }
-  };
+
+    if (!finalUrl) {
+      popup?.close();
+      toast.error('Certificate is taking too long. Try again in a moment.');
+      return;
+    }
+
+    if (popup && !popup.closed) {
+      popup.location.href = finalUrl;
+    } else {
+      // Fallback if popup was blocked or closed
+      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+    }
+  } catch (err) {
+    console.error('[download] error', err);
+    popup?.close();
+    toast.error('Failed to download certificate');
+  } finally {
+    setDownloadingId(null);
+  }
+};
 
   const emptyNode = (
     <Card className="border-0 border-b border-border">
@@ -269,7 +281,6 @@ export default function AccountCertificatesPage() {
         </>
       )}
 
-      {/* Step 1: pick an event */}
       <SelectEventDialog
         open={selectEventOpen}
         accountId={accountId}
@@ -280,24 +291,23 @@ export default function AccountCertificatesPage() {
         }}
       />
 
-      {/* Step 2: reuse the existing IssueBatchDialog with the selected event */}
-     {selectedEvent && (
-      <IssueBatchDialog
-        open={!!selectedEvent}
-        onOpenChange={(open) => {
-          if (!open) setSelectedEvent(null);
-        }}
-        accountId={accountId}
-        teamId={selectedEvent.team_id ?? ''}
-        eventId={selectedEvent.id}
-        eventTitle={selectedEvent.display_name || selectedEvent.name || 'Untitled event'}
-        eventDate={selectedEvent.start_date || new Date().toISOString()}
-        onIssued={() => {
-          setSelectedEvent(null);
-          refetch();
-        }}
-      />
-    )}
+      {selectedEvent && (
+        <IssueBatchDialog
+          open={!!selectedEvent}
+          onOpenChange={(open) => {
+            if (!open) setSelectedEvent(null);
+          }}
+          accountId={accountId}
+          teamId={selectedEvent.team_id ?? ''}
+          eventId={selectedEvent.id}
+          eventTitle={selectedEvent.display_name || selectedEvent.name || 'Untitled event'}
+          eventDate={selectedEvent.start_date || new Date().toISOString()}
+          onIssued={() => {
+            setSelectedEvent(null);
+            refetch();
+          }}
+        />
+      )}
 
       <SendCertificateDialog
         cert={sendTarget}

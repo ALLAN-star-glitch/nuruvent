@@ -7,7 +7,6 @@ import { useParams } from 'next/navigation';
 import { Grid3X3, List, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,8 +22,6 @@ import {
   useListAccountCertificatesQuery,
   useListCertificateTemplatesQuery,
 } from '@/lib/store/api/certificatesApi';
-
-// Reuse account-level components for consistent layout
 
 import { EventCertificatesEmpty } from './_components/EventCertificatesEmpty';
 import { EventCertificatesHeader } from './_components/EventCertificatesHeader';
@@ -70,7 +67,6 @@ export default function EventCertificatesPage() {
     params: { context_id: eventId, limit: 500 },
   });
 
-  // Fetch templates for the grid previews
   const { data: templatesData } = useListCertificateTemplatesQuery(accountId);
   const templates = templatesData?.data?.templates ?? [];
 
@@ -157,35 +153,49 @@ export default function EventCertificatesPage() {
     }
   };
 
-  const [downloadCertificate] = useDownloadCertificateMutation();
+const [downloadCertificate] = useDownloadCertificateMutation();
 
-  const handleDownload = async (cert: Certificate) => {
-    if (downloadingId) return;
-    setDownloadingId(cert.id);
-    try {
+const handleDownload = async (cert: Certificate) => {
+  if (downloadingId) return;
+
+  // Open a blank tab synchronously — this is user-initiated
+  const popup = window.open('', '_blank');
+
+  setDownloadingId(cert.id);
+  try {
+    let finalUrl: string | null = null;
+
+    for (let attempt = 0; attempt < 40; attempt++) {
       const result = await downloadCertificate(cert.id).unwrap();
+      console.log('[download] poll', attempt, result);
 
-      if (result && typeof result === 'object' && 'data' in result) {
-        const url = (result as { data: { url: string } }).data.url;
-        window.open(url, '_blank', 'noopener,noreferrer');
-        return;
+      if (result.status === 'ready' && result.url) {
+        finalUrl = result.url;
+        break;
       }
-
-      const blob = result as Blob;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate-${cert.verification_code}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast.error('Failed to download certificate');
-    } finally {
-      setDownloadingId(null);
+      await new Promise((r) => setTimeout(r, 1500));
     }
-  };
+
+    if (!finalUrl) {
+      popup?.close();
+      toast.error('Certificate is taking too long. Try again in a moment.');
+      return;
+    }
+
+    if (popup && !popup.closed) {
+      popup.location.href = finalUrl;
+    } else {
+      // Fallback if popup was blocked or closed
+      window.open(finalUrl, '_blank', 'noopener,noreferrer');
+    }
+  } catch (err) {
+    console.error('[download] error', err);
+    popup?.close();
+    toast.error('Failed to download certificate');
+  } finally {
+    setDownloadingId(null);
+  }
+};
 
   const backHref = `/dashboard/${accountId}/${teamId}/events/${eventId}`;
 
@@ -224,7 +234,6 @@ export default function EventCertificatesPage() {
           {certificates.length > 0 && (
             <Card className="border-border">
               <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-                {/* View toggle (Grid / Table) — LEFT */}
                 <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 shrink-0">
                   <button
                     type="button"
@@ -252,7 +261,6 @@ export default function EventCertificatesPage() {
                   </button>
                 </div>
 
-                {/* Search */}
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -272,7 +280,6 @@ export default function EventCertificatesPage() {
                   )}
                 </div>
 
-                {/* Status filter */}
                 <Select
                   value={statusFilter}
                   onValueChange={(v) =>

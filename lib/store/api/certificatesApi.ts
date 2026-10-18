@@ -168,30 +168,26 @@ export const certificatesApi = api.injectEndpoints({
       ],
     }),
 
-    /**
-     * GET /certificates/:id/download
-     *
-     * Returns the PDF. Backend either:
-     *   - responds 302 → PDF URL (browser follows, we get the blob), or
-     *   - responds JSON `{ url }` if the PDF is on a cross-origin host.
-     *
-     * We handle both shapes. The base query injects the auth header,
-     * so this works for authenticated users (account admins, recipients).
-     */
-    downloadCertificate: builder.mutation<{ url: string } | Blob, string>({
-      query: (certificateId) => ({
-        url: `/certificates/${certificateId}/download`,
-        method: 'GET',
-        cache: 'no-cache',
-        responseHandler: async (response) => {
-          const contentType = response.headers.get('content-type') ?? '';
-          if (contentType.includes('application/json')) {
-            return response.json();
-          }
-          return response.blob();
-        },
-      }),
-    }),
+    /** GET /certificates/:id/download
+ *
+ * Returns one of two shapes:
+ *   - { status: "ready", url }      → PDF is cached, ready to open
+ *   - { status: "rendering" }        → background render in progress, poll again
+ */
+downloadCertificate: builder.mutation<
+  { status: 'ready' | 'rendering'; url?: string; poll_url?: string },
+  string
+>({
+  query: (certificateId) => ({
+    url: `/certificates/${certificateId}/download`,
+    method: 'GET',
+  }),
+  transformResponse: (res: {
+    success: boolean;
+    message: string;
+    data: { status: 'ready' | 'rendering'; url?: string; poll_url?: string };
+  }) => res.data,
+}),
 
     // ============================================================
     // TEMPLATES (Account-scoped)
