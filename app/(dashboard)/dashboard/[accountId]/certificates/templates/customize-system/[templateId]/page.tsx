@@ -20,19 +20,21 @@ export default function CustomizeSystemTemplatePage() {
 
   // Detect platform admin: if this succeeds, the user is a super_admin.
   // If it 403s, they're an organizer → show the customize editor.
-  const { isSuccess: isPlatformAdmin, isLoading: isCheckingAdmin } =
-    useListSystemTemplatesQuery(undefined, {
-      refetchOnMountOrArgChange: false,
-    });
+ const {
+  data: adminData,
+  isSuccess: isPlatformAdmin,
+  isLoading: isCheckingAdmin,
+} = useListSystemTemplatesQuery(undefined, {
+  refetchOnMountOrArgChange: false,
+});
 
-  useEffect(() => {
-    if (isPlatformAdmin) {
-      // Admins edit system templates in place
-      router.replace(
-        `/dashboard/${accountId}/certificates/templates/${templateId}`,
-      );
-    }
-  }, [isPlatformAdmin, accountId, templateId, router]);
+useEffect(() => {
+  // Only redirect if we actually got templates back. Trainers may get
+  // a 200 with an empty list, which would otherwise fire the redirect.
+  if (isPlatformAdmin && (adminData?.data?.templates?.length ?? 0) > 0) {
+    router.replace(`/dashboard/${accountId}/certificates/templates/${templateId}`);
+  }
+}, [isPlatformAdmin, adminData, accountId, templateId, router]);
 
   const { data, isLoading } = useListCertificateTemplatesQuery(accountId, {
     refetchOnFocus: false,
