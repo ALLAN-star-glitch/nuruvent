@@ -59,6 +59,7 @@ interface NavItem {
   exact?: boolean;
   organizersOnly?: boolean;
   adminsOnly?: boolean;
+  learnersOnly?: boolean;
   disabled?: boolean;
   children?: NavItem[];
 }
@@ -122,6 +123,11 @@ export function DashboardSidebar({
     return role === 'account_admin' || role === 'trainer';
   }, [myMembership]);
 
+  const isLearner = useMemo(() => {
+    const role = myMembership?.role as AccountRole | undefined;
+    return role === 'learner';
+  }, [myMembership]);
+
   const TEAM_NAV_ITEMS = useMemo<NavItem[]>(
     () => [
       {
@@ -151,6 +157,7 @@ export function DashboardSidebar({
         icon: CreditCard,
         adminsOnly: true,
       },
+      // Organizer certificates (full management view)
       {
         segment: 'certificates',
         label: 'Certificates',
@@ -177,9 +184,19 @@ export function DashboardSidebar({
           },
         ],
       },
-      { 
-        segment: 'replays', 
-        label: 'Replays', 
+      // Learner certificates (self-service view)
+      {
+        segment: 'my-certificates',
+        label: 'My Certificates',
+        icon: Award,
+        learnersOnly: true,
+        href: accountId
+          ? `/me/certificates`
+          : undefined,
+      },
+      {
+        segment: 'replays',
+        label: 'Replays',
         icon: Clapperboard,
         disabled: true,
       },
@@ -199,9 +216,10 @@ export function DashboardSidebar({
       TEAM_NAV_ITEMS.filter((item) => {
         if (item.adminsOnly) return isAdmin;
         if (item.organizersOnly) return isOrganizer;
+        if (item.learnersOnly) return isLearner;
         return true;
       }),
-    [TEAM_NAV_ITEMS, isAdmin, isOrganizer],
+    [TEAM_NAV_ITEMS, isAdmin, isOrganizer, isLearner],
   );
 
   useEffect(() => {
@@ -368,7 +386,6 @@ export function DashboardSidebar({
               const isCertGroup = item.segment === 'certificates';
               const childrenExpanded = isCertGroup && certificatesExpanded;
 
-              // 🚨 Disabled Item Renderer
               if (item.disabled) {
                 if (collapsed) {
                   return (
@@ -399,7 +416,6 @@ export function DashboardSidebar({
                 );
               }
 
-              // Standard Item Renderer
               if (collapsed) {
                 return (
                   <div key={item.segment || item.label}>

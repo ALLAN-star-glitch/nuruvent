@@ -1,43 +1,60 @@
-// app/(dashboard)/dashboard/me/certificates/page.tsx
+// app/(dashboard)/me/certificates/page.tsx
 
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Award, RefreshCw, Search, X } from 'lucide-react';
+import { FileBadge, Grid3X3, List } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useGetMyCertificatesQuery } from '@/lib/store/api/certificatesApi';
+  useDownloadCertificateMutation,
+  useGetMyCertificatesQuery,
+  useListCertificateTemplatesQuery,
+} from '@/lib/store/api/certificatesApi';
+import { useAppSelector } from '@/lib/store/hooks';
+import { selectActiveAccount } from '@/lib/store/slices/authSlice';
 
-import { CertificateCard } from './_components/CertificateCard';
-import { CertificateEmpty } from './_components/CertificateEmpty';
 import { CertificateSkeleton } from './_components/CertificateSkeleton';
 
-type StatusFilter = 'all' | 'active' | 'revoked';
+// Reuse organizer components for consistent design
+import { AccountCertificatesStats } from '../../dashboard/[accountId]/certificates/_components/AccountCertificatesStats';
+import { AccountCertificatesFilters } from '../../dashboard/[accountId]/certificates/_components/AccountCertificatesFilters';
+import { AccountCertificatesGrid } from '../../dashboard/[accountId]/certificates/_components/AccountCertificatesGrid';
+import { AccountCertificatesTable } from '../../dashboard/[accountId]/certificates/_components/AccountCertificatesTable';
+
+import { Certificate, CertificateTemplate } from '@/lib/types/certificates';
+
+type ViewMode = 'grid' | 'table';
 
 export default function MyCertificatesPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    error,
-    refetch,
-  } = useGetMyCertificatesQuery({ limit: 100, offset: 0 });
+  // Get the active account ID to satisfy the required prop
+  const activeAccount = useAppSelector(selectActiveAccount);
+  const accountId = activeAccount?.id ?? '';
+
+  const { data, isLoading, isFetching, refetch } = useGetMyCertificatesQuery({
+    limit: 500,
+  });
+
+  // Fetch templates just to get names/designs if the grid uses them
+  const { data: templatesData } = useListCertificateTemplatesQuery(accountId, {
+    skip: !accountId,
+  });
 
   const certificates = data?.data?.certificates ?? [];
+  const templates = templatesData?.data?.templates ?? [];
 
-  // ---- Filter (client-side for search + status) ----
+  const templatesById = useMemo(() => {
+    const map = new Map<string, CertificateTemplate>();
+    templates.forEach((t) => map.set(t.id, t));
+    return map;
+  }, [templates]);
+
   const filtered = useMemo(() => {
     let list = certificates;
 
@@ -45,142 +62,191 @@ export default function MyCertificatesPage() {
       list = list.filter((c) => c.status === statusFilter);
     }
 
-    const q = searchQuery.trim().toLowerCase();
+    const q = search.trim().toLowerCase();
     if (q) {
-      list = list.filter((c) => {
-        const title = (c.metadata?.context_title ?? '').toLowerCase();
-        const issuer = (c.metadata?.issuer_name ?? '').toLowerCase();
-        return (
-          title.includes(q) ||
-          issuer.includes(q) ||
+      list = list.filter(
+        (c) =>
+          c.recipient_name.toLowerCase().includes(q) ||
           c.verification_code.toLowerCase().includes(q) ||
-          c.recipient_name.toLowerCase().includes(q)
-        );
-      });
+          (c.metadata?.context_title ?? '').toLowerCase().includes(q) ||
+          (c.metadata?.issuer_name ?? '').toLowerCase().includes(q),
+      );
     }
 
-    return list;
-  }, [certificates, searchQuery, statusFilter]);
+    return [...list].sort(
+      (a, b) => new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime(),
+    );
+  }, [certificates, statusFilter, search]);
 
-  const hasFilters = searchQuery.trim().length > 0 || statusFilter !== 'all';
+  const stats = useMemo(() => {
+    const total = certificates.length;
+    const active = certificates.filter((c) => c.status === 'active').length;
+    const revoked = total - active;
+    return { total, active, revoked, events: 0 };
+  }, [certificates]);
 
-  const clearFilters = () => {
-    setSearchQuery('');
+  const resetFilters = () => {
+    setSearch('');
     setStatusFilter('all');
   };
 
-  // ---- Error ----
-  if (error) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Card className="w-full max-w-md border-destructive/30">
-          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Failed to load certificates. Please try again.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="cursor-pointer"
-              onClick={() => refetch()}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const [downloadCertificate] = useDownloadCertificateMutation();
+
+  const handleDownload = async (cert: Certificate) => {
+    if (downloadingId) return;
+    setDownloadingId(cert.id);
+    const toastId = toast.loading('Preparing your certificate…');
+
+    try {
+      let finalUrl: string | null = null;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const result = await downloadCertificate(cert.id).unwrap();
+        if (result.status === 'ready' && result.url) {
+          finalUrl = result.url;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+
+      if (!finalUrl) {
+        toast.error('Certificate is taking too long. Try again in a moment.', { id: toastId });
+        return;
+      }
+
+      const res = await fetch(finalUrl);
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `${cert.recipient_name.replace(/\s+/g, '_')}_certificate.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+
+      toast.success('Certificate downloaded', { id: toastId });
+    } catch (err) {
+      console.error('[download] error', err);
+      toast.error('Failed to download certificate', { id: toastId });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const emptyNode = (
+    <Card className="border-0 border-b border-border">
+      <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+        <div className="rounded-full bg-muted p-4">
+          <FileBadge className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-foreground">
+            {certificates.length === 0 ? 'No certificates yet' : 'No certificates match'}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {certificates.length === 0
+              ? 'Complete an event to earn certificates.'
+              : 'Try adjusting your filters.'}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-            <Award className="h-6 w-6 text-primary" />
             My Certificates
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Certificates you have earned and can download.
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="cursor-pointer self-start"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`}
-          />
-          Refresh
-        </Button>
       </div>
 
-      {/* Filters */}
-      {!isLoading && certificates.length > 0 && (
-        <Card className="border-border">
-          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by title, issuer, or code…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-9"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full hover:bg-muted"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
-              )}
-            </div>
-            <Select
-              value={statusFilter}
-              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-            >
-              <SelectTrigger className="w-full cursor-pointer sm:w-[160px]">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="cursor-pointer">
-                  All statuses
-                </SelectItem>
-                <SelectItem value="active" className="cursor-pointer">
-                  Active
-                </SelectItem>
-                <SelectItem value="revoked" className="cursor-pointer">
-                  Revoked
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Content */}
       {isLoading ? (
         <CertificateSkeleton count={6} />
-      ) : filtered.length === 0 ? (
-        <CertificateEmpty hasFilters={hasFilters} onClearFilters={clearFilters} />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((cert) => (
-              <CertificateCard key={cert.id} cert={cert} />
-            ))}
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            {filtered.length} certificate{filtered.length === 1 ? '' : 's'}
-            {hasFilters && ` (of ${certificates.length})`}
-          </p>
+          <AccountCertificatesStats
+            total={stats.total}
+            active={stats.active}
+            revoked={stats.revoked}
+            events={stats.events}
+          />
+
+          {certificates.length > 0 && (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex items-center gap-1 rounded-lg bg-muted p-0.5 shrink-0 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'grid'
+                      ? 'bg-background text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Grid3X3 className="h-3.5 w-3.5" />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'table'
+                      ? 'bg-background text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <List className="h-3.5 w-3.5" />
+                  Table
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <AccountCertificatesFilters
+                  search={search}
+                  onSearchChange={setSearch}
+                  statusFilter={statusFilter}
+                  onStatusChange={setStatusFilter}
+                  eventFilter="all"
+                  onEventChange={() => {}}
+                  events={[]}
+                  onReset={resetFilters}
+                  resultCount={filtered.length}
+                  totalCount={certificates.length}
+                />
+              </div>
+            </div>
+          )}
+
+          {viewMode === 'grid' ? (
+            <AccountCertificatesGrid
+              certificates={filtered}
+              templatesById={templatesById}
+              accountId={accountId} // Passed valid string
+              downloadingId={downloadingId}
+              onSend={() => {}}
+              onRevoke={() => {}}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          ) : (
+            <AccountCertificatesTable
+              certificates={filtered}
+              accountId={accountId} // Passed valid string
+              downloadingId={downloadingId}
+              onSend={() => {}}
+              onRevoke={() => {}}
+              onDownload={handleDownload}
+              emptyState={emptyNode}
+            />
+          )}
         </>
       )}
     </div>
