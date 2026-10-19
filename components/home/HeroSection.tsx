@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight,
@@ -9,9 +11,37 @@ import {
   Award,
   CheckCircle,
   Sparkles,
+  QrCode,
 } from 'lucide-react';
 
 export function HeroSection() {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  // Generate the QR code for the verification page
+  useEffect(() => {
+    const generateQR = async () => {
+      try {
+        const verifyUrl = 
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/verify`
+            : 'https://nuruvent.com/verify';
+
+        const url = await QRCode.toDataURL(verifyUrl, {
+          margin: 1,
+          width: 256,
+          color: {
+            dark: '#1A73E8', // Primary blue
+            light: '#FFFFFF',
+          },
+        });
+        setQrDataUrl(url);
+      } catch (err) {
+        console.error('Failed to generate QR code', err);
+      }
+    };
+    generateQR();
+  }, []);
+
   return (
     <section className="relative flex items-center overflow-hidden bg-background">
       {/* Background image — desktop & tablet */}
@@ -80,6 +110,7 @@ export function HeroSection() {
       {/* Content */}
       <div className="container relative z-10 mx-auto px-4 py-12 sm:py-16 lg:py-20">
         <div className="grid grid-cols-1 items-center gap-8 lg:grid-cols-12 lg:gap-8">
+          
           {/* Left column — narrower so the image gets more space */}
           <div className="mx-auto max-w-xl text-center lg:col-span-5 lg:mx-0 lg:max-w-none lg:text-left">
             {/* Badge */}
@@ -169,8 +200,7 @@ export function HeroSection() {
 
           {/* Right column — wider, image-first */}
           <div className="relative hidden min-h-[420px] lg:col-span-7 lg:block">
-            {/* Floating badges sit on the LEFT edge of this column,
-                over the bokeh area, not over the image subject. */}
+            {/* Floating badges sit on the LEFT edge of this column */}
             <div className="animate-float absolute left-4 top-8 z-20 flex items-center gap-3 rounded-2xl border border-border/60 bg-card/85 p-3 shadow-xl backdrop-blur-md">
               <div className="rounded-xl bg-tertiary/15 p-2">
                 <Award className="h-5 w-5 text-tertiary" />
@@ -215,8 +245,52 @@ export function HeroSection() {
                 </p>
               </div>
             </div>
+
+            {/* Desktop Floating QR Code */}
+            {qrDataUrl && (
+              <div
+                className="animate-float absolute bottom-6 right-8 z-20 flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-card/85 p-3 shadow-xl backdrop-blur-md"
+                style={{ animationDelay: '2s' }}
+              >
+                <div className="rounded-xl bg-white p-1.5 shadow-sm border border-border/50">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={qrDataUrl}
+                    alt="Scan to verify a certificate"
+                    className="h-20 w-20 object-contain"
+                  />
+                </div>
+                <p className="flex items-center gap-1.5 text-[10px] font-bold text-foreground uppercase tracking-wider">
+                  <QrCode className="h-3 w-3 text-primary" />
+                  Scan to verify a certificate
+                </p>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Mobile Floating QR Code - positioned relative to the whole hero section */}
+        {qrDataUrl && (
+          <div className="mt-10 flex justify-center lg:hidden">
+            <div
+              className="animate-float flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-card/90 p-4 shadow-xl backdrop-blur-md"
+              style={{ animationDelay: '2s' }}
+            >
+              <div className="rounded-xl bg-white p-2 shadow-sm border border-border/50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={qrDataUrl}
+                  alt="Scan to verify a certificate"
+                  className="h-24 w-24 object-contain"
+                />
+              </div>
+              <p className="flex items-center gap-1.5 text-xs font-bold text-foreground uppercase tracking-wider">
+                <QrCode className="h-4 w-4 text-primary" />
+                Scan to verify a certificate
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

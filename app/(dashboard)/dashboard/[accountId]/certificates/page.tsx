@@ -226,6 +226,9 @@ export default function AccountCertificatesPage() {
           title: 'Issued Certificates',
           hostName: organizerName,
           hostLogoUrl: organizerLogo,
+          verifyUrl: typeof window !== 'undefined' 
+            ? `${window.location.origin}/verify` 
+            : 'https://nuruvent.com/verify',
         });
         toast.success('Exported as PDF');
       }

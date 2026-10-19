@@ -95,17 +95,19 @@ export default function VerifyCertificatePage() {
 // ============================================================
 
 function PageShell({ children }: { children: React.ReactNode }) {
+  const currentYear = new Date().getFullYear();
+
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       {/* Header */}
       <header className="border-b border-border bg-background">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3 sm:px-6">
           <Link
-            href="/"
+            href="/verify"
             className="flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
           >
             <ArrowLeft className="h-4 w-4" />
-            Nuruvent
+            Verify Another
           </Link>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Award className="h-4 w-4" />
@@ -121,8 +123,19 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
       {/* Footer */}
       <footer className="border-t border-border bg-background">
-        <div className="mx-auto max-w-4xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6">
-          Powered by Nuruvent
+        <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-3 px-4 py-6 text-center text-xs text-muted-foreground sm:flex-row sm:justify-between sm:px-6">
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png" 
+              alt="Nuruvent"
+              className="h-10 w-auto object-contain opacity-70 grayscale"
+            />
+            <span className="font-medium text-foreground/80">Nuruvent</span>
+          </div>
+          <p>
+            &copy; {currentYear} Nuruvent. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

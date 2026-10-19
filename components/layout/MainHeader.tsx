@@ -165,6 +165,7 @@ export function MainHeader() {
 
               {!isAuthenticated && (
                 <>
+                  {/* Desktop: Sign In + Get Started */}
                   <Link href="/signin" className="cursor-pointer hidden sm:flex">
                     <Button
                       variant="ghost"
@@ -174,13 +175,22 @@ export function MainHeader() {
                       Sign In
                     </Button>
                   </Link>
-                  <Link href="/signup" className="cursor-pointer">
+                  <Link href="/signup" className="cursor-pointer hidden sm:flex">
                     <Button
                       size="sm"
                       className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium cursor-pointer px-2.5 sm:px-4 py-1.5 sm:py-2 h-8 sm:h-9 text-xs sm:text-sm"
                     >
-                      <span className="hidden xs:inline">Get Started</span>
-                      <span className="xs:hidden">Get Started</span>
+                      Get Started
+                    </Button>
+                  </Link>
+
+                  {/* Mobile: Sign In only */}
+                  <Link href="/signin" className="cursor-pointer sm:hidden">
+                    <Button
+                      size="sm"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium cursor-pointer px-3 py-1.5 h-8 text-xs"
+                    >
+                      Sign In
                     </Button>
                   </Link>
                 </>

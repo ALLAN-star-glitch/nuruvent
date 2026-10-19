@@ -1,6 +1,7 @@
 // lib/utils/exportCertificates.ts
 
 import { Certificate } from '../types/certificates';
+import QRCode from 'qrcode';
 
 // ============================================================
 // BRAND — keep in sync with globals.css
@@ -127,6 +128,21 @@ async function loadImageDataUrl(
   }
 }
 
+async function generateQRCodeDataUrl(text: string): Promise<string | null> {
+  try {
+    return await QRCode.toDataURL(text, {
+      margin: 1,
+      width: 300,
+      color: {
+        dark: '#1A73E8', // BRAND.primary
+        light: '#FFFFFF',
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 // ============================================================
 // TOTALS
 // ============================================================
@@ -223,9 +239,10 @@ export interface ExportCertificatesPDFOptions {
   title?: string;
   subtitle?: string;
   hostName?: string;
-  hostLogoUrl?: string; // <-- Added for organizer logo
+  hostLogoUrl?: string;
   filtersSummary?: string;
   filename?: string;
+  verifyUrl?: string;
 }
 
 export async function exportCertificatesToPDF(
@@ -241,6 +258,7 @@ export async function exportCertificatesToPDF(
   const hostLogoUrl = options.hostLogoUrl ?? '';
   const filtersSummary = options.filtersSummary ?? '';
   const filename = options.filename ?? `certificates-${todayStamp()}.pdf`;
+  const verifyUrl = options.verifyUrl ?? 'https://nuruvent.com/verify';
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -256,7 +274,7 @@ export async function exportCertificatesToPDF(
   doc.rect(0, 2, pageWidth, 1, 'F');
 
   // ------------------------------------------------------------
-  // LOGO (Organizer)
+  // LOGO
   // ------------------------------------------------------------
   const logo = await loadImageDataUrl(hostLogoUrl);
   let textLeft = margin;
@@ -319,6 +337,23 @@ export async function exportCertificatesToPDF(
   if (filtersSummary) {
     doc.setFontSize(9);
     doc.text(filtersSummary, textLeft, metaY);
+  }
+
+  // ------------------------------------------------------------
+  // QR CODE (Top Right)
+  // ------------------------------------------------------------
+  const qrDataUrl = await generateQRCodeDataUrl(verifyUrl);
+  if (qrDataUrl) {
+    const qrSize = 60;
+    const qrX = pageWidth - margin - qrSize;
+    const qrY = 26;
+    
+    doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...BRAND.neutralGray);
+    doc.text('Scan to Verify', qrX + qrSize / 2, qrY + qrSize + 10, { align: 'center' });
   }
 
   // ------------------------------------------------------------
@@ -456,7 +491,6 @@ export async function exportCertificatesToPDF(
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
 
-    // Nuruvent brand stays in the footer
     doc.text('Nuruvent', margin, pageHeight - 18);
     doc.text(
       'Certificate report · Confidential',
