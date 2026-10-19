@@ -66,9 +66,9 @@ export default function AccountCertificatesPage() {
   const account = accountsData?.find((a) => a.id === accountId);
   
   const organizerName =
-    account?.display_name || account?.displayName || account?.name || 'Organizer';
+    account?.display_name || account?.display_name || account?.name || 'Organizer';
     
-  const organizerLogo = account?.logo_url || account?.logoUrl || '';
+  const organizerLogo = account?.logo_url || account?.logo_url || '';
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
