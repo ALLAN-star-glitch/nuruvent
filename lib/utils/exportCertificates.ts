@@ -348,30 +348,42 @@ export async function exportCertificatesToPDF(
     const qrX = pageWidth - margin - qrSize;
     const qrY = 26;
     
-    // Draw QR Code
+    // 1. Draw QR Code
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     
-    // Scan label
+    // 2. Scan label
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
     doc.text('Scan to verify certificate', qrX + qrSize / 2, qrY + qrSize + 12, { align: 'center' });
 
-    // Clickable visible link
+    // 3. Clickable visible Button
     const linkText = 'Or click here to verify';
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    
+    const textWidth = doc.getTextWidth(linkText);
+    const btnPaddingX = 6;
+    const btnPaddingY = 4;
+    const btnWidth = textWidth + btnPaddingX * 2;
+    const btnHeight = 8 + btnPaddingY * 2;
+    
+    // Center the button under the QR code
+    const btnX = qrX + (qrSize / 2) - (btnWidth / 2);
+    const btnY = qrY + qrSize + 18;
+
+    // Draw button background (light blue)
+    doc.setFillColor(240, 245, 255); // Very light primary blue
+    doc.setDrawColor(...BRAND.primary);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(btnX, btnY, btnWidth, btnHeight, 3, 3, 'FD');
+
+    // Draw button text (primary blue)
     doc.setTextColor(...BRAND.primary);
-    doc.setFont('helvetica', 'underline');
+    doc.text(linkText, btnX + btnPaddingX, btnY + btnHeight - btnPaddingY - 1);
     
-    const linkWidth = doc.getTextWidth(linkText);
-    const linkX = qrX + (qrSize / 2) - (linkWidth / 2);
-    const linkY = qrY + qrSize + 24;
-    
-    // Draw the visible text
-    doc.text(linkText, linkX, linkY);
-    
-    // Draw the invisible clickable area over the text
-    doc.link(linkX, linkY - 8, linkWidth, 10, { url: verifyUrl });
+    // Draw the invisible clickable area over the button
+    doc.link(btnX, btnY, btnWidth, btnHeight, { url: verifyUrl });
   }
 
   // ------------------------------------------------------------
