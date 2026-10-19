@@ -31,14 +31,15 @@ export interface ExportColumn {
 }
 
 export const getCertificateExportColumns = (
-  fallbackIssuer: string,
+  issuer: string,
 ): ExportColumn[] => [
   { key: 'id',                label: 'Certificate ID',   get: (c) => c.id },
   { key: 'verification_code', label: 'Verify Code',      get: (c) => c.verification_code },
   { key: 'recipient_name',    label: 'Recipient Name',   get: (c) => c.recipient_name },
   { key: 'recipient_email',   label: 'Recipient Email',  get: (c) => c.recipient_email },
   { key: 'event_title',       label: 'Event/Course',     get: (c) => c.metadata?.context_title || '—' },
-  { key: 'issuer_name',       label: 'Issuer',           get: (c) => c.metadata?.issuer_name || fallbackIssuer },
+  // Issuer is always the organizer (account name), never per-row metadata.
+  { key: 'issuer_name',       label: 'Issuer',           get: () => issuer },
   { key: 'completed_at',      label: 'Completed At',     get: (c) => (c.completed_at ? formatShortDate(c.completed_at) : '—') },
   { key: 'issued_at',         label: 'Issued At',        get: (c) => (c.issued_at ? formatShortDate(c.issued_at) : '—') },
   { key: 'status',            label: 'Status',           get: (c) => c.status },
@@ -46,11 +47,11 @@ export const getCertificateExportColumns = (
   { key: 'pdf_url',           label: 'PDF URL',          get: (c) => c.pdf_url || '—' },
 ];
 
-export const getPDFColumns = (fallbackIssuer: string): ExportColumn[] => [
+export const getPDFColumns = (issuer: string): ExportColumn[] => [
   { key: 'recipient_name',    label: 'Name',         get: (c) => c.recipient_name },
   { key: 'recipient_email',   label: 'Email',        get: (c) => c.recipient_email },
   { key: 'event_title',       label: 'Event/Course', get: (c) => c.metadata?.context_title || '—' },
-  { key: 'issuer_name',       label: 'Issuer',       get: (c) => c.metadata?.issuer_name || fallbackIssuer },
+  { key: 'issuer_name',       label: 'Issuer',       get: () => issuer },
   { key: 'completed_at',      label: 'Completed',    get: (c) => (c.completed_at ? formatShortDate(c.completed_at) : '—') },
   { key: 'issued_at',         label: 'Issued',       get: (c) => (c.issued_at ? formatShortDate(c.issued_at) : '—') },
   { key: 'status',            label: 'Status',       get: (c) => c.status },
@@ -156,10 +157,10 @@ function computeTotals(rows: Certificate[]): CertificateTotals {
 
 export function exportCertificatesToCSV(
   rows: Certificate[],
-  fallbackIssuer: string,
+  issuer: string,
   filename = `certificates-${todayStamp()}.csv`,
 ) {
-  const columns = getCertificateExportColumns(fallbackIssuer);
+  const columns = getCertificateExportColumns(issuer);
   const headers = columns.map((c) => c.label);
   const escape = (v: string | number) => {
     const s = String(v ?? '');
@@ -183,10 +184,10 @@ export function exportCertificatesToCSV(
 
 export function exportCertificatesToJSON(
   rows: Certificate[],
-  fallbackIssuer: string,
+  issuer: string,
   filename = `certificates-${todayStamp()}.json`,
 ) {
-  const columns = getCertificateExportColumns(fallbackIssuer);
+  const columns = getCertificateExportColumns(issuer);
   const data = rows.map((r) =>
     Object.fromEntries(columns.map((c) => [c.key, c.get(r)])),
   );
@@ -202,11 +203,11 @@ export function exportCertificatesToJSON(
 
 export async function exportCertificatesToExcel(
   rows: Certificate[],
-  fallbackIssuer: string,
+  issuer: string,
   filename = `certificates-${todayStamp()}.xlsx`,
 ) {
   const XLSX = await import('xlsx');
-  const columns = getCertificateExportColumns(fallbackIssuer);
+  const columns = getCertificateExportColumns(issuer);
   const data = rows.map((r) =>
     Object.fromEntries(columns.map((c) => [c.label, c.get(r)])),
   );

@@ -32,8 +32,7 @@ import {
   useListAccountCertificatesQuery,
   useListCertificateTemplatesQuery,
 } from '@/lib/store/api/certificatesApi';
-import { useAppSelector } from '@/lib/store/hooks';
-import { selectActiveAccount } from '@/lib/store/slices/authSlice';
+import { useGetMyAccountsQuery } from '@/lib/store/api/accountsApi';
 
 import { AccountCertificatesFilters } from './_components/AccountCertificatesFilters';
 import { AccountCertificatesHeader } from './_components/AccountCertificatesHeader';
@@ -62,9 +61,12 @@ export default function AccountCertificatesPage() {
   const params = useParams<{ accountId: string; teamId?: string }>();
   const accountId = params.accountId;
 
-  const activeAccount = useAppSelector(selectActiveAccount);
+  // Fetch accounts to reliably get the organizer/account name
+  const { data: accountsData } = useGetMyAccountsQuery();
+  const account = accountsData?.find((a) => a.id === accountId);
+  
   const organizerName =
-    activeAccount?.displayName || activeAccount?.name || 'Organizer';
+    account?.display_name || account?.display_name || account?.name || 'Organizer';
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
