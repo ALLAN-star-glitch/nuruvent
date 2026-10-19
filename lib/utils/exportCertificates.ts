@@ -340,24 +340,26 @@ export async function exportCertificatesToPDF(
   }
 
   // ------------------------------------------------------------
-  // QR CODE & LINK (Top Right)
+  // QR CODE & LINK (Top Right) - DRAWN LAST SO IT'S ON TOP
   // ------------------------------------------------------------
+  let qrBottomY = 26; // Track the lowest point of the QR block
   const qrDataUrl = await generateQRCodeDataUrl(verifyUrl);
+  
   if (qrDataUrl) {
     const qrSize = 80;
     const qrX = pageWidth - margin - qrSize;
     const qrY = 26;
     
-    // 1. Draw QR Code
+    // Draw QR Code
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     
-    // 2. Scan label
+    // Scan label
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
     doc.text('Scan to verify certificate', qrX + qrSize / 2, qrY + qrSize + 12, { align: 'center' });
 
-    // 3. Clickable visible Button
+    // Clickable Button
     const linkText = 'Or click here to verify';
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -368,22 +370,24 @@ export async function exportCertificatesToPDF(
     const btnWidth = textWidth + btnPaddingX * 2;
     const btnHeight = 8 + btnPaddingY * 2;
     
-    // Center the button under the QR code
     const btnX = qrX + (qrSize / 2) - (btnWidth / 2);
     const btnY = qrY + qrSize + 18;
 
-    // Draw button background (light blue)
-    doc.setFillColor(240, 245, 255); // Very light primary blue
+    // Draw button background
+    doc.setFillColor(240, 245, 255);
     doc.setDrawColor(...BRAND.primary);
     doc.setLineWidth(0.5);
     doc.roundedRect(btnX, btnY, btnWidth, btnHeight, 3, 3, 'FD');
 
-    // Draw button text (primary blue)
+    // Draw button text
     doc.setTextColor(...BRAND.primary);
     doc.text(linkText, btnX + btnPaddingX, btnY + btnHeight - btnPaddingY - 1);
     
-    // Draw the invisible clickable area over the button
+    // Draw clickable area
     doc.link(btnX, btnY, btnWidth, btnHeight, { url: verifyUrl });
+
+    // Update the bottom Y coordinate
+    qrBottomY = btnY + btnHeight;
   }
 
   // ------------------------------------------------------------
@@ -391,7 +395,9 @@ export async function exportCertificatesToPDF(
   // ------------------------------------------------------------
   const totals = computeTotals(rows);
 
-  const totalsY = metaY + 24;
+  // Ensure Totals block starts below the QR Code OR the meta text, whichever is lower
+  const totalsY = Math.max(metaY + 24, qrBottomY + 24);
+  
   const totalsBlockH = 62;
   const innerPad = 16;
 
