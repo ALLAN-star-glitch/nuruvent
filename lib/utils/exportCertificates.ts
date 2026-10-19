@@ -132,9 +132,9 @@ async function generateQRCodeDataUrl(text: string): Promise<string | null> {
   try {
     return await QRCode.toDataURL(text, {
       margin: 1,
-      width: 300,
+      width: 512,
       color: {
-        dark: '#1A73E8', // BRAND.primary
+        dark: '#1A73E8',
         light: '#FFFFFF',
       },
     });
@@ -344,16 +344,28 @@ export async function exportCertificatesToPDF(
   // ------------------------------------------------------------
   const qrDataUrl = await generateQRCodeDataUrl(verifyUrl);
   if (qrDataUrl) {
-    const qrSize = 60;
+    const qrSize = 80;
     const qrX = pageWidth - margin - qrSize;
     const qrY = 26;
     
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     
+    // Scan label
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
-    doc.text('Scan to Verify', qrX + qrSize / 2, qrY + qrSize + 10, { align: 'center' });
+    doc.text('Scan to verify certificate', qrX + qrSize / 2, qrY + qrSize + 12, { align: 'center' });
+
+    // Clickable link
+    doc.setFontSize(8);
+    doc.setTextColor(...BRAND.primary);
+    const linkText = 'Or click here to verify';
+    const linkWidth = doc.getTextWidth(linkText);
+    const linkX = qrX + (qrSize / 2) - (linkWidth / 2);
+    const linkY = qrY + qrSize + 22;
+    
+    doc.text(linkText, linkX, linkY);
+    doc.link(linkX, linkY - 8, linkWidth, 10, { url: verifyUrl });
   }
 
   // ------------------------------------------------------------

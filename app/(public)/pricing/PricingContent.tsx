@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -27,7 +27,25 @@ type Currency = 'USD' | 'KES';
 const EXCHANGE_RATE_KES = 130;
 
 export function PricingContent() {
+  // Default to KES for SSR, then detect on client mount
   const [currency, setCurrency] = useState<Currency>('KES');
+
+  useEffect(() => {
+    try {
+      // Get the user's timezone from the browser
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      // If the timezone is NOT Nairobi (or general Kenya/East Africa), default to USD
+      // We check for 'Africa/Nairobi' specifically.
+      // You can also check for 'Africa/' as a broader East Africa fallback.
+      if (tz !== 'Africa/Nairobi') {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setCurrency('USD');
+      }
+    } catch {
+      // Fallback silently to KES if Intl fails
+    }
+  }, []);
 
   const formatPrice = (usdAmount: number, suffix = '') => {
     const kesAmount = Math.round(usdAmount * EXCHANGE_RATE_KES);
@@ -43,7 +61,43 @@ export function PricingContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground pb-20">
+      
+      {/* ===== FLOATING CURRENCY SWITCHER ===== */}
+      <div className="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-card/90 backdrop-blur-md border border-border p-1.5 pl-3 rounded-full shadow-2xl">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden sm:block">
+          Currency
+        </span>
+        <div className="flex items-center gap-1 bg-muted p-1 rounded-full">
+          <button
+            type="button"
+            aria-pressed={currency === 'USD'}
+            onClick={() => setCurrency('USD')}
+            className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+              currency === 'USD'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            USD
+          </button>
+          <button
+            type="button"
+            aria-pressed={currency === 'KES'}
+            onClick={() => setCurrency('KES')}
+            className={`px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+              currency === 'KES'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <span className="text-[10px]">KES</span>
+            Shilling
+          </button>
+        </div>
+      </div>
+
       {/* ===== HERO ===== */}
       <section className="relative overflow-hidden bg-background py-14 md:py-20">
         <div className="absolute inset-0 z-0">
@@ -85,54 +139,23 @@ export function PricingContent() {
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-2xl text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3.5 py-1.5 rounded-full text-sm font-medium mb-4 border border-primary/15 shadow-sm cursor-default">
+            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3.5 py-1.5 rounded-full text-sm font-semibold mb-4 border border-primary/15 shadow-sm cursor-default">
               <Sparkles className="h-4 w-4" />
               <span>Pay only when you sell. Free events stay free.</span>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight mb-3">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-tight mb-4">
               Simple Pricing for{' '}
               <span className="bg-gradient-to-r from-primary via-primary-400 to-primary-800 bg-clip-text text-transparent">
-                Event Hosts in Kenya
+                Event Hosts
               </span>
             </h1>
 
-            <p className="text-base md:text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-6 leading-relaxed">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed">
               Host free events for {formatPrice(0)}. Sell paid tickets at a flat 4.5% Nuruvent fee,
               plus payment processing charged at cost. No monthly subscriptions. No fixed fees per
               ticket.
             </p>
-
-            <div className="flex justify-center lg:justify-start">
-              <div className="bg-card border border-border p-1 rounded-2xl flex items-center gap-1 shadow-sm">
-                <button
-                  type="button"
-                  aria-pressed={currency === 'USD'}
-                  onClick={() => setCurrency('USD')}
-                  className={`px-5 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                    currency === 'USD'
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Globe className="h-4 w-4" />
-                  USD ($)
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={currency === 'KES'}
-                  onClick={() => setCurrency('KES')}
-                  className={`px-5 py-2 rounded-xl text-xs md:text-sm font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${
-                    currency === 'KES'
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span className="font-bold text-xs">KES</span>
-                  KES (Shilling)
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -146,8 +169,8 @@ export function PricingContent() {
             <div>
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-2xl font-bold">Free Events</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <h3 className="text-3xl font-bold">Free Events</h3>
+                  <p className="text-base text-muted-foreground mt-1">
                     Webinars, meetups, community sessions
                   </p>
                 </div>
@@ -158,19 +181,19 @@ export function PricingContent() {
 
               <div className="mb-8">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-black">{formatPrice(0)}</span>
-                  <span className="text-muted-foreground font-medium">forever</span>
+                  <span className="text-5xl font-black">{formatPrice(0)}</span>
+                  <span className="text-lg text-muted-foreground font-medium">forever</span>
                 </div>
-                <p className="text-xs text-primary mt-2 font-medium">
+                <p className="text-sm text-primary mt-2 font-semibold">
                   No credit card required
                 </p>
               </div>
 
               <div className="space-y-4 mb-8">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                   Everything included:
                 </p>
-                <ul className="space-y-3 text-sm">
+                <ul className="space-y-3 text-base">
                   {[
                     'Unlimited free events, worldwide',
                     'Automatic Zoom & Google Meet attendance tracking',
@@ -191,7 +214,7 @@ export function PricingContent() {
             <Link href="/signup" className="w-full cursor-pointer">
               <Button
                 variant="outline"
-                className="w-full py-6 rounded-2xl font-semibold text-base transition-all cursor-pointer"
+                className="w-full py-6 rounded-2xl font-semibold text-lg transition-all cursor-pointer"
               >
                 Host Free Events
               </Button>
@@ -200,15 +223,15 @@ export function PricingContent() {
 
           {/* Card 2: Paid Events */}
           <div className="bg-card border-2 border-primary rounded-3xl p-8 relative flex flex-col justify-between shadow-xl shadow-primary/10">
-            <div className="absolute -top-4 right-8 bg-primary text-primary-foreground text-xs font-bold px-4 py-1.5 rounded-full shadow-md">
+            <div className="absolute -top-4 right-8 bg-primary text-primary-foreground text-sm font-bold px-4 py-1.5 rounded-full shadow-md">
               Most Popular
             </div>
 
             <div>
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-2xl font-bold">Paid Tickets</h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <h3 className="text-3xl font-bold">Paid Tickets</h3>
+                  <p className="text-base text-muted-foreground mt-1">
                     Workshops, bootcamps, paid trainings
                   </p>
                 </div>
@@ -220,44 +243,44 @@ export function PricingContent() {
               {/* Nuruvent fee — the headline */}
               <div className="mb-6">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-black">4.5%</span>
-                  <span className="text-muted-foreground font-medium">Nuruvent fee</span>
+                  <span className="text-6xl font-black">4.5%</span>
+                  <span className="text-lg text-muted-foreground font-medium">Nuruvent fee</span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   Plus payment processing, charged at cost by our payment provider
                 </p>
               </div>
 
               {/* Payment processing fees */}
               <div className="mb-6 p-4 bg-muted rounded-2xl border border-border">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   Payment Processing Fees
                 </p>
                 <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-base">
                     <span className="flex items-center gap-2 text-muted-foreground">
-                      <Smartphone className="h-4 w-4 text-tertiary" />
+                      <Smartphone className="h-5 w-5 text-tertiary" />
                       M-Pesa / Airtel Money
                     </span>
                     <span className="font-bold text-tertiary">3.5%</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-base">
                     <span className="flex items-center gap-2 text-muted-foreground">
-                      <CreditCard className="h-4 w-4 text-primary" />
+                      <CreditCard className="h-5 w-5 text-primary" />
                       Local Cards
                     </span>
                     <span className="font-bold text-primary">3.5%</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-base">
                     <span className="flex items-center gap-2 text-muted-foreground">
-                      <Globe className="h-4 w-4 text-secondary" />
+                      <Globe className="h-5 w-5 text-secondary" />
                       International Cards
                     </span>
                     <span className="font-bold text-secondary">4.5%</span>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     On a {formatPrice(7.69)} M-Pesa ticket, you receive{' '}
                     <span className="font-bold text-foreground">{formatPrice(7.08)}</span>.
                   </p>
@@ -265,10 +288,10 @@ export function PricingContent() {
               </div>
 
               <div className="space-y-4 mb-8">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                <p className="text-sm font-semibold uppercase tracking-wider text-primary">
                   Everything in Free, plus:
                 </p>
-                <ul className="space-y-3 text-sm">
+                <ul className="space-y-3 text-base">
                   {[
                     `No fixed fee per ticket (${formatPrice(0)} flat)`,
                     'Choose to absorb fees or pass them to attendees',
@@ -287,7 +310,7 @@ export function PricingContent() {
             </div>
 
             <Link href="/signup" className="w-full cursor-pointer">
-              <Button className="w-full py-6 rounded-2xl bg-primary hover:bg-primary-600 text-primary-foreground font-semibold text-base shadow-lg shadow-primary/25 transition-all cursor-pointer">
+              <Button className="w-full py-6 rounded-2xl bg-primary hover:bg-primary-600 text-primary-foreground font-semibold text-lg shadow-lg shadow-primary/25 transition-all cursor-pointer">
                 Start Selling Tickets
               </Button>
             </Link>
@@ -298,7 +321,7 @@ export function PricingContent() {
         {/* Honest banner — speaks to hosts with a concrete number */}
         <div className="max-w-5xl mx-auto mt-8">
           <div className="text-center p-6 bg-gradient-to-r from-tertiary/5 via-primary/5 to-secondary/5 border border-primary/15 rounded-2xl">
-            <p className="text-sm md:text-base text-muted-foreground">
+            <p className="text-base md:text-lg text-muted-foreground">
               <span className="font-bold text-foreground">
                 On a KES 1,000 M-Pesa ticket, you receive KES 920.
               </span>{' '}
@@ -316,13 +339,13 @@ export function PricingContent() {
               <CreditCard className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h4 className="font-bold text-sm">Payments Your Attendees Already Use</h4>
-              <p className="text-xs text-muted-foreground">
+              <h4 className="font-bold text-base">Payments Your Attendees Already Use</h4>
+              <p className="text-sm text-muted-foreground">
                 Local and international. No setup required.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-xs font-semibold flex-wrap justify-center">
+          <div className="flex items-center gap-4 text-sm font-semibold flex-wrap justify-center">
             <span className="px-3 py-1.5 bg-card border border-border rounded-lg shadow-xs flex items-center gap-1.5">
               <Smartphone className="h-4 w-4 text-tertiary" /> M-Pesa
             </span>
@@ -340,46 +363,71 @@ export function PricingContent() {
       <section className="py-16 bg-background border-b border-border">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold">
+            <h2 className="text-3xl md:text-4xl font-bold">
               Optional Add-Ons
             </h2>
-            <p className="text-muted-foreground mt-2 text-sm md:text-base">
+            <p className="text-lg text-muted-foreground mt-2">
               Only pay for these when you need them.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-muted/50 border border-border p-6 rounded-2xl flex items-start gap-5 hover:border-secondary/40 transition-all">
-              <div className="p-3 bg-secondary/10 border border-secondary/20 rounded-xl text-secondary-600 shrink-0">
-                <Award className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1 gap-1">
-                  <h4 className="text-lg font-bold">QR-Verified CPD Certificates</h4>
-                  <span className="text-secondary-600 font-bold text-sm">
-                    {formatPrice(0.5, ' / certificate')}
-                  </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            {/* UPDATED CERTIFICATE CARD - Prominent and Animated */}
+            <div className="relative group bg-card border-2 border-secondary/30 p-8 rounded-3xl shadow-lg hover:shadow-2xl hover:border-secondary/60 transition-all duration-500 flex flex-col md:col-span-2 overflow-hidden">
+              {/* Animated background glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-secondary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              <div className="flex flex-col md:flex-row items-start gap-6 relative z-10">
+                <div className="p-4 bg-secondary/15 border border-secondary/30 rounded-2xl text-secondary-600 shrink-0 animate-pulse">
+                  <Award className="h-8 w-8" />
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Certificates with QR codes that anyone can verify. Ideal for professional bodies
-                  and corporate CPD tracking. Pay per certificate, or charge attendees an optional
-                  fee to cover it.
-                </p>
+                
+                <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-2 gap-2">
+                    <h4 className="text-2xl font-bold">QR-Verified Certificates</h4>
+                    <span className="text-secondary-600 font-bold text-base bg-secondary/10 px-3 py-1 rounded-full">
+                      From {formatPrice(0.15, ' / cert')}
+                    </span>
+                  </div>
+                  <p className="text-base text-muted-foreground leading-relaxed mb-6">
+                    Secure, automatically generated certificates with QR codes for instant public verification. Perfect for CPD tracking and professional development.
+                  </p>
+                  
+                  {/* Tier breakdown */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-border pt-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground font-medium">Default</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.15, ' / cert')}</span>
+                      <span className="text-xs text-muted-foreground mt-1">Basic styling</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground font-medium">Professional</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.30, ' / cert')}</span>
+                      <span className="text-xs text-muted-foreground mt-1">Logo & signature</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground font-medium">Premium</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.45, ' / cert')}</span>
+                      <span className="text-xs text-muted-foreground mt-1">Full branding & watermark</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-muted/50 border border-border p-6 rounded-2xl flex items-start gap-5 hover:border-primary/40 transition-all">
-              <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl text-primary shrink-0">
-                <HardDrive className="h-6 w-6" />
+            <div className="bg-muted/50 border border-border p-8 rounded-3xl flex items-start gap-6 hover:border-primary/40 transition-all">
+              <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl text-primary shrink-0">
+                <HardDrive className="h-8 w-8" />
               </div>
               <div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1 gap-1">
-                  <h4 className="text-lg font-bold">Extended Replay Storage</h4>
-                  <span className="text-primary font-bold text-sm">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-2 gap-2">
+                  <h4 className="text-2xl font-bold">Extended Replay Storage</h4>
+                  <span className="text-primary font-bold text-base">
                     {formatPrice(9.99, ' / month')}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-base text-muted-foreground leading-relaxed">
                   Keep your event recordings online for longer than the standard 30 days. Includes
                   100 GB of fast global video delivery.
                 </p>
@@ -392,10 +440,10 @@ export function PricingContent() {
       {/* ===== COMPARISON TABLE ===== */}
       <section className="py-20 container mx-auto px-4 max-w-5xl">
         <div className="text-center mb-12">
-          <h2 className="text-2xl md:text-3xl font-bold">
+          <h2 className="text-3xl md:text-4xl font-bold">
             How Nuruvent Compares
           </h2>
-          <p className="text-muted-foreground mt-2 text-sm max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground mt-2 max-w-3xl mx-auto">
             A 20-ticket workshop at KES 1,950 per ticket — that&apos;s KES 39,000 in total sales,
             paid via M-Pesa. Here&apos;s what each platform charges and what the host actually
             receives.
@@ -405,15 +453,15 @@ export function PricingContent() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
             <thead>
-              <tr className="border-b border-border bg-muted text-muted-foreground text-xs uppercase tracking-wider">
-                <th className="py-4 px-6">Platform</th>
-                <th className="py-4 px-6">Platform Fee</th>
-                <th className="py-4 px-6">Fixed Fee Per Ticket</th>
-                <th className="py-4 px-6">Payment Processing</th>
-                <th className="py-4 px-6 text-right">You Receive</th>
+              <tr className="border-b border-border bg-muted text-muted-foreground text-sm uppercase tracking-wider">
+                <th className="py-4 px-6 font-semibold">Platform</th>
+                <th className="py-4 px-6 font-semibold">Platform Fee</th>
+                <th className="py-4 px-6 font-semibold">Fixed Fee Per Ticket</th>
+                <th className="py-4 px-6 font-semibold">Payment Processing</th>
+                <th className="py-4 px-6 font-semibold text-right">You Receive</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border text-sm">
+            <tbody className="divide-y divide-border text-base">
               <tr className="bg-primary/5 font-semibold">
                 <td className="py-4 px-6 flex items-center gap-2">
                   <ShieldCheck className="h-5 w-5 text-primary" />
@@ -422,7 +470,7 @@ export function PricingContent() {
                 <td className="py-4 px-6 text-primary font-bold">4.5%</td>
                 <td className="py-4 px-6 text-primary font-bold">KES 0</td>
                 <td className="py-4 px-6 text-primary font-bold">3.5% M-Pesa</td>
-                <td className="py-4 px-6 text-right font-black text-tertiary">
+                <td className="py-4 px-6 text-right font-black text-tertiary text-lg">
                   KES 35,880
                 </td>
               </tr>
@@ -457,20 +505,20 @@ export function PricingContent() {
           </table>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center mt-4">
+        <p className="text-sm text-muted-foreground text-center mt-4">
           Payouts on Nuruvent arrive every Monday, straight to M-Pesa or your bank. Luma and
           Eventbrite pay out via international settlement.
         </p>
 
-        {/* Advantage callouts — corrected numbers */}
+        {/* Advantage callouts */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
             <div className="p-2.5 bg-tertiary/10 rounded-xl">
               <TrendingUp className="h-5 w-5 text-tertiary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">vs. Luma</p>
-              <p className="text-lg font-black text-tertiary">
+              <p className="text-sm text-muted-foreground">vs. Luma</p>
+              <p className="text-xl font-black text-tertiary">
                 − KES 39
               </p>
             </div>
@@ -480,8 +528,8 @@ export function PricingContent() {
               <Users className="h-5 w-5 text-tertiary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">More than Enkare</p>
-              <p className="text-lg font-black text-tertiary">
+              <p className="text-sm text-muted-foreground">More than Enkare</p>
+              <p className="text-xl font-black text-tertiary">
                 + KES 780
               </p>
             </div>
@@ -491,8 +539,8 @@ export function PricingContent() {
               <Clock className="h-5 w-5 text-tertiary" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">More than Eventbrite</p>
-              <p className="text-lg font-black text-tertiary">
+              <p className="text-sm text-muted-foreground">More than Eventbrite</p>
+              <p className="text-xl font-black text-tertiary">
                 + KES 4,888
               </p>
             </div>
@@ -504,8 +552,8 @@ export function PricingContent() {
       <section className="py-16 bg-muted/30 border-t border-border">
         <div className="container mx-auto px-4 max-w-3xl">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold flex items-center justify-center gap-2">
-              <HelpCircle className="h-6 w-6 text-primary" />
+            <h2 className="text-3xl md:text-4xl font-bold flex items-center justify-center gap-2">
+              <HelpCircle className="h-7 w-7 text-primary" />
               Common Questions
             </h2>
           </div>
@@ -545,8 +593,8 @@ export function PricingContent() {
                 key={faq.q}
                 className="bg-card border border-border p-6 rounded-2xl shadow-xs hover:border-primary/30 transition-all"
               >
-                <h4 className="text-base font-bold mb-2">{faq.q}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
+                <h4 className="text-lg font-bold mb-2">{faq.q}</h4>
+                <p className="text-base text-muted-foreground leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>
@@ -557,7 +605,7 @@ export function PricingContent() {
       <section className="py-20 container mx-auto px-4 max-w-5xl">
         <div className="bg-card border border-border rounded-3xl p-10 md:p-16 text-center relative overflow-hidden shadow-xl hover:border-primary/40 transition-all">
           <div className="relative z-10 max-w-2xl mx-auto space-y-6">
-            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold shadow-xs">
+            <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary px-4 py-1.5 rounded-full text-sm font-semibold shadow-xs">
               <Sparkles className="h-4 w-4" />
               <span>Start Free</span>
             </div>
@@ -565,12 +613,12 @@ export function PricingContent() {
             <h2 className="text-3xl md:text-4xl font-extrabold">
               Ready to Run Your Next Event?
             </h2>
-            <p className="text-muted-foreground text-base">
+            <p className="text-lg text-muted-foreground">
               Set up your first event in under 3 minutes. No setup fees. No monthly fees.
             </p>
             <div className="pt-2">
               <Link href="/signup" className="cursor-pointer">
-                <Button className="px-8 py-6 rounded-2xl bg-primary hover:bg-primary-600 text-primary-foreground font-bold text-base shadow-lg shadow-primary/20 transition-all inline-flex items-center gap-2 cursor-pointer">
+                <Button className="px-8 py-6 rounded-2xl bg-primary hover:bg-primary-600 text-primary-foreground font-bold text-lg shadow-lg shadow-primary/20 transition-all inline-flex items-center gap-2 cursor-pointer">
                   <span>Create Your First Event</span>
                   <ArrowRight className="h-5 w-5" />
                 </Button>
