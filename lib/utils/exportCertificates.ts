@@ -4,18 +4,18 @@ import { Certificate } from '../types/certificates';
 import QRCode from 'qrcode';
 
 // ============================================================
-// BRAND — keep in sync with globals.css
+// BRAND
 // ============================================================
 
 const BRAND = {
-  primary:     [26, 115, 232]  as [number, number, number], // #1A73E8
-  secondary:   [251, 188, 4]   as [number, number, number], // #FBBC04
-  tertiary:    [52, 168, 83]   as [number, number, number], // #34A853
-  error:       [234, 67, 53]   as [number, number, number], // #EA4335
-  neutralDark: [32, 33, 36]    as [number, number, number], // #202124
-  neutralGray: [95, 99, 104]   as [number, number, number], // #5F6368
-  lightGray:   [248, 249, 250] as [number, number, number], // #F8F9FA
-  border:      [232, 234, 237] as [number, number, number], // #E8EAED
+  primary:     [26, 115, 232]  as [number, number, number],
+  secondary:   [251, 188, 4]   as [number, number, number],
+  tertiary:    [52, 168, 83]   as [number, number, number],
+  error:       [234, 67, 53]   as [number, number, number],
+  neutralDark: [32, 33, 36]    as [number, number, number],
+  neutralGray: [95, 99, 104]   as [number, number, number],
+  lightGray:   [248, 249, 250] as [number, number, number],
+  border:      [232, 234, 237] as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
 } as const;
 
@@ -340,7 +340,7 @@ export async function exportCertificatesToPDF(
   }
 
   // ------------------------------------------------------------
-  // QR CODE (Top Right)
+  // QR CODE & LINK (Top Right)
   // ------------------------------------------------------------
   const qrDataUrl = await generateQRCodeDataUrl(verifyUrl);
   if (qrDataUrl) {
@@ -348,6 +348,7 @@ export async function exportCertificatesToPDF(
     const qrX = pageWidth - margin - qrSize;
     const qrY = 26;
     
+    // Draw QR Code
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
     
     // Scan label
@@ -356,15 +357,20 @@ export async function exportCertificatesToPDF(
     doc.setTextColor(...BRAND.neutralGray);
     doc.text('Scan to verify certificate', qrX + qrSize / 2, qrY + qrSize + 12, { align: 'center' });
 
-    // Clickable link
+    // Clickable visible link
+    const linkText = 'Or click here to verify';
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.primary);
-    const linkText = 'Or click here to verify';
+    doc.setFont('helvetica', 'underline');
+    
     const linkWidth = doc.getTextWidth(linkText);
     const linkX = qrX + (qrSize / 2) - (linkWidth / 2);
-    const linkY = qrY + qrSize + 22;
+    const linkY = qrY + qrSize + 24;
     
+    // Draw the visible text
     doc.text(linkText, linkX, linkY);
+    
+    // Draw the invisible clickable area over the text
     doc.link(linkX, linkY - 8, linkWidth, 10, { url: verifyUrl });
   }
 
