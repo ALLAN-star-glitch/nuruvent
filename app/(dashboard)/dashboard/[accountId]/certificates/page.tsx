@@ -61,12 +61,14 @@ export default function AccountCertificatesPage() {
   const params = useParams<{ accountId: string; teamId?: string }>();
   const accountId = params.accountId;
 
-  // Fetch accounts to reliably get the organizer/account name
+  // Fetch accounts to reliably get the organizer/account name and logo
   const { data: accountsData } = useGetMyAccountsQuery();
   const account = accountsData?.find((a) => a.id === accountId);
   
   const organizerName =
-    account?.display_name || account?.display_name || account?.name || 'Organizer';
+    account?.display_name || account?.displayName || account?.name || 'Organizer';
+    
+  const organizerLogo = account?.logo_url || account?.logoUrl || '';
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('all');
@@ -223,6 +225,7 @@ export default function AccountCertificatesPage() {
         await exportCertificatesToPDF(filtered, {
           title: 'Issued Certificates',
           hostName: organizerName,
+          hostLogoUrl: organizerLogo,
         });
         toast.success('Exported as PDF');
       }

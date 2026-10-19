@@ -18,8 +18,6 @@ const BRAND = {
   white:       [255, 255, 255] as [number, number, number],
 } as const;
 
-const LOGO_SRC = '/logo.png';
-
 // ============================================================
 // COLUMNS
 // ============================================================
@@ -38,7 +36,6 @@ export const getCertificateExportColumns = (
   { key: 'recipient_name',    label: 'Recipient Name',   get: (c) => c.recipient_name },
   { key: 'recipient_email',   label: 'Recipient Email',  get: (c) => c.recipient_email },
   { key: 'event_title',       label: 'Event/Course',     get: (c) => c.metadata?.context_title || '—' },
-  // Issuer is always the organizer (account name), never per-row metadata.
   { key: 'issuer_name',       label: 'Issuer',           get: () => issuer },
   { key: 'completed_at',      label: 'Completed At',     get: (c) => (c.completed_at ? formatShortDate(c.completed_at) : '—') },
   { key: 'issued_at',         label: 'Issued At',        get: (c) => (c.issued_at ? formatShortDate(c.issued_at) : '—') },
@@ -101,6 +98,7 @@ function formatShortDate(iso: string | undefined): string {
 async function loadImageDataUrl(
   src: string,
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  if (!src) return null;
   try {
     const res = await fetch(src, { cache: 'force-cache' });
     if (!res.ok) return null;
@@ -225,6 +223,7 @@ export interface ExportCertificatesPDFOptions {
   title?: string;
   subtitle?: string;
   hostName?: string;
+  hostLogoUrl?: string; // <-- Added for organizer logo
   filtersSummary?: string;
   filename?: string;
 }
@@ -239,6 +238,7 @@ export async function exportCertificatesToPDF(
   const title = options.title ?? 'Certificates';
   const subtitle = options.subtitle ?? '';
   const hostName = options.hostName ?? 'Organizer';
+  const hostLogoUrl = options.hostLogoUrl ?? '';
   const filtersSummary = options.filtersSummary ?? '';
   const filename = options.filename ?? `certificates-${todayStamp()}.pdf`;
 
@@ -256,9 +256,9 @@ export async function exportCertificatesToPDF(
   doc.rect(0, 2, pageWidth, 1, 'F');
 
   // ------------------------------------------------------------
-  // LOGO
+  // LOGO (Organizer)
   // ------------------------------------------------------------
-  const logo = await loadImageDataUrl(LOGO_SRC);
+  const logo = await loadImageDataUrl(hostLogoUrl);
   let textLeft = margin;
 
   if (logo) {
@@ -456,6 +456,7 @@ export async function exportCertificatesToPDF(
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
 
+    // Nuruvent brand stays in the footer
     doc.text('Nuruvent', margin, pageHeight - 18);
     doc.text(
       'Certificate report · Confidential',
