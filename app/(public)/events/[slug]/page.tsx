@@ -11,6 +11,10 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// ============================================================
+// METADATA
+// ============================================================
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -19,7 +23,8 @@ export async function generateMetadata({
 
   if (!event) {
     return {
-      title: 'Event not found · Nuruvent',
+      title: 'Event not found | Nuruvent',
+      description: 'The requested event could not be found.',
       robots: { index: false, follow: false },
     };
   }
@@ -32,7 +37,7 @@ export async function generateMetadata({
 
   const ogImage = toOgImage(event, PUBLIC_SITE_URL);
   
-  // Cache Buster
+  // Cache Buster — ensures social platforms re-scrape when image changes
   const cacheBuster = event.updated_at 
     ? new Date(event.updated_at).getTime() 
     : Date.now();
@@ -76,8 +81,16 @@ export async function generateMetadata({
   };
 }
 
+// ============================================================
+// PAGE
+// ============================================================
+
 export default async function EventDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  await fetchEventBySlug(slug).catch(() => null);
-  return <EventDetailClient slug={slug} />;
+  
+  // Fetch the event on the server
+  const event = await fetchEventBySlug(slug);
+
+  // Pass the event directly to the client component as initial data
+  return <EventDetailClient slug={slug} initialEvent={event} />;
 }

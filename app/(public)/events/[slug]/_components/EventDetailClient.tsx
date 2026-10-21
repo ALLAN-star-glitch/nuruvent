@@ -87,6 +87,7 @@ type AuthMode = 'choice' | 'guest-form';
 
 interface Props {
   slug: string;
+  initialEvent?: Event | null;
 }
 
 // ============================================================
@@ -104,7 +105,7 @@ function getMinTicketPrice(event: Event): number {
 // COMPONENT
 // ============================================================
 
-export function EventDetailClient({ slug }: Props) {
+export function EventDetailClient({ slug, initialEvent }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -117,15 +118,13 @@ export function EventDetailClient({ slug }: Props) {
     error,
   } = useGetEventBySlugQuery(slug, { skip: !slug });
 
-  const event: Event | undefined = response?.data;
+  // Use the server-provided event as fallback if the client query is still loading
+  const event: Event | undefined = response?.data || initialEvent || undefined;
 
   const user = useAppSelector(selectUser);
   const account = useAppSelector(selectActiveAccount);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
-  // Teams query gives us the account that owns the event's team.
-  // The event itself only carries team_id (per the ownership model),
-  // so we traverse team → account to build dashboard URLs.
   const { data: teamsData } = useGetUserTeamsQuery();
 
   const [registerForEvent, { isLoading: isRegistering }] =
@@ -146,24 +145,13 @@ export function EventDetailClient({ slug }: Props) {
     phone: '',
   });
 
-  // For anonymous users: choice first, then guest form on demand.
   const [authMode, setAuthMode] = useState<AuthMode>('choice');
-
-  // Free-event email confirmation dialog.
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
-  // Mobile sticky CTA state.
   const ticketCardRef = useRef<HTMLDivElement | null>(null);
   const [showMobileCta, setShowMobileCta] = useState(false);
-
-  // Guards against re-running the autorun on every render.
   const autorunFiredRef = useRef(false);
 
-  // ---- Resolve the team-scoped tickets destination ----
-  //
-  // The event has team_id, not account_id. We resolve the account by
-  // looking up the team in the user's team list. This mirrors the same
-  // event → team → account traversal the event cards use.
   const owningTeam = useMemo(
     () => teamsData?.teams?.find((t) => t.id === event?.team_id) ?? null,
     [teamsData, event?.team_id],
@@ -174,7 +162,6 @@ export function EventDetailClient({ slug }: Props) {
       ? `/dashboard/${owningTeam.account_id}/${event.team_id}/tickets`
       : '/dashboard/tickets';
 
-  // ---- Prefill guest inputs on auth load ----
   useEffect(() => {
     if (isAuthenticated) {
       setGuest({
@@ -185,7 +172,6 @@ export function EventDetailClient({ slug }: Props) {
     }
   }, [isAuthenticated, account, user]);
 
-  // ---- Preselect ticket from URL ----
   useEffect(() => {
     if (!ticketParam || !event?.tickets) return;
     const match = event.tickets.find(
@@ -196,7 +182,6 @@ export function EventDetailClient({ slug }: Props) {
     }
   }, [ticketParam, event]);
 
-  // ---- Watch ticket card for the sticky mobile CTA ----
   useEffect(() => {
     const node = ticketCardRef.current;
     if (!node) return;
@@ -226,7 +211,6 @@ export function EventDetailClient({ slug }: Props) {
     setBookingError('');
   };
 
-  // ---- Share ----
   const handleShare = async () => {
     if (!event) return;
     const url = window.location.href;
@@ -252,7 +236,6 @@ export function EventDetailClient({ slug }: Props) {
     }
   };
 
-  // ---- Registration submission (shared by guest and authenticated) ----
   const submitRegistration = async () => {
     if (!event) return;
     if (!selectedTicketTypeId) {
@@ -283,7 +266,6 @@ export function EventDetailClient({ slug }: Props) {
 
       setRegistration(res.data);
 
-      // Paid events go straight to checkout.
       if (totalPrice > 0) {
         const email =
           res.data.guest?.email || user?.email || guest.email || '';
@@ -296,7 +278,6 @@ export function EventDetailClient({ slug }: Props) {
         return;
       }
 
-      // Free events show the email dialog.
       setIsEmailDialogOpen(true);
     } catch (err: unknown) {
       const msg =
@@ -311,7 +292,6 @@ export function EventDetailClient({ slug }: Props) {
     await submitRegistration();
   };
 
-  // ---- Autorun after returning from signup ----
   useEffect(() => {
     if (!autorunParam) return;
     if (!isAuthenticated) return;
@@ -322,11 +302,9 @@ export function EventDetailClient({ slug }: Props) {
 
     autorunFiredRef.current = true;
 
-    // Clear the autorun flag from the URL so a refresh doesn't resubmit.
     const cleanUrl = `/events/${slug}?ticket=${selectedTicketTypeId}`;
     router.replace(cleanUrl);
 
-    // Fire-and-forget; errors are shown inline.
     void submitRegistration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -337,7 +315,6 @@ export function EventDetailClient({ slug }: Props) {
     isRegistering,
   ]);
 
-  // ---- Back ----
   const handleBack = (e: React.MouseEvent) => {
     e.preventDefault();
     router.back();
@@ -350,23 +327,22 @@ export function EventDetailClient({ slug }: Props) {
     });
   };
 
-  // ---- Create account handler ----
   const handleCreateAccount = () => {
     if (!selectedTicketTypeId) return;
     const returnTo = `/events/${slug}?ticket=${selectedTicketTypeId}&autorun=1`;
     router.push(`/signup?next=${encodeURIComponent(returnTo)}`);
   };
 
-  // ---- Continue as guest ----
   const handleContinueAsGuest = () => {
     setAuthMode('guest-form');
-    // Give the reveal a beat, then scroll the user to the card.
     setTimeout(() => scrollToTicketCard(), 50);
   };
 
-  if (isLoading) return <EventDetailSkeleton />;
+  // Show skeleton only if there's no data AND we're still loading
+  if (isLoading && !event) return <EventDetailSkeleton />;
 
-  if (error || !event) {
+  // Show error only if there's no data AND there's an error
+  if ((error || !event) && !event) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
         <div className="max-w-md text-center">
@@ -387,6 +363,7 @@ export function EventDetailClient({ slug }: Props) {
     );
   }
 
+  // If we have an event, render it
   const startDate =
     event.start_date ?? event.schedules?.[0]?.start_date ?? '';
   const startTime = getEventStartTime(event);
@@ -415,6 +392,12 @@ export function EventDetailClient({ slug }: Props) {
 
   const canBook = !isPast && !isFullyBooked;
   const showSuccess = !!registration;
+
+  // ─────────────────────────────────────────────────────────────
+  // From here, the rest of the component JSX is unchanged.
+  // Copy everything from the original `return (` all the way to
+  // the closing `);` of the component.
+  // ─────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -770,7 +753,6 @@ export function EventDetailClient({ slug }: Props) {
 
                       {hasSelection && (
                         <>
-                          {/* Signed-in path */}
                           {isAuthenticated ? (
                             <>
                               <Separator />
@@ -812,7 +794,6 @@ export function EventDetailClient({ slug }: Props) {
                             </>
                           ) : (
                             <>
-                              {/* Anonymous: choice or guest form */}
                               {authMode === 'choice' ? (
                                 <>
                                   <Separator />
