@@ -18,9 +18,6 @@ const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY;
  * Toggle Supabase's on-the-fly image resize.
  * Requires Image Transformations enabled on the Supabase project
  * (Pro plan and above).
- *
- * Set SUPABASE_IMAGE_TRANSFORM_ENABLED=true in .env.local to opt in.
- * When false, raw public URLs are returned unchanged.
  */
 const SUPABASE_TRANSFORM_ENABLED =
   process.env.SUPABASE_IMAGE_TRANSFORM_ENABLED === 'true';
@@ -29,12 +26,6 @@ const SUPABASE_TRANSFORM_ENABLED =
 // FETCH — BY ID
 // ============================================================
 
-/**
- * Server-only fetch of a single event by UUID.
- * Cached for 5 minutes so repeat OG scrapes don't hammer the API.
- * Returns null if the event is missing, the API is unreachable, or
- * the API responds with a non-2xx status.
- */
 export async function fetchEventById(id: string): Promise<Event | null> {
   if (!id || !API_BASE_URL) return null;
   try {
@@ -58,11 +49,6 @@ export async function fetchEventById(id: string): Promise<Event | null> {
 // FETCH — BY SLUG
 // ============================================================
 
-/**
- * Server-only fetch of a single event by slug.
- * Mirrors fetchEventById — same cache policy, same error handling.
- * Used by the public event detail page for metadata generation.
- */
 export async function fetchEventBySlug(slug: string): Promise<Event | null> {
   if (!slug || !API_BASE_URL) return null;
   try {
@@ -86,17 +72,6 @@ export async function fetchEventBySlug(slug: string): Promise<Event | null> {
 // PATH HELPERS
 // ============================================================
 
-/**
- * Extracts the event UUID from a `/dashboard/events/<uuid>` path.
- * Used to pull the event out of the meeting URL's `return` param.
- *
- *   "/dashboard/events/9796fc87-91f6-4fde-b3ff-33dfd2c5485b"
- *     → "9796fc87-91f6-4fde-b3ff-33dfd2c5485b"
- *   "/dashboard/events/9796fc87-.../attendees"
- *     → "9796fc87-..."
- *   "not a path"
- *     → null
- */
 export function extractEventIdFromPath(
   path: string | undefined,
 ): string | null {
@@ -116,8 +91,8 @@ export function extractEventIdFromPath(
  *
  * Priority:
  *   1. Supabase transform (if enabled) — 1200×630 cover crop
- *   2. Cloudinary transform — 1200×630 cover crop
- *   3. Imgix transform — 1200×630 cover crop
+ *   2. Cloudinary transform — 1200×630 cover crop (forced JPEG)
+ *   3. Imgix transform — 1200×630 cover crop (forced JPEG)
  *   4. Raw URL pass-through
  *   5. Fallback brand asset at /og-default.png
  */
@@ -128,35 +103,35 @@ export function toOgImage(
   const raw = event?.image_url || event?.thumbnail_url || '';
   if (!raw) return `${publicSiteUrl}/og-default.png`;
 
-  // ---- Supabase Storage ----
-  // /storage/v1/object/public/... → /storage/v1/render/image/public/...?...
-  if (
-    SUPABASE_TRANSFORM_ENABLED &&
-    raw.includes('.supabase.co/storage/v1/object/public/')
-  ) {
-    const base = raw
-      .replace(
-        '/storage/v1/object/public/',
-        '/storage/v1/render/image/public/',
-      )
-      .split('?')[0];
-
-    return `${base}?width=1200&height=630&resize=cover&quality=80`;
+  // 1. Supabase Storage
+  if (raw.includes('.supabase.co/storage/v1/object/public/')) {
+    if (SUPABASE_TRANSFORM_ENABLED) {
+      const base = raw
+        .replace(
+          '/storage/v1/object/public/',
+          '/storage/v1/render/image/public/',
+        )
+        .split('?')[0];
+      // Force 1200x630 crop, quality 80, and try to keep the original format
+      return `${base}?width=1200&height=630&resize=cover&quality=80`;
+    }
+    return raw;
   }
 
-  // ---- Cloudinary ----
+  // 2. Cloudinary
   if (raw.includes('res.cloudinary.com') && raw.includes('/upload/')) {
+    // c_fill: crop to fill, f_jpg: force JPEG for max OG compatibility
     return raw.replace(
       '/upload/',
-      '/upload/c_fill,w_1200,h_630,q_auto,f_auto/',
+      '/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/',
     );
   }
 
-  // ---- Imgix ----
+  // 3. Imgix
   if (raw.includes('?') && raw.includes('ixlib=')) {
-    return `${raw}&w=1200&h=630&fit=crop`;
+    return `${raw}&w=1200&h=630&fit=crop&fm=jpg&q=80`;
   }
 
-  // ---- Fallback: raw URL ----
+  // 4. Fallback: raw URL
   return raw;
 }
