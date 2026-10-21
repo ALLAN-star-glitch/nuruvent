@@ -2,10 +2,6 @@
 import 'server-only';
 import type { Event, BaseResponse } from '@/lib/types/events';
 
-// ============================================================
-// CONFIG
-// ============================================================
-
 const API_BASE_URL =
   process.env.API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -13,12 +9,6 @@ const API_BASE_URL =
   '';
 
 const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY;
-
-/**
- * Toggle Supabase's on-the-fly image resize.
- * Requires Image Transformations enabled on the Supabase project
- * (Pro plan and above).
- */
 const SUPABASE_TRANSFORM_ENABLED =
   process.env.SUPABASE_IMAGE_TRANSFORM_ENABLED === 'true';
 
@@ -90,9 +80,9 @@ export function extractEventIdFromPath(
  * Resolves the best Open Graph image URL for the given event.
  *
  * Priority:
- *   1. Supabase transform (if enabled) — 1200×630 cover crop
- *   2. Cloudinary transform — 1200×630 cover crop (forced JPEG)
- *   3. Imgix transform — 1200×630 cover crop (forced JPEG)
+ *   1. Cloudinary transform (forced JPEG, 1200x630)
+ *   2. Supabase transform (if enabled in env)
+ *   3. Imgix transform (forced JPEG, 1200x630)
  *   4. Raw URL pass-through
  *   5. Fallback brand asset at /og-default.png
  */
@@ -101,9 +91,20 @@ export function toOgImage(
   publicSiteUrl: string,
 ): string {
   const raw = event?.image_url || event?.thumbnail_url || '';
-  if (!raw) return `${publicSiteUrl}/og-default.png`;
+  
+  if (!raw) {
+    return `${publicSiteUrl}/og-default.png`;
+  }
 
-  // 1. Supabase Storage
+  // 1. Cloudinary
+  if (raw.includes('res.cloudinary.com') && raw.includes('/upload/')) {
+    return raw.replace(
+      '/upload/',
+      '/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/',
+    );
+  }
+
+  // 2. Supabase
   if (raw.includes('.supabase.co/storage/v1/object/public/')) {
     if (SUPABASE_TRANSFORM_ENABLED) {
       const base = raw
@@ -112,19 +113,10 @@ export function toOgImage(
           '/storage/v1/render/image/public/',
         )
         .split('?')[0];
-      // Force 1200x630 crop, quality 80, and try to keep the original format
       return `${base}?width=1200&height=630&resize=cover&quality=80`;
     }
+    // Fallback to raw if transforms are off
     return raw;
-  }
-
-  // 2. Cloudinary
-  if (raw.includes('res.cloudinary.com') && raw.includes('/upload/')) {
-    // c_fill: crop to fill, f_jpg: force JPEG for max OG compatibility
-    return raw.replace(
-      '/upload/',
-      '/upload/c_fill,w_1200,h_630,q_auto:good,f_jpg/',
-    );
   }
 
   // 3. Imgix

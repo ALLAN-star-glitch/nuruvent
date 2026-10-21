@@ -11,10 +11,6 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-// ============================================================
-// METADATA
-// ============================================================
-
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -35,6 +31,14 @@ export async function generateMetadata({
     `Join ${title} on Nuruvent.`;
 
   const ogImage = toOgImage(event, PUBLIC_SITE_URL);
+  
+  // Cache Buster
+  const cacheBuster = event.updated_at 
+    ? new Date(event.updated_at).getTime() 
+    : Date.now();
+    
+  const ogImageWithCacheBust = `${ogImage}${ogImage.includes('?') ? '&' : '?'}v=${cacheBuster}`;
+
   const canonicalUrl = `${PUBLIC_SITE_URL}/events/${slug}`;
 
   return {
@@ -52,30 +56,28 @@ export async function generateMetadata({
       url: canonicalUrl,
       siteName: 'Nuruvent',
       type: 'website',
-      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      images: [{ 
+        url: ogImageWithCacheBust, 
+        width: 1200, 
+        height: 630, 
+        alt: title 
+      }],
     },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImageWithCacheBust],
+    },
+    other: {
+      'og:image:width': '1200',
+      'og:image:height': '630',
+    }
   };
 }
 
-// ============================================================
-// PAGE
-// ============================================================
-
 export default async function EventDetailPage({ params }: PageProps) {
   const { slug } = await params;
-
-  // Server-side fetch primes SEO + HTML for public events.
-  //
-  // It runs anonymously (no browser auth), so it will fail for
-  // private events. We do NOT call notFound() here — instead we let
-  // the client component retry with the user's auth token and decide
-  // what to render. That way private-event members can still see the
-  // page, and anonymous visitors get the client-side "private/not
-  // found" state.
-  //
-  // Public events: this fetch succeeds and primes the client cache,
-  // so the client's useGetEventBySlugQuery resolves instantly.
   await fetchEventBySlug(slug).catch(() => null);
-
   return <EventDetailClient slug={slug} />;
 }

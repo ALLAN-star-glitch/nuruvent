@@ -38,20 +38,13 @@ export const metadata: Metadata = {
     siteName: 'Nuruvent',
     type: 'website',
     locale: 'en_US',
-    images: [
-      {
-        url: '/hero-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'Nuruvent — Training Events & Online Courses Platform',
-      },
-    ],
+    // REMOVED images: ['/hero-image.png'] from here
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Nuruvent — Training Events & Online Courses Platform',
     description: 'The global platform connecting training providers and learners. Discover live training events, workshops, webinars, self-paced online courses, and earn certified qualifications.',
-    images: ['/hero-image.png'],
+    // REMOVED images: ['/hero-image.png'] from here
     site: '@nuruvent',
     creator: '@nuruvent',
   },
@@ -82,7 +75,7 @@ export default function PublicLayout({
 }) {
   return (
     <div className="flex flex-col min-h-screen">
-      {/* ✅ Header reads auth state from Redux automatically */}
+      {/* Header reads auth state from Redux automatically */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <Header />
       </header>
