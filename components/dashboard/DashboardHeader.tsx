@@ -237,8 +237,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
       <div className="container mx-auto px-2.5 sm:px-4">
         <div className="flex flex-col">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 md:gap-3">
-            {/* Left: Drawer Menu + Brand + Team Switcher */}
-            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 max-w-[520px]">
+            
+            {/* Left: Drawer Menu + Brand + Team Switcher (Mobile exact original) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 xl:flex-none xl:w-auto shrink-0">
               <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -459,8 +460,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </SheetContent>
               </Sheet>
 
-              {/* Nuruvent logo — hidden on mobile, visible from md upward.
-                  On mobile the team switcher takes its place. */}
+              {/* Nuruvent logo — hidden on mobile, visible from md upward. */}
               <span className="hidden md:inline-flex items-center shrink-0">
                 <Logo
                   width={120}
@@ -468,9 +468,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 />
               </span>
 
-              {/* Team switcher — always visible.
-                  Takes the freed space where the logo used to be on mobile. */}
-              <div className="min-w-0 flex-1 max-w-none md:max-w-[280px] lg:max-w-[260px]">
+              {/* Team switcher — mobile behavior intact */}
+              <div className="min-w-0 flex-1 max-w-none md:max-w-[280px] lg:max-w-[260px] xl:hidden">
                 <TeamSwitcher variant="compact" />
               </div>
 
@@ -486,30 +485,15 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               )}
             </div>
 
-            {/* Search (desktop) */}
-            <div className="hidden xl:flex items-center flex-1 max-w-2xl mx-4 justify-center">
-              <div className="w-full max-w-xl relative">
+            {/* Middle: Search + Create New + Theme (Desktop only) */}
+            <div className="hidden xl:flex items-center flex-1 mx-2 lg:mx-4 justify-center gap-3">
+              
+              {/* Using flex-1 max-w-3xl to give it the best possible stretch while keeping some max bounds */}
+              <div className="w-full flex-1 max-w-3xl relative">
                 <SearchBar />
               </div>
-            </div>
-
-            {/* Right controls */}
-            <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
-                onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
-                aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
-              >
-                {isMobileSearchOpen ? (
-                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                ) : (
-                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
-                )}
-              </Button>
-
-              <div className="hidden sm:block shrink-0">
+              
+              <div className="shrink-0">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -554,7 +538,85 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </DropdownMenu>
               </div>
 
-              <ThemeToggle />
+              <div className="shrink-0">
+                <ThemeToggle />
+              </div>
+            </div>
+
+            {/* Right controls */}
+            <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 shrink-0">
+              
+              {/* Mobile search toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
+                onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+                aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
+              >
+                {isMobileSearchOpen ? (
+                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                ) : (
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
+              </Button>
+
+              {/* Create New — original mobile behavior (visible < xl) */}
+              <div className="hidden sm:block xl:hidden shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
+                    >
+                      <PlusCircle className="h-4 w-4 shrink-0" />
+                      <span>Create New</span>
+                      <ChevronDown className="h-3 w-3 opacity-80" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onClick={goCreateEvent}
+                      disabled={!hasTeamContext}
+                      className="cursor-pointer"
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Event
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={goCreateTeam}
+                      disabled={!accountId}
+                      className="cursor-pointer"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Team
+                    </DropdownMenuItem>
+
+                     <DropdownMenuItem
+                      onClick={goCreateCertificate}
+                      disabled={!accountId}
+                      className="cursor-pointer"
+                    >
+                      <Award className="mr-2 h-4 w-4" />
+                      Certificate
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={goCreateWorkspace} className="cursor-pointer">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Workspace
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Theme Toggle — original mobile behavior (visible < xl) */}
+              <div className="xl:hidden">
+                <ThemeToggle />
+              </div>
+
+              {/* Team Switcher — Desktop Right position, width tightly constrained */}
+              <div className="hidden xl:block w-[220px] shrink-0">
+                <TeamSwitcher variant="compact" />
+              </div>
+
               <UserMenu user={user} onLogout={handleLogout} />
             </div>
           </div>
