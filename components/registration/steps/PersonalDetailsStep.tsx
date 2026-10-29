@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Mail, Phone, RefreshCw, User } from 'lucide-react';
+import { Mail, RefreshCw, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import type { ProfessionalType } from '@/lib/types/auth';
 import type { ProfessionalTypeOption } from '../constants';
 import type { SignupFormData, SignupErrors } from '../types';
 
+import { PhoneInput } from '../PhoneInput';
 import { GoogleSignupButton } from '../shared/GoogleSignupButton';
 import { OrDivider } from '../shared/OrDivider';
 
@@ -37,6 +38,7 @@ interface PersonalDetailsStepProps {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   onProfessionalTypeChange: (value: ProfessionalType) => void;
+  onPhoneChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onGeneratePassword: () => void;
 }
@@ -52,6 +54,7 @@ export function PersonalDetailsStep({
   professionalTypes,
   onChange,
   onProfessionalTypeChange,
+  onPhoneChange,
   onPasswordChange,
   onGeneratePassword,
 }: PersonalDetailsStepProps) {
@@ -116,25 +119,17 @@ export function PersonalDetailsStep({
           )}
         </div>
 
-        {/* Phone */}
+              {/* Phone */}
         <div className="space-y-1">
           <Label className="text-xs sm:text-sm font-medium text-foreground">
-            Phone <span className="text-destructive">*</span>
+            Phone {/* <--- REMOVED THE ASTERISK */}
           </Label>
-          <div className="relative">
-            <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-            <Input
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={onChange}
-              placeholder="0712345678"
-              className={cn(
-                'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-                errors.phone && 'border-destructive',
-              )}
-            />
-          </div>
+          <PhoneInput
+            value={formData.phone}
+            onChange={onPhoneChange}
+            hasError={!!errors.phone}
+            className="h-9 sm:h-10"
+          />
           {errors.phone && (
             <p className="text-[10px] sm:text-xs text-destructive">
               {errors.phone}
@@ -201,7 +196,6 @@ export function PersonalDetailsStep({
             value={formData.password}
             onChange={onPasswordChange}
             placeholder="Create a strong password"
-            required
             showStrength
             showRequirements
             error={passwordError || undefined}

@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Building2, Mail, Phone } from 'lucide-react';
+import { Building2, Mail } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +19,8 @@ import type { InstitutionType } from '@/lib/types/auth';
 import type { InstitutionTypeOption } from '../types';
 import type { SignupFormData, SignupErrors } from '../types';
 
+import { PhoneInput } from '../PhoneInput';
+
 // ============================================================
 // PROPS
 // ============================================================
@@ -31,6 +33,7 @@ interface InstitutionDetailsStepProps {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   onInstitutionTypeChange: (value: InstitutionType) => void;
+  onInstitutionPhoneChange: (value: string) => void;
 }
 
 // ============================================================
@@ -43,6 +46,7 @@ export function InstitutionDetailsStep({
   institutionTypes,
   onChange,
   onInstitutionTypeChange,
+  onInstitutionPhoneChange,
 }: InstitutionDetailsStepProps) {
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -102,20 +106,12 @@ export function InstitutionDetailsStep({
         <Label className="text-xs sm:text-sm font-medium text-foreground">
           Organization Phone <span className="text-destructive">*</span>
         </Label>
-        <div className="relative">
-          <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-          <Input
-            name="institutionPhone"
-            type="tel"
-            value={formData.institutionPhone}
-            onChange={onChange}
-            placeholder="0712345678"
-            className={cn(
-              'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-              errors.institutionPhone && 'border-destructive',
-            )}
-          />
-        </div>
+        <PhoneInput
+          value={formData.institutionPhone}
+          onChange={onInstitutionPhoneChange}
+          hasError={!!errors.institutionPhone}
+          className="h-9 sm:h-10"
+        />
         {errors.institutionPhone && (
           <p className="text-[10px] sm:text-xs text-destructive">
             {errors.institutionPhone}

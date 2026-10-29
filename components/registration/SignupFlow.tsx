@@ -55,43 +55,24 @@ export function SignupFlow() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center py-8 sm:py-12 px-3 sm:px-4 overflow-hidden bg-background">
-      {/* Background layer */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/registration-bg.jpeg')" }}
-      />
+      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/registration-bg.jpeg')" }} />
       <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/60" />
 
-      {/* Dot pattern (hidden on mobile) */}
       <div className="absolute inset-0 pointer-events-none hidden sm:block">
-        <svg
-          className="absolute left-4 sm:left-8 top-4 sm:top-8 h-48 w-48 sm:h-64 sm:w-64 lg:h-80 lg:w-80 opacity-40"
-          viewBox="0 0 200 200"
-          fill="none"
-        >
-          <pattern
-            id="dotPattern"
-            x="0"
-            y="0"
-            width="20"
-            height="20"
-            patternUnits="userSpaceOnUse"
-          >
+        <svg className="absolute left-4 sm:left-8 top-4 sm:top-8 h-48 w-48 sm:h-64 sm:w-64 lg:h-80 lg:w-80 opacity-40" viewBox="0 0 200 200" fill="none">
+          <pattern id="dotPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
             <circle cx="10" cy="10" r="2" fill="#1A73E8" opacity="0.3" />
           </pattern>
           <rect x="0" y="0" width="200" height="200" fill="url(#dotPattern)" />
         </svg>
       </div>
 
-      {/* Glow (hidden on mobile) */}
       <div className="absolute inset-0 pointer-events-none hidden sm:block">
         <div className="absolute top-1/3 left-8 sm:left-12 w-64 h-64 sm:w-96 sm:h-96 bg-[#1A73E8]/5 rounded-full blur-3xl -translate-y-1/2" />
         <div className="absolute bottom-8 sm:bottom-12 left-1/4 w-64 h-64 sm:w-80 sm:h-80 bg-[#FBBC04]/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 w-full max-w-3xl">
-        {/* Page header */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             Create Your Account
@@ -101,10 +82,8 @@ export function SignupFlow() {
           </p>
         </div>
 
-        {/* Card */}
         <Card className="relative bg-card/80 backdrop-blur-xl shadow-2xl border border-border">
           <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
-            {/* Back button */}
             {form.canGoBack && (
               <div className="flex justify-start mb-1.5 sm:mb-2">
                 <Button
@@ -120,15 +99,10 @@ export function SignupFlow() {
               </div>
             )}
 
-            {/* Step indicator */}
             <div className="mb-3 sm:mb-4 pt-0.5 sm:pt-1">
-              <StepIndicator
-                currentStep={meta.number}
-                labels={meta.labels}
-              />
+              <StepIndicator currentStep={meta.number} labels={meta.labels} />
             </div>
 
-            {/* Step title + description */}
             <div className="text-center mt-1.5 sm:mt-2">
               <h2 className="text-lg sm:text-xl font-semibold text-foreground">
                 {meta.title}
@@ -149,10 +123,7 @@ export function SignupFlow() {
                 transition={{ duration: 0.3 }}
               >
                 {form.currentStep === 'account-type' && (
-                  <AccountTypeStep
-                    selected={form.accountType}
-                    onSelect={form.selectAccountType}
-                  />
+                  <AccountTypeStep selected={form.accountType} onSelect={form.selectAccountType} />
                 )}
 
                 {form.currentStep === 'details' &&
@@ -164,6 +135,7 @@ export function SignupFlow() {
                       professionalTypes={form.professionalTypes}
                       onChange={form.changeField}
                       onProfessionalTypeChange={form.changeProfessionalType}
+                      onPhoneChange={form.changePhone} // <--- FIX: Pass the phone handler
                       onPasswordChange={form.changePassword}
                       onGeneratePassword={form.generatePassword}
                     />
@@ -173,6 +145,7 @@ export function SignupFlow() {
                       errors={form.errors}
                       passwordError={form.passwordError}
                       onChange={form.changeField}
+                      onAdminPhoneChange={form.changeAdminPhone} // <--- FIX: Pass the admin phone handler
                       onPasswordChange={form.changePassword}
                       onGeneratePassword={form.generatePassword}
                     />
@@ -185,6 +158,7 @@ export function SignupFlow() {
                     institutionTypes={form.institutionTypes}
                     onChange={form.changeField}
                     onInstitutionTypeChange={form.changeInstitutionType}
+                    onInstitutionPhoneChange={form.changeInstitutionPhone} // <--- FIX: Pass the institution phone handler
                   />
                 )}
 
@@ -217,7 +191,6 @@ export function SignupFlow() {
                     />
                   )}
 
-                {/* Primary continue button */}
                 {showContinueButton && (
                   <div className="mt-4 sm:mt-6">
                     <Button
@@ -228,9 +201,7 @@ export function SignupFlow() {
                       {form.isSubmitting ? (
                         <span className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                          {isFinalSubmit(form.accountType, form.currentStep)
-                            ? 'Creating Account...'
-                            : 'Loading...'}
+                          {isFinalSubmit(form.accountType, form.currentStep) ? 'Creating Account...' : 'Loading...'}
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
@@ -246,7 +217,6 @@ export function SignupFlow() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <div className="text-center mt-4 sm:mt-6">
           <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-muted-foreground">
             <Shield className="h-2.5 w-2.5 sm:h-3 sm:w-3" />

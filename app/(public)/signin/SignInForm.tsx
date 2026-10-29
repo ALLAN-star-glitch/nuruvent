@@ -1,13 +1,13 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // components/auth/SignInForm.tsx
 
-/* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Eye,
   EyeOff,
@@ -31,6 +31,18 @@ import {
   useResendOTPMutation,
 } from '@/lib/store/api/authApi';
 import { setTwoFactorEmail } from '@/lib/store/slices/authSlice';
+
+type ApiError = {
+  status?: number | string;
+  data?: {
+    message?: string;
+    data?: {
+      requires_2fa?: boolean;
+      email?: string;
+      reason?: string;
+    };
+  };
+};
 
 export function SignInForm() {
   const router = useRouter();
@@ -84,13 +96,6 @@ export function SignInForm() {
   }, [sessionExpired]);
 
   useEffect(() => {
-    if (error) {
-      console.log('🔴 Error was set to:', error);
-      console.trace('Stack trace:');
-    }
-  }, [error]);
-
-  useEffect(() => {
     if (isAuthenticated) {
       router.push(nextUrl || '/dashboard');
     }
@@ -122,13 +127,9 @@ export function SignInForm() {
     if (successMessage) setSuccessMessage(null);
     if (sessionExpiredMessage) setSessionExpiredMessage(false);
 
-    // Clear the guest banner if the email is edited away from
-    // the one that triggered it.
-    if (
-      name === 'email' &&
-      guestAccountEmail &&
-      value !== guestAccountEmail
-    ) {
+    // Clear the guest banner only if the user edits the email away
+    // from the one that triggered it.
+    if (name === 'email' && guestAccountEmail && value !== guestAccountEmail) {
       setGuestAccountEmail(null);
     }
   };
@@ -153,10 +154,7 @@ export function SignInForm() {
     setError(null);
     setSuccessMessage(null);
     setSessionExpiredMessage(false);
-    setGuestAccountEmail(null);
     setIsLoading(true);
-
-    console.log('🔍 Login attempt for:', formData.email);
 
     try {
       const response = await login({
@@ -164,16 +162,11 @@ export function SignInForm() {
         password: formData.password,
       }).unwrap();
 
-      console.log('✅ Login response:', response);
-
       if (
         response.data &&
         'requires_2fa' in response.data &&
         response.data.requires_2fa === true
       ) {
-        console.log('✅ 2FA required, showing 2FA screen');
-
-        setError(null);
         const email = response.data.email || formData.email;
         dispatch(setTwoFactorEmail(email));
         setShowTwoFactor(true);
@@ -181,18 +174,16 @@ export function SignInForm() {
         otpRef.current = '';
         setResendTimer(60);
         setSuccessMessage('2FA code sent to your email');
-
+        setIsLoading(false);
         setTimeout(() => {
           const input = document.getElementById('2fa-otp-input');
           if (input) (input as HTMLInputElement)?.focus();
         }, 100);
-
-        setIsLoading(false);
         return;
       }
 
       if (response.data && 'access_token' in response.data) {
-        console.log('✅ Direct login successful');
+        toast.success('Signed in successfully');
         router.push(nextUrl || '/dashboard');
         setIsLoading(false);
         return;
@@ -200,13 +191,12 @@ export function SignInForm() {
 
       router.push(nextUrl || '/dashboard');
       setIsLoading(false);
-    } catch (err: any) {
-      console.error('❌ Login error caught:', err);
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
 
-      if (err.data?.data?.requires_2fa === true) {
-        console.log('✅ 2FA found in error response');
-        setError(null);
-        const email = err.data.data.email || formData.email;
+      // 2FA required — backend returned it as part of the error envelope
+      if (apiErr.data?.data?.requires_2fa === true) {
+        const email = apiErr.data.data.email || formData.email;
         dispatch(setTwoFactorEmail(email));
         setShowTwoFactor(true);
         setTwoFactorOtp('');
@@ -221,10 +211,9 @@ export function SignInForm() {
         return;
       }
 
-      // Guest account: backend returns 409 with reason "guest_account"
-      // when the email belongs to an auto-created guest user.
-      const reason = err.data?.data?.reason;
-      if (err.status === 409 && reason === 'guest_account') {
+      // Guest account: 409 with reason "guest_account"
+      const reason = apiErr.data?.data?.reason;
+      if (apiErr.status === 409 && reason === 'guest_account') {
         setGuestAccountEmail(formData.email);
         setError(null);
         setSuccessMessage(null);
@@ -232,9 +221,11 @@ export function SignInForm() {
         return;
       }
 
-      setError(
-        err.data?.message || 'Invalid email or password. Please try again.',
-      );
+      const message =
+        apiErr.data?.message ||
+        'Invalid email or password. Please try again.';
+      setError(message);
+      toast.error(message);
       setIsLoading(false);
     }
   };
@@ -256,9 +247,14 @@ export function SignInForm() {
         otp: code,
       }).unwrap();
 
+      toast.success('Signed in successfully');
       router.push(nextUrl || '/dashboard');
-    } catch (err: any) {
-      setError(err.data?.message || 'Invalid 2FA code. Please try again.');
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      const message =
+        apiErr.data?.message || 'Invalid 2FA code. Please try again.';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -275,6 +271,7 @@ export function SignInForm() {
       }).unwrap();
 
       setSuccessMessage('New 2FA code sent to your email');
+      toast.success('New 2FA code sent');
       setResendTimer(60);
       setTwoFactorOtp('');
       otpRef.current = '';
@@ -282,8 +279,12 @@ export function SignInForm() {
         const input = document.getElementById('2fa-otp-input');
         if (input) (input as HTMLInputElement)?.focus();
       }, 100);
-    } catch (err: any) {
-      setError(err.data?.message || 'Failed to resend code. Please try again.');
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      const message =
+        apiErr.data?.message || 'Failed to resend code. Please try again.';
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -510,7 +511,6 @@ export function SignInForm() {
           transition={{ duration: 0.4 }}
           className="bg-card/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-border p-6 md:p-8"
         >
-          {/* Session expired */}
           {sessionExpiredMessage && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}

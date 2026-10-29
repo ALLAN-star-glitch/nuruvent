@@ -3,6 +3,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import {
@@ -10,6 +11,7 @@ import {
   useRegisterInstitutionMutation,
   useVerifyOTPMutation,
   useResendOTPMutation,
+  useCheckAvailabilityMutation,
 } from '@/lib/store/api/authApi';
 import { setOtpEmail } from '@/lib/store/slices/authSlice';
 import type { InstitutionType, ProfessionalType } from '@/lib/types/auth';
@@ -30,48 +32,43 @@ import {
   ProfessionalTypeOption,
 } from './constants';
 
-
-
 // ============================================================
 // PUBLIC TYPES
 // ============================================================
 
 export interface UseSignupFormResult {
-  // ---- Flow state ----
   accountType: SignupAccountType | null;
   currentStep: SignupStep;
   canGoBack: boolean;
 
-  // ---- Form state ----
   formData: SignupFormData;
   errors: SignupErrors;
   passwordError: string | null;
 
-  // ---- OTP state ----
   otpEmail: string | null;
   otpError: string | null;
   otpSuccess: string | null;
 
-  // ---- Loading flags (derived from RTK Query) ----
   isSubmitting: boolean;
   isVerifying: boolean;
   isResending: boolean;
   isLoading: boolean;
 
-  // ---- Dropdown options ----
   institutionTypes: InstitutionTypeOption[];
   professionalTypes: ProfessionalTypeOption[]; 
 
-  // ---- Handlers ----
   selectAccountType: (type: SignupAccountType) => void;
   goBack: () => void;
-  next: () => void;
+  next: () => Promise<void>;
 
   changeField: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
   changeProfessionalType: (value: ProfessionalType) => void;
   changeInstitutionType: (value: InstitutionType) => void;
+  changePhone: (value: string) => void;
+  changeAdminPhone: (value: string) => void;
+  changeInstitutionPhone: (value: string) => void;
   changePassword: (value: string) => void;
   generatePassword: () => void;
 
@@ -86,43 +83,32 @@ export interface UseSignupFormResult {
 export function useSignupForm(): UseSignupFormResult {
   const dispatch = useAppDispatch();
 
-  // The auth slice is the source of truth for which email is pending
-  // OTP verification — the RTK Query matchers write to it.
   const otpEmail = useAppSelector((state) => state.auth.otpEmail);
 
-  // ---- RTK Query mutations ----------------------------------------
   const [registerPersonal, { isLoading: isRegisteringPersonal }] =
     useRegisterPersonalMutation();
   const [registerInstitution, { isLoading: isRegisteringInstitution }] =
     useRegisterInstitutionMutation();
   const [verifyOTP, { isLoading: isVerifying }] = useVerifyOTPMutation();
   const [resendOTP, { isLoading: isResending }] = useResendOTPMutation();
+  const [checkAvailability, { isLoading: isCheckingAvailability }] = useCheckAvailabilityMutation();
 
-  // ---- Flow state -------------------------------------------------
   const [accountType, setAccountType] = useState<SignupAccountType | null>(null);
   const [currentStep, setCurrentStep] = useState<SignupStep>('account-type');
 
-  // ---- Form state -------------------------------------------------
   const [formData, setFormData] = useState<SignupFormData>(EMPTY_SIGNUP_FORM);
   const [errors, setErrors] = useState<SignupErrors>({});
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  // ---- OTP feedback (parent-owned; the step holds only the code) --
   const [otpError, setOtpError] = useState<string | null>(null);
   const [otpSuccess, setOtpSuccess] = useState<string | null>(null);
 
-  // ============================================================
-  // DERIVED
-  // ============================================================
-
   const isLoading =
-    isRegisteringPersonal || isRegisteringInstitution || isVerifying || isResending;
+    isRegisteringPersonal || isRegisteringInstitution || isVerifying || isResending || isCheckingAvailability;
 
   const canGoBack =
     currentStep !== 'account-type' && currentStep !== 'success';
 
-  // Dropdown options. Once reference endpoints exist, replace these with
-  // `useGetInstitutionTypesQuery()` / `useGetProfessionalTypesQuery()`.
   const institutionTypes = useMemo(() => INSTITUTION_TYPES_FALLBACK, []);
   const professionalTypes = useMemo(() => PROFESSIONAL_TYPES_FALLBACK, []);
 
@@ -160,6 +146,36 @@ export function useSignupForm(): UseSignupFormResult {
       if (!prev.institutionType) return prev;
       const next = { ...prev };
       delete next.institutionType;
+      return next;
+    });
+  }, []);
+
+  const changePhone = useCallback((value: string) => {
+    setFormData((prev) => ({ ...prev, phone: value }));
+    setErrors((prev) => {
+      if (!prev.phone) return prev;
+      const next = { ...prev };
+      delete next.phone;
+      return next;
+    });
+  }, []);
+
+  const changeAdminPhone = useCallback((value: string) => {
+    setFormData((prev) => ({ ...prev, adminPhone: value }));
+    setErrors((prev) => {
+      if (!prev.adminPhone) return prev;
+      const next = { ...prev };
+      delete next.adminPhone;
+      return next;
+    });
+  }, []);
+
+  const changeInstitutionPhone = useCallback((value: string) => {
+    setFormData((prev) => ({ ...prev, institutionPhone: value }));
+    setErrors((prev) => {
+      if (!prev.institutionPhone) return prev;
+      const next = { ...prev };
+      delete next.institutionPhone;
       return next;
     });
   }, []);
@@ -224,7 +240,7 @@ export function useSignupForm(): UseSignupFormResult {
 
     if (!formData.name) next.name = 'Full name is required';
     if (!formData.email) next.email = 'Email is required';
-    if (!formData.phone) next.phone = 'Phone number is required';
+    // Phone is optional
     if (!formData.professionalType)
       next.professionalType = 'Please choose a professional type';
     if (!formData.password) next.password = 'Password is required';
@@ -238,7 +254,7 @@ export function useSignupForm(): UseSignupFormResult {
 
     if (!formData.adminName) next.adminName = 'Admin name is required';
     if (!formData.adminEmail) next.adminEmail = 'Admin email is required';
-    if (!formData.adminPhone) next.adminPhone = 'Admin phone is required';
+    // Admin phone is optional
     if (!formData.password) next.password = 'Password is required';
 
     setErrors(next);
@@ -265,20 +281,18 @@ export function useSignupForm(): UseSignupFormResult {
   // SUBMIT: PERSONAL
   // ============================================================
 
-  const submitPersonal = useCallback(async () => {
-    if (!validatePersonalDetails()) return;
+  const submitPersonal = useCallback(async (): Promise<boolean> => {
+    if (!validatePersonalDetails()) return false;
 
     const passwordCheck = validatePassword(formData.password);
     if (!passwordCheck.isValid) {
       setPasswordError(
         passwordCheck.errors[0] ?? 'Please choose a stronger password',
       );
-      return;
+      return false;
     }
 
-    // Narrow the professional type before the API call. `validatePersonalDetails`
-    // guarantees it's non-empty, but TS doesn't know that yet.
-    if (!formData.professionalType) return;
+    if (!formData.professionalType) return false;
     const professionalType: ProfessionalType = formData.professionalType;
 
     try {
@@ -292,10 +306,25 @@ export function useSignupForm(): UseSignupFormResult {
       }).unwrap();
 
       dispatch(setOtpEmail(response.data.email));
+      toast.success('Verification code sent to your email');
       setCurrentStep('otp');
+      return true;
     } catch (err) {
-      const message = extractErrorMessage(err, 'Registration failed. Please try again.');
-      setErrors({ email: message });
+      const message = extractErrorMessage(
+        err,
+        'Registration failed. Please try again.',
+      );
+      toast.error(message);
+      
+      // Map the error to the UI fields
+      if (isEmailError(message)) {
+        setErrors({ email: message });
+      } else if (isPhoneError(message)) {
+        setErrors({ phone: message });
+      } else {
+        setErrors({ email: message }); // Fallback to email if unknown
+      }
+      return false;
     }
   }, [formData, registerPersonal, dispatch, validatePersonalDetails]);
 
@@ -303,25 +332,49 @@ export function useSignupForm(): UseSignupFormResult {
   // SUBMIT: INSTITUTION
   // ============================================================
 
-  const submitInstitutionAdmin = useCallback(() => {
-    if (!validateAdminDetails()) return;
+  const submitInstitutionAdmin = useCallback(async (): Promise<boolean> => {
+    // 1. Local validation
+    if (!validateAdminDetails()) return false;
 
     const passwordCheck = validatePassword(formData.password);
     if (!passwordCheck.isValid) {
       setPasswordError(
         passwordCheck.errors[0] ?? 'Please choose a stronger password',
       );
-      return;
+      return false;
     }
 
-    setCurrentStep('institution-details');
-  }, [formData, validateAdminDetails]);
+    // 2. API Validation (Check Availability)
+    try {
+      await checkAvailability({
+        email: formData.adminEmail,
+        phone: formData.adminPhone || undefined,
+      }).unwrap();
 
-  const submitInstitution = useCallback(async () => {
-    if (!validateInstitutionDetails()) return;
+      // 3. Move to next step if API succeeds
+      setCurrentStep('institution-details');
+      return true;
+    } catch (err) {
+      const message = extractErrorMessage(err, 'Validation failed. Please try again.');
+      toast.error(message);
+      
+      // Map the error to the UI fields
+      if (isEmailError(message)) {
+        setErrors({ adminEmail: message });
+      } else if (isPhoneError(message)) {
+        setErrors({ adminPhone: message });
+      } else {
+        setErrors({ adminEmail: message }); // Fallback
+      }
+      
+      return false;
+    }
+  }, [formData, validateAdminDetails, checkAvailability]);
 
-    // Narrow institution type — validated above.
-    if (!formData.institutionType) return;
+  const submitInstitution = useCallback(async (): Promise<boolean> => {
+    if (!validateInstitutionDetails()) return false;
+
+    if (!formData.institutionType) return false;
     const institutionType: InstitutionType = formData.institutionType;
 
     try {
@@ -338,13 +391,30 @@ export function useSignupForm(): UseSignupFormResult {
       }).unwrap();
 
       dispatch(setOtpEmail(response.data.email));
+      toast.success('Verification code sent to your email');
       setCurrentStep('otp');
+      return true;
     } catch (err) {
       const message = extractErrorMessage(
         err,
         'Registration failed. Please try again.',
       );
-      setErrors({ adminEmail: message });
+      toast.error(message);
+      
+      // Map the error to the UI fields
+      if (isEmailError(message)) {
+        setErrors({ adminEmail: message }); // The admin email is the main identity for institutions
+      } else if (isInstitutionPhoneError(message)) {
+        setErrors({ institutionPhone: message });
+      } else if (isInstitutionEmailError(message)) {
+        setErrors({ institutionEmail: message });
+      } else if (isPhoneError(message)) {
+        setErrors({ adminPhone: message }); // Fallback for admin phone
+      } else {
+        // General error, put it on the institution name or just show toast
+        toast.error(message);
+      }
+      return false;
     }
   }, [formData, registerInstitution, dispatch, validateInstitutionDetails]);
 
@@ -352,17 +422,17 @@ export function useSignupForm(): UseSignupFormResult {
   // NEXT
   // ============================================================
 
-  const next = useCallback(() => {
+  const next = useCallback(async () => {
     if (accountType === 'account_type_personal') {
-      submitPersonal();
+      await submitPersonal();
       return;
     }
 
     if (accountType === 'account_type_institution') {
       if (currentStep === 'details') {
-        submitInstitutionAdmin();
+        await submitInstitutionAdmin(); 
       } else if (currentStep === 'institution-details') {
-        submitInstitution();
+        await submitInstitution(); 
       }
     }
   }, [
@@ -390,16 +460,21 @@ export function useSignupForm(): UseSignupFormResult {
 
       if (!email) {
         setOtpError('Email not found. Please try again.');
+        toast.error('Email not found. Please try again.');
         return;
       }
 
       try {
         await verifyOTP({ email, otp: code }).unwrap();
+        toast.success('Account verified. Welcome to Nuruvent!');
         setCurrentStep('success');
       } catch (err) {
-        setOtpError(
-          extractErrorMessage(err, 'Invalid OTP. Please try again.'),
+        const message = extractErrorMessage(
+          err,
+          'Invalid OTP. Please try again.',
         );
+        setOtpError(message);
+        toast.error(message);
       }
     },
     [otpEmail, accountType, formData.adminEmail, formData.email, verifyOTP],
@@ -417,16 +492,21 @@ export function useSignupForm(): UseSignupFormResult {
 
     if (!email) {
       setOtpError('Email not found. Please try again.');
+      toast.error('Email not found. Please try again.');
       return;
     }
 
     try {
       await resendOTP({ email, purpose: 'registration' }).unwrap();
       setOtpSuccess('New verification code sent to your email');
+      toast.success('Verification code resent');
     } catch (err) {
-      setOtpError(
-        extractErrorMessage(err, 'Failed to resend OTP. Please try again.'),
+      const message = extractErrorMessage(
+        err,
+        'Failed to resend OTP. Please try again.',
       );
+      setOtpError(message);
+      toast.error(message);
     }
   }, [otpEmail, accountType, formData.adminEmail, formData.email, resendOTP]);
 
@@ -462,6 +542,9 @@ export function useSignupForm(): UseSignupFormResult {
     changeField,
     changeProfessionalType,
     changeInstitutionType,
+    changePhone,
+    changeAdminPhone,
+    changeInstitutionPhone,
     changePassword,
     generatePassword,
 
@@ -474,11 +557,6 @@ export function useSignupForm(): UseSignupFormResult {
 // HELPERS
 // ============================================================
 
-/**
- * Best-effort extraction of a human-readable message from an RTK Query
- * error. Handles the common shapes returned by our API and falls back to
- * the provided default.
- */
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (typeof err === 'object' && err !== null) {
     const anyErr = err as { data?: { message?: string }; message?: string };
@@ -486,4 +564,21 @@ function extractErrorMessage(err: unknown, fallback: string): string {
     if (anyErr.message) return anyErr.message;
   }
   return fallback;
+}
+
+// Helper to detect which field the error belongs to based on the message
+function isEmailError(message: string): boolean {
+  return /email/i.test(message) && !/institution/i.test(message);
+}
+
+function isPhoneError(message: string): boolean {
+  return /phone/i.test(message) && !/institution/i.test(message);
+}
+
+function isInstitutionEmailError(message: string): boolean {
+  return /institution email/i.test(message);
+}
+
+function isInstitutionPhoneError(message: string): boolean {
+  return /institution phone/i.test(message);
 }

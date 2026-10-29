@@ -25,11 +25,35 @@ import type {
   VerifyResetOTPResponse,
 } from '@/lib/types/auth';
 
+// Define the type for the availability check request
+export interface CheckAvailabilityRequest {
+  email?: string;
+  phone?: string;
+}
+
 export const authApi = api.injectEndpoints({
   endpoints: (builder) => ({
     // ============================================================
     // SELF-SERVICE REGISTRATION (OTP-based)
     // ============================================================
+
+    /**
+     * POST /api/v1/auth/check-availability
+     *
+     * Checks if an email or phone number is already registered.
+     * Used to validate details before moving to the next step in a
+     * multi-step form.
+     */
+    checkAvailability: builder.mutation<
+      { success: boolean; message: string },
+      CheckAvailabilityRequest
+    >({
+      query: (body) => ({
+        url: '/auth/check-availability',
+        method: 'POST',
+        body,
+      }),
+    }),
 
     /**
      * POST /api/v1/auth/register
@@ -236,6 +260,7 @@ export const authApi = api.injectEndpoints({
 // ============================================================
 
 export const {
+  useCheckAvailabilityMutation, // <--- EXPORTED HERE
   useRegisterPersonalMutation,
   useRegisterInstitutionMutation,
   useVerifyOTPMutation,

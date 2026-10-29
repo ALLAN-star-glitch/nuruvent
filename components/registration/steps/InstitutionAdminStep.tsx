@@ -2,7 +2,7 @@
 
 'use client';
 
-import { Mail, Phone, RefreshCw, User } from 'lucide-react';
+import { Mail, RefreshCw, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 
 import type { SignupFormData, SignupErrors } from '../types';
 
+import { PhoneInput } from '../PhoneInput';
 import { GoogleSignupButton } from '../shared/GoogleSignupButton';
 import { OrDivider } from '../shared/OrDivider';
 
@@ -26,6 +27,7 @@ interface InstitutionAdminStepProps {
   onChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => void;
+  onAdminPhoneChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
   onGeneratePassword: () => void;
 }
@@ -39,6 +41,7 @@ export function InstitutionAdminStep({
   errors,
   passwordError,
   onChange,
+  onAdminPhoneChange,
   onPasswordChange,
   onGeneratePassword,
 }: InstitutionAdminStepProps) {
@@ -103,25 +106,17 @@ export function InstitutionAdminStep({
           )}
         </div>
 
-        {/* Admin phone */}
+              {/* Admin phone */}
         <div className="space-y-1">
           <Label className="text-xs sm:text-sm font-medium text-foreground">
-            Your Phone <span className="text-destructive">*</span>
+            Your Phone {/* <--- REMOVED THE ASTERISK */}
           </Label>
-          <div className="relative">
-            <Phone className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-            <Input
-              name="adminPhone"
-              type="tel"
-              value={formData.adminPhone}
-              onChange={onChange}
-              placeholder="0712345678"
-              className={cn(
-                'pl-8 sm:pl-9 h-9 sm:h-10 text-sm cursor-text',
-                errors.adminPhone && 'border-destructive',
-              )}
-            />
-          </div>
+          <PhoneInput
+            value={formData.adminPhone}
+            onChange={onAdminPhoneChange}
+            hasError={!!errors.adminPhone}
+            className="h-9 sm:h-10"
+          />
           {errors.adminPhone && (
             <p className="text-[10px] sm:text-xs text-destructive">
               {errors.adminPhone}
@@ -150,7 +145,6 @@ export function InstitutionAdminStep({
             value={formData.password}
             onChange={onPasswordChange}
             placeholder="Create a strong password"
-            required
             showStrength
             showRequirements
             error={passwordError || undefined}

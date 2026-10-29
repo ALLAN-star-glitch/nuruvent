@@ -2,106 +2,58 @@
 
 'use client';
 
-import { Check } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface StepIndicatorProps {
-  /** 1-based index of the current step. */
-  currentStep: number;
-  /**
-   * Ordered labels, one per step. The length determines the total
-   * number of steps, so `labels.length` is the source of truth for
-   * "how many steps are there" — the caller doesn't need to pass it
-   * separately.
-   */
+  currentStep: number; // 1-based index (0 means hidden)
   labels: string[];
 }
 
-/**
- * Progress indicator for the signup flow.
- *
- * Renders one circle per step, connected by a horizontal line. Steps
- * before `currentStep` show a checkmark; the current step is
- * highlighted; future steps are dimmed.
- *
- * Responsive:
- *   - Mobile (default):  small circles, no labels, tight spacing
- *   - Small screens+:    small labels visible
- *   - Tablet and up:     full circles and labels
- *
- * Renders nothing if `labels` is empty — avoids a stray empty row.
- */
 export function StepIndicator({ currentStep, labels }: StepIndicatorProps) {
-  const totalSteps = labels.length;
+  if (currentStep === 0 || labels.length === 0) return null;
 
-  if (totalSteps === 0) return null;
+  const totalSteps = labels.length;
+  
+  // Calculate percentage (e.g., step 1 of 2 = 0%, step 2 of 2 = 100%)
+  // We use (currentStep - 1) so that step 1 is empty, step 2 is half, etc.
+  const progressPercentage = totalSteps > 1 
+    ? ((currentStep - 1) / (totalSteps - 1)) * 100 
+    : 0;
 
   return (
-    <div className="flex items-center justify-between w-full max-w-2xl mx-auto px-1 sm:px-2">
-      {labels.map((label, index) => {
-        const stepNumber = index + 1;
-        const isActive = stepNumber === currentStep;
-        const isCompleted = stepNumber < currentStep;
-        const isLast = index === totalSteps - 1;
+    <div className="w-full max-w-md mx-auto mb-6">
+      {/* Progress Bar Track */}
+      <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
+        {/* Animated Fill */}
+        <motion.div
+          className="absolute top-0 left-0 h-full bg-primary rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${progressPercentage}%` }}
+          transition={{ duration: 0.4, ease: 'easeInOut' }}
+        />
+      </div>
 
-        return (
-          <div
-            key={label}
-            className={cn(
-              'flex items-center flex-1 min-w-0',
-              isLast && 'flex-none',
-            )}
-          >
-            {/* Circle + label */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              <div
-                className={cn(
-                  'w-6 h-6 sm:w-8 sm:h-8 rounded-full',
-                  'flex items-center justify-center flex-shrink-0',
-                  'text-[10px] sm:text-sm font-medium transition-all',
-                  isActive &&
-                    'bg-primary text-primary-foreground ring-2 sm:ring-4 ring-primary/20',
-                  isCompleted && 'bg-tertiary-500 text-white',
-                  !isActive &&
-                    !isCompleted &&
-                    'bg-muted text-muted-foreground',
-                )}
-                aria-current={isActive ? 'step' : undefined}
-              >
-                {isCompleted ? (
-                  <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                ) : (
-                  stepNumber
-                )}
-              </div>
+      {/* Step Labels */}
+      <div className="flex justify-between mt-3 px-1">
+        {labels.map((label, index) => {
+          const isActive = index + 1 <= currentStep;
+          const isCurrent = index + 1 === currentStep;
 
-              <span
-                className={cn(
-                  'text-[8px] sm:text-xs font-medium hidden xs:block truncate',
-                  'max-w-[40px] sm:max-w-none',
-                  isActive && 'text-foreground',
-                  isCompleted && 'text-foreground/80',
-                  !isActive && !isCompleted && 'text-muted-foreground',
-                )}
-              >
-                {label}
-              </span>
-            </div>
-
-            {/* Connector line (not rendered after the last step) */}
-            {!isLast && (
-              <div className="flex-1 mx-1 sm:mx-2 h-0.5 bg-muted min-w-[10px]">
-                <div
-                  className={cn(
-                    'h-full transition-all duration-300',
-                    isCompleted ? 'w-full bg-tertiary-500' : 'w-0 bg-primary',
-                  )}
-                />
-              </div>
-            )}
-          </div>
-        );
-      })}
+          return (
+            <span
+              key={label}
+              className={cn(
+                'text-xs font-medium transition-colors duration-300',
+                isActive ? 'text-primary' : 'text-muted-foreground',
+                isCurrent && 'font-bold'
+              )}
+            >
+              {label}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }

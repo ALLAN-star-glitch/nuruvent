@@ -7,7 +7,7 @@ import type {
   InstitutionTypeOption,
 } from './types';
 
-import type {ProfessionalType} from '../../lib/types/auth';
+import type { ProfessionalType } from '../../lib/types/auth';
 
 // ============================================================
 // TIMING
@@ -21,15 +21,15 @@ export const RESEND_OTP_COOLDOWN_SECONDS = 60;
 // ============================================================
 
 /** Stepper labels for the personal signup flow. */
-const PERSONAL_STEP_LABELS = ['Type', 'Details', 'OTP', 'Done'] as const;
+// Personal: Details -> Verify
+const PERSONAL_STEP_LABELS = ['Details', 'Verify'] as const;
 
 /** Stepper labels for the institution signup flow. */
+// Institution: Admin -> Organization -> Verify
 const INSTITUTION_STEP_LABELS = [
-  'Type',
   'Admin',
-  'Inst.',
-  'OTP',
-  'Done',
+  'Organization',
+  'Verify',
 ] as const;
 
 // ============================================================
@@ -39,11 +39,6 @@ const INSTITUTION_STEP_LABELS = [
 /**
  * Compute the step metadata (number, total, labels, title, description)
  * for the current point in the flow.
- *
- * The step number and total depend on which flow we're in:
- *   - personal:    account-type(1) -> details(2) -> otp(3) -> success(4)
- *   - institution: account-type(1) -> details(2) -> institution-details(3)
- *                  -> otp(4) -> success(5)
  */
 export function getStepMeta(
   step: SignupStep,
@@ -51,6 +46,7 @@ export function getStepMeta(
 ): StepMeta {
   const isInstitution = accountType === 'account_type_institution';
 
+  // We exclude 'account-type' and 'success' from the progress bar labels
   const labels: string[] = isInstitution
     ? [...INSTITUTION_STEP_LABELS]
     : [...PERSONAL_STEP_LABELS];
@@ -63,7 +59,7 @@ export function getStepMeta(
 }
 
 /**
- * Map a step to its 1-based number and its card header text.
+ * Map a step to its 1-based number (matching the progress bar) and its card header text.
  */
 function describeStep(
   step: SignupStep,
@@ -74,7 +70,7 @@ function describeStep(
   switch (step) {
     case 'account-type':
       return {
-        number: 1,
+        number: 0, // 0 means don't show the progress bar
         title: 'Choose Your Account Type',
         description: 'Select how you want to use Nuruvent',
       };
@@ -82,33 +78,33 @@ function describeStep(
     case 'details':
       return isInstitution
         ? {
-            number: 2,
-            title: 'Personal Details',
-            description: 'Enter your personal details',
+            number: 1, // Admin step (1 of 3)
+            title: 'Admin Details',
+            description: 'Enter the administrator information',
           }
         : {
-            number: 2,
+            number: 1, // Details step (1 of 2)
             title: 'Personal Details',
             description: 'Enter your personal information',
           };
 
     case 'institution-details':
       return {
-        number: 3,
-        title: 'Institution Details',
+        number: 2, // Organization step (2 of 3)
+        title: 'Organization Details',
         description: 'Enter your organization details',
       };
 
     case 'otp':
       return {
-        number: isInstitution ? 4 : 3,
+        number: isInstitution ? 3 : 2,
         title: 'Verify Your Email',
         description: "We've sent a code to your email",
       };
 
     case 'success':
       return {
-        number: isInstitution ? 5 : 4,
+        number: 0, // Don't show progress bar on success
         title: 'Account Created!',
         description: 'Welcome to Nuruvent',
       };
@@ -118,15 +114,6 @@ function describeStep(
 // ============================================================
 // INSTITUTION TYPES
 // ============================================================
-//
-// Fallback list used until the reference-data endpoint is available.
-// Once `GET /api/v1/institution-types` exists, replace the
-// `institutionTypes` prop in the form with a fetch from
-// `referenceApi.ts` and delete this constant.
-//
-// The values below mirror the backend `institution_types` table:
-//   name         -> value
-//   display_name -> label
 
 export const INSTITUTION_TYPES_FALLBACK: InstitutionTypeOption[] = [
   { value: 'institution_type_company', label: 'Company' },
@@ -140,14 +127,6 @@ export const INSTITUTION_TYPES_FALLBACK: InstitutionTypeOption[] = [
 // STEP -> ANIMATION KEY
 // ============================================================
 
-/**
- * A stable key for the current step, used as the `key` prop on the
- * AnimatePresence wrapper so exit/enter animations run correctly.
- *
- * The `details` step renders two different forms depending on the
- * account type. This collapses them into distinct keys so the animation
- * replays when the user switches context.
- */
 export function stepAnimationKey(
   step: SignupStep,
   accountType: SignupAccountType | null,
@@ -158,23 +137,14 @@ export function stepAnimationKey(
   return step;
 }
 
-/**
- * A single option for the professional-type dropdown. `value` matches
- * `professional_types.name`, `label` matches `professional_types.display_name`.
- */
 export interface ProfessionalTypeOption {
   value: ProfessionalType;
   label: string;
 }
 
-/**
- * Fallback list used until `GET /api/v1/professional-types` is wired up.
- * Values mirror the `professional_types` table.
- */
 export const PROFESSIONAL_TYPES_FALLBACK: ProfessionalTypeOption[] = [
   { value: 'professional_type_trainer', label: 'Trainer' },
   { value: 'professional_type_coach', label: 'Coach' },
   { value: 'professional_type_consultant', label: 'Consultant' },
   { value: 'professional_type_freelancer', label: 'Freelancer' },
-  
 ];
