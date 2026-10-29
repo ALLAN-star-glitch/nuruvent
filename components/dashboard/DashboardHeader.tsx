@@ -62,6 +62,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { CountryFlag } from '../layout/CountryFlag';
 
 interface NavItem {
   segment: string;
@@ -473,16 +474,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <TeamSwitcher variant="compact" />
               </div>
 
-              {/* Team settings shortcut — only when inside a team */}
-              {hasTeamContext && (
-                <Link
-                  href={`/dashboard/${accountId}/${teamId}/settings`}
-                  aria-label="Team settings"
-                  className="hidden sm:inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <Settings className="h-4 w-4" />
-                </Link>
-              )}
             </div>
 
             {/* Middle: Search + Create New + Theme (Desktop only) */}
@@ -616,6 +607,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               <div className="hidden xl:block w-[220px] shrink-0">
                 <TeamSwitcher variant="compact" />
               </div>
+               {/* Add Country Flag here */}
+              <CountryFlag />
 
               <UserMenu user={user} onLogout={handleLogout} />
             </div>
