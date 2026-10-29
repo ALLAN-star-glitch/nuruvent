@@ -4,12 +4,19 @@ import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 // IR/KP/CU/SY). Must stay in sync with
 // internal/shared/validation/phone.go allowedRegions.
 const BACKEND_ALLOWLIST = new Set([
+  // Africa
   'DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','DJ',
   'EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','CI','KE','LS','LR',
   'LY','MG','MW','ML','MR','MU','MA','MZ','NA','NE','NG','RW','ST','SN',
   'SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','ZM','ZW',
+  
+  // Diaspora
   'US','CA','AE','SA','QA','KW','BH','OM','IL','JO','LB',
   'IN','PK','BD','PH','AU','NZ','JM','TT',
+
+  // Europe
+  'GB','DE','FR','NL','IE','IT','ES','PT','BE','CH','AT','SE','NO','DK','FI',
+  'PL','CZ','GR','HU','RO','BG','HR','SK','SI','EE','LV','LT','LU','MT','CY'
 ]);
 
 const ISO_NAMES: Record<string, string> = {
@@ -34,6 +41,14 @@ const ISO_NAMES: Record<string, string> = {
   IN: 'India', PK: 'Pakistan', BD: 'Bangladesh', PH: 'Philippines',
   AU: 'Australia', NZ: 'New Zealand', JM: 'Jamaica',
   TT: 'Trinidad and Tobago',
+    // Europe
+  GB: 'United Kingdom', DE: 'Germany', FR: 'France', NL: 'Netherlands',
+  IE: 'Ireland', IT: 'Italy', ES: 'Spain', PT: 'Portugal', BE: 'Belgium',
+  CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark',
+  FI: 'Finland', PL: 'Poland', CZ: 'Czech Republic', GR: 'Greece',
+  HU: 'Hungary', RO: 'Romania', BG: 'Bulgaria', HR: 'Croatia',
+  SK: 'Slovakia', SI: 'Slovenia', EE: 'Estonia', LV: 'Latvia', LT: 'Lithuania',
+  LU: 'Luxembourg', MT: 'Malta', CY: 'Cyprus'
 };
 
 export type Country = {
@@ -95,6 +110,37 @@ const TIMEZONE_TO_COUNTRY: Record<string, string> = {
   'Pacific/Auckland': 'NZ',
   'America/Jamaica': 'JM',
   'America/Port_of_Spain': 'TT',
+  // Europe
+  'Europe/London': 'GB',
+  'Europe/Dublin': 'IE',
+  'Europe/Paris': 'FR',
+  'Europe/Berlin': 'DE',
+  'Europe/Amsterdam': 'NL',
+  'Europe/Madrid': 'ES',
+  'Europe/Rome': 'IT',
+  'Europe/Lisbon': 'PT',
+  'Europe/Brussels': 'BE',
+  'Europe/Zurich': 'CH',
+  'Europe/Vienna': 'AT',
+  'Europe/Stockholm': 'SE',
+  'Europe/Oslo': 'NO',
+  'Europe/Copenhagen': 'DK',
+  'Europe/Helsinki': 'FI',
+  'Europe/Warsaw': 'PL',
+  'Europe/Prague': 'CZ',
+  'Europe/Athens': 'GR',
+  'Europe/Budapest': 'HU',
+  'Europe/Bucharest': 'RO',
+  'Europe/Sofia': 'BG',
+  'Europe/Zagreb': 'HR',
+  'Europe/Bratislava': 'SK',
+  'Europe/Ljubljana': 'SI',
+  'Europe/Tallinn': 'EE',
+  'Europe/Riga': 'LV',
+  'Europe/Vilnius': 'LT',
+  'Europe/Luxembourg': 'LU',
+  'Europe/Malta': 'MT',
+  'Asia/Nicosia': 'CY',
 };
 
 /**
