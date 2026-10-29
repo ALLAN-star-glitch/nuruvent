@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -6,10 +7,10 @@ import { Check, ChevronsUpDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { COUNTRIES, DEFAULT_COUNTRY, type Country } from './countries';
+import { COUNTRIES, DEFAULT_COUNTRY, detectDefaultCountry, type Country } from './countries';
 
 type Props = {
-  value: string; // E.164 string
+  value: string;
   onChange: (e164: string) => void;
   className?: string;
   hasError?: boolean;
@@ -23,16 +24,23 @@ function flagEmoji(iso: string): string {
 }
 
 export function PhoneInput({ value, onChange, className, hasError }: Props) {
+  // Start with default, then detect on mount to avoid SSR hydration mismatch
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [national, setNational] = useState('');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync from parent to local state (e.g. if form resets)
+  // 1. Detect country on mount (client-only)
   useEffect(() => {
     if (!value) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCountry(detectDefaultCountry());
+    }
+  }, []); // Only run once on mount
+
+  // 2. Sync external E.164 value to internal state
+  useEffect(() => {
+    if (!value) {
       setNational('');
       return;
     }
@@ -74,12 +82,10 @@ export function PhoneInput({ value, onChange, className, hasError }: Props) {
     );
   }, [search]);
 
-  // Handle typing in the input
   const handleNationalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, ''); // digits only
     setNational(raw); // Always update local state so the user can type
     
-    // Push to parent
     const dial = selected?.dial ?? '+254';
     onChange(raw ? `${dial}${raw}` : '');
   };

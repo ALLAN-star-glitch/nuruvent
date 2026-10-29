@@ -52,3 +52,68 @@ export const COUNTRIES: Country[] = getCountries()
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const DEFAULT_COUNTRY = 'KE';
+
+/**
+ * A lightweight map of common timezones to ISO country codes.
+ * If the timezone isn't here, it falls back to the default.
+ */
+const TIMEZONE_TO_COUNTRY: Record<string, string> = {
+  'Africa/Nairobi': 'KE',
+  'Africa/Kampala': 'UG',
+  'Africa/Dar_es_Salaam': 'TZ',
+  'Africa/Kigali': 'RW',
+  'Africa/Lagos': 'NG',
+  'Africa/Accra': 'GH',
+  'Africa/Johannesburg': 'ZA',
+  'Africa/Cairo': 'EG',
+  'Africa/Casablanca': 'MA',
+  'Africa/Algiers': 'DZ',
+  'Africa/Tunis': 'TN',
+  'Africa/Addis_Ababa': 'ET',
+  'Africa/Khartoum': 'SD',
+  'Africa/Juba': 'SS',
+  'Africa/Mogadishu': 'SO',
+  'Africa/Dakar': 'SN',
+  'Africa/Abidjan': 'CI',
+  'Africa/Douala': 'CM',
+  'Africa/Lusaka': 'ZM',
+  'Africa/Harare': 'ZW',
+  'Africa/Maputo': 'MZ',
+  'America/New_York': 'US',
+  'America/Chicago': 'US',
+  'America/Denver': 'US',
+  'America/Los_Angeles': 'US',
+  'America/Toronto': 'CA',
+  'America/Vancouver': 'CA',
+  'Asia/Dubai': 'AE',
+  'Asia/Riyadh': 'SA',
+  'Asia/Kolkata': 'IN',
+  'Asia/Karachi': 'PK',
+  'Asia/Manila': 'PH',
+  'Australia/Sydney': 'AU',
+  'Australia/Melbourne': 'AU',
+  'Pacific/Auckland': 'NZ',
+  'America/Jamaica': 'JM',
+  'America/Port_of_Spain': 'TT',
+};
+
+/**
+ * Detects the user's country using their browser's timezone.
+ * Falls back to DEFAULT_COUNTRY if detection fails, the timezone isn't 
+ * mapped, or the detected country isn't in the allowed list.
+ */
+export function detectDefaultCountry(): string {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!timezone) return DEFAULT_COUNTRY;
+
+    const detectedIso = TIMEZONE_TO_COUNTRY[timezone];
+    if (!detectedIso) return DEFAULT_COUNTRY;
+
+    // Double-check that the detected country is actually allowed
+    const isAllowed = COUNTRIES.some((c) => c.iso === detectedIso);
+    return isAllowed ? detectedIso : DEFAULT_COUNTRY;
+  } catch {
+    return DEFAULT_COUNTRY;
+  }
+}
