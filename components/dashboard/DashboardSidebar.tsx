@@ -332,7 +332,9 @@ export function DashboardSidebar({
           'hidden md:flex md:flex-col bg-card/95 backdrop-blur-md transition-all duration-300 ease-in-out select-none shrink-0',
           'fixed left-6 z-30 overflow-hidden',
           'rounded-2xl border border-border/70 shadow-xl shadow-black/5',
-          collapsed ? 'w-[68px]' : 'w-[260px]',
+          collapsed 
+            ? 'w-[68px]' 
+            : 'w-[220px] xl:w-[240px] 2xl:w-[260px]', 
           'top-[100px] h-[calc(100vh-120px)]', 
         )}
       >
