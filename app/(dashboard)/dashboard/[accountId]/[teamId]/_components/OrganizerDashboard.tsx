@@ -71,7 +71,7 @@ import {
   useGetTicketTypesQuery,
   useListMyEventsQuery,
 } from '@/lib/store/api/eventsApi';
-import { useGetPaymentStatsQuery } from '@/lib/store/api/paymentsApi';
+import { useGetPaymentStatsQuery, useListPaymentsQuery } from '@/lib/store/api/paymentsApi';
 import { useGetAttendeesQuery } from '@/lib/store/api/attendanceApi';
 import { useListAllRegistrationsQuery } from '@/lib/store/api/registrationsApi';
 import type {
@@ -318,7 +318,30 @@ export function OrganizerDashboard({
   const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
     null,
   );
-  const [range, setRange] = useState<RangeDays>(7);
+  const [range, setRange] = useState<RangeDays>(30);
+
+
+  // Revenue source for the Ticket Sales chart. Admin-only — trainers get
+// a 403 on /payments, so skip the request entirely for them (same
+// pattern as the stats query above).
+const { data: paymentsResponse, isLoading: paymentsListLoading } =
+  useListPaymentsQuery(
+    {
+      page: 1,
+      page_size: 200, // enough to cover a 6-month window for typical teams
+      team_id: teamId,
+      scope: 'team',
+      status: 'success',
+      sort_by: 'created_at',
+      sort_order: 'desc',
+    },
+    {
+      skip: !isAuthenticated || !teamId || !isAdmin,
+      refetchOnMountOrArgChange: true,
+    },
+  );
+
+const payments = paymentsResponse?.data?.payments ?? [];
 
   useEffect(() => {
     if (accountId) dispatch(setActiveAccount(accountId));
@@ -514,30 +537,61 @@ export function OrganizerDashboard({
   );
 
   const monthlyData = useMemo(() => {
-    const months: Record<
-      string,
-      { month: string; events: number; revenue: number; attendees: number }
-    > = {};
+  const buckets: Record<
+    string,
+    { month: string; events: number; revenue: number; attendees: number }
+  > = {};
 
-    events.forEach((event) => {
-      const startDate = event.start_date ?? event.schedules?.[0]?.start_date;
-      if (!startDate) return;
+  const ensure = (key: string, monthName: string) => {
+    if (!buckets[key]) {
+      buckets[key] = { month: monthName, events: 0, revenue: 0, attendees: 0 };
+    }
+    return buckets[key];
+  };
 
-      const d = new Date(startDate);
-      if (isNaN(d.getTime())) return;
+  // Events → events + attendees
+  events.forEach((event) => {
+    const startDate = event.start_date ?? event.schedules?.[0]?.start_date;
+    if (!startDate) return;
 
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+    const d = new Date(startDate);
+    if (isNaN(d.getTime())) return;
 
-      if (!months[key]) {
-        months[key] = { month: monthName, events: 0, revenue: 0, attendees: 0 };
-      }
-      months[key].events += 1;
-      months[key].attendees += event.current_attendees ?? 0;
-    });
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const monthName = d.toLocaleDateString('en-US', { month: 'short' });
 
-    return Object.values(months).slice(-6);
-  }, [events]);
+    const bucket = ensure(key, monthName);
+    bucket.events += 1;
+    bucket.attendees += event.current_attendees ?? 0;
+  });
+
+  // Payments → revenue (stored in cents on the backend)
+  payments.forEach((p) => {
+    const created = new Date(p.created_at);
+    if (isNaN(created.getTime())) return;
+
+    const key = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`;
+    const monthName = created.toLocaleDateString('en-US', { month: 'short' });
+
+    const bucket = ensure(key, monthName);
+    // Adjust `amount` if your Payment type uses a different field
+    // (e.g. `total`, `amount_major`, `gross_amount`). Value is in cents.
+    bucket.revenue += (p.amount ?? 0) / 100;
+  });
+
+    const isLoading =
+    eventsLoading ||
+    paymentsLoading ||
+    paymentsListLoading ||
+    attendeesLoading ||
+    registrationsLoading;
+
+  // Chronological, last 6 months
+  return Object.entries(buckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-6)
+    .map(([, v]) => v);
+}, [events, payments]);
 
   const statusDistribution = [
     { name: 'Published', value: metrics.liveEvents, color: COLORS.tertiary },
@@ -1400,53 +1454,57 @@ export function OrganizerDashboard({
       <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-3">
         {/* Ticket Sales Chart */}
         <Panel
-          title="Ticket Sales"
-          subtitle="Revenue from successful payments"
-          className="xl:col-span-2"
+      title="Ticket Sales"
+      subtitle="Monthly revenue from successful payments"
+      className="xl:col-span-2"
+    >
+    <div className="h-[220px] sm:h-[260px]">
+      {monthlyData.length === 0 ? (
+        <EmptyNote>
+          {isAdmin
+          ? 'No sales data available yet.'
+          : 'Revenue data is only available to team admins.'}
+      </EmptyNote>
+    ) : (
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={monthlyData}
+          margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
+          barSize={32}
         >
-          <div className="h-[220px] sm:h-[260px]">
-            {monthlyData.length === 0 ? (
-              <EmptyNote>No sales data available yet.</EmptyNote>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={monthlyData}
-                  margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
-                  barSize={32}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="var(--border)"
-                  />
-                  <XAxis
-                    dataKey="month"
-                    stroke="var(--muted-foreground)"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(val) => `KSh ${val / 1000}k`}
-                  />
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
-                  />
-                  <Bar
-                    dataKey="revenue"
-                    name="Revenue"
-                    fill={COLORS.primary}
-                    radius={[6, 6, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            vertical={false}
+            stroke="var(--border)"
+          />
+          <XAxis
+            dataKey="month"
+            stroke="var(--muted-foreground)"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            stroke="var(--muted-foreground)"
+            fontSize={11}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(val) => `KSh ${val / 1000}k`}
+          />
+          <Tooltip
+            content={<CustomTooltip />}
+            cursor={{ fill: 'var(--muted)', opacity: 0.4 }}
+          />
+          <Bar
+            dataKey="revenue"
+            name="Revenue"
+            fill={COLORS.primary}
+            radius={[6, 6, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    )}
+  </div>
         </Panel>
 
         {/* Event Types (moved from earlier to balance the row) */}
