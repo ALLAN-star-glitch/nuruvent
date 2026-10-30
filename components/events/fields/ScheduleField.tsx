@@ -223,6 +223,7 @@ interface SchedulesFieldProps extends FieldBaseProps {
   eventId?: string;
   onMeetingChanged?: () => void;
   onSchedulesCommitted?: (next: ScheduleForm[]) => void;
+  videoJustConnected?: boolean; 
 }
 
 const MAX_SCHEDULES = 20;
@@ -248,6 +249,7 @@ export function SchedulesField({
   eventId,
   onMeetingChanged,
   onSchedulesCommitted,
+  videoJustConnected,
 }: SchedulesFieldProps) {
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [pendingRemoveKey, setPendingRemoveKey] = useState<string | null>(null);
@@ -272,6 +274,23 @@ export function SchedulesField({
     () => (value.length > 0 ? value : [makeEmptySchedule()]),
     [value],
   );
+
+    useEffect(() => {
+    if (videoJustConnected && schedules.length > 0) {
+      const virtualIndex = schedules.findIndex((s) => s.is_virtual);
+      const keyToOpen = virtualIndex >= 0 ? schedules[virtualIndex]._key : schedules[0]._key;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOpenKey(keyToOpen);
+
+      // Add this timeout to wait for the DOM to expand before scrolling
+      setTimeout(() => {
+        const el = document.getElementById(fieldId('schedules', id));
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150); // 150ms gives React enough time to expand the accordion
+    }
+  }, [videoJustConnected, schedules, id]);
 
   const update = <K extends keyof ScheduleForm>(
     key: string,
