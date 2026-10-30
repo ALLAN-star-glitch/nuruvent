@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CertificateTierSelect } from '@/components/events/fields/CertificateTierSelect';
+import type { CertificateTemplateDesign } from '@/lib/types/certificates';
 
 import type { TemplateFormState } from './types';
 
@@ -16,7 +17,7 @@ interface Props {
     key: K,
     value: TemplateFormState[K],
   ) => void;
-  onTierChange: (tierId: string, priceMinor: number, slug: string) => void;
+  onTierChange: (tierId: string, priceMinor: number, slug: string, design: CertificateTemplateDesign) => void;
   disabled?: boolean;
 }
 

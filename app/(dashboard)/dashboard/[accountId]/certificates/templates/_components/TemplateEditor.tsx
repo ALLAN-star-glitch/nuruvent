@@ -72,12 +72,6 @@ function tierSlugFromPrice(priceMinor: number | null | undefined): string {
   return '';
 }
 
-// Resolves the tier slug from all available sources, treating empty
-// strings as "not provided" (unlike ??, which only falls through on
-// null/undefined). Order:
-//   1. forceTier.tierSlug (customize flow — parent's system_slug)
-//   2. initial.system_slug (system template hydration)
-//   3. derived from initial.price_minor (legacy fallback)
 function resolveTierSlug(
   forceTier: Props['forceTier'],
   initial: CertificateTemplate | undefined,
@@ -177,7 +171,12 @@ export function TemplateEditor({
     }));
   };
 
-  const handleTierChange = (tierId: string, priceMinor: number, slug: string) => {
+  const handleTierChange = (
+    tierId: string, 
+    priceMinor: number, 
+    slug: string,
+    design?: CertificateTemplateDesign
+  ) => {
     setForm((prev) => {
       if (prev.tierTemplateId === tierId && prev.tierSlug === slug) return prev;
       return {
@@ -185,6 +184,7 @@ export function TemplateEditor({
         tierTemplateId: tierId,
         tierSlug: slug,
         priceMinor,
+        design: design ? { ...design } : prev.design,
       };
     });
   };
