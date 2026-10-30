@@ -90,27 +90,27 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardContent className="pt-6">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-neutral-gray">
-              <Shield className="h-4 w-4 text-primary-500" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Shield className="h-4 w-4 text-primary" />
               <span>Review your event details before publishing</span>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               {/* Event Name */}
               <div className="col-span-2">
-                <p className="text-neutral-gray">Event Name</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Event Name</p>
+                <p className="font-medium text-foreground">
                   {formData.name || 'Not set'}
                 </p>
               </div>
 
               {/* Type */}
               <div>
-                <p className="text-neutral-gray">Type</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium text-foreground">
                   {selectedEventType?.display_name ||
                     selectedEventType?.name ||
                     'Not set'}
@@ -119,25 +119,25 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
               {/* Category */}
               <div>
-                <p className="text-neutral-gray">Category</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Category</p>
+                <p className="font-medium text-foreground">
                   {formData.category_id ? 'Set' : 'None'}
                 </p>
               </div>
 
               {/* Date */}
               <div>
-                <p className="text-neutral-gray">
+                <p className="text-muted-foreground">
                   {endDateLabel ? 'Start Date' : 'Date'}
                 </p>
-                <p className="font-medium text-neutral-dark">{dateLabel}</p>
+                <p className="font-medium text-foreground">{dateLabel}</p>
               </div>
 
               {/* End Date */}
               {endDateLabel && (
                 <div>
-                  <p className="text-neutral-gray">End Date</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">End Date</p>
+                  <p className="font-medium text-foreground">
                     {endDateLabel}
                   </p>
                 </div>
@@ -145,14 +145,14 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
               {/* Time */}
               <div>
-                <p className="text-neutral-gray">Time</p>
-                <p className="font-medium text-neutral-dark">{timeLabel}</p>
+                <p className="text-muted-foreground">Time</p>
+                <p className="font-medium text-foreground">{timeLabel}</p>
               </div>
 
               {/* Duration */}
               <div>
-                <p className="text-neutral-gray">Duration</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Duration</p>
+                <p className="font-medium text-foreground">
                   {duration ? `${duration} minutes` : 'Not set'}
                 </p>
               </div>
@@ -160,8 +160,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Additional schedules */}
               {additionalSchedules > 0 && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Additional Sessions</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Additional Sessions</p>
+                  <p className="font-medium text-foreground">
                     {additionalSchedules}{' '}
                     {additionalSchedules === 1 ? 'session' : 'sessions'}
                   </p>
@@ -171,8 +171,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Recurring */}
               {formData.is_recurring && formData.recurrence?.pattern && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Recurring</p>
-                  <p className="font-medium text-neutral-dark capitalize">
+                  <p className="text-muted-foreground">Recurring</p>
+                  <p className="font-medium text-foreground capitalize">
                     {formData.recurrence.pattern}
                     {formData.recurrence.interval &&
                       formData.recurrence.interval > 1 &&
@@ -183,22 +183,22 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
               {/* Tickets */}
               <div>
-                <p className="text-neutral-gray">Tickets</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Tickets</p>
+                <p className="font-medium text-foreground">
                   {ticketCount} {ticketCount === 1 ? 'type' : 'types'}
                 </p>
               </div>
 
               {/* Price */}
               <div>
-                <p className="text-neutral-gray">Price</p>
-                <p className="font-medium text-neutral-dark">{priceLabel}</p>
+                <p className="text-muted-foreground">Price</p>
+                <p className="font-medium text-foreground">{priceLabel}</p>
               </div>
 
               {/* Capacity */}
               <div className="col-span-2">
-                <p className="text-neutral-gray">Max Attendees</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Max Attendees</p>
+                <p className="font-medium text-foreground">
                   {formData.capacity && formData.capacity > 0
                     ? formData.capacity
                     : 'Unlimited'}
@@ -207,8 +207,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
               {/* Format — derived from schedules */}
               <div className="col-span-2">
-                <p className="text-neutral-gray">Format</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Format</p>
+                <p className="font-medium text-foreground">
                   {formatLabel}
                 </p>
               </div>
@@ -216,18 +216,18 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Location — derived from the primary schedule */}
               {!isVirtual && primaryLocation && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Location</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Location</p>
+                  <p className="font-medium text-foreground">
                     {primaryLocation}
                   </p>
                 </div>
               )}
 
-                           {/* Certificate */}
+              {/* Certificate */}
               {formData.certificate_enabled && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Certificate</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Certificate</p>
+                  <p className="font-medium text-foreground">
                     {formData.certificate_template_id
                       ? 'Included — attendees receive a certificate'
                       : 'Included — select a tier in Details'}
@@ -237,16 +237,16 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
               {/* Featured */}
               <div className="col-span-2">
-                <p className="text-neutral-gray">Featured</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Featured</p>
+                <p className="font-medium text-foreground">
                   {formData.is_featured ? 'Yes' : 'No'}
                 </p>
               </div>
 
               {/* Private */}
               <div className="col-span-2">
-                <p className="text-neutral-gray">Private</p>
-                <p className="font-medium text-neutral-dark">
+                <p className="text-muted-foreground">Private</p>
+                <p className="font-medium text-foreground">
                   {formData.is_private ? 'Yes' : 'No'}
                 </p>
               </div>
@@ -254,16 +254,16 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Waitlist */}
               {formData.waitlist_enabled && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Waitlist</p>
-                  <p className="font-medium text-neutral-dark">Enabled</p>
+                  <p className="text-muted-foreground">Waitlist</p>
+                  <p className="font-medium text-foreground">Enabled</p>
                 </div>
               )}
 
               {/* Invite only */}
               {formData.invite_only && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Invite only</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Invite only</p>
+                  <p className="font-medium text-foreground">
                     Yes — {formData.invited_emails.length}{' '}
                     {formData.invited_emails.length === 1
                       ? 'email'
@@ -275,8 +275,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Speakers */}
               {formData.speakers.length > 0 && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Speakers</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Speakers</p>
+                  <p className="font-medium text-foreground">
                     {formData.speakers.length}{' '}
                     {formData.speakers.length === 1 ? 'speaker' : 'speakers'}
                   </p>
@@ -286,8 +286,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Materials */}
               {formData.materials.length > 0 && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Materials</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Materials</p>
+                  <p className="font-medium text-foreground">
                     {formData.materials.length}{' '}
                     {formData.materials.length === 1 ? 'item' : 'items'}
                   </p>
@@ -297,8 +297,8 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
               {/* Tags */}
               {formData.tags.length > 0 && (
                 <div className="col-span-2">
-                  <p className="text-neutral-gray">Tags</p>
-                  <p className="font-medium text-neutral-dark">
+                  <p className="text-muted-foreground">Tags</p>
+                  <p className="font-medium text-foreground">
                     {formData.tags.join(', ')}
                   </p>
                 </div>
@@ -307,11 +307,11 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
             {/* Short Description */}
             {formData.short_description && (
-              <div className="pt-4 border-t border-neutral-light">
-                <p className="text-neutral-gray text-sm">
+              <div className="pt-4 border-t border-border">
+                <p className="text-muted-foreground text-sm">
                   Short Description
                 </p>
-                <p className="text-sm text-neutral-dark mt-1">
+                <p className="text-sm text-foreground mt-1">
                   {formData.short_description}
                 </p>
               </div>
@@ -319,9 +319,9 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
             {/* Full Description */}
             {formData.description && (
-              <div className="pt-4 border-t border-neutral-light">
-                <p className="text-neutral-gray text-sm">Description</p>
-                <p className="text-sm text-neutral-dark mt-1 whitespace-pre-wrap">
+              <div className="pt-4 border-t border-border">
+                <p className="text-muted-foreground text-sm">Description</p>
+                <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
                   {formData.description}
                 </p>
               </div>
@@ -329,13 +329,13 @@ export function ReviewStep({ formData, selectedEventType }: ReviewStepProps) {
 
             {/* Image */}
             {formData.imagePreview && (
-              <div className="pt-4 border-t border-neutral-light">
-                <p className="text-neutral-gray text-sm">Event Image</p>
+              <div className="pt-4 border-t border-border">
+                <p className="text-muted-foreground text-sm">Event Image</p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={formData.imagePreview}
                   alt="Event preview"
-                  className="mt-2 w-full max-w-xs h-32 object-cover rounded-lg"
+                  className="mt-2 w-full max-w-xs h-32 object-cover rounded-lg border border-border"
                 />
               </div>
             )}

@@ -49,12 +49,12 @@ export function ContentStep({
   return (
     <div className="space-y-6">
       {/* ---- Speakers ---- */}
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             Speakers
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             Add presenters, instructors, or guest speakers. Optional.
           </CardDescription>
         </CardHeader>
@@ -68,12 +68,12 @@ export function ContentStep({
       </Card>
 
       {/* ---- Materials ---- */}
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             Materials
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             Pre-reading, handouts, or resources attendees can access.
             Optional.
           </CardDescription>
@@ -88,12 +88,12 @@ export function ContentStep({
       </Card>
 
       {/* ---- SEO ---- */}
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             SEO &amp; Social Preview
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             Control how your event appears in search results and on social
             media. Optional.
           </CardDescription>
