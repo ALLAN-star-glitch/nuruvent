@@ -2,18 +2,20 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   AlertCircle,
   ArrowLeft,
-  Building2,
   Check,
-  Home,
+  CheckCircle2,
   Loader2,
+  Plug,
   Trash2,
   Upload,
+  Video,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -51,13 +53,19 @@ import {
   useGetMyAccountsQuery,
   useGetMyMembershipQuery,
 } from '@/lib/store/api/accountsApi';
+import {
+  PlatformPickerModal,
+  PLATFORMS,
+} from '@/components/events/video/PlatformPickerModal';
+import { useVideoConnection } from '@/components/events/video/useVideoConnection';
+import type { VideoPlatform } from '@/lib/types/events';
 import { cn } from '@/lib/utils';
 
 // ============================================================
 // NAV SECTIONS
 // ============================================================
 
-type SettingsSection = 'general' | 'status' | 'danger';
+type SettingsSection = 'general' | 'video-platforms' | 'status' | 'danger';
 
 const SETTINGS_SECTIONS: Array<{
   key: SettingsSection;
@@ -65,9 +73,19 @@ const SETTINGS_SECTIONS: Array<{
   hint: string;
 }> = [
   { key: 'general', label: 'General', hint: 'Name, logo, contact' },
+  {
+    key: 'video-platforms',
+    label: 'Video Platforms',
+    hint: 'Zoom, Google Meet',
+  },
   { key: 'status', label: 'Status', hint: 'Read-only information' },
   { key: 'danger', label: 'Danger Zone', hint: 'Irreversible actions' },
 ];
+
+// Legacy URL aliases — keeps old bookmarks / links working.
+const SECTION_ALIASES: Record<string, SettingsSection> = {
+  integrations: 'video-platforms',
+};
 
 // ============================================================
 // HELPERS
@@ -83,6 +101,18 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function isValidSection(value: string | null): value is SettingsSection {
+  if (!value) return false;
+  return SETTINGS_SECTIONS.some((s) => s.key === value);
+}
+
+function normalizeSection(value: string | null): SettingsSection {
+  if (!value) return 'general';
+  const aliased = SECTION_ALIASES[value];
+  if (aliased) return aliased;
+  return isValidSection(value) ? value : 'general';
+}
+
 // ============================================================
 // PAGE
 // ============================================================
@@ -90,6 +120,7 @@ function getInitials(name: string): string {
 export default function AccountSettingsPage() {
   const router = useRouter();
   const params = useParams<{ accountId: string }>();
+  const searchParams = useSearchParams();
   const accountId = params.accountId;
 
   // Caller's role in this account. Self-service endpoint — works for
@@ -118,8 +149,21 @@ export default function AccountSettingsPage() {
   const [deleteLogo] = useDeleteAccountLogoMutation();
   const [deleteAccount, { isLoading: deleting }] = useDeleteAccountMutation();
 
-  const [section, setSection] = useState<SettingsSection>('general');
+  // Read the ?tab query param to allow deep-linking to a specific section.
+  const initialSection = useMemo<SettingsSection>(
+    () => normalizeSection(searchParams.get('tab')),
+    [searchParams],
+  );
+
+  const [section, setSection] = useState<SettingsSection>(initialSection);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Sync state when the URL changes (e.g., arriving from the dashboard
+  // or from an OAuth return).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSection(initialSection);
+  }, [initialSection]);
 
   const [form, setForm] = useState({
     name: '',
@@ -151,6 +195,18 @@ export default function AccountSettingsPage() {
 
   const handleChange = (field: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSectionChange = (key: SettingsSection) => {
+    setSection(key);
+    // Update the URL so the state is shareable and survives refresh.
+    const url = new URL(window.location.href);
+    if (key === 'general') {
+      url.searchParams.delete('tab');
+    } else {
+      url.searchParams.set('tab', key);
+    }
+    router.replace(url.pathname + url.search, { scroll: false });
   };
 
   const handleSaveGeneral = async () => {
@@ -209,6 +265,7 @@ export default function AccountSettingsPage() {
       toast.error('Failed to delete account');
     }
   };
+
   if (membershipLoading || (accountLoading && isAdmin)) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -217,9 +274,6 @@ export default function AccountSettingsPage() {
     );
   }
 
-  // Non-admins cannot manage the account. Render a clear denial rather
-  // than a broken page. This handles the direct-URL case — the sidebar
-  // should hide the item, but a typed URL bypasses that.
   if (!isAdmin) {
     return (
       <div className="w-full py-16">
@@ -322,7 +376,7 @@ export default function AccountSettingsPage() {
                 <button
                   key={s.key}
                   type="button"
-                  onClick={() => setSection(s.key)}
+                  onClick={() => handleSectionChange(s.key)}
                   className={cn(
                     'flex shrink-0 flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer whitespace-nowrap lg:w-full',
                     isActive
@@ -344,7 +398,7 @@ export default function AccountSettingsPage() {
           </nav>
         </aside>
 
-        {/* Right panel — cards cap at max-w-2xl */}
+        {/* Right panel */}
         <div className="min-w-0 space-y-6">
           {/* GENERAL */}
           {section === 'general' && (
@@ -437,7 +491,6 @@ export default function AccountSettingsPage() {
 
                 <Separator />
 
-                {/* Name row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="account-name">Name</Label>
@@ -463,7 +516,6 @@ export default function AccountSettingsPage() {
                   </div>
                 </div>
 
-                {/* Contact row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="account-email">Contact email</Label>
@@ -566,6 +618,11 @@ export default function AccountSettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* VIDEO PLATFORMS */}
+          {section === 'video-platforms' && (
+            <VideoPlatformsPanel accountId={accountId} />
           )}
 
           {/* STATUS */}
@@ -709,5 +766,172 @@ function StatusRow({
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="text-right">{children}</div>
     </div>
+  );
+}
+
+// ============================================================
+// VIDEO PLATFORMS PANEL
+// ============================================================
+
+function VideoPlatformsPanel({ accountId }: { accountId: string }) {
+  const video = useVideoConnection();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
+    null,
+  );
+
+  const openPickerForAll = () => {
+    setPickedPlatform(null);
+    setIsPickerOpen(true);
+  };
+
+  const openPickerForPlatform = (platform: VideoPlatform) => {
+    setPickedPlatform(platform);
+    setIsPickerOpen(true);
+  };
+
+  const anyConnection = PLATFORMS.some(
+    (meta) => meta.available && !!video.getConnection(meta.platform),
+  );
+
+  return (
+    <>
+      <Card className="border-border/70 shadow-sm max-w-2xl">
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Video className="h-4 w-4 text-primary" />
+              Video Platforms
+            </CardTitle>
+            <CardDescription>
+              Connect Zoom or Google Meet to automatically create meeting
+              links and track attendance for your events.
+            </CardDescription>
+          </div>
+          {anyConnection && (
+            <Badge
+              variant="outline"
+              className="shrink-0 border-primary/30 text-primary bg-primary/5"
+            >
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Connected
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {PLATFORMS.map((meta) => {
+            const connection = video.getConnection(meta.platform);
+            const isConnected = !!connection;
+
+            return (
+              <button
+                key={meta.platform}
+                type="button"
+                disabled={!meta.available}
+                onClick={() =>
+                  meta.available && openPickerForPlatform(meta.platform)
+                }
+                className={cn(
+                  'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                  isConnected
+                    ? 'border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10 cursor-pointer group'
+                    : meta.available
+                      ? 'border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer group'
+                      : 'border-border opacity-70 cursor-not-allowed',
+                )}
+              >
+                <div
+                  className={cn(
+                    'shrink-0 h-12 w-12 rounded-lg flex items-center justify-center',
+                    'bg-background border border-border overflow-hidden p-2',
+                    meta.available && 'group-hover:border-primary/30',
+                  )}
+                >
+                  <Image
+                    src={meta.logo}
+                    alt={`${meta.label} logo`}
+                    width={48}
+                    height={48}
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-foreground">
+                      {meta.label}
+                    </p>
+                    {isConnected && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-primary/30 text-primary bg-primary/10"
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Connected
+                      </Badge>
+                    )}
+                    {!meta.available && !isConnected && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-border text-muted-foreground bg-muted"
+                      >
+                        Coming soon
+                      </Badge>
+                    )}
+                  </div>
+                  {isConnected && connection ? (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      Connected as{' '}
+                      <span className="font-medium text-foreground">
+                        {connection.external_email}
+                      </span>{' '}
+                      ·{' '}
+                      {new Date(connection.connected_at).toLocaleDateString()}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                      {meta.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="shrink-0">
+                  {isConnected ? (
+                    <span className="text-xs font-semibold text-primary">
+                      Manage
+                    </span>
+                  ) : meta.available ? (
+                    <span className="text-xs font-semibold text-primary">
+                      Connect
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Soon</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+
+          <div className="pt-2 flex justify-end">
+            <Button
+              onClick={openPickerForAll}
+              variant="outline"
+              size="sm"
+              className="cursor-pointer"
+            >
+              <Plug className="h-4 w-4 mr-2" />
+              Manage platforms
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <PlatformPickerModal
+        open={isPickerOpen}
+        onOpenChange={setIsPickerOpen}
+        returnUrl={`/dashboard/${accountId}/settings?tab=video-platforms`}
+        initialPlatform={pickedPlatform}
+      />
+    </>
   );
 }

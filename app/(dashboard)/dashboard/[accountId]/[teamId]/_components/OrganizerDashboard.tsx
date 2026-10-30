@@ -774,9 +774,7 @@ export function OrganizerDashboard({
                 className="cursor-pointer text-xs text-muted-foreground"
                 asChild
               >
-                <Link
-                  href={`/dashboard/${accountId}/${teamId}/settings?tab=integrations`}
-                >
+               <Link href={`/dashboard/${accountId}/settings?tab=video-platforms`}>
                   <Settings className="h-3.5 w-3.5 mr-1.5" />
                   Settings
                 </Link>
