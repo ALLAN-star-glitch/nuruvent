@@ -7,16 +7,20 @@ import { TopBar } from './TopBar';
 import { MainHeader } from './MainHeader';
 import { DashboardHeader } from '../dashboard/DashboardHeader';
 
-export function Header() {
+interface HeaderProps {
+  hideTopBar?: boolean;
+}
+
+export function Header({ hideTopBar = false }: HeaderProps) {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
 
-  // Show loading state while persisting
+  // Show loading state while persisting (Themed)
   if (isAuthenticated === undefined) {
     return (
-      <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-center">
+      <div className="h-16 bg-card border-b border-border flex items-center justify-center">
         <div className="animate-pulse flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-gray-200" />
-          <div className="h-4 w-32 bg-gray-200 rounded" />
+          <div className="h-6 w-6 rounded-full bg-muted" />
+          <div className="h-4 w-32 bg-muted rounded" />
         </div>
       </div>
     );
@@ -26,9 +30,11 @@ export function Header() {
   if (isAuthenticated && user) {
     return (
       <>
-        <div className="md:block">
-          <TopBar />
-        </div>
+        {!hideTopBar && (
+          <div className="md:block">
+            <TopBar />
+          </div>
+        )}
         <DashboardHeader user={user} />
       </>
     );

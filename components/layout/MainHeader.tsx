@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils';
 import { NAV_ITEMS } from '@/lib/constants';
 import { useAppSelector } from '@/lib/store/hooks';
 import { useState } from 'react';
-import { CountryFlag } from './CountryFlag';
 
 export function MainHeader() {
   const pathname = usePathname();
@@ -196,9 +195,6 @@ export function MainHeader() {
                   </Link>
                 </>
               )}
-
-              {/* Country Flag */}
-              <CountryFlag />
 
               {/* Theme toggle */}
               <ThemeToggle />
