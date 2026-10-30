@@ -7,6 +7,7 @@ import { useState, MouseEvent, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   ClipboardList,
   Users,
   CreditCard,
@@ -27,6 +28,8 @@ import {
   UserPlus,
   Check,
   Layers,
+  Mic,
+  BarChart2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -95,7 +98,7 @@ export function DashboardSidebar({
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [teamsExpanded, setTeamsExpanded] = useState(false);
-  const [certificatesExpanded, setCertificatesExpanded] = useState(true);
+  const [certificatesExpanded, setCertificatesExpanded] = useState(false); // Closed by default
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const { data: teamsResponse } = useGetUserTeamsQuery();
@@ -137,7 +140,8 @@ export function DashboardSidebar({
         href: '/accounts',
       },
       { segment: '', label: 'Dashboard', icon: LayoutDashboard },
-      { segment: 'events', label: 'Team Events', icon: Calendar },
+      { segment: 'events', label: 'Team Events', icon: Calendar, organizersOnly: true },
+      { segment: 'calendar', label: 'Calendar', icon: CalendarDays, organizersOnly: true, disabled: true }, // Coming Soon
       {
         segment: 'registrations',
         label: 'Registrations',
@@ -151,6 +155,7 @@ export function DashboardSidebar({
         icon: Users,
         organizersOnly: true,
       },
+      { segment: 'speakers', label: 'Speakers', icon: Mic, organizersOnly: true, disabled: true }, // Coming Soon
       {
         segment: 'payments',
         label: 'Payments',
@@ -184,6 +189,7 @@ export function DashboardSidebar({
           },
         ],
       },
+      { segment: 'reports', label: 'Reports', icon: BarChart2, organizersOnly: true, disabled: true }, // Coming Soon
       // Learner certificates (self-service view)
       {
         segment: 'my-certificates',
@@ -352,7 +358,7 @@ export function DashboardSidebar({
           'fixed left-6 z-30 overflow-hidden',
           'rounded-2xl border border-border/70 shadow-xl shadow-black/5',
           collapsed ? 'w-[68px]' : 'w-[260px]',
-          'top-[140px] h-[calc(100vh-200px)]',
+          'top-[100px] h-[calc(100vh-120px)]', // Increased vertical space
         )}
       >
         <div
@@ -449,67 +455,46 @@ export function DashboardSidebar({
                 <div key={item.segment || item.label}>
                   {hasChildren ? (
                     <div className="space-y-0.5">
-                      <div
+                      {/* Parent row: toggle-only, no link, no active highlight */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isCertGroup)
+                            setCertificatesExpanded((v) => !v);
+                        }}
+                        aria-expanded={childrenExpanded}
+                        aria-controls={`nav-group-panel-${item.segment}`}
                         className={cn(
-                          'flex items-center gap-1 rounded-lg text-sm font-medium transition-all duration-150 group relative',
-                          isActive
-                            ? isTrash
-                              ? 'bg-destructive/15 text-destructive font-semibold'
-                              : 'bg-primary/15 text-primary font-semibold'
-                            : isTrash
-                              ? 'text-destructive hover:bg-destructive/10'
-                              : 'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
+                          'flex w-full items-center gap-1 rounded-lg text-sm font-medium transition-all duration-150 group relative cursor-pointer',
+                          'text-foreground/85 hover:bg-accent/70 hover:text-foreground',
                         )}
                       >
-                        {isActive && (
-                          <div
-                            className={cn(
-                              'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full',
-                              isTrash ? 'bg-destructive' : 'bg-primary',
-                            )}
-                          />
-                        )}
-
-                        <Link
-                          href={buildTeamNavHref(item)}
-                          prefetch={false}
-                          className="flex flex-1 items-center gap-3 px-3 py-2.5 cursor-pointer truncate"
-                        >
+                        <span className="flex flex-1 items-center gap-3 px-3 py-2.5 truncate">
                           <Icon
                             className={cn(
                               'h-[18px] w-[18px] shrink-0 transition-colors',
-                              isTrash
-                                ? 'text-destructive'
-                                : isActive
-                                  ? 'text-primary'
-                                  : 'text-foreground/70 group-hover:text-foreground',
+                              'text-foreground/70 group-hover:text-foreground',
                             )}
                           />
                           <span className="truncate">{item.label}</span>
-                        </Link>
+                        </span>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (isCertGroup)
-                              setCertificatesExpanded((v) => !v);
-                          }}
-                          className="pr-3 py-2.5 cursor-pointer hover:text-primary transition-colors"
-                        >
-                          <ChevronDown
-                            className={cn(
-                              'h-4 w-4 shrink-0 transition-transform',
-                              childrenExpanded
-                                ? 'rotate-180 text-primary'
-                                : 'text-foreground/60',
-                            )}
-                          />
-                        </button>
-                      </div>
+                        <ChevronDown
+                          className={cn(
+                            'mr-3 h-4 w-4 shrink-0 transition-transform',
+                            childrenExpanded
+                              ? 'rotate-180'
+                              : 'text-foreground/60',
+                          )}
+                        />
+                      </button>
 
                       {childrenExpanded && (
-                        <div className="mt-1 ml-4 pl-3 border-l border-border/40 space-y-0.5">
+                        <div
+                          id={`nav-group-panel-${item.segment}`}
+                          role="group"
+                          className="mt-1 ml-4 pl-3 border-l border-border/40 space-y-0.5"
+                        >
                           {item.children!.map((child) => {
                             const ChildIcon = child.icon;
                             const childActive = isChildActive(child);

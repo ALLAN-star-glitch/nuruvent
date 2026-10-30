@@ -21,8 +21,10 @@ export default function DashboardLayout({
       <Suspense fallback={null}>
         <VideoConnectionListener />
       </Suspense>
+      
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background shadow-sm">
-        <Header />
+        {/* Pass the prop here to hide the topbar in the dashboard */}
+        <Header hideTopBar={true} /> 
       </header>
 
       <DashboardLayoutClient>

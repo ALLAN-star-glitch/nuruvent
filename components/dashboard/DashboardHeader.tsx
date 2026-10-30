@@ -62,7 +62,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CountryFlag } from '../layout/CountryFlag';
 
 interface NavItem {
   segment: string;
@@ -607,8 +606,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               <div className="hidden xl:block w-[220px] shrink-0">
                 <TeamSwitcher variant="compact" />
               </div>
-               {/* Add Country Flag here */}
-              <CountryFlag />
 
               <UserMenu user={user} onLogout={handleLogout} />
             </div>
