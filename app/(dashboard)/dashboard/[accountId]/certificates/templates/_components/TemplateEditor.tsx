@@ -277,8 +277,9 @@ export function TemplateEditor({
         : 'New Template';
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="sticky top-30 z-30 -mx-4 px-4 py-3 bg-muted/30 backdrop-blur supports-[backdrop-filter]:bg-muted/20 border-b border-border/40">
+    <div className="space-y-4 sm:space-y-6 pb-20">
+      {/* Sticky header with better mobile spacing and z-index */}
+      <div className="sticky top-0 z-50 -mx-4 px-4 py-3 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/60 border-b border-border/40 sm:-mx-6 sm:px-6">
         <TemplateEditorHeader
           backHref={backHref}
           title={title}
@@ -288,11 +289,11 @@ export function TemplateEditor({
         />
       </div>
 
-      <div className="grid gap-6 mt-2 sm:mt-4 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,560px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
-        <div className="min-w-0 space-y-6">
+      <div className="grid gap-4 mt-2 sm:mt-4 sm:gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] xl:grid-cols-[minmax(0,1fr)_minmax(0,560px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
+        <div className="min-w-0 space-y-4 sm:space-y-6">
           <Card className="border-border">
-            <CardContent className="p-5">
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <CardContent className="p-4 sm:p-5">
+              <h2 className="mb-3 sm:mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
                 <PenLine className="h-4 w-4 text-primary" />
                 Basics
               </h2>
@@ -308,7 +309,7 @@ export function TemplateEditor({
                       onValueChange={(v) => handleAdminTierChange(v as TierSlug)}
                       disabled={isSaving}
                     >
-                      <SelectTrigger id="tpl-tier-admin" className="cursor-pointer">
+                      <SelectTrigger id="tpl-tier-admin" className="cursor-pointer h-11">
                         <SelectValue placeholder="Select a tier" />
                       </SelectTrigger>
                       <SelectContent>
@@ -316,7 +317,7 @@ export function TemplateEditor({
                           <SelectItem
                             key={t.slug}
                             value={t.slug}
-                            className="cursor-pointer"
+                            className="cursor-pointer py-3 sm:py-2"
                           >
                             <span className="capitalize">{t.label}</span>
                             <span className="ml-2 text-muted-foreground">
@@ -342,6 +343,7 @@ export function TemplateEditor({
                       onChange={(e) => setField('name', e.target.value)}
                       placeholder="e.g. Premium Certificate"
                       disabled={isSaving}
+                      className="h-11"
                     />
                   </div>
 
@@ -400,6 +402,7 @@ export function TemplateEditor({
                       value={form.name}
                       onChange={(e) => setField('name', e.target.value)}
                       placeholder="e.g. My Premium Template"
+                      className="h-11"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -426,29 +429,29 @@ export function TemplateEditor({
           </Card>
 
           <Card className="border-border min-h-[300px]">
-            <CardContent className="p-5 h-full">
+            <CardContent className="p-4 sm:p-5 h-full">
               {!isTierSelected ? (
-                <div className="flex h-full flex-col items-center justify-center py-16 text-center">
+                <div className="flex h-full flex-col items-center justify-center py-12 sm:py-16 text-center">
                   <div className="rounded-full bg-muted p-4 mb-4">
                     <Lock className="h-8 w-8 text-muted-foreground" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground">
                     Design Locked
                   </h3>
-                  <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                  <p className="mt-2 max-w-sm px-4 text-sm text-muted-foreground">
                     Select a certificate tier in the Basics section above to
                     unlock the design and text editors.
                   </p>
                 </div>
               ) : (
                 <Tabs defaultValue="design">
-                  <TabsList className="mb-4 grid w-full grid-cols-2">
-                    <TabsTrigger value="design" className="cursor-pointer">
-                      <Palette className="mr-2 h-3.5 w-3.5" />
+                  <TabsList className="mb-4 grid w-full grid-cols-2 h-12 sm:h-10">
+                    <TabsTrigger value="design" className="cursor-pointer text-sm sm:text-xs">
+                      <Palette className="mr-2 h-4 w-4 sm:h-3.5 sm:w-3.5" />
                       Design
                     </TabsTrigger>
-                    <TabsTrigger value="text" className="cursor-pointer">
-                      <Eye className="mr-2 h-3.5 w-3.5" />
+                    <TabsTrigger value="text" className="cursor-pointer text-sm sm:text-xs">
+                      <Eye className="mr-2 h-4 w-4 sm:h-3.5 sm:w-3.5" />
                       Text
                     </TabsTrigger>
                   </TabsList>
@@ -475,26 +478,27 @@ export function TemplateEditor({
           </Card>
         </div>
 
-        <div className="hidden lg:block">
-          <div className="sticky top-60 h-fit space-y-4">
-            <Card className="border-border">
-              <CardContent className="p-5">
-                <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Eye className="h-4 w-4 text-primary" />
-                  Preview
-                </h2>
+        {/* Preview Area - now visible on mobile and stacked below the form */}
+        <div className="block lg:sticky lg:top-24 lg:h-fit space-y-4">
+          <Card className="border-border">
+            <CardContent className="p-4 sm:p-5">
+              <h2 className="mb-3 sm:mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Eye className="h-4 w-4 text-primary" />
+                Preview
+              </h2>
 
-                {!isTierSelected ? (
-                  <div className="flex aspect-[297/210] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30">
-                    <Lock className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Preview Locked
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Select a tier to preview
-                    </p>
-                  </div>
-                ) : (
+              {!isTierSelected ? (
+                <div className="flex aspect-[297/210] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 px-4 text-center">
+                  <Lock className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Preview Locked
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Select a tier to preview
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-border/50 bg-muted/10 p-2">
                   <TemplatePreview
                     design={form.design}
                     size="md"
@@ -503,14 +507,14 @@ export function TemplateEditor({
                       issuer_name: organizerName,
                     }}
                   />
-                )}
+                </div>
+              )}
 
-                <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                  Sample data shown. Actual certificates use real event data.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+              <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                Sample data shown. Actual certificates use real event data.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
