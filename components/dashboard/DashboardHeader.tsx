@@ -13,6 +13,7 @@ import {
   Settings,
   Building2,
   ChevronDown,
+  LayoutDashboard,
 } from 'lucide-react';
 import { SearchBar } from '@/components/layout/SearchBar';
 import { UserMenu } from '@/components/layout/UserMenu';
@@ -42,7 +43,6 @@ import { useState, useEffect, useMemo } from 'react';
 // ============================================================
 
 import {
-  LayoutDashboard,
   Calendar,
   ClipboardList,
   Users,
@@ -107,8 +107,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const router = useRouter();
   const params = useParams<{ accountId?: string; teamId?: string }>();
 
-  const accountId = params?.accountId;
-  const teamId = params?.teamId;
+  // Get IDs from URL params first, fallback to Redux workspace state
+  const urlAccountId = params?.accountId;
+  const urlTeamId = params?.teamId;
+  const reduxAccountId = useAppSelector((s) => s.workspace.activeAccountId);
+  const reduxTeamId = useAppSelector((s) => s.workspace.activeTeamId);
+
+  const accountId = urlAccountId ?? reduxAccountId ?? null;
+  const teamId = urlTeamId ?? reduxTeamId ?? null;
 
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
@@ -118,6 +124,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [logout, { isLoading }] = useLogoutMutation();
 
+  // Note: useGetMyMembershipQuery needs a real account ID. If the user is on 
+  // the public site and we have a cached reduxAccountId, it will work.
   const { data: myMembership } = useGetMyMembershipQuery(
     accountId ?? '',
     { skip: !accountId },
@@ -127,6 +135,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     const role = myMembership?.role as AccountRole | undefined;
     return role === 'account_admin' || role === 'trainer';
   }, [myMembership]);
+
+  // Check if we are inside the dashboard or on the public site
+  const isDashboardRoute = pathname.startsWith('/dashboard');
 
   const goCreateEvent = () => {
     if (!accountId || !teamId) return;
@@ -178,14 +189,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     }
   };
 
-  const handleCreateEvent = () => {
-    if (accountId && teamId) {
-      router.push(`/dashboard/${accountId}/${teamId}/events/new`);
-    } else {
-      router.push('/dashboard');
-    }
-  };
-
   const buildTeamNavHref = (segment: string) => {
     if (segment === '') return '/dashboard';
     if (!accountId || !teamId) return '/accounts';
@@ -228,10 +231,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  // Now hasTeamContext relies on the Redux fallback, so it stays true even on public routes
   const hasTeamContext = Boolean(accountId && teamId);
 
   return (
-    <header className="bg-white border-b border-gray-200/80 sticky top-0 z-50 backdrop-blur-sm bg-white/95 dark:bg-[#202124] dark:border-[#3C4043]/80 dark:backdrop-blur-sm dark:bg-[#202124]/95">
+    <header className="bg-background/95 backdrop-blur-sm border-b border-border sticky top-0 z-50">
       <div className="container mx-auto px-2.5 sm:px-4">
         <div className="flex flex-col">
           <div className="flex items-center justify-between h-14 sm:h-16 gap-1.5 md:gap-3">
@@ -243,7 +247,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer shrink-0"
+                    className="xl:hidden text-muted-foreground hover:text-foreground hover:bg-accent rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors cursor-pointer shrink-0"
                     aria-label="Open navigation menu"
                   >
                     <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -252,9 +256,9 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                 <SheetContent
                   side="left"
-                  className="p-0 w-[280px] sm:w-[320px] md:w-[340px] flex flex-col h-full bg-white dark:bg-[#202124] border-r dark:border-[#3C4043]"
+                  className="p-0 w-[280px] sm:w-[320px] md:w-[340px] flex flex-col h-full bg-background border-r border-border"
                 >
-                  <SheetHeader className="p-4 border-b border-gray-100 flex-row items-center justify-between space-y-0 text-left shrink-0 dark:border-[#3C4043]">
+                  <SheetHeader className="p-4 border-b border-border flex-row items-center justify-between space-y-0 text-left shrink-0">
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="inline-flex items-center">
                       <Logo />
@@ -266,7 +270,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                   {hasTeamContext && (
                     <div>
-                      <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 dark:text-gray-500">
+                      <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         Menu
                       </p>
                       <nav className="space-y-0.5">
@@ -277,16 +281,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                           className={cn(
                             'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                             isTeamNavActive('')
-                              ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                              : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                           )}
                         >
                           <LayoutDashboard
                             className={cn(
                               'h-5 w-5 shrink-0',
-                              isTeamNavActive('')
-                                ? 'text-primary'
-                                : 'text-gray-400 dark:text-gray-500',
+                              isTeamNavActive('') ? 'text-primary' : 'text-muted-foreground',
                             )}
                           />
                           <span>Dashboard</span>
@@ -313,7 +315,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                             return (
                               <div
                                 key={item.segment}
-                                className="flex items-center justify-between px-3 py-2.5 text-gray-400/60 dark:text-gray-500/60 cursor-not-allowed select-none"
+                                className="flex items-center justify-between px-3 py-2.5 text-muted-foreground/60 cursor-not-allowed select-none"
                               >
                                 <div className="flex items-center gap-3">
                                   <Icon className="h-5 w-5 shrink-0" />
@@ -336,11 +338,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                                 isActive
                                   ? isTrash
-                                    ? 'bg-destructive/10 text-destructive dark:bg-destructive/20'
-                                    : 'bg-primary/10 text-primary dark:bg-primary/20'
+                                    ? 'bg-destructive/10 text-destructive'
+                                    : 'bg-primary/10 text-primary'
                                   : isTrash
                                     ? 'text-destructive hover:bg-destructive/10'
-                                    : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                               )}
                             >
                               <Icon
@@ -352,7 +354,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                                       : 'text-primary'
                                     : isTrash
                                       ? 'text-destructive'
-                                      : 'text-gray-400 dark:text-gray-500',
+                                      : 'text-muted-foreground',
                                 )}
                               />
                               <span>{item.label}</span>
@@ -365,10 +367,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
                     <div>
                       <div className="flex items-center justify-between px-3 mb-2">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider dark:text-gray-500">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Explore Nuruvent
                         </p>
-                        <ExternalLink className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
                       <nav className="space-y-0.5">
                         {NAV_ITEMS.map((item) => {
@@ -383,16 +385,14 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                               className={cn(
                                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer',
                                 isActive
-                                  ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                                  : 'text-gray-600 hover:bg-gray-100/40 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-[#3C4043]/40 dark:hover:text-white',
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                               )}
                             >
                               <Icon
                                 className={cn(
                                   'h-5 w-5 shrink-0',
-                                  isActive
-                                    ? 'text-primary'
-                                    : 'text-gray-400 dark:text-gray-500',
+                                  isActive ? 'text-primary' : 'text-muted-foreground',
                                 )}
                               />
                               <span>{item.label}</span>
@@ -403,7 +403,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </div>
                   </div>
 
-                  <div className="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-3 dark:border-[#3C4043] dark:bg-[#2D2E32]">
+                  <div className="p-4 border-t border-border bg-muted shrink-0 space-y-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -411,11 +411,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         setShowLogoutDialog(true);
                       }}
                       disabled={isLoading}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-red-500 hover:bg-red-50/50 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-red-950/20 cursor-pointer"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                       {isLoading ? (
                         <div className="flex items-center gap-3">
-                          <svg className="animate-spin h-5 w-5 text-red-400" viewBox="0 0 24 24">
+                          <svg className="animate-spin h-5 w-5 text-destructive" viewBox="0 0 24 24">
                             <circle
                               className="opacity-25"
                               cx="12"
@@ -435,21 +435,21 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                         </div>
                       ) : (
                         <>
-                          <LogOut className="h-5 w-5 shrink-0 text-red-400" />
+                          <LogOut className="h-5 w-5 shrink-0 text-destructive" />
                           <span className="text-sm font-medium">Logout</span>
                         </>
                       )}
                     </button>
 
-                    <div className="flex items-center gap-3 pt-2 border-t border-gray-100 dark:border-[#3C4043]">
-                      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-semibold flex items-center justify-center text-sm shrink-0 dark:from-primary/30 dark:to-primary/10">
+                    <div className="flex items-center gap-3 pt-2 border-t border-border">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 text-primary font-semibold flex items-center justify-center text-sm shrink-0">
                         {getInitials(user.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate dark:text-white">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {user.name}
                         </p>
-                        <p className="text-xs text-gray-500 truncate dark:text-gray-400">
+                        <p className="text-xs text-muted-foreground truncate">
                           {user.email}
                         </p>
                       </div>
@@ -466,7 +466,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 />
               </span>
 
-              {/* Team switcher — mobile behavior intact */}
+              {/* Team switcher — always on mobile */}
               <div className="min-w-0 flex-1 max-w-none md:max-w-[280px] lg:max-w-[260px] xl:hidden">
                 <TeamSwitcher variant="compact" />
               </div>
@@ -485,7 +485,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
+                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white dark:text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
                       <span className="hidden 2xl:inline">Create New</span>
@@ -538,7 +538,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="xl:hidden text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-[#3C4043] cursor-pointer"
+                className="xl:hidden text-muted-foreground hover:text-foreground hover:bg-accent rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-colors cursor-pointer"
                 onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
                 aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
               >
@@ -554,7 +554,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
+                      className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white dark:text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
                     </Button>
@@ -597,10 +597,24 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 <ThemeToggle />
               </div>
 
-              {/* Team Switcher — ONLY show on very large screens to save space */}
-              <div className="hidden 2xl:block w-[220px] shrink-0">
-                <TeamSwitcher variant="compact" />
-              </div>
+              {/* Team Switcher — ONLY show on very large screens AND if inside dashboard */}
+              {isDashboardRoute && (
+                <div className="hidden 2xl:block w-[220px] shrink-0">
+                  <TeamSwitcher variant="compact" />
+                </div>
+              )}
+
+              {/* GO TO DASHBOARD BUTTON — Conspicuous, next to user menu, only on public routes */}
+              {!isDashboardRoute && (
+                <Link href="/dashboard">
+                  <Button
+                    className="hidden xl:flex h-9 px-4 gap-2 bg-primary hover:bg-primary/90 text-white dark:text-white font-semibold shadow-sm cursor-pointer mr-1"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
 
               <UserMenu user={user} onLogout={handleLogout} />
             </div>
