@@ -12,11 +12,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useListCertificateTemplatesQuery } from '@/lib/store/api/certificatesApi';
+import type { CertificateTemplateDesign } from '@/lib/types/certificates';
 
 interface Props {
   accountId: string;
   value: string | undefined;
-  onChange: (systemTemplateId: string, priceMinor: number, slug: string) => void;
+  onChange: (systemTemplateId: string, priceMinor: number, slug: string, design: CertificateTemplateDesign) => void;
   error?: string;
   disabled?: boolean;
   fallbackPriceMinor?: number;
@@ -63,7 +64,8 @@ export function CertificateTierSelect({
         onValueChange={(id) => {
           const tier = tiers.find((t) => t.id === id);
           if (tier) {
-            onChange(id, tier.price_minor ?? 0, tier.system_slug ?? '');
+            // Pass the design object up to the parent
+            onChange(id, tier.price_minor ?? 0, tier.system_slug ?? '', tier.design);
           }
         }}
       >
