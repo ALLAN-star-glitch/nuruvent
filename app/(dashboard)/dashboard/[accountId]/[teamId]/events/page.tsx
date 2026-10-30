@@ -61,12 +61,17 @@ import type {
   UIEvent,
 } from './_components/types';
 
-
 import { EmptyState } from '@/components/registrations/empty_state';
 import { MobileFilterStrip } from '@/components/registrations/mobile-filter-strip';
 import { StatsCards } from '@/components/registrations/stat_cards';
 import { EventsBulkActionsBar } from './_components/EventsBulkActionsBar';
-import { MoveToTrashDialog, PermanentDeleteDialog, RestoreEventDialog, PublishErrorDialog, BulkActionDialog } from './_components/EventsDialogs';
+import {
+  MoveToTrashDialog,
+  PermanentDeleteDialog,
+  RestoreEventDialog,
+  PublishErrorDialog,
+  BulkActionDialog,
+} from './_components/EventsDialogs';
 import { EventsFilterBar } from './_components/EventsFilterBar';
 import { EventsGrid } from './_components/EventsGrid';
 import { EventsListSkeleton } from './_components/EventsListSkeleton';
@@ -89,7 +94,7 @@ export default function EventsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize] = useState(10);
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [bulkAction, setBulkAction] = useState('');
@@ -136,21 +141,21 @@ export default function EventsDashboardPage() {
   const shouldSearch = debouncedSearchQuery.trim().length > 0;
 
   const {
-  data: listResponse,
-  isLoading: isListLoading,
-  isFetching: isListFetching,
-  error: listError,
-  refetch: refetchList,
-} = useListMyEventsQuery(
-  {
-    page: currentPage,
-    page_size: pageSize,
-    scope: 'team',
-    team_id: teamId,
-    only_deleted: activeTab === 'trash' ? true : undefined,
-  },
-  { skip: shouldSearch || !isAuthenticated || !teamId },
-);
+    data: listResponse,
+    isLoading: isListLoading,
+    isFetching: isListFetching,
+    error: listError,
+    refetch: refetchList,
+  } = useListMyEventsQuery(
+    {
+      page: currentPage,
+      page_size: pageSize,
+      scope: 'team',
+      team_id: teamId,
+      only_deleted: activeTab === 'trash' ? true : undefined,
+    },
+    { skip: shouldSearch || !isAuthenticated || !teamId },
+  );
 
   const {
     data: searchResponse,
@@ -160,12 +165,13 @@ export default function EventsDashboardPage() {
     refetch: refetchSearch,
   } = useSearchMyEventsQuery(
     {
-    q: debouncedSearchQuery,
-    page: currentPage,
-    page_size: pageSize,
-    scope: 'team',
-    team_id: teamId,
-  },
+      q: debouncedSearchQuery,
+      page: currentPage,
+      page_size: pageSize,
+      scope: 'team',
+      team_id: teamId,
+    },
+    { skip: !shouldSearch || !isAuthenticated || !teamId },
   );
 
   const { data: trashCountResponse, refetch: refetchTrashCount } =
@@ -204,13 +210,12 @@ export default function EventsDashboardPage() {
   const cpdEvents = activeEvents.filter((e) => e.cpdHours > 0).length;
 
   // ---- Handlers ----
-  const handleRowClick = (id: string) =>
-    setSelectedEvents((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
 
-  const handleCardClick = (event: UIEvent) =>
-    router.push(`/dashboard/${accountId}/${teamId}/events/${event.id}`);
+  // Clicking a row/card opens the event. Selection happens ONLY via the checkbox.
+  const handleRowClick = (id: string) =>
+    router.push(`/dashboard/${accountId}/${teamId}/events/${id}`);
+
+  const handleCardClick = (event: UIEvent) => handleRowClick(event.id);
 
   const handleDeleteEvent = (event: UIEvent) => {
     setSelectedEvent(event);
@@ -306,7 +311,9 @@ export default function EventsDashboardPage() {
 
   const handleViewSelected = () => {
     if (selectedEvents.length === 1) {
-      router.push(`/dashboard/${accountId}/${teamId}/events/${selectedEvents[0]}`);
+      router.push(
+        `/dashboard/${accountId}/${teamId}/events/${selectedEvents[0]}`,
+      );
     }
   };
 
@@ -315,13 +322,17 @@ export default function EventsDashboardPage() {
     setIsBulkDialogOpen(true);
   };
 
+  const clearSelection = () => {
+    setSelectedEvents([]);
+    setSelectAll(false);
+  };
+
   const handleBulkDelete = async () => {
     const count = selectedEvents.length;
     try {
       await bulkDeleteEvents({ ids: selectedEvents }).unwrap();
       setIsBulkDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
+      clearSelection();
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success(`${count} events moved to trash`);
     } catch (err) {
@@ -336,8 +347,7 @@ export default function EventsDashboardPage() {
     try {
       await bulkPermanentlyDeleteEvents({ ids: selectedEvents }).unwrap();
       setIsBulkDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
+      clearSelection();
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events permanently deleted');
     } catch {
@@ -349,8 +359,7 @@ export default function EventsDashboardPage() {
     try {
       await bulkRestoreEvents({ ids: selectedEvents }).unwrap();
       setIsBulkDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
+      clearSelection();
       await Promise.all([refetch(), refetchTrashCount()]);
       toast.success('Events restored');
     } catch {
@@ -366,8 +375,7 @@ export default function EventsDashboardPage() {
       toast.dismiss(loadingToast);
       toast.success(`${count} events published`, { duration: 4000 });
       setIsBulkDialogOpen(false);
-      setSelectedEvents([]);
-      setSelectAll(false);
+      clearSelection();
       await refetch();
     } catch (err) {
       toast.dismiss(loadingToast);
@@ -384,8 +392,7 @@ export default function EventsDashboardPage() {
   const handleBulkDuplicate = () => {
     const ids = selectedEvents.join(',');
     setIsBulkDialogOpen(false);
-    setSelectedEvents([]);
-    setSelectAll(false);
+    clearSelection();
     router.push(`/dashboard/${accountId}/${teamId}/events/new?duplicate=${ids}`);
   };
 
@@ -439,6 +446,37 @@ export default function EventsDashboardPage() {
     };
     return labels[sortField];
   };
+
+  // Shared row/card handlers
+  const goToEvent = (e: UIEvent) =>
+    router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}`);
+  const goToEdit = (e: UIEvent) =>
+    router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}/edit`);
+  const goToDuplicate = (e: UIEvent) =>
+    router.push(
+      `/dashboard/${accountId}/${teamId}/events/new?duplicate=${e.id}`,
+    );
+
+  const emptyState = (
+    <EmptyState
+      variant="compact"
+      icon={<Search className="h-4 w-4 text-muted-foreground" />}
+      title={
+        activeTab === 'trash'
+          ? 'No events in trash'
+          : searchQuery
+            ? 'No matches'
+            : 'No events yet'
+      }
+      sub={
+        activeTab === 'trash'
+          ? 'Deleted events appear here.'
+          : searchQuery
+            ? 'Try a different search term.'
+            : 'Create your first event to get started.'
+      }
+    />
+  );
 
   // ---- Auth gate ----
   if (!isAuthenticated) {
@@ -541,7 +579,6 @@ export default function EventsDashboardPage() {
       ) : (
         <>
           {/* Stats */}
-          <div className="w-full max-w-5xl"></div>
           <StatsCards
             desktopColumns={5}
             stats={[
@@ -628,15 +665,14 @@ export default function EventsDashboardPage() {
                     uiEvents={filteredEvents}
                     activeTab={activeTab}
                     publishingEventId={publishingEventId}
-                    accountId={accountId}      // <-- ADD THIS
-                    teamId={teamId}            // <-- ADD THIS
-                    onClear={() => {
-                      setSelectedEvents([]);
-                      setSelectAll(false);
-                    }}
+                    accountId={accountId}
+                    teamId={teamId}
+                    onClear={clearSelection}
                     onView={handleViewSelected}
                     onEdit={(id) =>
-                      router.push(`/dashboard/${accountId}/${teamId}/events/${id}/edit`)
+                      router.push(
+                        `/dashboard/${accountId}/${teamId}/events/${id}/edit`,
+                      )
                     }
                     onPublish={handlePublishEvent}
                     onBulkAction={handleBulkAction}
@@ -648,51 +684,22 @@ export default function EventsDashboardPage() {
           )}
 
           {/* Table / Grid / Mobile list */}
-          {isMobile ? (
+          {isMobile || viewMode !== 'table' ? (
             <EventsGrid
               events={filteredEvents}
               selectedIds={selectedEvents}
               onSelectOne={handleSelectEvent}
               onRowClick={handleCardClick}
-              onView={(e) =>
-                router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}`)
-              }
-              onEdit={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/${e.id}/edit`,
-                )
-              }
-              onDuplicate={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/new?duplicate=${e.id}`,
-                )
-              }
+              onView={goToEvent}
+              onEdit={goToEdit}
+              onDuplicate={goToDuplicate}
               onPublish={handlePublishEvent}
               onRestore={handleRestoreEvent}
               onPermanentDelete={handlePermanentDelete}
               onMoveToTrash={handleDeleteEvent}
-              emptyState={
-                <EmptyState
-                  variant="compact"
-                  icon={<Search className="h-4 w-4 text-muted-foreground" />}
-                  title={
-                    activeTab === 'trash'
-                      ? 'No events in trash'
-                      : searchQuery
-                        ? 'No matches'
-                        : 'No events yet'
-                  }
-                  sub={
-                    activeTab === 'trash'
-                      ? 'Deleted events appear here.'
-                      : searchQuery
-                        ? 'Try a different search term.'
-                        : 'Create your first event to get started.'
-                  }
-                />
-              }
+              emptyState={emptyState}
             />
-          ) : viewMode === 'table' ? (
+          ) : (
             <EventsTable
               events={filteredEvents}
               selectedIds={selectedEvents}
@@ -710,87 +717,14 @@ export default function EventsDashboardPage() {
               onSelectAll={handleSelectAll}
               onSelectOne={handleSelectEvent}
               onRowClick={handleRowClick}
-              onView={(e) =>
-                router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}`)
-              }
-              onEdit={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/${e.id}/edit`,
-                )
-              }
-              onDuplicate={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/new?duplicate=${e.id}`,
-                )
-              }
+              onView={goToEvent}
+              onEdit={goToEdit}
+              onDuplicate={goToDuplicate}
               onPublish={handlePublishEvent}
               onRestore={handleRestoreEvent}
               onPermanentDelete={handlePermanentDelete}
               onMoveToTrash={handleDeleteEvent}
-              emptyState={
-                <EmptyState
-                  variant="compact"
-                  icon={<Search className="h-4 w-4 text-muted-foreground" />}
-                  title={
-                    activeTab === 'trash'
-                      ? 'No events in trash'
-                      : searchQuery
-                        ? 'No matches'
-                        : 'No events yet'
-                  }
-                  sub={
-                    activeTab === 'trash'
-                      ? 'Deleted events appear here.'
-                      : searchQuery
-                        ? 'Try a different search term.'
-                        : 'Create your first event to get started.'
-                  }
-                />
-              }
-            />
-          ) : (
-            <EventsGrid
-              events={filteredEvents}
-              selectedIds={selectedEvents}
-              onSelectOne={handleSelectEvent}
-              onRowClick={handleCardClick}
-              onView={(e) =>
-                router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}`)
-              }
-              onEdit={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/${e.id}/edit`,
-                )
-              }
-              onDuplicate={(e) =>
-                router.push(
-                  `/dashboard/${accountId}/${teamId}/events/new?duplicate=${e.id}`,
-                )
-              }
-              onPublish={handlePublishEvent}
-              onRestore={handleRestoreEvent}
-              onPermanentDelete={handlePermanentDelete}
-              onMoveToTrash={handleDeleteEvent}
-              emptyState={
-                <EmptyState
-                  variant="compact"
-                  icon={<Search className="h-4 w-4 text-muted-foreground" />}
-                  title={
-                    activeTab === 'trash'
-                      ? 'No events in trash'
-                      : searchQuery
-                        ? 'No matches'
-                        : 'No events yet'
-                  }
-                  sub={
-                    activeTab === 'trash'
-                      ? 'Deleted events appear here.'
-                      : searchQuery
-                        ? 'Try a different search term.'
-                        : 'Create your first event to get started.'
-                  }
-                />
-              }
+              emptyState={emptyState}
             />
           )}
 
