@@ -476,10 +476,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </div>
 
             {/* Middle: Search + Create New + Theme (Desktop only) */}
-            <div className="hidden xl:flex items-center flex-1 mx-2 lg:mx-4 justify-center gap-3">
+            <div className="hidden xl:flex items-center flex-1 mx-4 lg:mx-6 justify-center gap-3 min-w-0">
               
-              {/* Using flex-1 max-w-3xl to give it the best possible stretch while keeping some max bounds */}
-              <div className="w-full flex-1 max-w-3xl relative">
+              {/* Search bar with minimum width to prevent squeezing */}
+              <div className="flex-1 min-w-[200px] max-w-2xl relative">
                 <SearchBar />
               </div>
               
@@ -490,8 +490,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
-                      <span>Create New</span>
-                      <ChevronDown className="h-3 w-3 opacity-80" />
+                      <span className="hidden 2xl:inline">Create New</span>
+                      <ChevronDown className="h-3 w-3 opacity-80 hidden 2xl:inline" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
@@ -559,8 +559,8 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
-                      <span>Create New</span>
-                      <ChevronDown className="h-3 w-3 opacity-80" />
+                      <span className="hidden 2xl:inline">Create New</span>
+                      <ChevronDown className="h-3 w-3 opacity-80 hidden 2xl:inline" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
@@ -603,7 +603,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
               </div>
 
               {/* Team Switcher — Desktop Right position, width tightly constrained */}
-              <div className="hidden xl:block w-[220px] shrink-0">
+              <div className="hidden xl:block 2xl:w-[220px] shrink-0">
                 <TeamSwitcher variant="compact" />
               </div>
 
