@@ -19,21 +19,6 @@ import type {
   FormErrors,
 } from '../../types';
 
-// ============================================================
-// TICKET STEP (Step 2)
-// ============================================================
-//
-// Fields rendered:
-//   - Tickets *           (TicketListField — accordion array editor)
-//   - Capacity            (NumberField — event-wide maximum)
-//   - Waitlist            (WaitlistField — toggle)
-//
-// Note on capacity vs ticket quantities:
-//   `capacity` is the event-wide maximum, independent of the sum of
-//   ticket quantities. It's a top-level field on the payload. Ticket
-//   quantities are per-ticket. Both matter — the backend checks that
-//   the sum of ticket quantities doesn't exceed capacity.
-
 interface TicketStepProps {
   formData: EventFormData;
   validationErrors: FormErrors;
@@ -51,12 +36,12 @@ export function TicketStep({
   return (
     <div className="space-y-6">
       {/* ---- Tickets ---- */}
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             Tickets
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             Define the ticket options attendees can purchase. Add multiple
             tickets for tiered access, VIP passes, or different price points.
           </CardDescription>
@@ -71,12 +56,12 @@ export function TicketStep({
       </Card>
 
       {/* ---- Capacity ---- */}
-      <Card className="border border-neutral-light">
+      <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-neutral-dark">
+          <CardTitle className="text-sm font-medium text-foreground">
             Capacity
           </CardTitle>
-          <CardDescription className="text-xs text-neutral-gray">
+          <CardDescription className="text-xs text-muted-foreground">
             The maximum number of attendees for the whole event. If left
             blank, capacity is unlimited.
           </CardDescription>
