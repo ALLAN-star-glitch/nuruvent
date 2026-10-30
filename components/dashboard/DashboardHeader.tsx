@@ -473,7 +473,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
             </div>
 
-            {/* Middle: Search + Create New (Desktop only) */}
+            {/* Middle: Search + Create New + Theme (Desktop only) */}
             <div className="hidden xl:flex items-center flex-1 mx-4 lg:mx-6 justify-center gap-3 min-w-0">
               
               {/* Search bar with minimum width to prevent squeezing */}
@@ -488,7 +488,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
-                      {/* Only show text on very large screens */}
                       <span className="hidden 2xl:inline">Create New</span>
                       <ChevronDown className="h-3 w-3 opacity-80 hidden 2xl:inline" />
                     </Button>
@@ -524,6 +523,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+
+              {/* Theme Toggle — Restored here for desktop */}
+              <div className="shrink-0">
+                <ThemeToggle />
               </div>
             </div>
 
