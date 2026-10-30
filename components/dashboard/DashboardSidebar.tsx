@@ -253,7 +253,8 @@ export function DashboardSidebar({
   };
 
   const buildTeamHref = (team: Team) => {
-    return buildTeamSwitchHref(pathname, team.account_id, team.id);
+    // CHANGE THIS to go straight to settings instead of the dashboard
+    return `/dashboard/${team.account_id}/${team.id}/settings`;
   };
 
   const isTeamNavActive = (item: NavItem) => {

@@ -334,7 +334,7 @@ function TeamCard({
 
   return (
     <Link
-      href={`/dashboard/${accountId}/${team.id}`}
+      href={`/dashboard/${accountId}/${team.id}/settings`}
       className={cn(
         'group relative flex flex-col gap-4 overflow-hidden rounded-2xl border border-border/70 bg-card p-4 transition-all',
         'hover:-translate-y-0.5 hover:border-primary/40 hover:bg-accent/40 hover:shadow-lg',
