@@ -2,6 +2,7 @@
 
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { CategoryField } from '@/components/events/fields/CategoryField';
 import { EventTypeField } from '@/components/events/fields/EventTypeField';
 import { SchedulesField } from '@/components/events/fields/ScheduleField';
@@ -24,23 +25,6 @@ import type {
 // ============================================================
 // BASIC INFO STEP (Step 1)
 // ============================================================
-//
-// Fields rendered:
-//   - Event Name *         (TextField)
-//   - Event Type * + Category   (side-by-side on md+)
-//   - Schedule *           (SchedulesField — nested array editor)
-//   - Short Description    (TextField with counter)
-//   - Description *        (TextareaField)
-//   - Tags                 (TagsField)
-//   - Language             (TextField)
-//
-// The AI generation flow now lives in the wizard header, not here.
-// `onAIDraft` is kept for backward compatibility with the wizard's
-// `handleAIDraft` handler, which is still called by the AI modal.
-//
-// `onOpenConnectModal` is threaded down from the wizard so the
-// SchedulesField can offer the "Connect Zoom" CTA when a virtual
-// session has no link and the host isn't connected.
 
 interface BasicInfoStepProps {
   formData: EventFormData;
@@ -67,6 +51,10 @@ export function BasicInfoStep({
   eventId,
   onSchedulesCommitted,
 }: BasicInfoStepProps) {
+  const searchParams = useSearchParams();
+  // If the user just connected a video platform, we want to force the schedule open
+  const videoJustConnected = searchParams.get('video_connected') === 'true';
+
   return (
     <div className="space-y-5">
       {/* ---- Event Name ---- */}
@@ -110,6 +98,7 @@ export function BasicInfoStep({
         onOpenConnectModal={onOpenConnectModal}
         eventId={eventId} 
         onSchedulesCommitted={onSchedulesCommitted}
+        videoJustConnected={videoJustConnected} // <--- Pass the new prop
       />
 
       {/* ---- Short Description ---- */}

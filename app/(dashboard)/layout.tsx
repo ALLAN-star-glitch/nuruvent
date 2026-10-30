@@ -3,6 +3,8 @@
 import type { Metadata } from 'next';
 import { Header } from '@/components/layout/Header';
 import { DashboardLayoutClient } from '@/components/dashboard/DashboardLayoutClient';
+import { VideoConnectionListener } from '@/components/layout/VideoConnectionListener';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'Dashboard | Nuruvent',
@@ -16,6 +18,9 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-muted/30 flex flex-col">
+      <Suspense fallback={null}>
+        <VideoConnectionListener />
+      </Suspense>
       <header className="sticky top-0 z-40 w-full border-b border-border bg-background shadow-sm">
         <Header />
       </header>
