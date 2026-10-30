@@ -380,13 +380,18 @@ export function DashboardSidebar({
                 );
               }
 
-              return (
+                          return (
                 <div key={item.segment || item.label}>
                   {hasChildren ? (
                     <div className="space-y-0.5">
-                      <div
+                      {/* PARENT ITEM: Now a button that only toggles, not navigates */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isCertGroup) setCertificatesExpanded((v) => !v);
+                        }}
                         className={cn(
-                          'flex items-center gap-1 rounded-lg text-[13px] font-medium transition-all duration-150 group relative',
+                          'w-full flex items-center justify-between rounded-lg text-[13px] font-medium transition-all duration-150 group relative cursor-pointer',
                           isActive
                             ? 'bg-primary/15 text-primary font-semibold'
                             : isTrash
@@ -398,26 +403,15 @@ export function DashboardSidebar({
                           <div className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full', isTrash ? 'bg-destructive' : 'bg-primary')} />
                         )}
 
-                        <Link
-                          href={buildTeamNavHref(item)}
-                          prefetch={false}
-                          className="flex flex-1 items-center gap-3 px-3 py-2 cursor-pointer truncate"
-                        >
+                        <div className="flex flex-1 items-center gap-3 px-3 py-2 truncate">
                           <Icon className={cn('h-[18px] w-[18px] shrink-0 transition-colors', isTrash ? 'text-destructive' : isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground')} />
                           <span className="truncate">{item.label}</span>
-                        </Link>
+                        </div>
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (isCertGroup) setCertificatesExpanded((v) => !v);
-                          }}
-                          className="pr-3 py-2 cursor-pointer hover:text-primary transition-colors"
-                        >
+                        <div className="pr-3 py-2">
                           <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', childrenExpanded ? 'rotate-180 text-primary' : 'text-foreground/60')} />
-                        </button>
-                      </div>
+                        </div>
+                      </button>
 
                       {childrenExpanded && (
                         <div className="mt-1 ml-4 pl-3 border-l border-border/40 space-y-0.5">
@@ -445,6 +439,7 @@ export function DashboardSidebar({
                       )}
                     </div>
                   ) : (
+                
                     <Link
                       href={buildTeamNavHref(item)}
                       prefetch={false}
