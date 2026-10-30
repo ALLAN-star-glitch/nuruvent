@@ -38,7 +38,7 @@ import { LogoutDialog } from '../ui/LogoutDialog';
 import { useState, useEffect, useMemo } from 'react';
 
 // ============================================================
-// DASHBOARD NAV ITEMS
+// DASHBOARD NAV ITEMS (For mobile drawer)
 // ============================================================
 
 import {
@@ -190,7 +190,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     if (segment === '') return '/dashboard';
     if (!accountId || !teamId) return '/accounts';
     
-    // Role-aware routing for certificates
     if (segment === 'certificates') {
       if (isOrganizer) {
         return `/dashboard/${accountId}/certificates`;
@@ -198,7 +197,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
       return '/me/certificates';
     }
     
-    // Account-level templates
     if (segment === 'certificates/templates') {
       return `/dashboard/${accountId}/certificates/templates`;
     }
@@ -475,11 +473,11 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
             </div>
 
-            {/* Middle: Search + Create New + Theme (Desktop only) */}
+            {/* Middle: Search + Create New (Desktop only) */}
             <div className="hidden xl:flex items-center flex-1 mx-4 lg:mx-6 justify-center gap-3 min-w-0">
               
               {/* Search bar with minimum width to prevent squeezing */}
-              <div className="flex-1 min-w-[200px] max-w-2xl relative">
+              <div className="flex-1 min-w-[300px] max-w-2xl relative">
                 <SearchBar />
               </div>
               
@@ -490,6 +488,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
+                      {/* Only show text on very large screens */}
                       <span className="hidden 2xl:inline">Create New</span>
                       <ChevronDown className="h-3 w-3 opacity-80 hidden 2xl:inline" />
                     </Button>
@@ -511,8 +510,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       <Users className="mr-2 h-4 w-4" />
                       Team
                     </DropdownMenuItem>
-
-                     <DropdownMenuItem
+                    <DropdownMenuItem
                       onClick={goCreateCertificate}
                       disabled={!accountId}
                       className="cursor-pointer"
@@ -526,10 +524,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </div>
-
-              <div className="shrink-0">
-                <ThemeToggle />
               </div>
             </div>
 
@@ -551,7 +545,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 )}
               </Button>
 
-              {/* Create New — original mobile behavior (visible < xl) */}
+              {/* Create New — Mobile (visible < xl) */}
               <div className="hidden sm:block xl:hidden shrink-0">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -559,8 +553,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       className="cursor-pointer gap-1.5 bg-primary hover:bg-primary/90 text-white shadow-sm hover:shadow-md px-3 md:px-4 py-2 h-9 text-sm font-medium"
                     >
                       <PlusCircle className="h-4 w-4 shrink-0" />
-                      <span className="hidden 2xl:inline">Create New</span>
-                      <ChevronDown className="h-3 w-3 opacity-80 hidden 2xl:inline" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
@@ -580,8 +572,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                       <Users className="mr-2 h-4 w-4" />
                       Team
                     </DropdownMenuItem>
-
-                     <DropdownMenuItem
+                    <DropdownMenuItem
                       onClick={goCreateCertificate}
                       disabled={!accountId}
                       className="cursor-pointer"
@@ -597,13 +588,13 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 </DropdownMenu>
               </div>
 
-              {/* Theme Toggle — original mobile behavior (visible < xl) */}
+              {/* Theme Toggle — Mobile (visible < xl) */}
               <div className="xl:hidden">
                 <ThemeToggle />
               </div>
 
-              {/* Team Switcher — Desktop Right position, width tightly constrained */}
-              <div className="hidden xl:block 2xl:w-[220px] shrink-0">
+              {/* Team Switcher — ONLY show on very large screens to save space */}
+              <div className="hidden 2xl:block w-[220px] shrink-0">
                 <TeamSwitcher variant="compact" />
               </div>
 
