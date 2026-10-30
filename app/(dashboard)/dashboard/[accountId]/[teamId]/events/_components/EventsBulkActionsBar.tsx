@@ -1,15 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import {
+  Award,
   Check,
   CheckCircle2,
+  ClipboardList,
   Copy,
+  DollarSign,
   Edit3,
   Eye,
   Loader2,
   RotateCcw,
   Trash,
   Trash2,
+  Users,
   XCircle,
 } from 'lucide-react';
 
@@ -22,6 +27,8 @@ interface Props {
   uiEvents: UIEvent[];
   activeTab: string;
   publishingEventId: string | null;
+  accountId: string;
+  teamId: string;
   onClear: () => void;
   onView: () => void;
   onEdit: (id: string) => void;
@@ -35,6 +42,8 @@ export function EventsBulkActionsBar({
   uiEvents,
   activeTab,
   publishingEventId,
+  accountId,
+  teamId,
   onClear,
   onView,
   onEdit,
@@ -49,6 +58,10 @@ export function EventsBulkActionsBar({
     return e?.status === 'Draft' && !e?.isDeleted;
   });
 
+  const baseUrl = `/dashboard/${accountId}/${teamId}`;
+  const singleId = count === 1 ? selectedIds[0] : null;
+  const isTrash = activeTab === 'trash';
+
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
       <div className="flex items-center gap-2">
@@ -58,7 +71,7 @@ export function EventsBulkActionsBar({
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {count === 1 && (
+        {count === 1 && !isTrash && (
           <>
             <Button
               size="sm"
@@ -76,10 +89,53 @@ export function EventsBulkActionsBar({
             >
               <Edit3 className="mr-2 h-4 w-4" /> Edit
             </Button>
+
+            <div className="w-px h-4 bg-border mx-1" />
+
+            <Link href={`${baseUrl}/events/${singleId}/payments`}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer text-xs"
+                title="View Payments"
+              >
+                <DollarSign className="h-3.5 w-3.5 mr-1.5" /> Payments
+              </Button>
+            </Link>
+            <Link href={`${baseUrl}/events/${singleId}/attendees`}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer text-xs"
+                title="View Attendees"
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" /> Attendees
+              </Button>
+            </Link>
+            <Link href={`${baseUrl}/events/${singleId}/registrations`}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer text-xs"
+                title="View Registrations"
+              >
+                <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> Registrations
+              </Button>
+            </Link>
+            <Link href={`${baseUrl}/events/${singleId}/certificates`}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cursor-pointer text-xs"
+                title="View Certificates"
+              >
+                <Award className="h-3.5 w-3.5 mr-1.5" /> Certificates
+              </Button>
+            </Link>
           </>
         )}
 
-        {allDraft && count > 0 && (
+        {allDraft && count > 0 && !isTrash && (
           <Button
             size="sm"
             className="cursor-pointer bg-emerald-600 text-white hover:bg-emerald-700"
@@ -104,7 +160,7 @@ export function EventsBulkActionsBar({
 
         {count > 1 && (
           <>
-            {activeTab === 'trash' ? (
+            {isTrash ? (
               <>
                 <Button
                   size="sm"
@@ -146,7 +202,7 @@ export function EventsBulkActionsBar({
           </>
         )}
 
-        {count === 1 && (
+        {count === 1 && !isTrash && (
           <Button
             size="sm"
             variant="outline"
@@ -158,6 +214,27 @@ export function EventsBulkActionsBar({
           >
             <Trash2 className="mr-2 h-4 w-4" /> Move to Trash
           </Button>
+        )}
+
+        {count === 1 && isTrash && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900/50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+              onClick={() => onBulkAction('restore')}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" /> Restore
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer border-destructive/30 text-destructive hover:bg-destructive/10"
+              onClick={() => onBulkAction('permanentDelete')}
+            >
+              <Trash className="mr-2 h-4 w-4" /> Delete Permanently
+            </Button>
+          </>
         )}
 
         <Button

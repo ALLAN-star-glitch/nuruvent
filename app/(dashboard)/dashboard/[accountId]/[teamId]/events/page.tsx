@@ -628,15 +628,15 @@ export default function EventsDashboardPage() {
                     uiEvents={filteredEvents}
                     activeTab={activeTab}
                     publishingEventId={publishingEventId}
+                    accountId={accountId}      // <-- ADD THIS
+                    teamId={teamId}            // <-- ADD THIS
                     onClear={() => {
                       setSelectedEvents([]);
                       setSelectAll(false);
                     }}
                     onView={handleViewSelected}
                     onEdit={(id) =>
-                      router.push(
-                        `/dashboard/${accountId}/${teamId}/events/${id}/edit`,
-                      )
+                      router.push(`/dashboard/${accountId}/${teamId}/events/${id}/edit`)
                     }
                     onPublish={handlePublishEvent}
                     onBulkAction={handleBulkAction}
