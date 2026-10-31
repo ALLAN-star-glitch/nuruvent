@@ -797,37 +797,23 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
                               {authMode === 'choice' ? (
                                 <>
                                   <Separator />
-                                  <div className="space-y-2 pt-1">
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                                      2. Continue as
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Create an account to manage your
-                                      tickets, or continue as a guest — no
-                                      signup required.
-                                    </p>
-                                  </div>
+                                                                    <div className="space-y-3 pt-1">
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                                        2. Attendee Information
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        No account needed. We&apos;ll send your ticket and join links straight to your email.
+                                      </p>
+                                    </div>
 
-                                  <div className="space-y-2 pt-1">
                                     <Button
                                       type="button"
-                                      onClick={handleCreateAccount}
+                                      onClick={handleContinueAsGuest}
                                       disabled={!selectedTicketTypeId}
                                       className="h-11 w-full cursor-pointer rounded-xl bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
                                     >
-                                      <UserPlus className="mr-2 h-4 w-4" />
-                                      Create an account
-                                      <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={handleContinueAsGuest}
-                                      disabled={!selectedTicketTypeId}
-                                      className="h-11 w-full cursor-pointer rounded-xl font-medium"
-                                    >
-                                      Continue as guest
+                                      Continue
                                     </Button>
 
                                     <p className="pt-2 text-center text-[11px] text-muted-foreground">

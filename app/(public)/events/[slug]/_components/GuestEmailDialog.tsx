@@ -102,7 +102,7 @@ export function GuestEmailDialog({
                   onClick={() => onOpenChange(false)}
                 >
                   <Ticket className="mr-2 h-4 w-4" />
-                  View my tickets
+                  View tickets in dashboard
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -110,7 +110,7 @@ export function GuestEmailDialog({
               {email ? (
                 <OpenEmailButton
                   email={email}
-                  label="Open email instead"
+                  label="View Ticket in Email"
                   className="h-11 w-full cursor-pointer rounded-xl"
                 />
               ) : null}
