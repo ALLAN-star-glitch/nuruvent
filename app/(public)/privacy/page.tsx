@@ -41,7 +41,7 @@ export default function PrivacyPage() {
           and the choices you have.
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          Effective Date: [Insert Date]
+          Effective Date: 31/10/2026
         </p>
       </header>
 
@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           <StatCard
             icon={<Database className="h-5 w-5" />}
             title="What we collect"
-            description="Account, event, payment, attendance, and Zoom integration data."
+            description="Account, event, payment, attendance, and video meeting integration data (Zoom, Google Meet)."
           />
           <StatCard
             icon={<Lock className="h-5 w-5" />}
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           <StatCard
             icon={<Share2 className="h-5 w-5" />}
             title="Who we share with"
-            description="Render (hosting), Zoom, payment and messaging providers."
+            description="Render (hosting), Zoom, Google, payment and messaging providers."
           />
           <StatCard
             icon={<UserCheck className="h-5 w-5" />}
@@ -125,12 +125,23 @@ export default function PrivacyPage() {
           />
         </SubSection>
 
-        <SubSection title="Attendance Data (from Zoom webhooks)">
+        <SubSection title="Google Account Data (when you connect Google Meet)">
+          <BulletList
+            items={[
+              'Google account email address and basic profile information',
+              'OAuth access token, refresh token, and granted scopes for the Google Meet API',
+              'Meeting metadata: meeting code, space name, join URL, start time, duration, and conference record identifiers',
+              'Conference and participant records available through the Google Meet API after a meeting ends',
+            ]}
+          />
+        </SubSection>
+
+        <SubSection title="Attendance Data (from video provider webhooks and APIs)">
           <BulletList
             items={[
               'Participant email address and display name',
               'Join and leave timestamps',
-              'Meeting UUID and participant UUID',
+              'Meeting and participant identifiers (e.g., Zoom meeting UUID, Google conference record ID)',
             ]}
           />
         </SubSection>
@@ -160,7 +171,7 @@ export default function PrivacyPage() {
             'Process payments, payouts, refunds, and reconciliation with mobile money and card providers.',
             'Track attendance and completion, and issue QR-verified certificates.',
             'Calculate CPD credits and generate CPD reports for professional bodies.',
-            'Connect to Zoom on your behalf and create meetings for virtual sessions.',
+            'Connect to Zoom or Google on your behalf and create meetings for virtual sessions.',
             'Send transactional notifications (registration, reminders, certificates) via email, SMS, WhatsApp, and in-app push.',
             'Detect, investigate, and prevent security incidents.',
             'Comply with legal and tax obligations.',
@@ -185,7 +196,7 @@ export default function PrivacyPage() {
           items={[
             <><Bold>Contractual necessity</Bold> — to provide the services you have requested.</>,
             <><Bold>Legitimate interests</Bold> — to secure our platform, prevent abuse, and improve the service.</>,
-            <><Bold>Consent</Bold> — where you have explicitly granted it, such as connecting your Zoom account or opting into marketing.</>,
+            <><Bold>Consent</Bold> — where you have explicitly granted it, such as connecting your Zoom or Google account or opting into marketing.</>,
             <><Bold>Legal obligation</Bold> — to comply with applicable law, including tax and financial record-keeping.</>,
           ]}
         />
@@ -199,7 +210,7 @@ export default function PrivacyPage() {
         <SubSection title="Encryption at Rest">
           <BulletList
             items={[
-              'Zoom OAuth access and refresh tokens are encrypted with AES-256-GCM before storage.',
+              'Zoom and Google OAuth access and refresh tokens are encrypted with AES-256-GCM before storage.',
               'The encryption key is stored separately from the data and is never written to logs.',
               'The underlying database is encrypted at rest at the storage layer.',
             ]}
@@ -209,7 +220,7 @@ export default function PrivacyPage() {
           <BulletList
             items={[
               'All traffic to and from Nuruvent is served over HTTPS (TLS).',
-              'All outbound calls to third-party providers (Zoom, payment gateways, messaging providers) use HTTPS.',
+              'All outbound calls to third-party providers (Zoom, Google, payment gateways, messaging providers) use HTTPS.',
             ]}
           />
         </SubSection>
@@ -244,11 +255,30 @@ export default function PrivacyPage() {
             items={[
               <><Bold>Render (render.com)</Bold> — hosting and managed PostgreSQL database.</>,
               <><Bold>Zoom (zoom.us)</Bold> — OAuth authentication and meeting provisioning.</>,
+              <><Bold>Google (Google Meet API / Google Workspace)</Bold> — OAuth authentication and meeting provisioning when you connect a Google account.</>,
               <><Bold>Mobile money providers</Bold> (e.g., Safaricom M-Pesa, Airtel Money, MTN MoMo) — payment processing.</>,
               <><Bold>Card processors</Bold> — card payment processing.</>,
               <><Bold>Email, SMS, and WhatsApp providers</Bold> — transactional notifications.</>,
             ]}
           />
+        </SubSection>
+
+        <SubSection title="Google API Services User Data Policy">
+          <p className="text-base text-muted-foreground">
+            Nuruvent&apos;s use and transfer of information received from Google
+            APIs to any other app will adhere to the{' '}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              className="text-primary hover:underline font-medium"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Google API Services User Data Policy
+            </a>
+            , including the Limited Use requirements. We only request the Google
+            scopes needed to create meeting spaces and to read meeting and
+            participant metadata for attendance and CPD tracking.
+          </p>
         </SubSection>
 
         <SubSection title="Trainers and Institutions">
@@ -311,7 +341,7 @@ export default function PrivacyPage() {
                 v="Indefinite, so verification remains available"
               />
               <Row
-                k="Zoom OAuth tokens"
+                k="Zoom and Google OAuth tokens"
                 v="While the connection is active; deleted immediately on disconnect or deauthorization"
               />
               <Row k="Technical logs" v="90 days" />
@@ -335,7 +365,7 @@ export default function PrivacyPage() {
             'Request deletion of your data.',
             'Object to or restrict certain processing.',
             'Export your data in a portable format.',
-            'Withdraw consent at any time (for example, by disconnecting your Zoom account or opting out of marketing).',
+            'Withdraw consent at any time (for example, by disconnecting your Zoom or Google account or opting out of marketing).',
           ]}
         />
         <Callout icon={<Mail className="h-4 w-4" />}>
@@ -362,7 +392,9 @@ export default function PrivacyPage() {
           Nuruvent&apos;s backend and database are hosted on Render.
           Render&apos;s infrastructure may store data in regions outside your
           own. Where required, we rely on standard contractual clauses or
-          equivalent safeguards for such transfers.
+          equivalent safeguards for such transfers. Google and Zoom process
+          data in accordance with their own global infrastructure and
+          safeguards.
         </p>
       </Section>
 
