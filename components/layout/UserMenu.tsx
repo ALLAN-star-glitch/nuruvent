@@ -160,6 +160,20 @@ const MOBILE_QUICK_LINKS_BASE = QUICK_LINKS.filter((item) => !item.isTrash);
 // MOBILE SECTION (collapsible)
 // ============================================================
 
+type MobileSectionState = {
+  actions: boolean;
+  teams: boolean;
+  account: boolean;
+};
+
+// Defaults on mobile: Quick Actions and Your Teams start collapsed,
+// Account starts expanded.
+const MOBILE_SECTION_DEFAULTS: MobileSectionState = {
+  actions: false,
+  teams: false,
+  account: true,
+};
+
 function MobileSection({
   title,
   expanded,
@@ -264,16 +278,13 @@ export function UserMenu({ user }: UserMenuProps) {
   const [isMobile, setIsMobile] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // Mobile menu sections: only Teams collapsed.
-  const [mobileSections, setMobileSections] = useState<{
-    actions: boolean;
-    teams: false;
-    account: boolean;
-  }>({
-    actions: true,
-    teams: false,
-    account: true,
-  });
+  // Mobile menu sections: Quick Actions and Your Teams collapsed.
+  const [mobileSections, setMobileSections] = useState<MobileSectionState>(
+    MOBILE_SECTION_DEFAULTS,
+  );
+
+  // Desktop "Your Teams" container: collapsed by default.
+  const [desktopTeamsCollapsed, setDesktopTeamsCollapsed] = useState(true);
 
   // Desktop "Manage this team" sub-block: collapsed by default.
   const [desktopManageCollapsed, setDesktopManageCollapsed] = useState(true);
@@ -380,19 +391,21 @@ export function UserMenu({ user }: UserMenuProps) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // Reset collapsed state every time the menu closes.
   useEffect(() => {
     if (!open && isMobile) {
-      setMobileSections({ actions: true, teams: false, account: true });
+      setMobileSections(MOBILE_SECTION_DEFAULTS);
     }
   }, [open, isMobile]);
 
   useEffect(() => {
     if (!open && !isMobile) {
+      setDesktopTeamsCollapsed(true);
       setDesktopManageCollapsed(true);
     }
   }, [open, isMobile]);
 
-  const toggleMobileSection = (key: 'actions' | 'teams' | 'account') => {
+  const toggleMobileSection = (key: keyof MobileSectionState) => {
     setMobileSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -588,25 +601,38 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   // ============================================================
-  // CONSPICUOUS "YOUR TEAMS" CONTAINER
+  // DESKTOP "YOUR TEAMS" HEADER (collapsible toggle)
   // ============================================================
 
   const teamsSectionHeader = (
-    <div className="mb-2 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={() => setDesktopTeamsCollapsed((v) => !v)}
+      aria-expanded={!desktopTeamsCollapsed}
+      className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-md text-left"
+    >
+      <span className="flex items-center gap-2">
         <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/15 text-primary">
           <Users className="h-3 w-3" />
         </span>
         <span className="text-[11px] font-semibold uppercase tracking-wider text-primary">
           Your Teams
         </span>
-      </div>
-      {teams.length > 0 && (
-        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
-          {teams.length}
-        </span>
-      )}
-    </div>
+      </span>
+      <span className="flex items-center gap-2">
+        {teams.length > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+            {teams.length}
+          </span>
+        )}
+        <ChevronRight
+          className={cn(
+            'h-4 w-4 shrink-0 text-primary transition-transform duration-200',
+            !desktopTeamsCollapsed && 'rotate-90',
+          )}
+        />
+      </span>
+    </button>
   );
 
   // ============================================================
@@ -694,17 +720,21 @@ export function UserMenu({ user }: UserMenuProps) {
           <div className="space-y-1">
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
               {teamsSectionHeader}
-              {teams.length === 0 ? (
-                <p className="px-1 py-2 text-xs text-muted-foreground">
-                  No teams yet
-                </p>
-              ) : (
-                <div
-                  role="radiogroup"
-                  aria-label="Your teams"
-                  className="space-y-0.5"
-                >
-                  {teams.map(renderTeamRow)}
+              {!desktopTeamsCollapsed && (
+                <div className="mt-2">
+                  {teams.length === 0 ? (
+                    <p className="px-1 py-2 text-xs text-muted-foreground">
+                      No teams yet
+                    </p>
+                  ) : (
+                    <div
+                      role="radiogroup"
+                      aria-label="Your teams"
+                      className="space-y-0.5"
+                    >
+                      {teams.map(renderTeamRow)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
