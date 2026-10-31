@@ -5,6 +5,7 @@ import type {
   CreateEventRequest,
   EventVisibility,
   GeneratedEventDraft,
+  RecurrenceInput,
   TicketInput,
   UpdateEventRequest,
 } from '@/lib/types/events';
@@ -54,35 +55,42 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
 // RECURRENCE
 // ============================================================
 
-function recurrenceToRequest(recurrence: RecurrenceForm | null) {
+/**
+ * Maps the form's RecurrenceForm to the backend's RecurrenceInput.
+ *
+ * The form still uses the legacy field names (pattern, ends_on,
+ * occurrences, day_of_month, week_of_month) so existing UI code
+ * doesn't need to be rewritten. This function translates them into
+ * the new shape (frequency, end_date, count) that the backend now
+ * requires.
+ *
+ * Fields the backend no longer supports (day_of_month,
+ * week_of_month) are silently dropped. If a user had them set, they
+ * are lost on save — that's acceptable because the backend rejects
+ * "custom" recurrence anyway.
+ */
+function recurrenceToRequest(
+  recurrence: RecurrenceForm | null,
+): RecurrenceInput | undefined {
   if (!recurrence || !recurrence.pattern) return undefined;
+
+  // Legacy "custom" is no longer supported. Downgrade to the closest
+  // concrete frequency so users don't lose their saved events.
+  const frequency: RecurrenceInput['frequency'] =
+    recurrence.pattern === 'custom' ? 'weekly' : recurrence.pattern;
 
   const days = (recurrence.days_of_week ?? []).filter(Boolean);
 
-  if (
-    (recurrence.pattern === 'weekly' ||
-      recurrence.pattern === 'custom') &&
-    days.length === 0
-  ) {
-    return undefined;
-  }
-
-  if (
-    recurrence.pattern === 'monthly' &&
-    recurrence.day_of_month == null &&
-    !recurrence.week_of_month
-  ) {
+  if (frequency === 'weekly' && days.length === 0) {
     return undefined;
   }
 
   return {
-    pattern: recurrence.pattern,
+    frequency,
     interval: recurrence.interval ?? undefined,
-    days_of_week: days.length ? days : undefined,
-    day_of_month: recurrence.day_of_month ?? undefined,
-    week_of_month: recurrence.week_of_month || undefined,
-    ends_on: recurrence.ends_on || undefined,
-    occurrences: recurrence.occurrences ?? undefined,
+    days_of_week: frequency === 'weekly' && days.length ? days : undefined,
+    end_date: recurrence.ends_on || undefined,
+    count: recurrence.occurrences ?? undefined,
   };
 }
 
@@ -381,16 +389,20 @@ export function mapAIDraftToForm(
       }))
     : undefined;
 
+  // The form's RecurrenceForm shape is still legacy (pattern /
+  // ends_on / occurrences). Map the AI's new-shape output (frequency
+  // / end_date / count) into the form's field names so the UI
+  // continues to work without changing the form component.
   const recurrence: RecurrenceForm | null =
     draft.is_recurring && draft.recurrence
       ? {
-          pattern: draft.recurrence.pattern,
+          pattern: draft.recurrence.frequency,
           interval: draft.recurrence.interval ?? 1,
           days_of_week: draft.recurrence.days_of_week ?? [],
-          day_of_month: draft.recurrence.day_of_month ?? null,
-          week_of_month: draft.recurrence.week_of_month ?? '',
-          ends_on: draft.recurrence.ends_on ?? '',
-          occurrences: draft.recurrence.occurrences ?? null,
+          day_of_month: null,
+          week_of_month: '',
+          ends_on: draft.recurrence.end_date ?? '',
+          occurrences: draft.recurrence.count ?? null,
         }
       : null;
 

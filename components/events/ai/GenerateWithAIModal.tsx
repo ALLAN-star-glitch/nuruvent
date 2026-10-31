@@ -41,6 +41,7 @@ import type {
   EventType as EventTypeModel,
   GeneratedEventDraft,
   RecurrenceInput,
+  RecurrencePattern,
   TicketType as TicketTypeModel,
 } from '@/lib/types/events';
 
@@ -75,11 +76,9 @@ interface PromptFormState {
 
 interface RecurrenceFormState {
   enabled: boolean;
-  pattern: 'daily' | 'weekly' | 'monthly' | 'custom';
+  pattern: RecurrencePattern;
   interval: number | null;
   daysOfWeek: string[];
-  dayOfMonth: number | null;
-  weekOfMonth: string;
   endsOn: string;
   occurrences: number | null;
 }
@@ -100,8 +99,6 @@ const INITIAL_RECURRENCE: RecurrenceFormState = {
   pattern: 'weekly',
   interval: 1,
   daysOfWeek: [],
-  dayOfMonth: null,
-  weekOfMonth: '',
   endsOn: '',
   occurrences: null,
 };
@@ -198,19 +195,16 @@ export function GenerateWithAIModal({
 
   // ---- Recurrence validation (block submit until complete) ----
 
-  const recurrenceValid = useMemo(() => {
-    if (!recurrence.enabled) return true;
+const recurrenceValid = useMemo(() => {
+  if (!recurrence.enabled) return true;
 
-    if (recurrence.pattern === 'weekly' || recurrence.pattern === 'custom') {
-      if (recurrence.daysOfWeek.length === 0) return false;
-    }
-    if (recurrence.pattern === 'monthly') {
-      if (recurrence.dayOfMonth == null && !recurrence.weekOfMonth) return false;
-    }
-    if (!recurrence.endsOn && !recurrence.occurrences) return false;
+  if (recurrence.pattern === 'weekly' && recurrence.daysOfWeek.length === 0) {
+    return false;
+  }
+  if (!recurrence.endsOn && !recurrence.occurrences) return false;
 
-    return true;
-  }, [recurrence]);
+  return true;
+}, [recurrence]);
 
   const canGenerate = useMemo(() => {
     return (
@@ -222,28 +216,24 @@ export function GenerateWithAIModal({
     );
   }, [form, recurrenceValid]);
 
-  const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
-    if (!recurrence.enabled) return null;
+const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
+  if (!recurrence.enabled) return null;
 
-    const base: RecurrenceInput = {
-      pattern: recurrence.pattern,
-      interval: recurrence.interval ?? 1,
-    };
+  const base: RecurrenceInput = {
+    frequency: recurrence.pattern,
+    interval: recurrence.interval ?? 1,
+  };
 
-    if (recurrence.pattern === 'weekly' || recurrence.pattern === 'custom') {
-      base.days_of_week = recurrence.daysOfWeek;
-    }
-    if (recurrence.pattern === 'monthly' || recurrence.pattern === 'custom') {
-      if (recurrence.dayOfMonth != null) base.day_of_month = recurrence.dayOfMonth;
-      if (recurrence.weekOfMonth) base.week_of_month = recurrence.weekOfMonth;
-    }
+  if (recurrence.pattern === 'weekly') {
+    base.days_of_week = recurrence.daysOfWeek;
+  }
 
-    if (recurrence.endsOn) base.ends_on = recurrence.endsOn;
-    else if (recurrence.occurrences != null)
-      base.occurrences = recurrence.occurrences;
+  if (recurrence.endsOn) base.end_date = recurrence.endsOn;
+  else if (recurrence.occurrences != null)
+    base.count = recurrence.occurrences;
 
-    return base;
-  }, [recurrence]);
+  return base;
+}, [recurrence]);
 
   // ---- Generate ----
 
@@ -536,19 +526,10 @@ export function GenerateWithAIModal({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="daily" className="cursor-pointer">
-                            Daily
-                          </SelectItem>
-                          <SelectItem value="weekly" className="cursor-pointer">
-                            Weekly
-                          </SelectItem>
-                          <SelectItem value="monthly" className="cursor-pointer">
-                            Monthly
-                          </SelectItem>
-                          <SelectItem value="custom" className="cursor-pointer">
-                            Custom
-                          </SelectItem>
-                        </SelectContent>
+                        <SelectItem value="daily" className="cursor-pointer">Daily</SelectItem>
+                        <SelectItem value="weekly" className="cursor-pointer">Weekly</SelectItem>
+                        <SelectItem value="monthly" className="cursor-pointer">Monthly</SelectItem>
+                      </SelectContent>
                       </Select>
                     </div>
 
@@ -575,16 +556,13 @@ export function GenerateWithAIModal({
                           ? 'Every N day(s)'
                           : recurrence.pattern === 'weekly'
                             ? 'Every N week(s)'
-                            : recurrence.pattern === 'monthly'
-                              ? 'Every N month(s)'
-                              : 'Custom interval'}
+                            : 'Every N month(s)'}
                       </p>
                     </div>
                   </div>
 
                   {/* Weekdays */}
-                  {(recurrence.pattern === 'weekly' ||
-                    recurrence.pattern === 'custom') && (
+                  {recurrence.pattern === 'weekly' && (
                     <div className="space-y-1.5 min-w-0">
                       <Label className="text-xs text-muted-foreground">
                         On days <span className="text-destructive">*</span>
@@ -618,61 +596,6 @@ export function GenerateWithAIModal({
                       )}
                     </div>
                   )}
-
-                  {/* Monthly */}
-                  {(recurrence.pattern === 'monthly' ||
-                    recurrence.pattern === 'custom') && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5 min-w-0">
-                        <Label className="text-xs text-muted-foreground">
-                          Day of month
-                        </Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={31}
-                          placeholder="e.g., 15"
-                          value={recurrence.dayOfMonth ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            updateRec(
-                              'dayOfMonth',
-                              v === '' ? null : parseInt(v, 10) || null,
-                            );
-                          }}
-                          disabled={isGenerating}
-                          className="cursor-text w-full"
-                        />
-                      </div>
-                      <div className="space-y-1.5 min-w-0">
-                        <Label className="text-xs text-muted-foreground">
-                          Or week of month
-                        </Label>
-                        <Select
-                          value={recurrence.weekOfMonth || '__none__'}
-                          onValueChange={(v) =>
-                            updateRec('weekOfMonth', v === '__none__' ? '' : v)
-                          }
-                          disabled={isGenerating}
-                        >
-                          <SelectTrigger className="cursor-pointer w-full">
-                            <SelectValue placeholder="None" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="cursor-pointer">
-                              None
-                            </SelectItem>
-                            <SelectItem value="first" className="cursor-pointer">First</SelectItem>
-                            <SelectItem value="second" className="cursor-pointer">Second</SelectItem>
-                            <SelectItem value="third" className="cursor-pointer">Third</SelectItem>
-                            <SelectItem value="fourth" className="cursor-pointer">Fourth</SelectItem>
-                            <SelectItem value="last" className="cursor-pointer">Last</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Ends */}
                   <div className="space-y-1.5 min-w-0">
                     <Label className="text-xs text-muted-foreground">
@@ -1098,32 +1021,30 @@ function formatDate(iso: string): string {
 }
 
 function formatRecurrence(r: {
-  pattern: string;
+  frequency: string;
   interval?: number;
   days_of_week?: string[];
-  ends_on?: string | null;
-  occurrences?: number | null;
+  end_date?: string | null;
+  count?: number | null;
 }): string {
   const every = r.interval && r.interval > 1 ? `Every ${r.interval} ` : 'Every ';
   const unit =
-    r.pattern === 'daily'
+    r.frequency === 'daily'
       ? r.interval && r.interval > 1 ? 'days' : 'day'
-      : r.pattern === 'weekly'
+      : r.frequency === 'weekly'
         ? r.interval && r.interval > 1 ? 'weeks' : 'week'
-        : r.pattern === 'monthly'
-          ? r.interval && r.interval > 1 ? 'months' : 'month'
-          : 'period';
+        : r.interval && r.interval > 1 ? 'months' : 'month';
 
   let label = `${every}${unit}`;
 
-  if (r.pattern === 'weekly' && r.days_of_week?.length) {
+  if (r.frequency === 'weekly' && r.days_of_week?.length) {
     label += ` on ${r.days_of_week.map((d) => d.slice(0, 3)).join(', ')}`;
   }
 
-  if (r.ends_on) {
-    label += ` until ${r.ends_on}`;
-  } else if (r.occurrences) {
-    label += ` · ${r.occurrences} times`;
+  if (r.end_date) {
+    label += ` until ${r.end_date}`;
+  } else if (r.count) {
+    label += ` · ${r.count} times`;
   }
 
   return label;
