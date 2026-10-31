@@ -91,9 +91,6 @@ export default function BookingConfirmationPage() {
   const registration = regRes?.data;
   const event = eventRes?.data;
 
-  // Resolve the team-scoped tickets destination. Events only carry
-  // team_id; we traverse via the user's team list to find the parent
-  // account, mirroring the pattern used elsewhere in the app.
   const owningTeam = useMemo(
     () => teamsData?.teams?.find((t) => t.id === event?.team_id) ?? null,
     [teamsData, event?.team_id],
@@ -396,8 +393,8 @@ export default function BookingConfirmationPage() {
               </div>
             )}
 
-            {/* Primary CTA — team-scoped for authenticated users */}
-            <div className="pt-2">
+            {/* Primary CTA — team-scoped for authenticated users, Email for guests */}
+            <div className="pt-2 space-y-3">
               {isAuthenticated ? (
                 <Button
                   asChild
@@ -412,16 +409,17 @@ export default function BookingConfirmationPage() {
               ) : (
                 <Button
                   asChild
-                  className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow"
+                  className="w-full h-12 text-base font-semibold rounded-xl cursor-pointer shadow-sm hover:shadow-md transition-shadow bg-primary text-primary-foreground hover:bg-primary/90"
                 >
-                  <Link href={`/events/${event.slug}`}>
-                    <Ticket className="h-4 w-4 mr-2" />
-                    View event details
+                  <a href="mailto:">
+                    <Mail className="h-4 w-4 mr-2" />
+                    View Ticket in Email
                     <ArrowRight className="h-4 w-4 ml-2" />
-                  </Link>
+                  </a>
                 </Button>
               )}
-              <p className="text-xs text-center text-muted-foreground mt-3 flex items-center justify-center gap-1.5">
+              
+              <p className="text-xs text-center text-muted-foreground mt-1 flex items-center justify-center gap-1.5">
                 <Info className="h-3 w-3" />
                 {isAuthenticated
                   ? 'Find your QR pass and session join links on your tickets'

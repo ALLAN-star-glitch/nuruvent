@@ -79,7 +79,7 @@ function resolveInboxUrl(email: string): {
       // Fallback: mailto link opens the OS's default mail app on mobile.
       return {
         url: `mailto:${email}`,
-        label: 'Open Email App',
+        label: 'View Ticket in Email',
         external: false,
       };
   }
