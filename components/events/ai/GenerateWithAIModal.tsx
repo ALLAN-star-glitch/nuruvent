@@ -259,13 +259,15 @@ const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
 
       const { draft: generatedDraft, warnings } = response.data;
 
+      // Always show a success message first. If there were corrections,
+      // mention them in the description so the user knows the AI
+      // adjusted something, but the tone stays positive.
       if (warnings?.length) {
-        toast.warning(
-          `Draft generated with ${warnings.length} correction${
-            warnings.length === 1 ? '' : 's'
-          }`,
-          { description: warnings.slice(0, 3).join(' • ') },
-        );
+        toast.success('Draft generated successfully', {
+          description: `Applied ${warnings.length} correction${warnings.length === 1 ? '' : 's'} to fit your event type.`,
+        });
+      } else {
+        toast.success('Draft generated successfully');
       }
 
       setDraft(generatedDraft);
