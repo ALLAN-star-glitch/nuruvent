@@ -39,7 +39,7 @@ export default function TermsPage() {
           Service.
         </p>
         <p className="mt-3 text-sm text-muted-foreground">
-          Effective Date: [Insert Date]
+          Effective Date: 31/10/2026
         </p>
       </header>
 
@@ -162,15 +162,36 @@ export default function TermsPage() {
 
       <Section
         number="9"
-        title="Third-Party Integrations"
+        title="Third-Party Integrations (Zoom, Google Meet, Payments, Messaging)"
         icon={<Video className="h-5 w-5" />}
       >
-        <p className="text-base text-muted-foreground">
+        <p className="text-base text-muted-foreground mb-4">
           The Service allows you to connect third-party accounts, including
-          Zoom, payment providers, and messaging providers. By connecting a
+          Zoom, Google (Google Meet and related Google Workspace services),
+          payment providers, and messaging providers. By connecting a
           third-party account, you authorize Nuruvent to access and use that
-          account as described in our Privacy Policy. Your use of third-party
-          services is also governed by their own terms and privacy policies.
+          account as described in our Privacy Policy.
+        </p>
+        <p className="text-base text-muted-foreground mb-4">
+          When you connect a Google account, you authorize Nuruvent to access
+          Google Meet data (meeting spaces, conference records, and participant
+          metadata) solely to create meeting links and to track attendance for
+          events and courses you organize or attend. Nuruvent&apos;s use of
+          information received from Google APIs adheres to the{' '}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            className="text-primary hover:underline font-medium"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          , including the Limited Use requirements.
+        </p>
+        <p className="text-base text-muted-foreground">
+          Your use of third-party services is also governed by their own terms
+          and privacy policies, including Google&apos;s Terms of Service and
+          Zoom&apos;s Terms of Service.
         </p>
       </Section>
 
