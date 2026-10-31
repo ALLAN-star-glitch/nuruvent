@@ -11,8 +11,10 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  Info,
   Loader2,
   Plug,
+  Settings2,
   Trash2,
   Upload,
   Video,
@@ -71,15 +73,34 @@ const SETTINGS_SECTIONS: Array<{
   key: SettingsSection;
   label: string;
   hint: string;
+  icon: typeof Settings2;
+  danger?: boolean;
 }> = [
-  { key: 'general', label: 'General', hint: 'Name, logo, contact' },
+  {
+    key: 'general',
+    label: 'General',
+    hint: 'Name, logo, contact',
+    icon: Settings2,
+  },
   {
     key: 'video-platforms',
     label: 'Video Platforms',
     hint: 'Zoom, Google Meet',
+    icon: Video,
   },
-  { key: 'status', label: 'Status', hint: 'Read-only information' },
-  { key: 'danger', label: 'Danger Zone', hint: 'Irreversible actions' },
+  {
+    key: 'status',
+    label: 'Status',
+    hint: 'Read-only information',
+    icon: Info,
+  },
+  {
+    key: 'danger',
+    label: 'Danger Zone',
+    hint: 'Irreversible actions',
+    icon: Trash2,
+    danger: true,
+  },
 ];
 
 // Legacy URL aliases — keeps old bookmarks / links working.
@@ -277,7 +298,7 @@ export default function AccountSettingsPage() {
   if (!isAdmin) {
     return (
       <div className="w-full py-16">
-        <div className="mx-auto max-w-sm text-center">
+        <div className="mx-auto max-w-sm px-4 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <AlertCircle className="h-7 w-7 text-muted-foreground" />
           </div>
@@ -304,7 +325,7 @@ export default function AccountSettingsPage() {
   if (!account) {
     return (
       <div className="w-full py-16">
-        <div className="mx-auto max-w-sm text-center">
+        <div className="mx-auto max-w-sm px-4 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
             <AlertCircle className="h-7 w-7 text-destructive" />
           </div>
@@ -328,23 +349,25 @@ export default function AccountSettingsPage() {
   const personal = account.type.includes('personal');
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-x-hidden sm:space-y-6">
       {/* HEADER */}
-      <div className="flex items-start gap-3">
+      <div className="flex min-w-0 items-start gap-2 sm:gap-3">
         <Link
           href={`/dashboard/${accountId}`}
-          className="mt-0.5 shrink-0 cursor-pointer rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="mt-0.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:p-2"
           aria-label="Back to account"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            <span className="h-1 w-1 rounded-full bg-primary" />
-            {account.display_name || account.name}
+          <div className="mb-1.5 flex min-w-0 items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground sm:gap-2 sm:text-[11px]">
+            <span className="h-1 w-1 shrink-0 rounded-full bg-primary" />
+            <span className="truncate">
+              {account.display_name || account.name}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl md:text-3xl">
               Account Settings
             </h1>
             <Badge
@@ -359,37 +382,85 @@ export default function AccountSettingsPage() {
               {personal ? 'Personal' : 'Institution'}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             Manage your account&apos;s identity, contact, and preferences.
           </p>
         </div>
       </div>
 
       {/* TWO-COLUMN LAYOUT */}
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 sm:gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* Left rail */}
-        <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
-          <nav className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
+        <aside className="min-w-0 lg:sticky lg:top-6 lg:h-fit lg:self-start">
+          {/* Mobile: horizontal scrollable pill tabs */}
+          <div
+            className="-mx-4 overflow-x-auto overscroll-x-contain px-4 pb-1 lg:hidden"
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <nav className="flex w-max gap-1.5">
+              {SETTINGS_SECTIONS.map((s) => {
+                const isActive = section === s.key;
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    onClick={() => handleSectionChange(s.key)}
+                    className={cn(
+                      'flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap',
+                      isActive
+                        ? s.danger
+                          ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                          : 'border-primary/40 bg-primary/10 text-primary'
+                        : s.danger
+                          ? 'border-border text-destructive/80 hover:bg-destructive/5'
+                          : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {s.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Desktop: vertical nav */}
+          <nav className="hidden lg:flex lg:flex-col lg:gap-0.5">
             {SETTINGS_SECTIONS.map((s) => {
               const isActive = section === s.key;
+              const Icon = s.icon;
               return (
                 <button
                   key={s.key}
                   type="button"
                   onClick={() => handleSectionChange(s.key)}
                   className={cn(
-                    'flex shrink-0 flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer whitespace-nowrap lg:w-full',
+                    'flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
                     isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-foreground/80 hover:bg-accent',
+                      ? s.danger
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-primary/10 text-primary'
+                      : s.danger
+                        ? 'text-destructive/80 hover:bg-destructive/10'
+                        : 'text-foreground/80 hover:bg-accent',
                   )}
                 >
-                  <span
-                    className={cn('text-sm', isActive ? 'font-medium' : '')}
-                  >
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <Icon className="h-4 w-4" />
                     {s.label}
                   </span>
-                  <span className="hidden text-xs text-muted-foreground lg:block">
+                  <span
+                    className={cn(
+                      'text-xs',
+                      isActive && s.danger
+                        ? 'text-destructive/70'
+                        : 'text-muted-foreground',
+                    )}
+                  >
                     {s.hint}
                   </span>
                 </button>
@@ -399,24 +470,24 @@ export default function AccountSettingsPage() {
         </aside>
 
         {/* Right panel */}
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 max-w-full space-y-4 sm:space-y-6">
           {/* GENERAL */}
           {section === 'general' && (
-            <Card className="border-border/70 shadow-sm max-w-2xl">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">
+            <Card className="w-full max-w-2xl border-border/70 shadow-sm">
+              <CardHeader className="px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="text-sm font-semibold sm:text-base">
                   General
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   This is how your account appears across Nuruvent.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 px-4 pb-4 sm:space-y-6 sm:px-6 sm:pb-6">
                 {/* Logo */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                   <div
                     className={cn(
-                      'flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl',
+                      'flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl sm:h-20 sm:w-20',
                       personal
                         ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
                         : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
@@ -430,17 +501,17 @@ export default function AccountSettingsPage() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="text-2xl font-semibold">
+                      <span className="text-xl font-semibold sm:text-2xl">
                         {getInitials(account.display_name || account.name)}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex-1 space-y-2">
+                  <div className="min-w-0 flex-1 space-y-1.5 sm:space-y-2">
                     <p className="text-sm font-medium text-foreground">
                       Account logo
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground sm:text-xs">
                       PNG or JPG, up to 5MB. Square images look best.
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
@@ -481,7 +552,7 @@ export default function AccountSettingsPage() {
                           onClick={handleLogoRemove}
                           className="cursor-pointer text-destructive hover:text-destructive"
                         >
-                          <X className="h-4 w-4 mr-1.5" />
+                          <X className="mr-1.5 h-4 w-4" />
                           Remove
                         </Button>
                       )}
@@ -491,19 +562,29 @@ export default function AccountSettingsPage() {
 
                 <Separator />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="account-name">Name</Label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="min-w-0 space-y-2">
+                    <Label
+                      htmlFor="account-name"
+                      className="text-xs sm:text-sm"
+                    >
+                      Name
+                    </Label>
                     <Input
                       id="account-name"
                       value={form.name}
                       onChange={(e) => handleChange('name', e.target.value)}
                       placeholder={personal ? 'Your name' : 'Organisation name'}
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="account-display">Display name</Label>
+                  <div className="min-w-0 space-y-2">
+                    <Label
+                      htmlFor="account-display"
+                      className="text-xs sm:text-sm"
+                    >
+                      Display name
+                    </Label>
                     <Input
                       id="account-display"
                       value={form.display_name}
@@ -511,14 +592,19 @@ export default function AccountSettingsPage() {
                         handleChange('display_name', e.target.value)
                       }
                       placeholder="Shown publicly"
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="account-email">Contact email</Label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <div className="min-w-0 space-y-2">
+                    <Label
+                      htmlFor="account-email"
+                      className="text-xs sm:text-sm"
+                    >
+                      Contact email
+                    </Label>
                     <Input
                       id="account-email"
                       type="text"
@@ -526,11 +612,16 @@ export default function AccountSettingsPage() {
                       autoComplete="email"
                       value={form.email}
                       onChange={(e) => handleChange('email', e.target.value)}
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="account-phone">Contact phone</Label>
+                  <div className="min-w-0 space-y-2">
+                    <Label
+                      htmlFor="account-phone"
+                      className="text-xs sm:text-sm"
+                    >
+                      Contact phone
+                    </Label>
                     <Input
                       id="account-phone"
                       type="text"
@@ -539,13 +630,18 @@ export default function AccountSettingsPage() {
                       value={form.phone}
                       onChange={(e) => handleChange('phone', e.target.value)}
                       placeholder="+254 ..."
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="account-website">Website</Label>
+                  <Label
+                    htmlFor="account-website"
+                    className="text-xs sm:text-sm"
+                  >
+                    Website
+                  </Label>
                   <Input
                     id="account-website"
                     type="text"
@@ -554,12 +650,17 @@ export default function AccountSettingsPage() {
                     value={form.website}
                     onChange={(e) => handleChange('website', e.target.value)}
                     placeholder="https://example.com"
-                    className="h-11 rounded-xl"
+                    className="h-10 w-full rounded-xl text-sm sm:h-11"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="account-description">Description</Label>
+                  <Label
+                    htmlFor="account-description"
+                    className="text-xs sm:text-sm"
+                  >
+                    Description
+                  </Label>
                   <Textarea
                     id="account-description"
                     value={form.description}
@@ -568,40 +669,43 @@ export default function AccountSettingsPage() {
                     }
                     placeholder="A short description of this account."
                     rows={3}
+                    className="w-full text-sm"
                   />
                 </div>
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium">Address</Label>
+                <div className="space-y-2.5 sm:space-y-3">
+                  <Label className="text-xs font-medium sm:text-sm">
+                    Address
+                  </Label>
                   <Input
                     value={form.address}
                     onChange={(e) => handleChange('address', e.target.value)}
                     placeholder="Street address"
-                    className="h-11 rounded-xl"
+                    className="h-10 w-full rounded-xl text-sm sm:h-11"
                   />
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                     <Input
                       value={form.city}
                       onChange={(e) => handleChange('city', e.target.value)}
                       placeholder="City"
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                     <Input
                       value={form.country}
                       onChange={(e) => handleChange('country', e.target.value)}
                       placeholder="Country"
-                      className="h-11 rounded-xl"
+                      className="h-10 w-full rounded-xl text-sm sm:h-11"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex justify-end pt-1 sm:pt-2">
                   <Button
                     onClick={handleSaveGeneral}
                     disabled={saving}
-                    className="cursor-pointer gap-2"
+                    className="w-full cursor-pointer gap-2 sm:w-auto"
                   >
                     {saving ? (
                       <>
@@ -627,16 +731,16 @@ export default function AccountSettingsPage() {
 
           {/* STATUS */}
           {section === 'status' && (
-            <Card className="border-border/70 shadow-sm max-w-2xl">
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">
+            <Card className="w-full max-w-2xl border-border/70 shadow-sm">
+              <CardHeader className="px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="text-sm font-semibold sm:text-base">
                   Status
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Read-only information about this account.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-3 px-4 pb-4 sm:px-6 sm:pb-6">
                 <StatusRow label="Account status">
                   <Badge
                     variant="outline"
@@ -651,17 +755,17 @@ export default function AccountSettingsPage() {
                   </Badge>
                 </StatusRow>
                 <StatusRow label="Account ID">
-                  <code className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  <code className="block break-all rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground sm:text-xs">
                     {account.id}
                   </code>
                 </StatusRow>
                 <StatusRow label="Slug">
-                  <code className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  <code className="block break-all rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground sm:text-xs">
                     {account.slug}
                   </code>
                 </StatusRow>
                 <StatusRow label="Created">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs text-muted-foreground sm:text-sm">
                     {new Date(account.created_at).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
@@ -675,23 +779,23 @@ export default function AccountSettingsPage() {
 
           {/* DANGER ZONE */}
           {section === 'danger' && (
-            <Card className="border-destructive/30 shadow-sm max-w-2xl">
-              <CardHeader className="bg-destructive/5">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold text-destructive">
+            <Card className="w-full max-w-2xl border-destructive/30 shadow-sm">
+              <CardHeader className="bg-destructive/5 px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-destructive sm:text-base">
                   <AlertCircle className="h-4 w-4" />
                   Danger Zone
                 </CardTitle>
-                <CardDescription className="text-destructive/80">
+                <CardDescription className="text-xs text-destructive/80 sm:text-sm">
                   Irreversible actions. Please be certain.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardContent className="px-4 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
+                <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">
                       Delete this account
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">
                       Permanently deletes the account, its teams, events,
                       attendees, payments, and all associated data.
                     </p>
@@ -699,7 +803,7 @@ export default function AccountSettingsPage() {
                   <Button
                     variant="destructive"
                     onClick={() => setIsDeleteOpen(true)}
-                    className="shrink-0 cursor-pointer gap-2"
+                    className="w-full shrink-0 cursor-pointer gap-2 sm:w-auto"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete account
@@ -713,7 +817,7 @@ export default function AccountSettingsPage() {
 
       {/* DELETE CONFIRM */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md sm:w-full">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <Trash2 className="h-5 w-5" />
@@ -762,9 +866,11 @@ function StatusRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <div className="text-right">{children}</div>
+    <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
+        {label}
+      </span>
+      <div className="min-w-0 sm:text-right">{children}</div>
     </div>
   );
 }
@@ -796,14 +902,14 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
 
   return (
     <>
-      <Card className="border-border/70 shadow-sm max-w-2xl">
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Video className="h-4 w-4 text-primary" />
+      <Card className="w-full max-w-2xl border-border/70 shadow-sm">
+        <CardHeader className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold sm:text-base">
+              <Video className="h-4 w-4 shrink-0 text-primary" />
               Video Platforms
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Connect Zoom or Google Meet to automatically create meeting
               links and track attendance for your events.
             </CardDescription>
@@ -811,14 +917,14 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
           {anyConnection && (
             <Badge
               variant="outline"
-              className="shrink-0 border-primary/30 text-primary bg-primary/5"
+              className="w-fit shrink-0 border-primary/30 bg-primary/5 text-primary"
             >
-              <CheckCircle2 className="h-3 w-3 mr-1" />
+              <CheckCircle2 className="mr-1 h-3 w-3" />
               Connected
             </Badge>
           )}
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2.5 px-4 pb-4 sm:space-y-3 sm:px-6 sm:pb-6">
           {PLATFORMS.map((meta) => {
             const connection = video.getConnection(meta.platform);
             const isConnected = !!connection;
@@ -832,18 +938,18 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
                   meta.available && openPickerForPlatform(meta.platform)
                 }
                 className={cn(
-                  'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                  'flex w-full min-w-0 items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all sm:gap-3 sm:p-3',
                   isConnected
-                    ? 'border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10 cursor-pointer group'
+                    ? 'group cursor-pointer border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10'
                     : meta.available
-                      ? 'border-border hover:border-primary/40 hover:bg-primary/5 cursor-pointer group'
-                      : 'border-border opacity-70 cursor-not-allowed',
+                      ? 'group cursor-pointer border-border hover:border-primary/40 hover:bg-primary/5'
+                      : 'cursor-not-allowed border-border opacity-70',
                 )}
               >
                 <div
                   className={cn(
-                    'shrink-0 h-12 w-12 rounded-lg flex items-center justify-center',
-                    'bg-background border border-border overflow-hidden p-2',
+                    'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg p-1.5 sm:h-12 sm:w-12 sm:p-2',
+                    'border border-border bg-background',
                     meta.available && 'group-hover:border-primary/30',
                   )}
                 >
@@ -856,40 +962,43 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
                   />
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
                     <p className="text-sm font-semibold text-foreground">
                       {meta.label}
                     </p>
                     {isConnected && (
                       <Badge
                         variant="outline"
-                        className="text-[10px] border-primary/30 text-primary bg-primary/10"
+                        className="border-primary/30 bg-primary/10 text-[10px] text-primary"
                       >
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        <CheckCircle2 className="mr-1 h-3 w-3" />
                         Connected
                       </Badge>
                     )}
                     {!meta.available && !isConnected && (
                       <Badge
                         variant="outline"
-                        className="text-[10px] border-border text-muted-foreground bg-muted"
+                        className="border-border bg-muted text-[10px] text-muted-foreground"
                       >
                         Coming soon
                       </Badge>
                     )}
                   </div>
                   {isConnected && connection ? (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground sm:text-xs">
                       Connected as{' '}
                       <span className="font-medium text-foreground">
                         {connection.external_email}
-                      </span>{' '}
-                      ·{' '}
-                      {new Date(connection.connected_at).toLocaleDateString()}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {' '}
+                        ·{' '}
+                        {new Date(connection.connected_at).toLocaleDateString()}
+                      </span>
                     </p>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-muted-foreground sm:line-clamp-1 sm:text-xs">
                       {meta.description}
                     </p>
                   )}
@@ -912,14 +1021,14 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
             );
           })}
 
-          <div className="pt-2 flex justify-end">
+          <div className="flex justify-end pt-1 sm:pt-2">
             <Button
               onClick={openPickerForAll}
               variant="outline"
               size="sm"
-              className="cursor-pointer"
+              className="w-full cursor-pointer sm:w-auto"
             >
-              <Plug className="h-4 w-4 mr-2" />
+              <Plug className="mr-2 h-4 w-4" />
               Manage platforms
             </Button>
           </div>
