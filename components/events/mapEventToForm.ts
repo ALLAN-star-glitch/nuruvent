@@ -167,21 +167,34 @@ function mapSEO(seo: SEOModel | undefined): SEOForm | null {
   };
 }
 
+// ============================================================
+// RECURRENCE MAPPER
+// ============================================================
+//
+// The API returns the new shape (frequency / end_date / count).
+// The form's RecurrenceForm still uses the legacy shape
+// (pattern / ends_on / occurrences) because the form UI has not
+// been rewritten. This function is the seam between the two.
+//
+// day_of_month and week_of_month are no longer supported by the
+// backend; they are set to their empty defaults so the form fields
+// stay defined.
+
 function mapRecurrence(
   r: RecurrenceModel | undefined,
 ): RecurrenceForm | null {
   if (!r) return null;
-  if (!r.pattern) return null;
+  if (!r.frequency) return null;
 
   return {
     ...makeEmptyRecurrence(),
-    pattern: r.pattern,
+    pattern: r.frequency,
     interval: r.interval ?? null,
     days_of_week: r.days_of_week ?? [],
-    day_of_month: r.day_of_month ?? null,
-    week_of_month: r.week_of_month ?? '',
-    ends_on: toDateInput(r.ends_on),
-    occurrences: r.occurrences ?? null,
+    day_of_month: null,
+    week_of_month: '',
+    ends_on: toDateInput(r.end_date),
+    occurrences: r.count ?? null,
   };
 }
 

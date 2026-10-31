@@ -71,15 +71,13 @@ export function isEventPast(event: Event): boolean {
   return d.getTime() < Date.now();
 }
 
+// AFTER
 /**
- * True if the event starts in the future (today or later).
+ * True if the event has not yet concluded. A multi-session event with
+ * future sessions is "upcoming" even if it started last week.
  */
 export function isEventUpcoming(event: Event): boolean {
-  const start = getEventStartDate(event);
-  if (!start) return false;
-  const d = new Date(start);
-  if (isNaN(d.getTime())) return false;
-  return d.getTime() >= Date.now();
+  return !isEventPast(event);
 }
 
 // ============================================================

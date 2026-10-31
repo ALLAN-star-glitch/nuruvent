@@ -47,16 +47,17 @@ export function draftToPublishPayload(
     language: draft.language || undefined,
 
     // ---- Recurrence ----
+    //
+    // AI output already uses the new shape (frequency / end_date /
+    // count). We pass the fields through unchanged.
     is_recurring: draft.is_recurring || undefined,
     recurrence: draft.recurrence
       ? {
-          pattern: draft.recurrence.pattern,
+          frequency: draft.recurrence.frequency,
           interval: draft.recurrence.interval,
           days_of_week: draft.recurrence.days_of_week,
-          day_of_month: draft.recurrence.day_of_month,
-          week_of_month: draft.recurrence.week_of_month,
-          ends_on: draft.recurrence.ends_on,
-          occurrences: draft.recurrence.occurrences,
+          end_date: draft.recurrence.end_date,
+          count: draft.recurrence.count,
         }
       : undefined,
 

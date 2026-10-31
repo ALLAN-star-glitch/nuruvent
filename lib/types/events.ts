@@ -7,7 +7,7 @@
 // ============================================================
 
 export type EventVisibility = 'public' | 'private' | 'unlisted';
-export type RecurrencePattern = 'daily' | 'weekly' | 'monthly' | 'custom';
+export type RecurrencePattern = 'daily' | 'weekly' | 'monthly';
 export type OrganizerType = 'personal' | 'institution';
 export type EventSortBy = 'created_at' | 'start_date' | 'name';
 export type SortOrder = 'asc' | 'desc';
@@ -252,14 +252,19 @@ export interface Venue {
   coordinates?: Record<string, number>;
 }
 
+/**
+ * Recurrence configuration as returned by the backend.
+ *
+ * Shape matches the domain RecurrenceRule. "end_date" and "count" are
+ * both optional but at least one must be present for a valid
+ * recurrence; the backend rejects rules with neither.
+ */
 export interface Recurrence {
-  pattern: RecurrencePattern;
+  frequency: RecurrencePattern;
   interval: number;
   days_of_week?: string[];
-  day_of_month?: number;
-  week_of_month?: string;
-  ends_on?: string;
-  occurrences: number;
+  end_date?: string;
+  count?: number;
 }
 
 export interface Organizer {
@@ -458,14 +463,20 @@ export interface ScheduleInput {
   max_attendees?: number;
 }
 
+/**
+ * Recurrence input for create/update requests.
+ *
+ * At least one of `end_date` or `count` must be set; the backend
+ * rejects rules with neither. For `weekly` frequency, `days_of_week`
+ * must contain at least one day. For `daily` and `monthly`, no
+ * additional fields are required beyond `interval`.
+ */
 export interface RecurrenceInput {
-  pattern: RecurrencePattern;
+  frequency: RecurrencePattern;
   interval?: number;
   days_of_week?: string[];
-  day_of_month?: number;
-  week_of_month?: string;
-  ends_on?: string;
-  occurrences?: number;
+  end_date?: string;
+  count?: number;
 }
 
 export interface TicketInput {
@@ -816,13 +827,11 @@ export interface GeneratedEventDraft {
 
   is_recurring?: boolean;
   recurrence?: {
-    pattern: RecurrencePattern;
+    frequency: RecurrencePattern;
     interval?: number;
     days_of_week?: string[];
-    day_of_month?: number;
-    week_of_month?: string;
-    ends_on?: string;
-    occurrences?: number;
+    end_date?: string;
+    count?: number;
   } | null;
 
   is_free?: boolean;
