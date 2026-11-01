@@ -313,22 +313,6 @@ const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
     onOpenChange(false);
   }, [draft, form.eventTypeId, onEditDraft, onOpenChange]);
 
-  const handlePublishDraft = useCallback(async () => {
-    if (!draft) return;
-    setIsPublishing(true);
-    try {
-      await onPublishDraft(draft, form.eventTypeId);
-      onOpenChange(false);
-    } catch (err: unknown) {
-      const message =
-        (err as { data?: { message?: string } })?.data?.message ??
-        'Failed to publish the AI-generated event.';
-      setError(message);
-      setStep('error');
-    } finally {
-      setIsPublishing(false);
-    }
-  }, [draft, form.eventTypeId, onOpenChange, onPublishDraft]);
 
   const handleRetry = useCallback(() => {
     setError(null);
@@ -831,27 +815,15 @@ const buildRecurrenceInput = useCallback((): RecurrenceInput | null => {
               >
                 Edit draft
               </Button>
-              <Button
-                type="button"
-                onClick={handlePublishDraft}
-                disabled={isPublishing}
-                className={cn(
-                  'bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.99] w-full sm:w-auto',
-                  isPublishing && 'animate-pulse cursor-wait',
-                )}
-              >
-                {isPublishing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Publishing…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Publish as-is
-                  </>
-                )}
-              </Button>
+                            <Button
+                  type="button"
+                  onClick={handleEditDraft}
+                  disabled={isPublishing}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50 w-full sm:w-auto"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Continue to setup
+                </Button>
             </>
           )}
 

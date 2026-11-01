@@ -29,6 +29,8 @@ interface RecurrenceFieldProps extends FieldBaseProps {
   value: RecurrenceForm | null;
   onEnabledChange: (enabled: boolean) => void;
   onChange: (value: RecurrenceForm) => void;
+  startDate: string;
+  onStartDateChange: (date: string) => void;
 }
 
 type Pattern = RecurrenceForm['pattern'];
@@ -37,7 +39,6 @@ const PATTERNS: { value: Pattern; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
-  { value: 'custom', label: 'Custom' },
 ];
 
 const WEEK_OF_MONTH = [
@@ -53,6 +54,8 @@ export function RecurrenceField({
   value,
   onEnabledChange,
   onChange,
+  startDate,
+  onStartDateChange,
   error,
   disabled,
   id,
@@ -74,16 +77,18 @@ export function RecurrenceField({
     update('days_of_week', next);
   };
 
-  const showWeeklyDays =
-    recur.pattern === 'weekly' || recur.pattern === 'custom';
-  const showMonthlyFields =
-    recur.pattern === 'monthly' || recur.pattern === 'custom';
+  const showWeeklyDays = recur.pattern === 'weekly';
+  const showMonthlyFields = recur.pattern === 'monthly';
 
   return (
     <FieldWrapper
       id={fieldId('recurrence', id)}
       label="Recurrence"
-      helper="Set a recurrence pattern for repeated sessions."
+      helper={
+        enabled
+          ? 'This event will generate multiple sessions based on these rules.'
+          : 'Set a recurrence pattern for repeated sessions.'
+      }
       error={error}
     >
       <div className="space-y-4">
@@ -110,11 +115,25 @@ export function RecurrenceField({
 
         {/* Editor */}
         {enabled && (
-          <div className="space-y-4">
+          <div className="space-y-4 border border-border rounded-lg p-4 bg-card">
+            {/* Series Start Date */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-foreground">
+                Starts on <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={startDate || ''}
+                onChange={(e) => onStartDateChange(e.target.value)}
+                disabled={disabled}
+                className="cursor-text"
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-foreground">
-                  Repeats <span className="text-destructive">*</span>
+                  How often? <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={recur.pattern}
@@ -122,7 +141,7 @@ export function RecurrenceField({
                   disabled={disabled}
                 >
                   <SelectTrigger className="cursor-pointer">
-                    <SelectValue placeholder="Choose pattern" />
+                    <SelectValue placeholder="Choose frequency" />
                   </SelectTrigger>
                   <SelectContent>
                     {PATTERNS.map((p) => (
@@ -140,7 +159,7 @@ export function RecurrenceField({
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-foreground">
-                  Every
+                  Repeat every
                 </Label>
                 <Input
                   type="number"
@@ -156,12 +175,10 @@ export function RecurrenceField({
                 />
                 <p className="text-[11px] text-muted-foreground">
                   {recur.pattern === 'daily'
-                    ? 'day(s)'
+                    ? 'Number of days between sessions'
                     : recur.pattern === 'weekly'
-                      ? 'week(s)'
-                      : recur.pattern === 'monthly'
-                        ? 'month(s)'
-                        : 'interval'}
+                      ? 'Number of weeks between sessions'
+                      : 'Number of months between sessions'}
                 </p>
               </div>
             </div>
@@ -169,7 +186,7 @@ export function RecurrenceField({
             {showWeeklyDays && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-foreground">
-                  On days
+                  On which days?
                 </Label>
                 <div className="flex flex-wrap gap-1.5">
                   {WEEKDAY_CODES.map((code) => {
@@ -253,26 +270,34 @@ export function RecurrenceField({
               </div>
             )}
 
-            <div className="space-y-1.5">
+            <div className="space-y-3 border-t border-border pt-4 mt-2">
               <Label className="text-xs font-medium text-foreground">
-                Ends
+                When should it stop?
               </Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">
-                    On date
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    On a specific date
                   </Label>
                   <Input
                     type="date"
-                    value={recur.ends_on}
-                    onChange={(e) => update('ends_on', e.target.value)}
+                    value={recur.ends_on || ''}
+                    min={startDate || undefined}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      onChange({
+                        ...recur,
+                        ends_on: newDate,
+                        occurrences: newDate ? null : recur.occurrences,
+                      });
+                    }}
                     disabled={disabled}
-                    className="cursor-text mt-1"
+                    className="cursor-text"
                   />
                 </div>
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">
-                    After occurrences
+                  <Label className="text-[11px] text-muted-foreground mb-1 block">
+                    After a number of sessions
                   </Label>
                   <Input
                     type="number"
@@ -281,18 +306,20 @@ export function RecurrenceField({
                     value={recur.occurrences ?? ''}
                     onChange={(e) => {
                       const v = e.target.value;
-                      update(
-                        'occurrences',
-                        v === '' ? null : parseInt(v, 10) || null,
-                      );
+                      const count = v === '' ? null : parseInt(v, 10) || null;
+                      onChange({
+                        ...recur,
+                        occurrences: count,
+                        ends_on: count ? '' : recur.ends_on,
+                      });
                     }}
                     disabled={disabled}
-                    className="cursor-text mt-1"
+                    className="cursor-text"
                   />
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Leave both blank to repeat indefinitely.
+                Pick one. If you leave both blank, it will repeat forever.
               </p>
             </div>
           </div>

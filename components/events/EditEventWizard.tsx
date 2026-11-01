@@ -68,6 +68,7 @@ import { useEventSubmit } from './new/hooks/useEventSubmit';
 import { useEventHydration } from './new/hooks/useEventHydration';
 
 import { BasicInfoStep } from './new/steps/BasicInfoStep';
+import { ScheduleStep } from './new/steps/ScheduleStep';
 import { TicketStep } from './new/steps/TicketStep';
 import { DetailsStep } from './new/steps/DetailsStep';
 import { ContentStep } from './new/steps/ContentStep';
@@ -83,7 +84,7 @@ import { Stepper } from './new/Stepper';
 // EDIT EVENT WIZARD
 // ============================================================
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 interface EditEventWizardProps {
   eventId: string;
@@ -186,8 +187,8 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
   const event = hydration.event;
   const isPublishedStatus =
     !!event?.published_at ||
-  event?.event_status?.slug === 'event-status-published' ||
-  event?.event_status?.name === 'event_status_published';
+    event?.event_status?.slug === 'event-status-published' ||
+    event?.event_status?.name === 'event_status_published';
 
   const statusLabel =
     event?.event_status?.display_name ||
@@ -368,24 +369,29 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
       case 1:
         return {
           title: 'Basic Information',
-          description: 'Name, type, schedule, and description.',
+          description: 'Name, type, and description.',
         };
       case 2:
+        return {
+          title: 'Schedule',
+          description: 'When does your event happen?',
+        };
+      case 3:
         return {
           title: 'Tickets',
           description: 'Ticket options, capacity, and waitlist settings.',
         };
-      case 3:
+      case 4:
         return {
           title: 'Event Details',
-          description: 'Certificate, venue, recurrence, access, and image.',
+          description: 'Certificate, access, promotion, and image.',
         };
-      case 4:
+      case 5:
         return {
           title: 'Content',
           description: 'Speakers, materials, and SEO.',
         };
-      case 5:
+      case 6:
         return {
           title: 'Review & Publish',
           description: 'Review your event before saving.',
@@ -605,27 +611,32 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                     validationErrors={formState.validationErrors}
                     eventTypes={eventTypes}
                     onFieldChange={handleFieldChange}
-                    onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
-                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
-                     eventId={eventId}
-                     onSchedulesCommitted={(next) => {
-                    autoSave.setLastSavedData({
-                      ...formState.formData,
-                      schedules: next,
-                    });
-                  }}
-
                   />
                 )}
                 {currentStep === 2 && (
+                  <ScheduleStep
+                    formData={formState.formData}
+                    validationErrors={formState.validationErrors}
+                    onFieldChange={handleFieldChange}
+                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
+                    eventId={createdEventId ?? undefined}
+                    onSchedulesCommitted={(next) => {
+                      autoSave.setLastSavedData({
+                        ...formState.formData,
+                        schedules: next,
+                      });
+                    }}
+                  />
+                )}
+                {currentStep === 3 && (
                   <TicketStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}
                     onFieldChange={handleFieldChange}
                   />
                 )}
-                {currentStep === 3 && (
+                {currentStep === 4 && (
                   <DetailsStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}
@@ -636,7 +647,7 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                     onImageRemove={handleImageRemove}
                   />
                 )}
-                {currentStep === 4 && (
+                {currentStep === 5 && (
                   <ContentStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}
@@ -695,36 +706,36 @@ export function EditEventWizard({ eventId }: EditEventWizardProps) {
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              <Button
-                variant="outline"
-                onClick={() => submit.submit('draft')}
-                disabled={isLoadingFlow}
-                className="w-full sm:w-auto cursor-pointer"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </Button>
-              {!isPublishedStatus && (
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <Button
-                  className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
-                  onClick={() => submit.submit('published')}
-                  disabled={!validation.isPublishReady || isLoadingFlow}
+                  variant="outline"
+                  onClick={() => submit.submit('draft')}
+                  disabled={isLoadingFlow}
+                  className="w-full sm:w-auto cursor-pointer"
                 >
-                  {isLoadingFlow ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Publishing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Publish
-                    </>
-                  )}
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Draft
                 </Button>
-              )}
-            </div>
+                {!isPublishedStatus && (
+                  <Button
+                    className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer disabled:opacity-50"
+                    onClick={() => submit.submit('published')}
+                    disabled={!validation.isPublishReady || isLoadingFlow}
+                  >
+                    {isLoadingFlow ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Publishing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Publish
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </div>

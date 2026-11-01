@@ -97,6 +97,7 @@ function buildSchedules(draft: GeneratedEventDraft): ScheduleInput[] {
     session_number: s.session_number ?? undefined,
     location: s.location || undefined,
     is_virtual: s.is_virtual,
+    platform: s.platform,                        // ← ADD
     // zoom_link / meet_link intentionally omitted — the backend
     // creates the meeting if the schedule is virtual.
     max_attendees: s.max_attendees ?? undefined,

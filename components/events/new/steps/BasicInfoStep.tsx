@@ -2,29 +2,16 @@
 
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { CategoryField } from '@/components/events/fields/CategoryField';
 import { EventTypeField } from '@/components/events/fields/EventTypeField';
-import { SchedulesField } from '@/components/events/fields/ScheduleField';
 import {
   TagsField,
   TextField,
   TextareaField,
 } from '@/components/form';
-import type {
-  EventType as EventTypeModel,
-  GeneratedEventDraft,
-} from '@/lib/types/events';
+import type { EventType as EventTypeModel } from '@/lib/types/events';
 
-import type {
-  EventFormData,
-  FormErrors,
-  ScheduleForm,
-} from '../../types';
-
-// ============================================================
-// BASIC INFO STEP (Step 1)
-// ============================================================
+import type { EventFormData, FormErrors } from '../../types';
 
 interface BasicInfoStepProps {
   formData: EventFormData;
@@ -34,11 +21,7 @@ interface BasicInfoStepProps {
     field: K,
     value: EventFormData[K],
   ) => void;
-  onAIDraft: (draft: GeneratedEventDraft) => void;
   onEventTypeTouched: () => void;
-  onOpenConnectModal?: () => void;
-  eventId?: string; 
-  onSchedulesCommitted?: (next: ScheduleForm[]) => void;
 }
 
 export function BasicInfoStep({
@@ -47,17 +30,9 @@ export function BasicInfoStep({
   eventTypes,
   onFieldChange,
   onEventTypeTouched,
-  onOpenConnectModal,
-  eventId,
-  onSchedulesCommitted,
 }: BasicInfoStepProps) {
-  const searchParams = useSearchParams();
-  // If the user just connected a video platform, we want to force the schedule open
-  const videoJustConnected = searchParams.get('video_connected') === 'true';
-
   return (
     <div className="space-y-5">
-      {/* ---- Event Name ---- */}
       <TextField
         name="name"
         label={
@@ -73,7 +48,6 @@ export function BasicInfoStep({
         error={validationErrors.name}
       />
 
-      {/* ---- Event Type + Category (side by side) ---- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <EventTypeField
           value={formData.event_type_id}
@@ -90,18 +64,6 @@ export function BasicInfoStep({
         />
       </div>
 
-      {/* ---- Schedules ---- */}
-      <SchedulesField
-        value={formData.schedules}
-        onChange={(v: ScheduleForm[]) => onFieldChange('schedules', v)}
-        error={validationErrors.schedules}
-        onOpenConnectModal={onOpenConnectModal}
-        eventId={eventId} 
-        onSchedulesCommitted={onSchedulesCommitted}
-        videoJustConnected={videoJustConnected} // <--- Pass the new prop
-      />
-
-      {/* ---- Short Description ---- */}
       <TextField
         name="short_description"
         label="Short Description"
@@ -115,7 +77,6 @@ export function BasicInfoStep({
         error={validationErrors.short_description}
       />
 
-      {/* ---- Description ---- */}
       <TextareaField
         name="description"
         label={
@@ -129,7 +90,6 @@ export function BasicInfoStep({
         error={validationErrors.description}
       />
 
-      {/* ---- Tags ---- */}
       <TagsField
         name="tags"
         label="Tags"
@@ -139,7 +99,6 @@ export function BasicInfoStep({
         optional
       />
 
-      {/* ---- Language ---- */}
       <TextField
         name="language"
         label="Language"
