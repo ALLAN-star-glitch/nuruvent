@@ -20,6 +20,7 @@ import {
   MapPin,
   Mic2,
   Presentation,
+  RefreshCw,
   Share2,
   Sparkles,
   Users2,
@@ -36,6 +37,7 @@ import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import type { Event } from '@/lib/types/events';
 import {
   formatEventDateBadge,
+  formatEventDateSummary,
   formatPrice,
   getEventFillRate,
   getEventHostName,
@@ -77,6 +79,87 @@ function getEventTypeIcon(slug: string | undefined) {
 }
 
 // ============================================================
+// BADGE METADATA
+// ============================================================
+//
+// Three modes, each producing an unambiguous pill:
+//
+//   single    → JAN / 15 / WED / 10:00 AM – 12:00 PM
+//   multi-day → JAN 1 → 8 · 2027
+//   recurring → ⚡ STARTS / JAN 4, 2027
+//
+// "STARTS" is loud and unambiguous for recurring events: the viewer
+// immediately knows this is a series beginning at that date, not a
+// one-off event.
+
+interface DateBadgeMeta {
+  mode: 'single' | 'multi-day' | 'recurring';
+  lines: string[];
+}
+
+function getDateBadgeMeta(event: Event): DateBadgeMeta {
+  const badge = formatEventDateBadge(event);
+  const first = event.schedules?.[0];
+  const sessions = event.schedules?.length ?? 0;
+
+  const startStr = first?.start_date ?? event.start_date?.split('T')[0] ?? '';
+
+  // ---- Recurring ----
+  if (event.is_recurring) {
+    const startDate = startStr ? new Date(`${startStr}T12:00:00Z`) : null;
+    const startLabel = startDate
+      ? startDate
+          .toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            timeZone: 'UTC',
+          })
+          .toUpperCase()
+      : badge.month;
+
+    return {
+      mode: 'recurring',
+      lines: [startLabel],
+    };
+  }
+
+  // ---- Multi-day ----
+  if (event.is_multi_day && sessions > 1) {
+    const last = event.schedules?.[sessions - 1]?.start_date;
+    if (startStr && last) {
+      const startDate = new Date(`${startStr}T12:00:00Z`);
+      const endDate = new Date(`${last}T12:00:00Z`);
+
+      const startMonth = startDate
+        .toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+        .toUpperCase();
+      const endMonth = endDate
+        .toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+        .toUpperCase();
+      const year = endDate.getUTCFullYear();
+
+      const sameMonth = startMonth === endMonth;
+      const rangeLabel = sameMonth
+        ? `${startMonth} ${startDate.getUTCDate()} → ${endDate.getUTCDate()} · ${year}`
+        : `${startMonth} ${startDate.getUTCDate()} → ${endMonth} ${endDate.getUTCDate()} · ${year}`;
+
+      return { mode: 'multi-day', lines: [rangeLabel] };
+    }
+  }
+
+  // ---- Single ----
+  return {
+    mode: 'single',
+    lines: [
+      `${badge.month} ${badge.day}`,
+      badge.weekday.toUpperCase(),
+      badge.timeRange,
+    ],
+  };
+}
+
+// ============================================================
 // COMPONENT
 // ============================================================
 
@@ -108,7 +191,9 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const typeColor = getEventTypeColor(event);
   const typeIcon = getEventTypeIcon(event.event_type?.slug);
 
-  const { month, day, weekday, time } = formatEventDateBadge(event);
+  const { fullDate } = formatEventDateBadge(event);
+  const dateSummary = formatEventDateSummary(event);
+  const badgeMeta = getDateBadgeMeta(event);
 
   const hostName = getEventHostName(event);
   const hostIsInstitution = isHostInstitution(event);
@@ -116,9 +201,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const price = getEventMinPrice(event);
   const isFree = isEventFree(event);
 
-  // Certificate is shown as an informational strip — no price.
-  // Uses the boolean, not a price check, because the tier-based
-  // model keeps certificate_price at 0 for organizer-paid events.
   const hasCertificate = event.certificate_enabled === true;
 
   const isPast = isEventPast(event);
@@ -214,6 +296,60 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
     <AccountFallbackIcon className="h-3.5 w-3.5" />
   );
 
+  // ============================================================
+  // PILL RENDER
+  // ============================================================
+
+  const renderPillLines = () => {
+    if (badgeMeta.mode === 'single') {
+      return (
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex flex-col items-center leading-none">
+            <span className="text-[8px] sm:text-[10px] font-bold tracking-wider text-amber-600 dark:text-amber-400 uppercase">
+              {badgeMeta.lines[0].split(' ')[0]}
+            </span>
+            <span className="text-xl sm:text-3xl font-extrabold text-foreground leading-none">
+              {badgeMeta.lines[0].split(' ')[1]}
+            </span>
+          </div>
+          <div className="w-px h-7 sm:h-10 bg-border" />
+          <div className="flex flex-col leading-none gap-0.5">
+            <span className="text-[8px] sm:text-[10px] text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap">
+              {badgeMeta.lines[1]}
+            </span>
+            <span className="text-[11px] sm:text-sm font-semibold text-foreground whitespace-nowrap">
+              {badgeMeta.lines[2]}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    if (badgeMeta.mode === 'recurring') {
+      // Loud, unmistakable "STARTS" block for recurring series.
+      return (
+        <div className="flex flex-col leading-none gap-1">
+          <span className="inline-flex items-center gap-1 text-[9px] sm:text-[11px] font-extrabold tracking-[0.15em] uppercase text-amber-600 dark:text-amber-400">
+            <RefreshCw className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+            Starts
+          </span>
+          <span className="text-sm sm:text-lg font-extrabold text-foreground whitespace-nowrap">
+            {badgeMeta.lines[0]}
+          </span>
+        </div>
+      );
+    }
+
+    // multi-day
+    return (
+      <div className="flex flex-col leading-none">
+        <span className="text-[11px] sm:text-sm font-extrabold text-foreground whitespace-nowrap">
+          {badgeMeta.lines[0]}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div
       className="block h-full cursor-pointer"
@@ -303,33 +439,18 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             )}
           />
 
-          {/* Date badge */}
+          {/* Date pill */}
           <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-10">
             <div
               className={cn(
-                'flex items-center gap-2.5 sm:gap-3 bg-background/95 backdrop-blur-md rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 border border-border transition-all duration-300',
+                'flex items-center bg-background/95 backdrop-blur-md rounded-xl px-2.5 py-1.5 sm:px-4 sm:py-2.5 border border-border transition-all duration-300',
                 isHovered
                   ? 'shadow-2xl shadow-black/20 scale-105'
                   : 'shadow-lg shadow-black/10',
               )}
+              title={fullDate}
             >
-              <div className="flex flex-col items-center leading-none">
-                <span className="text-[8px] sm:text-[10px] font-bold tracking-wider text-amber-600 dark:text-amber-400 uppercase">
-                  {month}
-                </span>
-                <span className="text-xl sm:text-3xl font-extrabold text-foreground leading-none">
-                  {day}
-                </span>
-              </div>
-              <div className="w-px h-7 sm:h-10 bg-border" />
-              <div className="flex flex-col leading-none">
-                <span className="text-[8px] sm:text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                  {weekday}
-                </span>
-                <span className="text-[11px] sm:text-sm font-semibold text-foreground">
-                  {time}
-                </span>
-              </div>
+              {renderPillLines()}
             </div>
           </div>
 
@@ -343,8 +464,8 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Event type */}
-          <div className="absolute top-3 right-3 z-10">
+          {/* Event type + Recurring */}
+          <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
             <Badge
               className="border-0 shadow-lg shadow-black/20 px-2.5 sm:px-3 py-1 sm:py-1.5 text-white text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-md rounded-full"
               style={{ backgroundColor: typeColor }}
@@ -352,6 +473,13 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               {typeIcon}
               <span className="hidden xs:inline">{typeName}</span>
             </Badge>
+
+            {event.is_recurring && (
+              <Badge className="bg-background/90 backdrop-blur-md text-foreground border border-border shadow-lg text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
+                <RefreshCw className="h-3 w-3" />
+                <span className="hidden xs:inline">Recurring</span>
+              </Badge>
+            )}
           </div>
 
           {/* Virtual */}
@@ -368,7 +496,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
           {/* Private */}
           {isPrivate && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
-              <Badge className="bg-foreground/90 text-background backdrop-blur-md border-0 shadow-lg text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
+              <Badge className="bg-foreground/90 text-background backdrop-blur-md border-0 shadow-lg text-[10px] sm:text-[11px] font-medium px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
                 Private
               </Badge>
             </div>
@@ -405,7 +533,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
         {/* ---- Content ---- */}
         <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col gap-2.5 sm:gap-3 relative z-10">
-          {/* Host + actions */}
+          {/* Host */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">
               <span className="truncate flex items-center gap-1.5">
@@ -469,6 +597,15 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             {event.display_name || event.name}
           </h3>
 
+          {/* Date summary */}
+          <div
+            className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-foreground/80"
+            title={fullDate}
+          >
+            <CalendarDays className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-500 flex-shrink-0" />
+            <span className="truncate">{dateSummary}</span>
+          </div>
+
           {/* Location */}
           {location && location !== 'TBD' && (
             <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground">
@@ -479,7 +616,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
           <div className="h-px bg-border my-1" />
 
-          {/* Price — one number, ticket-derived, certificate cost included */}
+          {/* Price */}
           <div className="flex flex-col">
             <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Registration Fee
@@ -496,7 +633,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </span>
           </div>
 
-          {/* Certificate included — informational, no price */}
+          {/* Certificate */}
           {hasCertificate && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-200/60 bg-emerald-50/60 px-3 py-1.5 sm:py-2 dark:border-emerald-900/40 dark:bg-emerald-950/20">
               <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -506,7 +643,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* ---- Actions ---- */}
+          {/* Actions */}
           <div className="mt-auto pt-2 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
             <Button
               type="button"
@@ -515,12 +652,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 e.stopPropagation();
                 router.push(detailHref);
               }}
-              className={cn(
-                'cursor-pointer gap-1.5 font-semibold transition-all duration-300',
-                'h-11 w-full rounded-xl text-sm',
-                'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
-                'border-border hover:bg-accent',
-              )}
+              className="cursor-pointer gap-1.5 font-semibold h-11 w-full rounded-xl text-sm sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs border-border hover:bg-accent"
             >
               <span>View details</span>
               <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
@@ -533,7 +665,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 className={cn(
                   'cursor-pointer gap-1.5 font-semibold shadow-md hover:shadow-lg transition-all duration-300',
                   'h-11 w-full rounded-xl text-sm',
-                  'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs sm:font-semibold',
+                  'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs',
                   isFree
                     ? 'bg-gradient-to-r from-tertiary-500 to-tertiary-600 hover:from-tertiary-600 hover:to-tertiary-700 text-white'
                     : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white',
@@ -541,17 +673,12 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 )}
               >
                 <span>{isFree ? 'Register' : 'Get Ticket'}</span>
-                <ArrowUpRight
-                  className={cn(
-                    'h-4 w-4 sm:h-3.5 sm:w-3.5 transition-all duration-300',
-                    isHovered ? 'translate-x-0.5 -translate-y-0.5' : '',
-                  )}
-                />
+                <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
               </Button>
             )}
           </div>
 
-          {/* Spots left bar */}
+          {/* Spots */}
           {canInteract && spotsLeft !== null && (
             <div className="flex items-center gap-3 mt-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -567,7 +694,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               </div>
               <span
                 className={cn(
-                  'text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors duration-300',
+                  'text-xs sm:text-sm font-semibold whitespace-nowrap',
                   spotsLeft <= 5
                     ? 'text-amber-600 dark:text-amber-400'
                     : 'text-tertiary-600 dark:text-tertiary-400',

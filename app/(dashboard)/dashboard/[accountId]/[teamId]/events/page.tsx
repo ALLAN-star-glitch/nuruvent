@@ -49,10 +49,9 @@ import {
   usePermanentlyDeleteEventMutation,
   usePublishEventMutation,
   useRestoreEventMutation,
-  useSearchMyEventsQuery,
 } from '@/lib/store/api/eventsApi';
 import { useAppSelector } from '@/lib/store/hooks';
-import type { Event } from '@/lib/types/events';
+import type { Event, EventSortBy, SortOrder } from '@/lib/types/events';
 
 import type {
   SortField,
@@ -76,7 +75,93 @@ import { EventsFilterBar } from './_components/EventsFilterBar';
 import { EventsGrid } from './_components/EventsGrid';
 import { EventsListSkeleton } from './_components/EventsListSkeleton';
 import { EventsTable } from './_components/EventsTable';
-import { useUIEvents } from './_components/useUIEvents';
+
+// ============================================================
+// CONSTANTS & HELPERS
+// ============================================================
+
+const DRAFT_STATUS_ID = 'a75ed3af-15a6-4c74-929e-8149fdf80268';
+const PUBLISHED_STATUS_ID = 'a1228647-2ae3-40be-a687-c5b867a9e250';
+
+function mapSortFieldToBackend(field: SortField): EventSortBy {
+  switch (field) {
+    case 'name':
+      return 'display_name';
+    case 'eventDate':
+      return 'start_date';
+    case 'addedDate':
+      return 'created_at';
+    case 'current_attendees':
+      return 'current_attendees';
+    case 'price':
+      return 'price';
+    case 'status':
+      return 'event_status_id';
+    default:
+      return 'updated_at';
+  }
+}
+
+function resolveStatusParam(tab: string): string | undefined {
+  if (tab === 'draft') return DRAFT_STATUS_ID;
+  if (tab === 'live' || tab === 'upcoming' || tab === 'ended') {
+    return PUBLISHED_STATUS_ID;
+  }
+  return undefined;
+}
+
+function toUIEvent(e: Event): UIEvent {
+  const statusDisplayName =
+    e.event_status?.display_name ??
+    (e.event_status?.slug === 'event-status-published' ? 'Published' : 'Draft');
+
+  const price = e.tickets && e.tickets.length > 0
+    ? Math.min(...e.tickets.map((t) => t.price ?? 0))
+    : 0;
+  
+  const priceDisplay = e.is_free || price === 0 ? 'Free' : `KSh ${price.toLocaleString()}`;
+
+  const startDate = e.start_date ?? '';
+  const startTime = e.time ?? '';
+
+  const platform =
+    e.virtual_platform === 'google_meet' ? 'Google Meet'
+    : e.virtual_platform === 'zoom' ? 'Zoom'
+    : e.virtual_platform === 'microsoft_teams' ? 'Microsoft Teams'
+    : e.virtual_platform === 'webex' ? 'Webex'
+    : e.is_virtual ? 'Virtual' : 'In-Person';
+
+  return {
+    id: e.id,
+    title: e.display_name || e.name,
+    statusDisplayName,
+    typeDisplayName: e.event_type?.display_name ?? '',
+    date: startDate ? formatDateShort(startDate) : 'N/A',
+    time: startTime,
+    createdAt: e.created_at ?? '',
+    publishedAt: e.published_at ?? '',
+    platform,
+    priceDisplay,
+    cpdHours: 0,
+    registered: e.current_attendees ?? 0,
+    capacity: e.capacity ?? 0,
+    isFeatured: e.is_featured ?? false,
+    isPrivate: e.is_private ?? false,
+    isDeleted: !!e.deleted_at,
+    raw: e,
+  } as unknown as UIEvent;
+}
+
+function formatDateShort(dateString: string | undefined): string {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 // ============================================================
 // PAGE
@@ -93,8 +178,11 @@ export default function EventsDashboardPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  
+  // PAGINATION STATE
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5); 
+  
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [bulkAction, setBulkAction] = useState('');
@@ -115,7 +203,7 @@ export default function EventsDashboardPage() {
     null,
   );
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [sortField, setSortField] = useState<SortField>('eventDate');
+  const [sortField, setSortField] = useState<SortField>('addedDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isMobile, setIsMobile] = useState(false);
 
@@ -129,72 +217,56 @@ export default function EventsDashboardPage() {
     return () => mql.removeEventListener('change', onChange);
   }, []);
 
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
+  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchQuery]);
+  }, [activeTab, debouncedSearchQuery, sortField, sortDirection, pageSize]);
 
-  const shouldSearch = debouncedSearchQuery.trim().length > 0;
+  // SERVER-SIDE DATA FETCH
+  const statusParam = resolveStatusParam(activeTab);
+  const backendSortBy = mapSortFieldToBackend(sortField);
 
-  const {
-    data: listResponse,
-    isLoading: isListLoading,
-    isFetching: isListFetching,
-    error: listError,
-    refetch: refetchList,
-  } = useListMyEventsQuery(
-    {
-      page: currentPage,
-      page_size: pageSize,
-      scope: 'team',
-      team_id: teamId,
-      only_deleted: activeTab === 'trash' ? true : undefined,
-    },
-    { skip: shouldSearch || !isAuthenticated || !teamId },
-  );
-
-  const {
-    data: searchResponse,
-    isLoading: isSearchLoading,
-    isFetching: isSearchFetching,
-    error: searchError,
-    refetch: refetchSearch,
-  } = useSearchMyEventsQuery(
-    {
-      q: debouncedSearchQuery,
-      page: currentPage,
-      page_size: pageSize,
-      scope: 'team',
-      team_id: teamId,
-    },
-    { skip: !shouldSearch || !isAuthenticated || !teamId },
-  );
+ const {
+  data: listResponse,
+  isLoading,
+  isFetching,
+  error,
+  refetch,
+} = useListMyEventsQuery(
+  {
+    page: currentPage,
+    page_size: pageSize,
+    scope: 'team',
+    team_id: teamId,
+    only_deleted: activeTab === 'trash' ? true : undefined,
+    event_status_id: statusParam,
+    q: debouncedSearchQuery.trim() || undefined,
+    sort_by: backendSortBy,
+    sort_order: sortDirection as SortOrder,
+  },
+  {
+    skip: !isAuthenticated || !teamId,
+    refetchOnMountOrArgChange: true,
+  },
+);
 
   const { data: trashCountResponse, refetch: refetchTrashCount } =
     useGetTrashedEventsCountQuery(undefined, { skip: !isAuthenticated });
 
   const trashedEvents = trashCountResponse?.count ?? 0;
 
-  const activeData = shouldSearch ? searchResponse : listResponse;
-  const isLoading = isListLoading || isSearchLoading;
-  const isFetching = shouldSearch ? isSearchFetching : isListFetching;
-  const error = shouldSearch ? searchError : listError;
-  const refetch = shouldSearch ? refetchSearch : refetchList;
+  // DERIVED DATA
+  const rawEvents: Event[] = listResponse?.data?.data ?? [];
+  const totalItems = listResponse?.data?.total ?? 0;
+  const filteredEvents: UIEvent[] = rawEvents.map(toUIEvent);
 
-  const rawEvents: Event[] = activeData?.data?.data ?? [];
-  const totalItems = activeData?.data?.total ?? 0;
-
-  const filteredEvents = useUIEvents({
-    rawEvents,
-    activeTab,
-    sortField,
-    sortDirection,
-  });
-
+  // MUTATIONS
   const [deleteEvent] = useDeleteEventMutation();
   const [permanentlyDeleteEvent] = usePermanentlyDeleteEventMutation();
   const [restoreEvent] = useRestoreEventMutation();
@@ -204,14 +276,14 @@ export default function EventsDashboardPage() {
   const [bulkRestoreEvents] = useBulkRestoreEventsMutation();
   const [bulkPublishEvents] = useBulkPublishEventsMutation();
 
+  // STATS (based on current page data)
   const activeEvents = filteredEvents.filter((e) => !e.isDeleted);
   const totalRegistered = activeEvents.reduce((s, e) => s + e.registered, 0);
-  const liveEvents = activeEvents.filter((e) => e.status === 'Published').length;
+  const liveEvents = activeEvents.filter((e) => e.statusDisplayName === 'Published').length;
   const cpdEvents = activeEvents.filter((e) => e.cpdHours > 0).length;
 
   // ---- Handlers ----
 
-  // Clicking a row/card opens the event. Selection happens ONLY via the checkbox.
   const handleRowClick = (id: string) =>
     router.push(`/dashboard/${accountId}/${teamId}/events/${id}`);
 
@@ -423,7 +495,7 @@ export default function EventsDashboardPage() {
     setSearchQuery('');
     setDebouncedSearchQuery('');
     setActiveTab('all');
-    setSortField('eventDate');
+    setSortField('addedDate');
     setSortDirection('desc');
     setCurrentPage(1);
   };
@@ -447,7 +519,6 @@ export default function EventsDashboardPage() {
     return labels[sortField];
   };
 
-  // Shared row/card handlers
   const goToEvent = (e: UIEvent) =>
     router.push(`/dashboard/${accountId}/${teamId}/events/${e.id}`);
   const goToEdit = (e: UIEvent) =>
@@ -573,8 +644,7 @@ export default function EventsDashboardPage() {
         </div>
       </div>
 
-      {/* Skeleton — full page chrome while initial load */}
-      {isLoading && !activeData ? (
+      {isLoading && !listResponse ? (
         <EventsListSkeleton view={isMobile ? 'grid' : viewMode} rows={5} />
       ) : (
         <>
@@ -585,37 +655,28 @@ export default function EventsDashboardPage() {
               {
                 label: 'Total Events',
                 value: totalItems,
-                sub: `${
-                  activeEvents.filter((e) => e.status === 'Published').length
-                } published`,
+                sub: `${liveEvents} published`,
                 tone: 'primary',
                 icon: <Calendar className="h-4 w-4" />,
               },
               {
                 label: 'Registrations',
                 value: totalRegistered,
-                sub: `${
-                  activeEvents.filter((e) => e.registered > 0).length
-                } events`,
+                sub: `${activeEvents.filter((e) => e.registered > 0).length} events`,
                 tone: 'emerald',
                 icon: <Users className="h-4 w-4" />,
               },
               {
                 label: 'Live Sessions',
                 value: liveEvents,
-                sub: `${
-                  activeEvents.filter((e) => e.status === 'Draft').length
-                } drafts`,
+                sub: `${activeEvents.filter((e) => e.statusDisplayName === 'Draft').length} drafts`,
                 tone: 'sky',
                 icon: <Video className="h-4 w-4" />,
               },
               {
                 label: 'CPD Accredited',
                 value: cpdEvents,
-                sub: `${activeEvents.reduce(
-                  (s, e) => s + e.cpdHours,
-                  0,
-                )} total hours`,
+                sub: `${activeEvents.reduce((s, e) => s + e.cpdHours, 0)} total hours`,
                 tone: 'amber',
                 icon: <Award className="h-4 w-4" />,
               },
@@ -634,10 +695,7 @@ export default function EventsDashboardPage() {
           {!isMobile && (
             <EventsFilterBar
               activeTab={activeTab}
-              onTabChange={(tab) => {
-                setActiveTab(tab);
-                setCurrentPage(1);
-              }}
+              onTabChange={(tab) => setActiveTab(tab)}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
               onClearSearch={() => {
@@ -683,7 +741,7 @@ export default function EventsDashboardPage() {
             />
           )}
 
-          {/* Table / Grid / Mobile list */}
+          {/* Table / Grid */}
           {isMobile || viewMode !== 'table' ? (
             <EventsGrid
               events={filteredEvents}
@@ -698,6 +756,15 @@ export default function EventsDashboardPage() {
               onPermanentDelete={handlePermanentDelete}
               onMoveToTrash={handleDeleteEvent}
               emptyState={emptyState}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              isFetching={isFetching}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setCurrentPage(1);
+              }}
             />
           ) : (
             <EventsTable
@@ -725,6 +792,15 @@ export default function EventsDashboardPage() {
               onPermanentDelete={handlePermanentDelete}
               onMoveToTrash={handleDeleteEvent}
               emptyState={emptyState}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={totalItems}
+              isFetching={isFetching}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(n) => {
+                setPageSize(n);
+                setCurrentPage(1);
+              }}
             />
           )}
 
@@ -787,10 +863,7 @@ export default function EventsDashboardPage() {
                   <Label className="truncate text-sm font-medium">Status</Label>
                   <Select
                     value={activeTab}
-                    onValueChange={(v) => {
-                      setActiveTab(v);
-                      setCurrentPage(1);
-                    }}
+                    onValueChange={(v) => setActiveTab(v)}
                   >
                     <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
                       <SelectValue placeholder="All" />
@@ -839,9 +912,6 @@ export default function EventsDashboardPage() {
                         className="cursor-pointer"
                       >
                         Registrations
-                      </SelectItem>
-                      <SelectItem value="price" className="cursor-pointer">
-                        Price
                       </SelectItem>
                       <SelectItem value="status" className="cursor-pointer">
                         Status
@@ -919,7 +989,7 @@ export default function EventsDashboardPage() {
         error={publishError}
         onEdit={() =>
           router.push(
-            `/dashboard/${accountId}/${teamId}/events/${publishingEventId || selectedEvent?.id}/edit`,
+            `/dashboard/${accountId}/${teamId}/events/${selectedEvent?.id}/edit`,
           )
         }
       />

@@ -31,7 +31,6 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'eventDate', label: 'Event Date' },
   { value: 'addedDate', label: 'Added Date' },
   { value: 'current_attendees', label: 'Registrations' },
-  { value: 'price', label: 'Price' },
   { value: 'status', label: 'Status' },
 ];
 

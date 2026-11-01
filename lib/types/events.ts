@@ -9,7 +9,15 @@
 export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type RecurrencePattern = 'daily' | 'weekly' | 'monthly';
 export type OrganizerType = 'personal' | 'institution';
-export type EventSortBy = 'created_at' | 'start_date' | 'name';
+export type EventSortBy =
+  | 'created_at'
+  | 'updated_at'
+  | 'start_date'
+  | 'name'
+  | 'display_name'
+  | 'current_attendees'
+  | 'price'
+  | 'event_status_id';
 export type SortOrder = 'asc' | 'desc';
 
 /**
@@ -663,6 +671,10 @@ export interface ListEventsParams {
   user_id?: string;
   visibility?: EventVisibility;
 
+  /** Free-text search matched via ILIKE against name, display_name,
+   *  description, short_description. */
+  q?: string;   // ← ADD
+
   include_deleted?: boolean;
   only_deleted?: boolean;
   include_creator?: boolean;
@@ -683,12 +695,15 @@ export interface SearchEventsParams {
   team_type?: 'personal' | 'institution';
   event_type_id?: string;
   category_id?: string;
+  event_status_id?: string;   // ← ADD
   visibility?: EventVisibility;
   include_deleted?: boolean;
   only_deleted?: boolean;
   include_creator?: boolean;
   page?: number;
   page_size?: number;
+  sort_by?: EventSortBy;      // ← ADD
+  sort_order?: SortOrder;     // ← ADD
 }
 
 export interface GetEventsByTypeParams {

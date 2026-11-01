@@ -37,6 +37,17 @@ import type { UseEventImageResult } from './useEventImage';
 //   - Publish — that's useEventSubmit
 //   - Validation — that's useEventValidation
 //   - draftId storage — that's useEventDraft
+//
+// v1.1 — create-path concurrency guard
+//
+// The first save creates a draft (POST /events/draft). If two auto-
+// save fires happen before `draft.setDraftId()` lands (debounce +
+// unmount-save race, or fast typing), both would POST and the second
+// would hit the slug unique constraint.
+//
+// `creatingDraftRef` in-memory lock closes that window: while a create
+// is in flight, subsequent auto-save fires no-op. Combined with the
+// backend's slug-collision retry, no duplicate drafts are ever created.
 
 const DEBOUNCE_MS = 2000;
 
@@ -53,24 +64,11 @@ export interface UseAutoSaveResult {
 }
 
 interface UseAutoSaveParams {
-  /**
-   * The team this event belongs to. Sent as ?team_id= on the initial
-   * createDraft request so the backend scopes the new draft to the
-   * correct team.
-   */
   teamId: string;
-
   formData: EventFormData;
   draft: UseEventDraftResult;
   image: UseEventImageResult;
-
-  /**
-   * Ref the wizard flips to true while an explicit submit (draft save
-   * or publish) is running. Auto-save skips its debounced fire while
-   * this is true, so we don't race two mutations against the same row.
-   */
   submitInFlightRef: React.MutableRefObject<boolean>;
-
   onDraftCreated?: (eventId: string) => void;
 }
 
@@ -94,6 +92,10 @@ export function useAutoSave({
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
   const formDataRef = useRef(formData);
+
+  // In-memory lock for the create path. Prevents two concurrent
+  // auto-save fires from both POSTing a new draft.
+  const creatingDraftRef = useRef(false);
 
   useEffect(() => {
     formDataRef.current = formData;
@@ -144,11 +146,18 @@ export function useAutoSave({
 
     const currentDraftId = draft.getDraftId();
 
+    // Guard: another create is already in flight — don't POST again.
+    // This is what stops the slug-collision on a double-fire.
+    if (!currentDraftId && creatingDraftRef.current) {
+      return;
+    }
+
     isAutoSavingRef.current = true;
     setIsAutoSaving(true);
 
     try {
       if (currentDraftId) {
+        // ---- UPDATE PATH ----
         try {
           await updateEvent({
             id: currentDraftId,
@@ -171,21 +180,27 @@ export function useAutoSave({
           throw err;
         }
       } else {
-        const response = await createDraft({
-          teamId,
-          data: buildDraftPayload(current),
-        }).unwrap();
-
-        const newId = response.data.id;
-        draft.setDraftId(newId);
-        onDraftCreated?.(newId);
-
-        if (image.imageFile) {
-          await uploadEventImage({
-            eventId: newId,
-            image: image.imageFile,
+        // ---- CREATE PATH (guarded by creatingDraftRef) ----
+        creatingDraftRef.current = true;
+        try {
+          const response = await createDraft({
+            teamId,
+            data: buildDraftPayload(current),
           }).unwrap();
-          image.clearImage();
+
+          const newId = response.data.id;
+          draft.setDraftId(newId);
+          onDraftCreated?.(newId);
+
+          if (image.imageFile) {
+            await uploadEventImage({
+              eventId: newId,
+              image: image.imageFile,
+            }).unwrap();
+            image.clearImage();
+          }
+        } finally {
+          creatingDraftRef.current = false;
         }
       }
 
