@@ -857,6 +857,7 @@ export interface GeneratedSchedule {
   session_number: number;
   location: string;
   is_virtual: boolean;
+  platform?: VideoPlatform;        // ← ADD
   max_attendees?: number | null;
 }
 

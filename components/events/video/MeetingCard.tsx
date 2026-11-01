@@ -60,6 +60,12 @@ export interface MeetingCardProps {
 
   connectedPlatforms: PlatformMeta[];
 
+  /**
+   * True while the async worker is still provisioning meetings for
+   * in-window sessions. Drives the "Provisioning meetings…" banner.
+   */
+  provisioningInProgress?: boolean;
+
   runningSessionId: string | null;
   runningAction:
     | 'create'
@@ -163,6 +169,7 @@ export function MeetingCard({
   hasMeetConnection,
   hasAnyConnection,
   connectedPlatforms: _connectedPlatforms,
+  provisioningInProgress,
   runningSessionId,
   runningAction,
   onCreateMeetings,
@@ -336,6 +343,23 @@ export function MeetingCard({
         {/* BODY — collapsible */}
         {expanded && (
           <div id="meeting-card-body">
+            {/* Provisioning banner — shown while the async worker is still
+                creating meetings for in-window sessions. */}
+            {isHost && provisioningInProgress && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5 mt-4">
+                <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-primary">
+                    Provisioning meetings…
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    This usually takes a few seconds. The page will update
+                    automatically.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {(hasAnyMeeting ||
               virtualMissingMeeting.length > 0 ||
               inPersonSchedules.length > 0) && (
@@ -382,7 +406,8 @@ export function MeetingCard({
 
             {!hasAnyMeeting &&
               virtualMissingMeeting.length > 0 &&
-              hasAnyVirtual && (
+              hasAnyVirtual &&
+              !provisioningInProgress && (
                 <EmptyMeetingState
                   isDraft={isDraft}
                   hasAnyConnection={hasAnyConnection}
@@ -767,14 +792,17 @@ function SessionRow({
               {meta ? ` · ${meta.label}` : ''}
             </p>
           </div>
+        ) : session.platform ? (
+          <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5">
+            <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+            <p className="text-xs text-primary">
+              Provisioning meeting{meta ? ` on ${meta.label}` : ''}…
+            </p>
+          </div>
         ) : (
           <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5">
             <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              {session.platform || session.video_meeting_id
-                ? 'Meeting configured but no link available'
-                : 'No meeting yet'}
-            </p>
+            <p className="text-xs text-muted-foreground">No meeting yet</p>
           </div>
         )}
       </div>

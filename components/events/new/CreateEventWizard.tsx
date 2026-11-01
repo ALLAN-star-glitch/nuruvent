@@ -55,6 +55,7 @@ import { useAutoSave } from './hooks/useAutoSave';
 import { useEventSubmit } from './hooks/useEventSubmit';
 
 import { BasicInfoStep } from './steps/BasicInfoStep';
+import { ScheduleStep } from './steps/ScheduleStep';
 import { TicketStep } from './steps/TicketStep';
 import { DetailsStep } from './steps/DetailsStep';
 import { ContentStep } from './steps/ContentStep';
@@ -70,7 +71,7 @@ import { Stepper } from './Stepper';
 // CREATE EVENT WIZARD
 // ============================================================
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 const AI_DRAFT_STORAGE_KEY = 'nuruvent_ai_draft';
 
@@ -344,25 +345,30 @@ export function CreateEventWizard() {
       case 1:
         return {
           title: 'Basic Information',
-          description: 'Name, type, schedule, and description.',
+          description: 'Name, type, and description.',
         };
       case 2:
+        return {
+          title: 'Schedule',
+          description: 'When does your event happen?',
+        };
+      case 3:
         return {
           title: 'Tickets',
           description: 'Ticket options, capacity, and waitlist settings.',
         };
-      case 3:
+      case 4:
         return {
           title: 'Event Details',
           description:
-            'Certificate, venue, recurrence, access, and image.',
+            'Certificate, access, promotion, and image.',
         };
-      case 4:
+      case 5:
         return {
           title: 'Content',
           description: 'Speakers, materials, and SEO.',
         };
-      case 5:
+      case 6:
         return {
           title: 'Review & Publish',
           description: 'Review your event before publishing.',
@@ -518,26 +524,32 @@ export function CreateEventWizard() {
                     validationErrors={formState.validationErrors}
                     eventTypes={eventTypes}
                     onFieldChange={handleFieldChange}
-                    onAIDraft={handleAIDraft}
                     onEventTypeTouched={handleEventTypeTouched}
-                    eventId={createdEventId ?? undefined}
-                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
-                                    onSchedulesCommitted={(next) => {
-                    autoSave.setLastSavedData({
-                      ...formState.formData,
-                      schedules: next,
-                    });
-                  }}
-                                  />
+                  />
                 )}
                 {currentStep === 2 && (
+                  <ScheduleStep
+                    formData={formState.formData}
+                    validationErrors={formState.validationErrors}
+                    onFieldChange={handleFieldChange}
+                    onOpenConnectModal={() => setIsPlatformPickerOpen(true)}
+                    eventId={createdEventId ?? undefined}
+                    onSchedulesCommitted={(next) => {
+                      autoSave.setLastSavedData({
+                        ...formState.formData,
+                        schedules: next,
+                      });
+                    }}
+                  />
+                )}
+                {currentStep === 3 && (
                   <TicketStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}
                     onFieldChange={handleFieldChange}
                   />
                 )}
-                {currentStep === 3 && (
+                {currentStep === 4 && (
                   <DetailsStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}
@@ -548,7 +560,7 @@ export function CreateEventWizard() {
                     onImageRemove={handleImageRemove}
                   />
                 )}
-                {currentStep === 4 && (
+                {currentStep === 5 && (
                   <ContentStep
                     formData={formState.formData}
                     validationErrors={formState.validationErrors}

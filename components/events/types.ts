@@ -434,6 +434,7 @@ export const defaultFormData: EventFormData = {
 
 export const STEPS = [
   'Basic Info',
+  'Schedule',
   'Tickets',
   'Details',
   'Content',

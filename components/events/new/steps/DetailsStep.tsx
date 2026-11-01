@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 import { AccessField } from '@/components/events/fields/AccessField';
 import { CertificateTierField } from '@/components/events/fields/CertificateTierField';
-import { RecurrenceField } from '@/components/events/fields/RecurrenceField';
+
 
 import type { EventFormData, FormErrors } from '../../types';
 
@@ -99,22 +99,7 @@ export function DetailsStep({
         </CardContent>
       </Card>
 
-      {/* ====================================================
-          Recurrence
-         ==================================================== */}
-      <Card className="border border-border">
-        <CardContent className="pt-6">
-          <RecurrenceField
-            enabled={formData.is_recurring}
-            value={formData.recurrence}
-            onEnabledChange={(enabled) =>
-              onFieldChange('is_recurring', enabled)
-            }
-            onChange={(r) => onFieldChange('recurrence', r)}
-            error={validationErrors.recurrence}
-          />
-        </CardContent>
-      </Card>
+
 
       {/* ====================================================
           Access & Privacy
