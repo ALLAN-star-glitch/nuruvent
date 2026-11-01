@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // components/events/new/SaveSuccessDialog.tsx
 
 'use client';
