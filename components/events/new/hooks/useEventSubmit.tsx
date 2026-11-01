@@ -34,6 +34,10 @@ import type { UseEventImageResult } from './useEventImage';
 //
 // Flips `submitInFlightRef.current` while mutations run, so the
 // auto-save engine skips its debounced fire.
+//
+// v1.1 — after publishing, the draft ID is kept (not cleared). The
+// wizard may continue to edit the published event; auto-save needs the
+// ID to PUT updates against the same row.
 
 export interface UseEventSubmitResult {
   isSaving: boolean;
@@ -41,14 +45,7 @@ export interface UseEventSubmitResult {
 }
 
 interface UseEventSubmitParams {
-  /**
-   * The team this event belongs to. Sent as ?team_id= on create
-   * requests so the backend scopes the new event to the correct
-   * team. Without it, the backend falls back to the request
-   * context's team, which can be stale.
-   */
   teamId: string;
-
   formData: EventFormData;
   draft: UseEventDraftResult;
   image: UseEventImageResult;
@@ -137,14 +134,18 @@ export function useEventSubmit({
 
             await publishEvent(currentId).unwrap();
 
+            // Keep the draft ID — the event still exists and the wizard
+            // may continue to edit it. Clearing it here caused the next
+            // auto-save fire to create a duplicate.
             onCreated(currentId);
-            draft.clearDraftId();
           } else {
             const response = await createEvent({
               teamId,
               data: buildPublishPayload(formData),
             }).unwrap();
-            onCreated(response.data.id);
+            const newId = response.data.id;
+            draft.setDraftId(newId);
+            onCreated(newId);
             image.clearImage();
           }
         } else {

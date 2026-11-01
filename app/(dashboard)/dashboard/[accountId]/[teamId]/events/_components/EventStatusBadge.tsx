@@ -1,12 +1,7 @@
 'use client';
 
-import { StatusBadge } from "@/components/registrations/status_badge";
+import { StatusBadge } from '@/components/registrations/status_badge';
 
-
-/**
- * Event statuses come through as display names ("Draft", "Published", etc.)
- * We normalize them to the slugs that `StatusBadge` understands.
- */
 const EVENT_STATUS_SLUG: Record<string, string> = {
   Draft: 'draft',
   Published: 'published',
@@ -21,12 +16,16 @@ interface Props {
 }
 
 export function EventStatusBadge({ status, className }: Props) {
-  const slug = EVENT_STATUS_SLUG[status] ?? status.toLowerCase();
+  // Defensive: if `status` is missing (raw Event was passed where a
+  // UIEvent was expected, or the event has no event_status), default
+  // to Draft instead of crashing.
+  const safeStatus = status ?? 'Draft';
+  const slug = EVENT_STATUS_SLUG[safeStatus] ?? safeStatus.toLowerCase();
 
   return (
     <StatusBadge
       status={slug}
-      label={status}
+      label={safeStatus}
       variant="dot"
       className={className}
     />
