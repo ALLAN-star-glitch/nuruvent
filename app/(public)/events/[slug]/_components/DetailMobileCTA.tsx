@@ -44,7 +44,7 @@ export function DetailMobileCTA({
           className="h-11 shrink-0 cursor-pointer rounded-xl bg-primary px-6 font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
         >
           <CreditCard className="mr-2 h-4 w-4" />
-          {hasSelection ? 'Continue' : 'Get Ticket'}
+          {hasSelection ? 'Continue' : 'Register'}
         </Button>
       </div>
     </div>
