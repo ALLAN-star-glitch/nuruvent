@@ -5,13 +5,6 @@ import type { VideoPlatform } from '@/lib/types/events';
 // ============================================================
 // FORM SHAPE — flat scalars + nested structured slices
 // ============================================================
-//
-// Event-level timing, venue, and virtual/hybrid fields have been
-// REMOVED from EventFormData. They are derived by the backend from
-// `schedules[]`. The schedules are the single source of truth.
-//
-// The preview/review components compute any event-level display
-// values on the fly from the schedules.
 
 // ============================================================
 // SCHEDULE
@@ -46,11 +39,6 @@ export interface ScheduleForm {
   /**
    * Video provider chosen for this schedule. `null` when the host has
    * not picked one yet, or when the schedule is manual (pasted link).
-   *
-   * Populated by the platform picker in the delivery-mode section.
-   * Sent to the backend on create and update so the backend can route
-   * to the correct provider or preserve the existing meeting's
-   * platform.
    */
   platform: VideoPlatform | null;
   /**
@@ -287,18 +275,6 @@ export function makeEmptySEO(): SEOForm {
 // ============================================================
 // EVENT FORM DATA
 // ============================================================
-//
-// Note on derived fields:
-//
-// Event-level timing (start_date, end_date, duration), venue
-// (venue_name, venue_address, venue_city, venue_country,
-// in_person_location), virtual/hybrid flags (is_virtual, is_hybrid),
-// platform info (virtual_platform, virtual_platform_url), and meeting
-// links (zoom_link, meet_link) are NOT stored on the form.
-//
-// They are computed by the backend from `schedules[]` and returned in
-// the Event response. UI that needs them (preview cards, review step)
-// computes them on the fly from `schedules`.
 
 export interface EventFormData {
   // ---- Basic info ----
@@ -319,24 +295,11 @@ export interface EventFormData {
   recurrence: RecurrenceForm | null;
 
   // ---- Tickets ----
-  // The ticket list is the source of truth for per-ticket pricing.
-  // `capacity` is the event-wide maximum (independent of the sum of
-  // ticket quantities). `waitlist_enabled` gates the waitlist feature.
   tickets: TicketForm[];
   capacity: number | null;
   waitlist_enabled: boolean;
 
   // ---- Certificate ----
-  //
-  // certificate_enabled  — whether this event issues certificates.
-  // certificate_template_id — the system tier the organizer picked.
-  //                          Determines the price charged to the
-  //                          organizer at issuance. Empty means the
-  //                          backend falls back to the account default.
-  //
-  // The legacy certificate_price field has been removed. Pricing is
-  // now derived from the template's price_minor — Nuruvent sets
-  // prices, organizers pick a tier.
   certificate_enabled: boolean;
   certificate_template_id: string;
 
@@ -345,6 +308,15 @@ export interface EventFormData {
   password: string;
   invite_only: boolean;
   invited_emails: string[];
+  /**
+   * When true, the public event page shows a registration form
+   * (name + email). When false, the event is "open access" — the
+   * join link is shown directly and no data is collected.
+   *
+   * Backend enforces this: register endpoint returns 400 if false.
+   * Defaults to true.
+   */
+  registration_enabled: boolean;
 
   // ---- Monetization / promotion ----
   is_featured: boolean;
@@ -415,6 +387,7 @@ export const defaultFormData: EventFormData = {
   password: '',
   invite_only: false,
   invited_emails: [],
+  registration_enabled: true,
 
   // Promotion
   is_featured: false,
@@ -450,11 +423,6 @@ export const NO_CATEGORY = '__none__';
 // ============================================================
 // DERIVED EVENT-LEVEL HELPERS
 // ============================================================
-//
-// Compute event-level display values from schedules. These mirror the
-// backend's `deriveEventFromSchedules` and are used only for UI.
-//
-// Never send these to the backend. They are computed there.
 
 /** Earliest session start date (ISO YYYY-MM-DD), or '' if none. */
 export function deriveStartDate(schedules: ScheduleForm[]): string {
@@ -520,9 +488,6 @@ export function deriveInPersonLocation(schedules: ScheduleForm[]): string {
 
 /**
  * First virtual platform implied by a schedule.
- *
- * Prefers the explicit `platform` field when set; falls back to link
- * inspection for schedules created before the field existed.
  */
 export function deriveVirtualPlatform(schedules: ScheduleForm[]): string {
   for (const s of schedules) {

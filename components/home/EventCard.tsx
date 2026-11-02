@@ -81,16 +81,6 @@ function getEventTypeIcon(slug: string | undefined) {
 // ============================================================
 // BADGE METADATA
 // ============================================================
-//
-// Three modes, each producing an unambiguous pill:
-//
-//   single    → JAN / 15 / WED / 10:00 AM – 12:00 PM
-//   multi-day → JAN 1 → 8 · 2027
-//   recurring → ⚡ STARTS / JAN 4, 2027
-//
-// "STARTS" is loud and unambiguous for recurring events: the viewer
-// immediately knows this is a series beginning at that date, not a
-// one-off event.
 
 interface DateBadgeMeta {
   mode: 'single' | 'multi-day' | 'recurring';
@@ -104,7 +94,6 @@ function getDateBadgeMeta(event: Event): DateBadgeMeta {
 
   const startStr = first?.start_date ?? event.start_date?.split('T')[0] ?? '';
 
-  // ---- Recurring ----
   if (event.is_recurring) {
     const startDate = startStr ? new Date(`${startStr}T12:00:00Z`) : null;
     const startLabel = startDate
@@ -118,13 +107,9 @@ function getDateBadgeMeta(event: Event): DateBadgeMeta {
           .toUpperCase()
       : badge.month;
 
-    return {
-      mode: 'recurring',
-      lines: [startLabel],
-    };
+    return { mode: 'recurring', lines: [startLabel] };
   }
 
-  // ---- Multi-day ----
   if (event.is_multi_day && sessions > 1) {
     const last = event.schedules?.[sessions - 1]?.start_date;
     if (startStr && last) {
@@ -148,7 +133,6 @@ function getDateBadgeMeta(event: Event): DateBadgeMeta {
     }
   }
 
-  // ---- Single ----
   return {
     mode: 'single',
     lines: [
@@ -212,6 +196,15 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const fillRate = getEventFillRate(event);
   const location = getEventLocation(event);
 
+  // ---- NEW: open-access mode ----
+  const registrationEnabled = event.registration_enabled !== false;
+  const directJoinUrl =
+    event.zoom_link ||
+    event.meet_link ||
+    event.schedules?.[0]?.zoom_link ||
+    event.schedules?.[0]?.meet_link ||
+    '';
+
   const isDashboardDestination = isPrivate || isMemberOfOwningTeam;
 
   const publicDetailHref = `/events/${event.slug}`;
@@ -240,6 +233,18 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
     e.preventDefault();
     if (!canInteract) return;
     router.push(registerHref);
+  };
+
+  // ---- NEW: direct join handler for open-access ----
+  const handleJoinClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!canInteract) return;
+    if (directJoinUrl) {
+      window.open(directJoinUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      router.push(detailHref);
+    }
   };
 
   const handleLike = (e: React.MouseEvent) => {
@@ -326,7 +331,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
     }
 
     if (badgeMeta.mode === 'recurring') {
-      // Loud, unmistakable "STARTS" block for recurring series.
       return (
         <div className="flex flex-col leading-none gap-1">
           <span className="inline-flex items-center gap-1 text-[9px] sm:text-[11px] font-extrabold tracking-[0.15em] uppercase text-amber-600 dark:text-amber-400">
@@ -340,7 +344,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
       );
     }
 
-    // multi-day
     return (
       <div className="flex flex-col leading-none">
         <span className="text-[11px] sm:text-sm font-extrabold text-foreground whitespace-nowrap">
@@ -400,12 +403,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             isHovered ? 'opacity-100' : 'opacity-0',
           )}
         >
-          <div
-            className={cn(
-              'absolute inset-0 rounded-2xl bg-gradient-to-r',
-              'from-transparent via-white/20 to-transparent dark:via-white/5',
-            )}
-          />
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/5" />
         </div>
 
         {/* ---- Image ---- */}
@@ -464,7 +462,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Event type + Recurring */}
+          {/* Event type + Recurring + Open Access */}
           <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
             <Badge
               className="border-0 shadow-lg shadow-black/20 px-2.5 sm:px-3 py-1 sm:py-1.5 text-white text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-md rounded-full"
@@ -478,6 +476,13 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               <Badge className="bg-background/90 backdrop-blur-md text-foreground border border-border shadow-lg text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
                 <RefreshCw className="h-3 w-3" />
                 <span className="hidden xs:inline">Recurring</span>
+              </Badge>
+            )}
+
+            {!registrationEnabled && (
+              <Badge className="bg-emerald-500/90 backdrop-blur-md text-white border-0 shadow-lg shadow-emerald-500/30 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full">
+                <ArrowUpRight className="h-3 w-3" />
+                <span className="hidden xs:inline">Open Access</span>
               </Badge>
             )}
           </div>
@@ -502,8 +507,8 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Low availability */}
-          {isLowAvailability && canInteract && spotsLeft !== null && (
+          {/* Low availability — only when registration is on */}
+          {registrationEnabled && isLowAvailability && canInteract && spotsLeft !== null && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
               <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-white border-0 shadow-lg shadow-amber-500/40 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full animate-pulse">
                 <ClockIcon className="h-3 w-3" />
@@ -512,8 +517,8 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Fully booked */}
-          {isFullyBooked && !isPast && (
+          {/* Fully booked — only when registration is on */}
+          {registrationEnabled && isFullyBooked && !isPast && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
               <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-2xl shadow-red-500/40 text-sm font-bold px-6 py-3 rounded-full">
                 Fully Booked
@@ -616,22 +621,33 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
           <div className="h-px bg-border my-1" />
 
-          {/* Price */}
-          <div className="flex flex-col">
-            <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              Registration Fee
-            </span>
-            <span
-              className={cn(
-                'text-2xl sm:text-3xl font-bold',
-                isFree
-                  ? 'text-tertiary-600 dark:text-tertiary-400'
-                  : 'text-primary-600 dark:text-primary-400',
-              )}
-            >
-              {formatPrice(price)}
-            </span>
-          </div>
+          {/* Price — only when registration is on */}
+          {registrationEnabled ? (
+            <div className="flex flex-col">
+              <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                Registration Fee
+              </span>
+              <span
+                className={cn(
+                  'text-2xl sm:text-3xl font-bold',
+                  isFree
+                    ? 'text-tertiary-600 dark:text-tertiary-400'
+                    : 'text-primary-600 dark:text-primary-400',
+                )}
+              >
+                {formatPrice(price)}
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                Access
+              </span>
+              <span className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                Open
+              </span>
+            </div>
+          )}
 
           {/* Certificate */}
           {hasCertificate && (
@@ -658,7 +674,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
             </Button>
 
-            {canInteract && (
+            {canInteract && registrationEnabled && (
               <Button
                 type="button"
                 onClick={handleRegisterClick}
@@ -676,10 +692,27 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 <ArrowUpRight className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
               </Button>
             )}
+
+            {canInteract && !registrationEnabled && (
+              <Button
+                type="button"
+                onClick={handleJoinClick}
+                className={cn(
+                  'cursor-pointer gap-1.5 font-semibold shadow-md hover:shadow-lg transition-all duration-300',
+                  'h-11 w-full rounded-xl text-sm',
+                  'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs',
+                  'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white',
+                  'hover:scale-[1.02]',
+                )}
+              >
+                <Video className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <span>Join Meeting</span>
+              </Button>
+            )}
           </div>
 
-          {/* Spots */}
-          {canInteract && spotsLeft !== null && (
+          {/* Spots — only when registration is on */}
+          {registrationEnabled && canInteract && spotsLeft !== null && (
             <div className="flex items-center gap-3 mt-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div

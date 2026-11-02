@@ -145,56 +145,21 @@ export interface RecurrencePatternRef {
 // 3. NESTED EVENT PIECES
 // ============================================================
 
-/**
- * Mirrors `ScheduleDTO`.
- *
- * Derived event-level fields (`start_date`, `end_date`, `duration`,
- * `is_virtual`, `virtual_platform`, `zoom_link`) come from the
- * schedules. The schedules are the single source of truth.
- *
- * `video_meeting_id` is present only when the video module auto-created
- * a meeting for this session. Manually-pasted links leave it null.
- */
 export interface Schedule {
   id: string;
   session_name?: string;
   session_number?: number;
-  /** ISO date (YYYY-MM-DD). */
   start_date: string;
-  /** ISO date (YYYY-MM-DD). Omitted for single-day sessions. */
   end_date?: string;
-  /** HH:MM:SS. */
   start_time: string;
-  /** HH:MM:SS. */
   end_time: string;
   timezone: string;
   location?: string;
   is_virtual: boolean;
-
-  /**
-   * Video provider chosen for this schedule. `undefined` when the
-   * schedule is in-person, or when the host pasted a link manually.
-   *
-   * Pre-select this value in the edit form's provider dropdown.
-   */
   platform?: VideoPlatform;
-
   zoom_link?: string;
   meet_link?: string;
-
-  /**
-   * Platform-side meeting code. "spaces/abc-defg-hij" for Google
-   * Meet, numeric string for Zoom. Matches video_meetings.external_id.
-   * Use this — not video_meeting_id — to build join URLs.
-   */
   video_meeting_external_id?: string | null;
-
-  /**
-   * Nuruvent UUID of the video meeting (FK to video_meetings.id).
-   * Do NOT use this as a platform code — Google and Zoom cannot
-   * resolve it. Used only by server-side endpoints keyed by meeting
-   * UUID (e.g. fetch-attendance).
-   */
   video_meeting_id?: string | null;
   max_attendees?: number;
 }
@@ -260,13 +225,6 @@ export interface Venue {
   coordinates?: Record<string, number>;
 }
 
-/**
- * Recurrence configuration as returned by the backend.
- *
- * Shape matches the domain RecurrenceRule. "end_date" and "count" are
- * both optional but at least one must be present for a valid
- * recurrence; the backend rejects rules with neither.
- */
 export interface Recurrence {
   frequency: RecurrencePattern;
   interval: number;
@@ -297,23 +255,6 @@ export interface Creator {
 // 4. MAIN RESPONSE
 // ============================================================
 
-/**
- * Mirrors `EventResponse`.
- *
- * Derived fields — computed from `schedules` by the backend:
- *   - `start_date`, `end_date` (min/max of sessions)
- *   - `date` (date-only, midnight in schedule tz)
- *   - `time` (HH:MM:SS of the first session)
- *   - `duration_minutes` (sum of session durations)
- *   - `is_multi_day`
- *   - `is_virtual`, `is_hybrid`
- *   - `virtual_platform`, `virtual_platform_url`
- *   - `zoom_link`, `meet_link`
- *   - `venue`, `in_person_location`
- *
- * The client should not send these on create/update. They are accepted
- * for backward compatibility and ignored by the backend.
- */
 export interface Event {
   // ---- Core identity ----
   id: string;
@@ -333,19 +274,7 @@ export interface Event {
   certificate_template?: CertificateTemplate;
 
   // ---- Ownership ----
-  /**
-   * Team that owns this event. Used by the client to determine
-   * dashboard-vs-public routing and to fetch the parent account.
-   */
   team_id: string;
-
-  /**
-   * Account that owns the team that owns this event.
-   *
-   * Used to build dashboard URLs of the form
-   * `/dashboard/{account_id}/{team_id}/events/{event_id}`.
-   * Present on all event responses.
-   */
   account_id: string;
 
   organizer: Organizer | null;
@@ -354,11 +283,8 @@ export interface Event {
   // ---- Schedule (derived from sessions) ----
   start_date?: string;
   end_date?: string;
-  /** Date portion of the earliest session, ISO date (YYYY-MM-DD). */
   date?: string;
-  /** HH:MM:SS of the earliest session. */
   time?: string;
-  /** Sum of session durations, in minutes. */
   duration_minutes?: number;
   is_multi_day: boolean;
   is_recurring: boolean;
@@ -390,6 +316,17 @@ export interface Event {
   is_private: boolean;
   invite_only: boolean;
   invited_emails?: string[];
+
+  /**
+   * Whether the organizer has enabled registration for this event.
+   * When false, the event is "open access" — the frontend should
+   * show a direct join button instead of the ticket/registration
+   * form. The backend rejects any POST to /register with
+   * ErrRegistrationDisabled.
+   *
+   * Always present on the wire (backend defaults it to true).
+   */
+  registration_enabled: boolean;
 
   // ---- Monetization ----
   is_featured: boolean;
@@ -430,19 +367,6 @@ export interface Event {
 // 5. REQUEST SHAPES
 // ============================================================
 
-/**
- * Nested: schedule input for create/update requests.
- *
- * This is the ONLY place timing, venue, and virtual/hybrid info is
- * entered. Event-level fields are derived from these.
- *
- * For auto video creation: omit `zoom_link`/`meet_link` and set
- * `is_virtual: true`. The backend will create a meeting on the host's
- * connected account.
- *
- * For manual mode: set `zoom_link` or `meet_link` explicitly. The
- * backend will not create a meeting.
- */
 export interface ScheduleInput {
   id?: string;
   start_date: string;
@@ -454,31 +378,12 @@ export interface ScheduleInput {
   session_number?: number;
   location?: string;
   is_virtual?: boolean;
-
-  /**
-   * Selects the video provider. Required when `is_virtual` is true
-   * and neither `zoom_link` nor `meet_link` is set — the backend
-   * will auto-create a meeting on the host's connected account for
-   * this platform.
-   *
-   * Leave undefined for in-person sessions and for manually-pasted
-   * links.
-   */
   platform?: VideoPlatform;
-
   zoom_link?: string;
   meet_link?: string;
   max_attendees?: number;
 }
 
-/**
- * Recurrence input for create/update requests.
- *
- * At least one of `end_date` or `count` must be set; the backend
- * rejects rules with neither. For `weekly` frequency, `days_of_week`
- * must contain at least one day. For `daily` and `monthly`, no
- * additional fields are required beyond `interval`.
- */
 export interface RecurrenceInput {
   frequency: RecurrencePattern;
   interval?: number;
@@ -540,10 +445,6 @@ export interface SEOInput {
 
 /**
  * Mirrors `CreateDraftRequest`.
- *
- * Event-level timing, venue, and virtual/hybrid fields are accepted for
- * backward compatibility but IGNORED by the backend. They are derived
- * from `schedules`. Do not send them on new calls.
  */
 export interface CreateDraftRequest {
   name?: string;
@@ -568,6 +469,12 @@ export interface CreateDraftRequest {
   invite_only?: boolean;
   invited_emails?: string[];
 
+  /**
+   * Controls whether the public event page shows a registration form.
+   * Omit to use the backend default (true).
+   */
+  registration_enabled?: boolean;
+
   is_featured?: boolean;
   certificate_enabled?: boolean;
   certificate_price?: number;
@@ -583,8 +490,8 @@ export interface CreateEventRequest {
   name: string;
   description: string;
   event_type_id: string;
-  schedules: ScheduleInput[]; // min 1
-  tickets: TicketInput[]; // min 1
+  schedules: ScheduleInput[];
+  tickets: TicketInput[];
   visibility: EventVisibility;
 
   // ---- Optional ----
@@ -605,6 +512,12 @@ export interface CreateEventRequest {
   invite_only?: boolean;
   invited_emails?: string[];
 
+  /**
+   * Controls whether the public event page shows a registration form.
+   * Omit to use the backend default (true).
+   */
+  registration_enabled?: boolean;
+
   is_featured?: boolean;
   certificate_enabled?: boolean;
   certificate_price?: number;
@@ -615,11 +528,6 @@ export interface CreateEventRequest {
   seo?: SEOInput;
 }
 
-/**
- * Mirrors `UpdateEventRequest`. All fields optional.
- *
- * Same derived-field caveat as CreateDraftRequest.
- */
 export interface UpdateEventRequest {
   name?: string;
   display_name?: string;
@@ -646,6 +554,12 @@ export interface UpdateEventRequest {
   invite_only?: boolean;
   invited_emails?: string[];
 
+  /**
+   * Controls whether the public event page shows a registration form.
+   * Omit to leave the existing value untouched.
+   */
+  registration_enabled?: boolean;
+
   is_featured?: boolean;
   certificate_enabled?: boolean;
   certificate_price?: number;
@@ -671,9 +585,7 @@ export interface ListEventsParams {
   user_id?: string;
   visibility?: EventVisibility;
 
-  /** Free-text search matched via ILIKE against name, display_name,
-   *  description, short_description. */
-  q?: string;   // ← ADD
+  q?: string;
 
   include_deleted?: boolean;
   only_deleted?: boolean;
@@ -695,15 +607,15 @@ export interface SearchEventsParams {
   team_type?: 'personal' | 'institution';
   event_type_id?: string;
   category_id?: string;
-  event_status_id?: string;   // ← ADD
+  event_status_id?: string;
   visibility?: EventVisibility;
   include_deleted?: boolean;
   only_deleted?: boolean;
   include_creator?: boolean;
   page?: number;
   page_size?: number;
-  sort_by?: EventSortBy;      // ← ADD
-  sort_order?: SortOrder;     // ← ADD
+  sort_by?: EventSortBy;
+  sort_order?: SortOrder;
 }
 
 export interface GetEventsByTypeParams {
@@ -805,11 +717,6 @@ export interface MediaInfo {
 // ============================================================
 // 8. AI DRAFT GENERATION
 // ============================================================
-//
-// The AI draft shape mirrors the schedule-only model. Event-level
-// timing, venue, and virtual/hybrid fields are NOT produced by the AI
-// — they are derived from schedules by the events service when the
-// draft is submitted to /events.
 
 export interface GenerateEventDraftRequest {
   prompt: string;
@@ -824,12 +731,6 @@ export interface GenerateEventDraftRequest {
   recurrence?: RecurrenceInput | null;
 }
 
-/**
- * The draft produced by the AI.
- *
- * Event-level venue/virtual/hybrid fields are absent by design. Only
- * identity, discovery, pricing, policy, and one canonical schedule.
- */
 export interface GeneratedEventDraft {
   name: string;
   description: string;
@@ -837,7 +738,6 @@ export interface GeneratedEventDraft {
   tags?: string[];
   language?: string;
 
-  /** Exactly one canonical session. */
   schedules: GeneratedSchedule[];
 
   is_recurring?: boolean;
@@ -857,12 +757,15 @@ export interface GeneratedEventDraft {
   invite_only?: boolean;
   is_featured?: boolean;
   certificate_enabled?: boolean;
+
+  /**
+   * Propagated from the AI draft when the organizer asks for an
+   * open-access event. Optional here — the setup form defaults to
+   * true when this is absent.
+   */
+  registration_enabled?: boolean;
 }
 
-/**
- * Mirrors the backend's `GeneratedSchedule`. This is the shape the AI
- * returns — the frontend maps it to `ScheduleInput` when submitting.
- */
 export interface GeneratedSchedule {
   start_date: string;
   start_time: string;
@@ -872,7 +775,7 @@ export interface GeneratedSchedule {
   session_number: number;
   location: string;
   is_virtual: boolean;
-  platform?: VideoPlatform;        // ← ADD
+  platform?: VideoPlatform;
   max_attendees?: number | null;
 }
 
@@ -884,17 +787,7 @@ export interface GenerateEventDraftResult {
 // ============================================================
 // 9. VIDEO MODULE
 // ============================================================
-//
-// Mirrors `service.ConnectionResponse` and `service.ListConnectionsResponse`
-// from the video module.
 
-/**
- * Mirrors `ConnectionResponse`. A host's authorized link to their
- * account on a video platform.
- *
- * Tokens are never present in the response. `is_active` is derived from
- * `revoked_at == null`.
- */
 export interface VideoConnection {
   id: string;
   platform: VideoPlatform;
@@ -913,11 +806,6 @@ export interface ListConnectionsResponse {
   connections: VideoConnection[];
 }
 
-/**
- * Response of GET /video/oauth/:platform/connect when the request is
- * made with `Accept: application/json`. The frontend should open
- * `authorize_url` in a popup or same-tab navigation.
- */
 export interface VideoConnectResponse {
   authorize_url: string;
 }

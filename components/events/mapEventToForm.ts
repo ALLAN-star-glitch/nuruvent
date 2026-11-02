@@ -170,15 +170,6 @@ function mapSEO(seo: SEOModel | undefined): SEOForm | null {
 // ============================================================
 // RECURRENCE MAPPER
 // ============================================================
-//
-// The API returns the new shape (frequency / end_date / count).
-// The form's RecurrenceForm still uses the legacy shape
-// (pattern / ends_on / occurrences) because the form UI has not
-// been rewritten. This function is the seam between the two.
-//
-// day_of_month and week_of_month are no longer supported by the
-// backend; they are set to their empty defaults so the form fields
-// stay defined.
 
 function mapRecurrence(
   r: RecurrenceModel | undefined,
@@ -242,13 +233,6 @@ export function mapEventToForm(event: EventModel): EventFormData {
     waitlist_enabled: event.waitlist_enabled ?? false,
 
     // ---- Certificate ----
-    //
-    // The wizard no longer collects a certificate price. Pricing is
-    // determined server-side from the chosen tier's price_minor. We
-    // only carry the tier's template ID.
-    //
-    // The API may return the ID either as `certificate_template_id`
-    // or as a nested `certificate_template.id` object — accept both.
     certificate_enabled: event.certificate_enabled ?? false,
     certificate_template_id:
       (event as unknown as { certificate_template_id?: string })
@@ -261,6 +245,7 @@ export function mapEventToForm(event: EventModel): EventFormData {
     password: '',
     invite_only: event.invite_only ?? false,
     invited_emails: event.invited_emails ?? [],
+    registration_enabled: event.registration_enabled ?? true, // <-- ADDED
 
     // ---- Promotion ----
     is_featured: event.is_featured ?? false,
