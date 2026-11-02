@@ -228,16 +228,17 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
               isFullyBooked={isFullyBooked}
             />
 
-            <DetailHeader
-              title={event.display_name || event.name}
-              hostName={hostName}
-              hostIsInstitution={hostIsInstitution}
-              isVirtual={event.is_virtual}
-              isHybrid={event.is_hybrid}
-              isPast={isPast}
-              isFullyBooked={isFullyBooked}
-              timeRemaining={timeRemaining}
-            />
+          <DetailHeader
+            title={event.display_name || event.name}
+            hostName={hostName}
+            hostIsInstitution={hostIsInstitution}
+            organizerLogoUrl={event.organizer?.avatar_url ?? null}
+            isVirtual={event.is_virtual}
+            isHybrid={event.is_hybrid}
+            isPast={isPast}
+            isFullyBooked={isFullyBooked}
+            timeRemaining={timeRemaining}
+          />
 
             <DetailKeyInfo
               isRange={isRange}

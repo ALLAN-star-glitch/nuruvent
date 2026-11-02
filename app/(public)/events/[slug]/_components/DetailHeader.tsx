@@ -14,6 +14,8 @@ interface DetailHeaderProps {
   title: string;
   hostName: string;
   hostIsInstitution: boolean;
+  /** Organizer's logo URL from event.organizer.avatar_url. */
+  organizerLogoUrl?: string | null;
   isVirtual: boolean;
   isHybrid: boolean;
   isPast: boolean;
@@ -30,6 +32,7 @@ export function DetailHeader({
   title,
   hostName,
   hostIsInstitution,
+  organizerLogoUrl,
   isVirtual,
   isHybrid,
   isPast,
@@ -46,11 +49,19 @@ export function DetailHeader({
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
-          {hostIsInstitution ? (
+          {organizerLogoUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={organizerLogoUrl}
+              alt={hostName}
+              className="h-6 w-6 shrink-0 rounded-full border border-border bg-background object-cover"
+            />
+          ) : hostIsInstitution ? (
             <Building2 className="h-4 w-4 shrink-0 text-primary" />
           ) : (
             <User className="h-4 w-4 shrink-0" />
           )}
+
           <span>Hosted by</span>
           <span className="flex items-center gap-1 font-medium text-foreground">
             {hostName}

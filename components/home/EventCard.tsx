@@ -196,7 +196,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
   const fillRate = getEventFillRate(event);
   const location = getEventLocation(event);
 
-  // ---- NEW: open-access mode ----
+  // ---- Open access mode ----
   const registrationEnabled = event.registration_enabled !== false;
   const directJoinUrl =
     event.zoom_link ||
@@ -235,7 +235,6 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
     router.push(registerHref);
   };
 
-  // ---- NEW: direct join handler for open-access ----
   const handleJoinClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -462,7 +461,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Event type + Recurring + Open Access */}
+          {/* Event type + Recurring + Open Access + Organizer Logo */}
           <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
             <Badge
               className="border-0 shadow-lg shadow-black/20 px-2.5 sm:px-3 py-1 sm:py-1.5 text-white text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 backdrop-blur-md rounded-full"
@@ -484,6 +483,18 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 <ArrowUpRight className="h-3 w-3" />
                 <span className="hidden xs:inline">Open Access</span>
               </Badge>
+            )}
+
+            {/* Floating organizer logo — prominent brand mark */}
+            {organizerLogoUrl && (
+              <div className="mt-1 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center overflow-hidden rounded-full border-2 border-background bg-background shadow-lg">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={organizerLogoUrl}
+                  alt={event.organizer?.display_name ?? hostName}
+                  className="h-full w-full object-cover"
+                />
+              </div>
             )}
           </div>
 
@@ -507,7 +518,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Low availability — only when registration is on */}
+          {/* Low availability */}
           {registrationEnabled && isLowAvailability && canInteract && spotsLeft !== null && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
               <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 backdrop-blur-sm text-white border-0 shadow-lg shadow-amber-500/40 text-[10px] sm:text-[11px] font-medium flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full animate-pulse">
@@ -517,7 +528,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             </div>
           )}
 
-          {/* Fully booked — only when registration is on */}
+          {/* Fully booked */}
           {registrationEnabled && isFullyBooked && !isPast && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 backdrop-blur-sm">
               <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 shadow-2xl shadow-red-500/40 text-sm font-bold px-6 py-3 rounded-full">
@@ -548,10 +559,10 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                 <span className="font-semibold text-foreground hover:text-primary-500 transition-colors flex items-center gap-1.5 min-w-0">
                   <span
                     className={cn(
-                      'flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md',
+                      'flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background',
                       organizerIsPersonal
-                        ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400'
-                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-400',
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-indigo-600 dark:text-indigo-400',
                     )}
                   >
                     {accountLogo}
@@ -621,7 +632,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
 
           <div className="h-px bg-border my-1" />
 
-          {/* Price — only when registration is on */}
+          {/* Price / Access */}
           {registrationEnabled ? (
             <div className="flex flex-col">
               <span className="text-[10px] sm:text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -701,7 +712,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
                   'cursor-pointer gap-1.5 font-semibold shadow-md hover:shadow-lg transition-all duration-300',
                   'h-11 w-full rounded-xl text-sm',
                   'sm:h-10 sm:flex-1 sm:rounded-full sm:text-xs',
-                  'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white',
+                  'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white',
                   'hover:scale-[1.02]',
                 )}
               >
@@ -711,7 +722,7 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
             )}
           </div>
 
-          {/* Spots — only when registration is on */}
+          {/* Spots */}
           {registrationEnabled && canInteract && spotsLeft !== null && (
             <div className="flex items-center gap-3 mt-1">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">

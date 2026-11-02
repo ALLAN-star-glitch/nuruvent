@@ -252,7 +252,6 @@ export function SearchBar({
   const isLoading = isSearchMode ? search.isFetching : browse.isFetching;
   const isError = isSearchMode ? search.isError : browse.isError;
 
-  // Format refinement (client-side only) — backend has no format param.
   const filteredResults = useMemo(() => {
     if (!filters.format) return results;
     return results.filter((e) => deriveFormat(e) === filters.format);
@@ -466,6 +465,7 @@ export function SearchBar({
                   const host = deriveHost(event);
                   const dateLabel = deriveDateLabel(event.start_date);
                   const image = deriveImage(event);
+                  const organizerLogo = event.organizer?.avatar_url ?? null;
 
                   return (
                     <button
@@ -480,8 +480,8 @@ export function SearchBar({
                           : 'hover:bg-accent/60',
                       )}
                     >
-                      {/* Image */}
-                      <div className="shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-lg md:rounded-xl overflow-hidden bg-muted ring-1 ring-border">
+                      {/* Image + organizer logo badge */}
+                      <div className="relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-lg md:rounded-xl overflow-hidden bg-muted ring-1 ring-border">
                         {image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -511,6 +511,18 @@ export function SearchBar({
                         >
                           {initialOf(title)}
                         </div>
+
+                        {/* Organizer logo overlay */}
+                        {organizerLogo && (
+                          <div className="absolute -bottom-1 -right-1 h-5 w-5 md:h-6 md:w-6 rounded-full overflow-hidden border-2 border-popover bg-popover shadow-sm">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={organizerLogo}
+                              alt={host}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
                       </div>
 
                       {/* Text */}
