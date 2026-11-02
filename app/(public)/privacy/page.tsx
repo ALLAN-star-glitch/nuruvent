@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   UserCheck,
   Users,
+  Video,
+  CalendarCheck,
 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -45,6 +47,8 @@ export default function PrivacyPage() {
         </p>
       </header>
 
+      
+
       {/* TL;DR cards */}
       <section className="mb-14">
         <h2 className="text-2xl font-semibold text-foreground mb-4">
@@ -74,6 +78,54 @@ export default function PrivacyPage() {
         </div>
       </section>
 
+      {/* NEW: Event Attendee Data section */}
+      <Section
+        number="0"
+        title="Event Attendee Data (Organizer Notice)"
+        icon={<CalendarCheck className="h-5 w-5" />}
+      >
+        <p className="text-base text-muted-foreground mb-4">
+          When you register for an event on Nuruvent, the organizer of that
+          event becomes a data controller in their own right for the attendee
+          data they can access. This section explains exactly what they see
+          and what they do not.
+        </p>
+
+        <SubSection title="What organizers can see">
+          <BulletList
+            items={[
+              'Your name and email address (used to send you join links, reminders, and certificates)',
+              'Your registration status (e.g., confirmed, pending, cancelled)',
+              'Your attendance status for each session you were registered for',
+              'Any guest details you provided on the registration form',
+            ]}
+          />
+        </SubSection>
+
+        <SubSection title="What organizers cannot see">
+          <BulletList
+            items={[
+              'Your payment card details or mobile money PIN (never stored, always tokenised by the payment provider)',
+              'Your browsing history outside this event',
+              'Any other events you have registered for on Nuruvent',
+              'Your password or authentication credentials',
+            ]}
+          />
+        </SubSection>
+
+        <SubSection title="Events with no data collection">
+          <p className="text-base text-muted-foreground">
+            Some organizers choose to configure events as <em>public</em> with
+            a shared Zoom or Google Meet link and <em>no registration form</em>.
+            In that case, Nuruvent does not collect any attendee data for the
+            event — not even your email address. You simply click the link and
+            join the meeting directly. In this configuration, the organizer
+            cannot see who attended, cannot send reminders, and cannot issue
+            certificates.
+          </p>
+        </SubSection>
+      </Section>
+
       <Section
         number="1"
         title="Data We Collect"
@@ -101,6 +153,22 @@ export default function PrivacyPage() {
               'Certificates issued and their verification data',
             ]}
           />
+        </SubSection>
+
+        <SubSection title="Attendee Data (collected at registration)">
+          <BulletList
+            items={[
+              'Name and email address (and optional phone number)',
+              'Ticket type and quantity selected',
+              'Attendance status per session (derived from the video provider)',
+              'Certificate issuance status',
+            ]}
+          />
+          <p className="text-sm text-muted-foreground mt-2">
+            Attendee data is collected only when the event uses a registration
+            form. Events configured with a shared link and no registration
+            collect no attendee data.
+          </p>
         </SubSection>
 
         <SubSection title="Payment Data">
@@ -281,11 +349,13 @@ export default function PrivacyPage() {
           </p>
         </SubSection>
 
-        <SubSection title="Trainers and Institutions">
+        <SubSection title="Trainers and Institutions (Event Organizers)">
           <p className="text-base text-muted-foreground">
             When you register for an event or course, the organizer receives
             your registration details (name, email, ticket type, attendance
-            status) so they can deliver the training and issue your certificate.
+            status) so they can deliver the training and issue your
+            certificate. The organizer is a separate data controller for that
+            data and is bound by their own privacy obligations.
           </p>
         </SubSection>
 
@@ -327,6 +397,10 @@ export default function PrivacyPage() {
               <Row
                 k="Event and course data"
                 v="Lifetime of the event or course, plus 12 months"
+              />
+              <Row
+                k="Attendee registration data"
+                v="While the event is active, plus 12 months unless the organizer configures a longer retention period"
               />
               <Row
                 k="Payment and payout records"
@@ -471,7 +545,7 @@ export default function PrivacyPage() {
 }
 
 // ============================================================
-// PRIMITIVES
+// PRIMITIVES (unchanged)
 // ============================================================
 
 function Section({
