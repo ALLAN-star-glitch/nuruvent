@@ -2,6 +2,8 @@
 
 'use client';
 
+import { AlertCircle } from 'lucide-react';
+
 import {
   Card,
   CardContent,
@@ -35,6 +37,24 @@ export function TicketStep({
 }: TicketStepProps) {
   return (
     <div className="space-y-6">
+      {/* ---- Open-access banner ---- */}
+      {!formData.registration_enabled && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Registration is disabled
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Because this is an open access event, attendees will not
+              register or select tickets. You can safely leave the ticket
+              details below blank, or turn registration back on in Step 1
+              to sell tickets.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ---- Tickets ---- */}
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">

@@ -24,30 +24,6 @@ import type { UseEventImageResult } from './useEventImage';
 // ============================================================
 // useAutoSave
 // ============================================================
-//
-// The auto-save engine. Debounces 2s after the last change, saves to
-// the server (create on first save, update after), and uploads the
-// image once the event exists.
-//
-// Does NOT own `isLoadingFlow`. Instead it reads a ref that the wizard
-// flips while a manual submit is running, so auto-save and submit
-// don't race.
-//
-// Does NOT handle:
-//   - Publish — that's useEventSubmit
-//   - Validation — that's useEventValidation
-//   - draftId storage — that's useEventDraft
-//
-// v1.1 — create-path concurrency guard
-//
-// The first save creates a draft (POST /events/draft). If two auto-
-// save fires happen before `draft.setDraftId()` lands (debounce +
-// unmount-save race, or fast typing), both would POST and the second
-// would hit the slug unique constraint.
-//
-// `creatingDraftRef` in-memory lock closes that window: while a create
-// is in flight, subsequent auto-save fires no-op. Combined with the
-// backend's slug-collision retry, no duplicate drafts are ever created.
 
 const DEBOUNCE_MS = 2000;
 
@@ -72,6 +48,26 @@ interface UseAutoSaveParams {
   onDraftCreated?: (eventId: string) => void;
 }
 
+/**
+ * Whether the form has enough data to warrant a save.
+ *
+ * The base check is "name OR event type OR first schedule start".
+ * A user who flips `registration_enabled` to `false` on an otherwise
+ * empty form has expressed intent and should be persisted — so that
+ * case also counts.
+ *
+ * `registration_enabled === true` does NOT count, because `true` is
+ * the default; toggling back to it on an empty form is a no-op.
+ */
+function hasMeaningfulData(form: EventFormData): boolean {
+  const first = form.schedules?.[0];
+  if (form.name?.trim()) return true;
+  if (form.event_type_id) return true;
+  if (first?.start_date) return true;
+  if (form.registration_enabled === false) return true;
+  return false;
+}
+
 export function useAutoSave({
   teamId,
   formData,
@@ -93,8 +89,6 @@ export function useAutoSave({
   const isAutoSavingRef = useRef(false);
   const formDataRef = useRef(formData);
 
-  // In-memory lock for the create path. Prevents two concurrent
-  // auto-save fires from both POSTing a new draft.
   const creatingDraftRef = useRef(false);
 
   useEffect(() => {
@@ -104,9 +98,7 @@ export function useAutoSave({
   // ---- Dirty tracking ----
   useEffect(() => {
     if (!lastSavedData) {
-      const first = formData.schedules?.[0];
-      const hasAny =
-        !!formData.name || !!formData.event_type_id || !!first?.start_date;
+      const hasAny = hasMeaningfulData(formData);
       setHasChanges(hasAny);
       if (hasAny && saveStatus !== 'saving') setSaveStatus('saving');
       return;
@@ -137,17 +129,10 @@ export function useAutoSave({
     if (submitInFlightRef.current) return;
 
     const current = formDataRef.current;
-    const firstSchedule = current.schedules?.[0];
-    const hasAny =
-      !!current.name?.trim() ||
-      !!current.event_type_id ||
-      !!firstSchedule?.start_date;
-    if (!hasAny) return;
+    if (!hasMeaningfulData(current)) return;
 
     const currentDraftId = draft.getDraftId();
 
-    // Guard: another create is already in flight — don't POST again.
-    // This is what stops the slug-collision on a double-fire.
     if (!currentDraftId && creatingDraftRef.current) {
       return;
     }
@@ -233,13 +218,7 @@ export function useAutoSave({
   // ---- Debounced timer ----
   useEffect(() => {
     const current = formDataRef.current;
-    const firstSchedule = current.schedules?.[0];
-    const hasAny =
-      !!current.name?.trim() ||
-      !!current.event_type_id ||
-      !!firstSchedule?.start_date;
-
-    if (!hasAny) return;
+    if (!hasMeaningfulData(current)) return;
     if (submitInFlightRef.current) return;
     if (isAutoSaving) return;
     if (!hasChanges) return;

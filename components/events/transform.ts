@@ -55,27 +55,11 @@ function schedulesToRequest(schedules: ScheduleForm[]) {
 // RECURRENCE
 // ============================================================
 
-/**
- * Maps the form's RecurrenceForm to the backend's RecurrenceInput.
- *
- * The form still uses the legacy field names (pattern, ends_on,
- * occurrences, day_of_month, week_of_month) so existing UI code
- * doesn't need to be rewritten. This function translates them into
- * the new shape (frequency, end_date, count) that the backend now
- * requires.
- *
- * Fields the backend no longer supports (day_of_month,
- * week_of_month) are silently dropped. If a user had them set, they
- * are lost on save — that's acceptable because the backend rejects
- * "custom" recurrence anyway.
- */
 function recurrenceToRequest(
   recurrence: RecurrenceForm | null,
 ): RecurrenceInput | undefined {
   if (!recurrence || !recurrence.pattern) return undefined;
 
-  // Legacy "custom" is no longer supported. Downgrade to the closest
-  // concrete frequency so users don't lose their saved events.
   const frequency: RecurrenceInput['frequency'] =
     recurrence.pattern === 'custom' ? 'weekly' : recurrence.pattern;
 
@@ -224,16 +208,6 @@ function buildCommonFields(form: EventFormData) {
 // ============================================================
 // CERTIFICATE FIELDS
 // ============================================================
-//
-// The event wizard no longer collects a free-form certificate price.
-// The organizer picks a system tier (Basic / Professional / Premium),
-// and its ID is stored on the event. Pricing is resolved server-side
-// from that tier's price_minor when certificates are issued.
-//
-// `certificate_price` is only kept in the payload for backward
-// compatibility with older backend versions that still require it.
-// It is always derived from the tier's snapshot — never typed by the
-// user.
 
 function certificateFields(form: EventFormData) {
   if (!form.certificate_enabled) {
@@ -277,6 +251,7 @@ export function buildDraftPayload(form: EventFormData): CreateDraftRequest {
       ? form.invited_emails
       : undefined,
     is_featured: form.is_featured,
+    registration_enabled: form.registration_enabled,
     ...certificateFields(form),
     speakers: speakersToRequest(form.speakers),
     materials: materialsToRequest(form.materials),
@@ -309,6 +284,7 @@ export function buildPublishPayload(form: EventFormData): CreateEventRequest {
     capacity: form.capacity ?? undefined,
     waitlist_enabled: form.waitlist_enabled || undefined,
     is_featured: form.is_featured,
+    registration_enabled: form.registration_enabled,
     ...certificateFields(form),
     password: form.password || undefined,
     invite_only: form.invite_only || undefined,
@@ -353,6 +329,7 @@ export function buildUpdatePayload(
       ? form.invited_emails
       : undefined,
     is_featured: form.is_featured,
+    registration_enabled: form.registration_enabled,
     ...certificateFields(form),
     speakers: speakersToRequest(form.speakers),
     materials: materialsToRequest(form.materials),
@@ -389,10 +366,6 @@ export function mapAIDraftToForm(
       }))
     : undefined;
 
-  // The form's RecurrenceForm shape is still legacy (pattern /
-  // ends_on / occurrences). Map the AI's new-shape output (frequency
-  // / end_date / count) into the form's field names so the UI
-  // continues to work without changing the form component.
   const recurrence: RecurrenceForm | null =
     draft.is_recurring && draft.recurrence
       ? {
@@ -439,6 +412,7 @@ export function mapAIDraftToForm(
     invite_only: draft.invite_only ?? undefined,
     is_private: draft.visibility === 'private' ? true : undefined,
     is_featured: draft.is_featured ?? undefined,
+    registration_enabled: draft.registration_enabled,
     certificate_enabled: draft.certificate_enabled ?? undefined,
   };
 }

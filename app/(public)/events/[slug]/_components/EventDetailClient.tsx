@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Video } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -86,8 +86,6 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
   const ticketCardRef = useRef<HTMLDivElement | null>(null);
   const [showMobileCta, setShowMobileCta] = useState(false);
 
-  // Scroll-to-tickets helper, defined before the hook so the guest flow
-  // can invoke it after switching to the form.
   const scrollToTicketCard = () => {
     ticketCardRef.current?.scrollIntoView({
       behavior: 'smooth',
@@ -163,7 +161,7 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
     );
   }
 
-  // --- derived display data ---
+  // ---- Derived display data ----
   const dateLabel = getEventLongDateLabel(event);
   const dateSummary = formatEventDateSummary(event);
   const timeRange = getEventTimeRange(event);
@@ -202,6 +200,15 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
       `/checkout/${event.slug}?registration=${registration.id}${emailParam}`,
     );
   };
+
+  // ---- Open access state ----
+  const registrationEnabled = event.registration_enabled !== false;
+  const directJoinUrl =
+    event.zoom_link ||
+    event.meet_link ||
+    event.schedules?.[0]?.zoom_link ||
+    event.schedules?.[0]?.meet_link ||
+    '';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -290,13 +297,42 @@ export function EventDetailClient({ slug, initialEvent }: Props) {
         </div>
       </div>
 
-      {showMobileCta && canBook && !showSuccess && (
-        <DetailMobileCTA
-          hasSelection={hasSelection}
-          totalPrice={totalPrice}
-          minTicketPrice={minTicketPrice}
-          onScrollToTickets={scrollToTicketCard}
-        />
+      {/* Mobile sticky CTA — two variants */}
+      {!registrationEnabled ? (
+        !isPast && directJoinUrl && (
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-xl lg:hidden">
+            <div className="container mx-auto flex max-w-7xl items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Open Access
+                </p>
+                <p className="truncate text-base font-bold text-foreground">
+                  No registration required
+                </p>
+              </div>
+              <a
+                href={directJoinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              >
+                <Video className="h-4 w-4" />
+                Join Meeting
+              </a>
+            </div>
+          </div>
+        )
+      ) : (
+        showMobileCta &&
+        canBook &&
+        !showSuccess && (
+          <DetailMobileCTA
+            hasSelection={hasSelection}
+            totalPrice={totalPrice}
+            minTicketPrice={minTicketPrice}
+            onScrollToTickets={scrollToTicketCard}
+          />
+        )
       )}
 
       <GuestEmailDialog
