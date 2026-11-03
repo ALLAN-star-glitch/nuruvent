@@ -77,6 +77,11 @@ const PLATFORM_META: Record<
     helpText:
       'Connect your Webex account to create meetings automatically. (Coming soon)',
   },
+  moodle: {
+    label: 'Moodle',
+    helpText:
+      'Connect your Moodle account to create meetings automatically. (Coming soon)',
+  },
 };
 
 /**

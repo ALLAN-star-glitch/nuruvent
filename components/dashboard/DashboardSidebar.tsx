@@ -30,6 +30,7 @@ import {
   Layers,
   Mic,
   BarChart2,
+  BookOpen, // ✨ ADDED: Icon for Courses
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -55,7 +56,8 @@ import type { Team } from '@/lib/types/team';
 
 interface NavItem {
   segment: string;
-  label: string;
+  // Allow dynamic labels based on role
+  label: string | ((role: { isAdmin: boolean; isOrganizer: boolean; isLearner: boolean }) => string);
   icon: LucideIcon;
   isTrash?: boolean;
   href?: string;
@@ -134,6 +136,8 @@ export function DashboardSidebar({
     return role === 'learner';
   }, [myMembership]);
 
+  const currentRole = useMemo(() => ({ isAdmin, isOrganizer, isLearner }), [isAdmin, isOrganizer, isLearner]);
+
   // ============================================================
   // NAVIGATION DEFINITIONS
   // ============================================================
@@ -150,6 +154,15 @@ export function DashboardSidebar({
       
       // Manage
       { segment: 'events', label: 'Events', icon: Calendar, organizersOnly: true },
+      
+      // ✨ ADDED: Courses item, disabled for now with dynamic label
+      { 
+        segment: 'courses', 
+        label: (role) => role.isOrganizer ? 'Manage Courses' : 'My Courses', 
+        icon: BookOpen, 
+        disabled: true, // 🛑 Disabled until the pages are built
+      },
+
       { segment: 'calendar', label: 'Calendar', icon: CalendarDays, organizersOnly: true, disabled: true },
       { segment: 'registrations', label: 'Registrations', icon: ClipboardList, organizersOnly: true },
       { segment: 'attendees', label: 'Attendees', icon: Users, organizersOnly: true },
@@ -253,7 +266,6 @@ export function DashboardSidebar({
   };
 
   const buildTeamHref = (team: Team) => {
-    // CHANGE THIS to go straight to settings instead of the dashboard
     return `/dashboard/${team.account_id}/${team.id}/settings`;
   };
 
@@ -366,13 +378,18 @@ export function DashboardSidebar({
               const hasChildren = !!item.children && item.children.length > 0;
               const isCertGroup = item.segment === 'certificates';
               const childrenExpanded = isCertGroup && certificatesExpanded;
+              
+              // Resolve dynamic labels
+              const resolvedLabel = typeof item.label === 'function' 
+                ? item.label(currentRole) 
+                : item.label;
 
               if (item.disabled) {
                 return (
-                  <div key={item.segment || item.label}>
+                  <div key={item.segment || resolvedLabel}>
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-foreground/40 opacity-50 cursor-not-allowed">
                       <Icon className="h-[18px] w-[18px] shrink-0" />
-                      <span className="truncate flex-1">{item.label}</span>
+                      <span className="truncate flex-1">{resolvedLabel}</span>
                       <span className="text-[10px] uppercase font-bold tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
                         Soon
                       </span>
@@ -381,11 +398,10 @@ export function DashboardSidebar({
                 );
               }
 
-                          return (
-                <div key={item.segment || item.label}>
+              return (
+                <div key={item.segment || resolvedLabel}>
                   {hasChildren ? (
                     <div className="space-y-0.5">
-                      {/* PARENT ITEM: Now a button that only toggles, not navigates */}
                       <button
                         type="button"
                         onClick={() => {
@@ -406,7 +422,7 @@ export function DashboardSidebar({
 
                         <div className="flex flex-1 items-center gap-3 px-3 py-2 truncate">
                           <Icon className={cn('h-[18px] w-[18px] shrink-0 transition-colors', isTrash ? 'text-destructive' : isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground')} />
-                          <span className="truncate">{item.label}</span>
+                          <span className="truncate">{resolvedLabel}</span>
                         </div>
 
                         <div className="pr-3 py-2">
@@ -419,9 +435,11 @@ export function DashboardSidebar({
                           {item.children!.map((child) => {
                             const ChildIcon = child.icon;
                             const childActive = isChildActive(child);
+                            const childResolvedLabel = typeof child.label === 'function' ? child.label(currentRole) : child.label;
+                            
                             return (
                               <Link
-                                key={child.label}
+                                key={childResolvedLabel}
                                 href={buildTeamNavHref(child)}
                                 prefetch={false}
                                 className={cn(
@@ -432,7 +450,7 @@ export function DashboardSidebar({
                                 )}
                               >
                                 <ChildIcon className="h-[16px] w-[16px] shrink-0" />
-                                <span className="truncate">{child.label}</span>
+                                <span className="truncate">{childResolvedLabel}</span>
                               </Link>
                             );
                           })}
@@ -457,7 +475,7 @@ export function DashboardSidebar({
                     >
                       {isActive && <div className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full', isTrash ? 'bg-destructive' : 'bg-primary')} />}
                       <Icon className={cn('h-[18px] w-[18px] shrink-0 transition-colors', isTrash ? 'text-destructive' : isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground')} />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">{resolvedLabel}</span>
                     </Link>
                   )}
                 </div>
