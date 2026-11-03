@@ -414,9 +414,14 @@ const payments = paymentsResponse?.data?.payments ?? [];
 
   const zoomConnection = video.getConnection('zoom');
   const googleMeetConnection = video.getConnection('google_meet');
+  // ✨ UPDATE: Safe check for Moodle
+  const moodleConnection = video.getConnection ? (video.getConnection('moodle' as VideoPlatform) || null) : null;
+  
   const hasAnyConnection = !!zoomConnection || !!googleMeetConnection;
   const connectedCount =
-    (zoomConnection ? 1 : 0) + (googleMeetConnection ? 1 : 0);
+    (zoomConnection ? 1 : 0) + 
+    (googleMeetConnection ? 1 : 0) +
+    (moodleConnection ? 1 : 0);
 
   const openPickerFromList = () => {
     setPickedPlatform(null);
@@ -842,7 +847,7 @@ const payments = paymentsResponse?.data?.payments ?? [];
     if (isAuthenticated && !video.isLoading) {
       base.push({
         icon: Plug,
-        label: hasAnyConnection ? 'Manage platforms' : 'Connect platform',
+        label: hasAnyConnection ? 'Manage integrations' : 'Connect platform',
         href: '#',
         color: 'text-primary',
         bg: 'bg-primary/10',
@@ -966,7 +971,7 @@ const payments = paymentsResponse?.data?.payments ?? [];
         </div>
       </div>
 
-      {/* Platform connection banner — same as before */}
+      {/* Integrations banner */}
       {!video.isLoading && (
         <div
           className={cn(
@@ -985,7 +990,7 @@ const payments = paymentsResponse?.data?.payments ?? [];
             {hasAnyConnection ? (
               <CheckCircle2 className="h-5 w-5" />
             ) : (
-              <Video className="h-5 w-5" />
+              <Plug className="h-5 w-5" />
             )}
           </div>
 
@@ -993,8 +998,8 @@ const payments = paymentsResponse?.data?.payments ?? [];
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-semibold text-foreground">
                 {hasAnyConnection
-                  ? `${connectedCount} platform${connectedCount > 1 ? 's' : ''} connected`
-                  : 'Connect a video platform'}
+                  ? `${connectedCount} integration${connectedCount > 1 ? 's' : ''} connected`
+                  : 'Connect your tools & platforms'}
               </p>
               {!hasAnyConnection && (
                 <Badge
@@ -1023,17 +1028,16 @@ const payments = paymentsResponse?.data?.payments ?? [];
                     {[
                       zoomConnection ? 'Zoom' : null,
                       googleMeetConnection ? 'Google Meet' : null,
+                      moodleConnection ? 'Moodle' : null,
                     ]
                       .filter(Boolean)
                       .join(', ')}
                   </span>
-                  . Meeting links are created automatically for your virtual
-                  sessions.
+                  . Meeting links and course enrollments are handled automatically.
                 </>
               ) : (
                 <>
-                  We&apos;ll create meeting links for each virtual session and
-                  track attendance automatically. Takes 30 seconds.
+                  We&apos;ll create meeting links, track attendance, and sync courses automatically. Takes 30 seconds.
                 </>
               )}
             </p>
@@ -1050,7 +1054,7 @@ const payments = paymentsResponse?.data?.payments ?? [];
                 )}
               >
                 <Plug className="h-4 w-4 mr-2" />
-                {hasAnyConnection ? 'Manage platforms' : 'Connect platform'}
+                {hasAnyConnection ? 'Manage integrations' : 'Connect platform'}
               </Button>
 
               <div className="flex items-center gap-1.5 ml-1">
@@ -1076,7 +1080,7 @@ const payments = paymentsResponse?.data?.payments ?? [];
                         'bg-background border border-border p-1.5',
                         meta.available
                           ? 'hover:border-primary/50 hover:bg-primary/5 cursor-pointer active:scale-95'
-                          : 'opacity-50 cursor-not-allowed',
+                          : 'opacity-50 cursor-not-allowed grayscale',
                       )}
                     >
                       <Image

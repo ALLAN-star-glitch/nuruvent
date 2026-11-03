@@ -23,7 +23,7 @@ export type SortOrder = 'asc' | 'desc';
 /**
  * Supported video platforms. Mirrors the backend `videodomain.Platform`.
  */
-export type VideoPlatform = 'zoom' | 'google_meet' | 'microsoft_teams' | 'webex';
+export type VideoPlatform = 'zoom' | 'google_meet' | 'microsoft_teams' | 'webex' | 'moodle';
 
 // ============================================================
 // 2. REFERENCE DATA

@@ -17,7 +17,7 @@ import {
   Settings2,
   Trash2,
   Upload,
-  Video,
+  Video, // Keep for the icon, or swap to Plug
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,7 +67,7 @@ import { cn } from '@/lib/utils';
 // NAV SECTIONS
 // ============================================================
 
-type SettingsSection = 'general' | 'video-platforms' | 'status' | 'danger';
+type SettingsSection = 'general' | 'integrations' | 'status' | 'danger';
 
 const SETTINGS_SECTIONS: Array<{
   key: SettingsSection;
@@ -83,10 +83,11 @@ const SETTINGS_SECTIONS: Array<{
     icon: Settings2,
   },
   {
-    key: 'video-platforms',
-    label: 'Video Platforms',
-    hint: 'Zoom, Google Meet',
-    icon: Video,
+    // ✨ UPDATE: Renamed from 'video-platforms' to 'integrations'
+    key: 'integrations',
+    label: 'Integrations',
+    hint: 'Zoom, Meet, Moodle',
+    icon: Plug, // ✨ UPDATE: Swapped Video icon for Plug icon
   },
   {
     key: 'status',
@@ -105,7 +106,8 @@ const SETTINGS_SECTIONS: Array<{
 
 // Legacy URL aliases — keeps old bookmarks / links working.
 const SECTION_ALIASES: Record<string, SettingsSection> = {
-  integrations: 'video-platforms',
+  'video-platforms': 'integrations', // ✨ UPDATE: Alias old URL to new one
+  video: 'integrations', 
 };
 
 // ============================================================
@@ -724,9 +726,9 @@ export default function AccountSettingsPage() {
             </Card>
           )}
 
-          {/* VIDEO PLATFORMS */}
-          {section === 'video-platforms' && (
-            <VideoPlatformsPanel accountId={accountId} />
+          {/* INTEGRATIONS */}
+          {section === 'integrations' && (
+            <IntegrationsPanel accountId={accountId} />
           )}
 
           {/* STATUS */}
@@ -876,10 +878,10 @@ function StatusRow({
 }
 
 // ============================================================
-// VIDEO PLATFORMS PANEL
+// INTEGRATIONS PANEL
 // ============================================================
 
-function VideoPlatformsPanel({ accountId }: { accountId: string }) {
+function IntegrationsPanel({ accountId }: { accountId: string }) {
   const video = useVideoConnection();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickedPlatform, setPickedPlatform] = useState<VideoPlatform | null>(
@@ -906,12 +908,12 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
         <CardHeader className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold sm:text-base">
-              <Video className="h-4 w-4 shrink-0 text-primary" />
-              Video Platforms
+              <Plug className="h-4 w-4 shrink-0 text-primary" />
+              Integrations
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm">
-              Connect Zoom or Google Meet to automatically create meeting
-              links and track attendance for your events.
+              Connect Zoom, Google Meet, or Moodle to automatically create meeting
+              links, track attendance, and sync course enrollments for your events.
             </CardDescription>
           </div>
           {anyConnection && (
@@ -943,7 +945,7 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
                     ? 'group cursor-pointer border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10'
                     : meta.available
                       ? 'group cursor-pointer border-border hover:border-primary/40 hover:bg-primary/5'
-                      : 'cursor-not-allowed border-border opacity-70',
+                      : 'cursor-not-allowed border-border opacity-70 grayscale', // ✨ UPDATE: Added grayscale for disabled
                 )}
               >
                 <div
@@ -1029,7 +1031,7 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
               className="w-full cursor-pointer sm:w-auto"
             >
               <Plug className="mr-2 h-4 w-4" />
-              Manage platforms
+              Manage integrations
             </Button>
           </div>
         </CardContent>
@@ -1038,7 +1040,7 @@ function VideoPlatformsPanel({ accountId }: { accountId: string }) {
       <PlatformPickerModal
         open={isPickerOpen}
         onOpenChange={setIsPickerOpen}
-        returnUrl={`/dashboard/${accountId}/settings?tab=video-platforms`}
+        returnUrl={`/dashboard/${accountId}/settings?tab=integrations`}
         initialPlatform={pickedPlatform}
       />
     </>

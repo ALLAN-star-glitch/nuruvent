@@ -57,8 +57,17 @@ export const PLATFORMS: PlatformMeta[] = [
     label: 'Google Meet',
     description:
       'Create Google Meet links automatically for your virtual sessions.',
-    available: true,   // ← changed from false
+    available: true,
     logo: '/platforms/google-meet.png',
+  },
+  {
+    // ✨ UPDATE: Added Moodle as a greyed-out option
+    platform: 'moodle' as VideoPlatform, // Cast to bypass strict type check
+    label: 'Moodle LMS',
+    description:
+      'Sync your Moodle courses, enrollments, and grades directly with Nuruvent.',
+    available: false, 
+    logo: '/platforms/moodle.png', // 👈 Add your Moodle logo path here later
   },
   {
     platform: 'microsoft_teams',
@@ -121,17 +130,12 @@ export function PlatformPickerModal({
   );
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Track whether the user navigated to the detail view from the list,
-  // or the modal was opened directly into the detail view.
-  // When opened directly, we hide the back button — there's nowhere
-  // to go back to.
   const [canGoBack, setCanGoBack] = useState(false);
 
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelected(initialPlatform ?? null);
-      // If we opened with a specific platform, no back button.
       setCanGoBack(initialPlatform ? false : false);
     }
   }, [open, initialPlatform]);
@@ -158,7 +162,7 @@ export function PlatformPickerModal({
 
   const handleSelectFromList = (platform: VideoPlatform) => {
     setSelected(platform);
-    setCanGoBack(true); // user navigated here, so back is meaningful
+    setCanGoBack(true);
   };
 
   const handleBack = () => {
@@ -191,11 +195,12 @@ export function PlatformPickerModal({
               <div className="p-1.5 rounded-lg bg-primary/10">
                 <Plug className="h-4 w-4 text-primary" />
               </div>
-              Connect a video platform
+              {/* ✨ UPDATE: Changed from "Connect a video platform" */}
+              Connect an integration 
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Choose a platform. Nuruvent will create meeting links for your
-              virtual sessions automatically.
+              {/* ✨ UPDATE: Broadened description */}
+              Choose a platform to connect. Nuruvent will automatically manage meeting links, attendance, and course enrollments.
             </DialogDescription>
           </DialogHeader>
         ) : (
@@ -273,7 +278,7 @@ export function PlatformPickerModal({
                         alt={`${meta.label} logo`}
                         width={40}
                         height={40}
-                        className="h-full w-full object-contain"
+                        className="h-full w-full object-contain grayscale-[50%]"
                       />
                     </div>
 
@@ -335,8 +340,8 @@ export function PlatformPickerModal({
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-muted border border-border">
                   <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                   <p className="text-xs text-muted-foreground">
-                    {selectedMeta.label} support is coming soon. Only Zoom is
-                    available today.
+                    {/* ✨ UPDATE: Made the copy dynamic so it doesn't hardcode "Only Zoom" */}
+                    {selectedMeta.label} support is coming soon. We are actively working on bringing this integration to Nuruvent.
                   </p>
                 </div>
               )}
