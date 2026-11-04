@@ -1,10 +1,11 @@
+/* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/set-state-in-effect */
 // components/events/new/SaveSuccessDialog.tsx
 
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,7 @@ interface SaveSuccessDialogProps {
   onDismiss: () => void;
 }
 
-type ProvisionState = 'idle' | 'polling' | 'done' | 'timed-out';
+type ProvisionState = 'idle' | 'polling' | 'done' | 'timed-out' | 'deferred';
 
 export function SaveSuccessDialog({
   open,
@@ -61,15 +62,24 @@ export function SaveSuccessDialog({
   const hasVirtualSessions = !!formData.schedules?.some(
     (s) => s.is_virtual && !!s.platform,
   );
-  const shouldPoll = isPublished && hasVirtualSessions && !!createdEventId;
+
+  // Check if the first schedule is more than 30 days away
+  const isDeferred = useMemo(() => {
+    if (!primarySchedule?.start_date) return false;
+    const startDate = new Date(`${primarySchedule.start_date}T00:00:00Z`).getTime();
+    // eslint-disable-next-line react-hooks/purity
+    const thirtyDaysFromNow = Date.now() + 30 * 24 * 60 * 60 * 1000;
+    return startDate > thirtyDaysFromNow;
+  }, [primarySchedule?.start_date]);
+
+  // Only poll if it's a virtual event AND it's not deferred
+  const shouldPoll =
+    isPublished && hasVirtualSessions && !!createdEventId && !isDeferred;
 
   const [provisionState, setProvisionState] =
     useState<ProvisionState>('idle');
   const [pollAttempts, setPollAttempts] = useState(0);
 
-  // Poll the event every 2s while the dialog is open and meetings
-  // haven't been provisioned yet. Stops when all sessions have
-  // video_meeting_id (or after 15 attempts — 30s timeout).
   const { data: eventResponse, refetch } = useGetEventByIdQuery(
     createdEventId ?? '',
     { skip: !shouldPoll || !open },
@@ -85,13 +95,17 @@ export function SaveSuccessDialog({
 
   // Reset state when the dialog opens for a fresh save.
   useEffect(() => {
-    if (open && shouldPoll) {
-      setProvisionState('polling');
-      setPollAttempts(0);
-    } else if (!open) {
+    if (open) {
+      if (isDeferred) {
+        setProvisionState('deferred');
+      } else if (shouldPoll) {
+        setProvisionState('polling');
+        setPollAttempts(0);
+      }
+    } else {
       setProvisionState('idle');
     }
-  }, [open, shouldPoll]);
+  }, [open, shouldPoll, isDeferred]);
 
   // Drive the poll.
   useEffect(() => {
@@ -123,8 +137,8 @@ export function SaveSuccessDialog({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isPublished
-              ? 'Your event has been published and is now visible to attendees.'
-              : 'Your event has been saved as a draft. You can publish it anytime.'}
+              ? 'Your event is live and open for registration.'
+              : 'Your event is saved as a draft. You can publish it when you are ready.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -150,43 +164,62 @@ export function SaveSuccessDialog({
             </div>
           </div>
 
+          {/* Deferred State (Event > 30 days away) */}
+          {isPublished && hasVirtualSessions && provisionState === 'deferred' && (
+            <div className="w-full flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900/40 dark:bg-blue-950/20">
+              <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  Join link coming soon
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                  Because your event is still a while away, we&apos;ll create the
+                  video link closer to the date. You don&apos;t need to do anything.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Polling State */}
           {shouldPoll && provisionState === 'polling' && (
             <div className="w-full flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-primary">
-                  Generating meeting links…
+                  Creating your video link…
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This usually takes a few seconds.
+                  This will just take a moment.
                 </p>
               </div>
             </div>
           )}
 
+          {/* Done State */}
           {shouldPoll && provisionState === 'done' && (
             <div className="w-full flex items-start gap-2.5 rounded-lg border border-tertiary-500/30 bg-tertiary-50 dark:bg-tertiary-950/20 p-3">
               <CheckCircle2 className="h-4 w-4 text-tertiary-500 shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-tertiary-700 dark:text-tertiary-300">
-                  Meeting links ready
+                  Video link is ready
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Open the event to share them with attendees.
+                  Open the event to share it with your attendees.
                 </p>
               </div>
             </div>
           )}
 
+          {/* Timed Out State */}
           {shouldPoll && provisionState === 'timed-out' && (
             <div className="w-full flex items-start gap-2.5 rounded-lg border border-border bg-muted/50 p-3">
-              <Loader2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">
-                  Still provisioning
+                  Taking longer than usual
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Links will appear on the event page shortly.
+                  Don&apos;t worry — the link will show up on the event page as soon as it&apos;s ready.
                 </p>
               </div>
             </div>
