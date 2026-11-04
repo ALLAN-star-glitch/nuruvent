@@ -2,9 +2,8 @@
 
 'use client';
 
-import { useMemo } from 'react';
 import Image from 'next/image';
-import { Pencil, Plug } from 'lucide-react';
+import { Info, Pencil, Plug, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { VideoPlatform } from '@/lib/types/events';
@@ -32,7 +31,7 @@ export function ConnectedState({
   onRegenerateMeeting,
   onDeleteMeeting,
   onCopyMeetingLink,
-  isRecurring, // <--- NEW
+  isRecurring,
 }: {
   schedule: ScheduleForm;
   platforms: PlatformMeta[];
@@ -51,11 +50,10 @@ export function ConnectedState({
   onRegenerateMeeting: () => void;
   onDeleteMeeting: () => void;
   onCopyMeetingLink: () => void;
-  isRecurring?: boolean; // <--- NEW
+  isRecurring?: boolean;
 }) {
   const onlyOne = platforms.length === 1;
   const meetingLink = schedule.zoom_link || schedule.meet_link || undefined;
-
   const canCreateMeeting = !!selected?.platform && !hasMeeting;
 
   return (
@@ -145,22 +143,48 @@ export function ConnectedState({
         </>
       )}
 
-      <MeetingActionsInline
-        meetingLink={meetingLink}
-        platform={selected}
-        isPersisted={isPersisted}
-        hasMeeting={hasMeeting}
-        canCreateMeeting={canCreateMeeting}
-        isRunning={isMeetingActionRunning}
-        otherSessionsMissingMeeting={otherSessionsMissingMeeting}
-        onCreate={onCreateMeeting}
-        onRegenerate={onRegenerateMeeting}
-        onDelete={onDeleteMeeting}
-        onCopy={onCopyMeetingLink}
-        copied={copied}
-        disabled={disabled}
-        isRecurring={isRecurring} // <--- NEW
-      />
+      {/* ============================================================
+          RECURRING MODE
+          Hide the "Meeting is linked" card and the Join/Copy/
+          Regenerate/Delete buttons entirely. Show a clean hint.
+          ============================================================ */}
+      {isRecurring ? (
+        <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+              <Video className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold text-foreground">
+                Unique {selected?.label ?? 'video'} links per session
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Because this is a recurring event, a distinct{' '}
+                {selected?.label ?? 'video'} meeting will be created for
+                each occurrence when you publish. The links will be
+                available per-session on the event page after publishing.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <MeetingActionsInline
+          meetingLink={meetingLink}
+          platform={selected}
+          isPersisted={isPersisted}
+          hasMeeting={hasMeeting}
+          canCreateMeeting={canCreateMeeting}
+          isRunning={isMeetingActionRunning}
+          otherSessionsMissingMeeting={otherSessionsMissingMeeting}
+          onCreate={onCreateMeeting}
+          onRegenerate={onRegenerateMeeting}
+          onDelete={onDeleteMeeting}
+          onCopy={onCopyMeetingLink}
+          copied={copied}
+          disabled={disabled}
+          isRecurring={isRecurring}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button
@@ -168,7 +192,7 @@ export function ConnectedState({
           variant="outline"
           size="sm"
           onClick={onUseManual}
-          disabled={disabled}
+          disabled={disabled || isRecurring}
           className="cursor-pointer font-semibold h-9 border-border text-muted-foreground hover:text-foreground hover:bg-accent"
         >
           <Pencil className="h-3.5 w-3.5 mr-1.5" />

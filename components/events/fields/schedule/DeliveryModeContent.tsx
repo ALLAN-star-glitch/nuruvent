@@ -32,7 +32,7 @@ export function DeliveryModeContent({
   onRegenerateMeeting,
   onDeleteMeeting,
   onCopyMeetingLink,
-  isRecurring, // <--- NEW
+  isRecurring,
 }: {
   schedule: ScheduleForm;
   index: number;
@@ -53,23 +53,20 @@ export function DeliveryModeContent({
   onRegenerateMeeting: () => void;
   onDeleteMeeting: () => void;
   onCopyMeetingLink: () => void;
-  isRecurring?: boolean; // <--- NEW
+  isRecurring?: boolean;
 }) {
   const hasLink = !!(schedule.zoom_link?.trim() || schedule.meet_link?.trim());
   const hasMeeting = !!schedule.video_meeting_id;
   const showManual = manualMode || (hasLink && !hasMeeting);
 
   const connectedPlatforms: PlatformMeta[] = useMemo(
-    () => PLATFORMS.filter((p) => p.available && !!video.getConnection(p.platform)),
+    () =>
+      PLATFORMS.filter((p) => p.available && !!video.getConnection(p.platform)),
     [video],
   );
   const anyConnected = connectedPlatforms.length > 0;
   const onlyOneConnected = connectedPlatforms.length === 1;
 
-  // Auto-select the platform when exactly one is connected and the
-  // schedule doesn't have one yet. Runs once per (schedule, connection)
-  // pair — safe because onSelectPlatform is a no-op when the value
-  // doesn't change.
   useEffect(() => {
     if (!onlyOneConnected) return;
     if (showManual) return;
@@ -129,7 +126,7 @@ export function DeliveryModeContent({
         onRegenerateMeeting={onRegenerateMeeting}
         onDeleteMeeting={onDeleteMeeting}
         onCopyMeetingLink={onCopyMeetingLink}
-        isRecurring={isRecurring} // <--- NEW
+        isRecurring={isRecurring}
       />
     );
   }

@@ -1,4 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+// components/dashboard/DashboardSidebar.tsx
+
 'use client';
 
 import Link from 'next/link';
@@ -30,7 +32,7 @@ import {
   Layers,
   Mic,
   BarChart2,
-  BookOpen, // ✨ ADDED: Icon for Courses
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +46,7 @@ import {
   useGetMyAccountsQuery,
   useGetMyMembershipQuery,
 } from '@/lib/store/api/accountsApi';
+import { useGetTrashedEventsCountQuery } from '@/lib/store/api/eventsApi'; // <-- NEW
 import { InviteMemberDialog } from '@/components/team/InviteMemberDialog';
 import { buildTeamSwitchHref } from '@/lib/utils/team-switch';
 import { accountLabel } from '@/lib/utils/account-label';
@@ -56,7 +59,6 @@ import type { Team } from '@/lib/types/team';
 
 interface NavItem {
   segment: string;
-  // Allow dynamic labels based on role
   label: string | ((role: { isAdmin: boolean; isOrganizer: boolean; isLearner: boolean }) => string);
   icon: LucideIcon;
   isTrash?: boolean;
@@ -95,15 +97,15 @@ export function DashboardSidebar({
   const accountId = urlAccountId ?? workspaceAccountId ?? null;
   const teamId = urlTeamId ?? workspaceTeamId ?? null;
 
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated); // <-- NEW
+
   const dispatch = useAppDispatch();
   const [logout, { isLoading }] = useLogoutMutation();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   
-  // Accordions closed by default
   const [teamsExpanded, setTeamsExpanded] = useState(false);
   const [certificatesExpanded, setCertificatesExpanded] = useState(false);
-  
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const { data: teamsResponse } = useGetUserTeamsQuery();
@@ -114,6 +116,15 @@ export function DashboardSidebar({
   const { data: myMembership } = useGetMyMembershipQuery(accountId ?? '', {
     skip: !accountId,
   });
+
+  // ─── NEW: Trash count for the badge ───
+  const { data: trashCountResponse } = useGetTrashedEventsCountQuery(undefined, {
+    skip: !isAuthenticated || !teamId,
+    // Optional: poll every 60s so the badge stays fresh without a full refetch
+    pollingInterval: 60000,
+    refetchOnMountOrArgChange: true,
+  });
+  const trashedCount = trashCountResponse?.count ?? 0;
 
   const accountById = useMemo(() => {
     const map = new Map<string, Account>();
@@ -152,15 +163,13 @@ export function DashboardSidebar({
       },
       { segment: '', label: 'Dashboard', icon: LayoutDashboard },
       
-      // Manage
       { segment: 'events', label: 'Events', icon: Calendar, organizersOnly: true },
       
-      // ✨ ADDED: Courses item, disabled for now with dynamic label
       { 
         segment: 'courses', 
         label: (role) => role.isOrganizer ? 'Manage Courses' : 'My Courses', 
         icon: BookOpen, 
-        disabled: true, // 🛑 Disabled until the pages are built
+        disabled: true,
       },
 
       { segment: 'calendar', label: 'Calendar', icon: CalendarDays, organizersOnly: true, disabled: true },
@@ -197,7 +206,6 @@ export function DashboardSidebar({
       { segment: 'reports', label: 'Reports', icon: BarChart2, organizersOnly: true, disabled: true },
       { segment: 'trash', label: 'Trash', icon: Trash2, isTrash: true, organizersOnly: true },
 
-      // Participate
       { segment: 'tickets', label: 'My Tickets', icon: Ticket },
       { segment: 'my-certificates', label: 'My Certificates', icon: Award, learnersOnly: true, href: accountId ? `/me/certificates` : undefined },
       { segment: 'replays', label: 'Replays', icon: Clapperboard, disabled: true },
@@ -368,7 +376,6 @@ export function DashboardSidebar({
           )}
         </div>
 
-        {/* Scrollable Area */}
         <div className="flex-1 sidebar-scroll relative">
           <div className="px-3 py-2 space-y-0.5">
             {visibleNavItems.map((item) => {
@@ -379,10 +386,13 @@ export function DashboardSidebar({
               const isCertGroup = item.segment === 'certificates';
               const childrenExpanded = isCertGroup && certificatesExpanded;
               
-              // Resolve dynamic labels
               const resolvedLabel = typeof item.label === 'function' 
                 ? item.label(currentRole) 
                 : item.label;
+
+              // Show a count badge on the Trash item only
+              const badgeCount = isTrash ? trashedCount : 0;
+              const showBadge = isTrash && badgeCount > 0;
 
               if (item.disabled) {
                 return (
@@ -476,6 +486,20 @@ export function DashboardSidebar({
                       {isActive && <div className={cn('absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full', isTrash ? 'bg-destructive' : 'bg-primary')} />}
                       <Icon className={cn('h-[18px] w-[18px] shrink-0 transition-colors', isTrash ? 'text-destructive' : isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground')} />
                       <span className="truncate">{resolvedLabel}</span>
+                      
+                      {/* ─── NEW: Trash count badge ─── */}
+                      {showBadge && (
+                        <span
+                          className={cn(
+                            'ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold',
+                            isActive
+                              ? 'bg-destructive text-destructive-foreground'
+                              : 'bg-destructive/10 text-destructive'
+                          )}
+                        >
+                          {badgeCount > 99 ? '99+' : badgeCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                 </div>
@@ -601,7 +625,6 @@ export function DashboardSidebar({
             </button>
           </div>
           
-          {/* Bottom fade to hint at more content */}
           <div className="pointer-events-none sticky bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-card to-transparent z-10" />
         </div>
       </aside>
