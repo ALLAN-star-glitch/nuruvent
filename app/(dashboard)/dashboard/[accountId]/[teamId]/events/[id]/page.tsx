@@ -336,38 +336,56 @@ export default function EventDetailPage({
 
   const event: Event | undefined = response?.data;
 
+  // ----------------------------------------------------------
+  // Provisioning / missing-meeting tracking
+  // ----------------------------------------------------------
+  //
+  // `hasUnprovisionedSessions` is the raw fact: at least one virtual
+  // session has a platform but no video_meeting_id yet, and its start
+  // date is within the 30-day provisioning window.
+  //
+  // We split the UI states as follows:
+  //   - provisioningInProgress -> worker is expected to be running now
+  //     (poll window still open after publish). Blue spinner banner.
+  //   - meetingsMissing -> worker has finished / not running / capped,
+  //     but links are still absent. Amber actionable banner.
+  const [pollAttempts, setPollAttempts] = useState(0);
 
-  // Poll while any provisioned-eligible session is still missing a meeting.
-// The worker provisions asynchronously after publish, usually within
-// 1–3 seconds. Poll every 2s, cap at 30s.
-const [pollAttempts, setPollAttempts] = useState(0);
+  const hasUnprovisionedSessions = useMemo(() => {
+    if (!event || !isEventPublished(event)) return false;
+    // eslint-disable-next-line react-hooks/purity
+    const now = Date.now();
+    const windowMs = 30 * 24 * 60 * 60 * 1000;
+    return (event.schedules ?? []).some((s) => {
+      if (!s.is_virtual || !s.platform) return false;
+      if (s.video_meeting_id) return false;
+      const t = new Date(s.start_date).getTime();
+      return t - now <= windowMs;
+    });
+  }, [event]);
 
-const needsProvisioning = useMemo(() => {
-  if (!event || !isEventPublished(event)) return false;
-  // eslint-disable-next-line react-hooks/purity
-  const now = Date.now();
-  const windowMs = 30 * 24 * 60 * 60 * 1000;
-  return (event.schedules ?? []).some((s) => {
-    if (!s.is_virtual || !s.platform) return false;
-    if (s.video_meeting_id) return false;
-    const t = new Date(s.start_date).getTime();
-    return t - now <= windowMs;
-  });
-}, [event]);
+  const provisioningInProgress =
+    hasUnprovisionedSessions && pollAttempts < 15;
 
-useEffect(() => {
-  if (!needsProvisioning) {
-    setPollAttempts(0);
-    return;
-  }
-  if (pollAttempts >= 15) return; // 30s cap
+  const meetingsMissing =
+    hasUnprovisionedSessions && pollAttempts >= 15;
 
-  const timer = setTimeout(() => {
-    refetch();
-    setPollAttempts((n) => n + 1);
-  }, 2000);
-  return () => clearTimeout(timer);
-}, [needsProvisioning, pollAttempts, refetch]);
+  useEffect(() => {
+    if (!hasUnprovisionedSessions) {
+      // Only reset the counter when provisioning is fully complete
+      // (all sessions have links). If we previously capped out, keep
+      // the cap so the amber banner stays visible until the user acts.
+      if (pollAttempts !== 0) setPollAttempts(0);
+      return;
+    }
+    if (pollAttempts >= 15) return; // 30s cap
+
+    const timer = setTimeout(() => {
+      refetch();
+      setPollAttempts((n) => n + 1);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [hasUnprovisionedSessions, pollAttempts, refetch]);
 
   const statusName = event ? getEventStatusName(event) : 'Draft';
   const statusConfig = getStatusConfig(statusName);
@@ -424,6 +442,8 @@ useEffect(() => {
         `"${event.display_name || event.name}" published successfully!`,
         { duration: 4000, position: 'top-right' },
       );
+      // Reset the polling window so the "Provisioning…" banner reappears
+      // while the worker creates meetings.
       setPollAttempts(0);
       refetch();
     } catch (err: unknown) {
@@ -1033,29 +1053,30 @@ useEffect(() => {
           {/* Meeting card */}
           {(event.is_virtual || event.is_hybrid) &&
             (isHost ? (
-             <MeetingCard
-              event={event}
-              isDraft={isDraft}
-              currentUserId={user?.id}
-              hasZoomConnection={hasZoomConnection}
-              hasMeetConnection={hasMeetConnection}
-              hasAnyConnection={hasAnyConnection}
-              connectedPlatforms={connectedPlatformMetas}
-              provisioningInProgress={needsProvisioning}   
-              runningSessionId={runningSessionId}
-              runningAction={runningAction}
-              onCreateMeetings={handleCreateMeetings}
-              onOpenPlatformPicker={openPlatformPicker}
-              onAddMeeting={() => setIsAddMeetingDialogOpen(true)}
-              onJoinLink={handleJoinLink}
-              onEditSession={handleEditSession}
-              onRegenerateSession={handleRegenerateSession}
-              onDeleteSession={handleDeleteSession}
-              onStartMeeting={handleStartMeeting}
-              onRegenerateAll={handleRegenerateAll}
-              onDeleteAll={handleDeleteAll}
-              editEventHref={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
-            />
+              <MeetingCard
+                event={event}
+                isDraft={isDraft}
+                currentUserId={user?.id}
+                hasZoomConnection={hasZoomConnection}
+                hasMeetConnection={hasMeetConnection}
+                hasAnyConnection={hasAnyConnection}
+                connectedPlatforms={connectedPlatformMetas}
+                provisioningInProgress={provisioningInProgress}
+                meetingsMissing={meetingsMissing}
+                runningSessionId={runningSessionId}
+                runningAction={runningAction}
+                onCreateMeetings={handleCreateMeetings}
+                onOpenPlatformPicker={openPlatformPicker}
+                onAddMeeting={() => setIsAddMeetingDialogOpen(true)}
+                onJoinLink={handleJoinLink}
+                onEditSession={handleEditSession}
+                onRegenerateSession={handleRegenerateSession}
+                onDeleteSession={handleDeleteSession}
+                onStartMeeting={handleStartMeeting}
+                onRegenerateAll={handleRegenerateAll}
+                onDeleteAll={handleDeleteAll}
+                editEventHref={`/dashboard/${accountId}/${teamId}/events/${event.id}/edit`}
+              />
             ) : (
               <MeetingCardReadOnly
                 event={event}
@@ -1064,19 +1085,19 @@ useEffect(() => {
             ))}
 
           {/* Attendance — host only */}
-        {isHost && (
-        <AttendanceCard
-          eventId={event.id}
-          accountId={accountId}
-          teamId={teamId}
-          summary={attendanceSummary}
-          loading={isAttendanceLoading}
-          error={attendanceErrorMessage}
-          fetchingSessionIds={fetchingSessionIds}
-          onFetchAttendance={handleFetchAttendance}
-          onExportAll={handleExportAll}
-        />
-      )}
+          {isHost && (
+            <AttendanceCard
+              eventId={event.id}
+              accountId={accountId}
+              teamId={teamId}
+              summary={attendanceSummary}
+              loading={isAttendanceLoading}
+              error={attendanceErrorMessage}
+              fetchingSessionIds={fetchingSessionIds}
+              onFetchAttendance={handleFetchAttendance}
+              onExportAll={handleExportAll}
+            />
+          )}
 
           {/* Description */}
           {event.description && (

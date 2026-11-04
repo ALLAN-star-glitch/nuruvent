@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  Clock,
   Edit,
   ExternalLink,
   Link2,
@@ -61,10 +62,18 @@ export interface MeetingCardProps {
   connectedPlatforms: PlatformMeta[];
 
   /**
-   * True while the async worker is still provisioning meetings for
-   * in-window sessions. Drives the "Provisioning meetings…" banner.
+   * True while the async worker is actively provisioning meetings
+   * (typically right after publish). Drives the "Provisioning meetings…"
+   * banner with a spinner.
    */
   provisioningInProgress?: boolean;
+
+  /**
+   * True when virtual sessions exist but no meeting link has been
+   * created/pasted yet, AND provisioning is not currently running.
+   * Drives the persistent "Meeting links not provided yet" banner.
+   */
+  meetingsMissing?: boolean;
 
   runningSessionId: string | null;
   runningAction:
@@ -115,17 +124,11 @@ function rawProviderLink(s: Schedule): string | undefined {
 /** Virtual schedule that has a meeting attached. */
 function hasMeeting(s: Schedule): boolean {
   if (!s.is_virtual) return false;
-  return !!(s.platform || s.video_meeting_id || rawProviderLink(s));
+  // Require an actual meeting ID or link. A platform alone means 
+  // it's provisioned but deferred (or failed).
+  return !!(s.video_meeting_id || rawProviderLink(s));
 }
 
-/**
- * Best link for a virtual session. Prefers the Nuruvent wrapper URL so
- * join flows route through us and attendance tracking works. Falls back
- * to the raw provider link.
- *
- * NOTE: this is only used to drive the Join button now — the URL string
- * itself is never rendered in the UI.
- */
 function resolveJoinLink(s: Schedule, event: Event): string | undefined {
   return nuruventMeetingUrl(s, event) ?? rawProviderLink(s);
 }
@@ -144,17 +147,21 @@ function sessionTimeLabel(s: Schedule): string {
 
 /**
  * Is the current viewer the host (creator) of the event?
- *
- * The backend includes `creator` on the payload only when the caller is
- * authorized to see creator details — which is always true for the host
- * themselves, and may be true for other account members depending on
- * their role. The identity check is what actually determines host
- * status; `creator` being absent simply means the viewer isn't allowed
- * to see who created the event, which also means they're not the host.
  */
 function isEventHost(event: Event, currentUserId: string | undefined): boolean {
   if (!currentUserId) return false;
   return event.creator?.id === currentUserId;
+}
+
+/**
+ * Is the event more than 30 days away?
+ */
+function isEventFarOut(event: Event): boolean {
+  const firstDate = event.schedules?.[0]?.start_date || event.start_date;
+  if (!firstDate) return false;
+  const start = new Date(`${firstDate.slice(0, 10)}T00:00:00Z`).getTime();
+  const thirtyDaysFromNow = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  return start > thirtyDaysFromNow;
 }
 
 // ============================================================
@@ -170,6 +177,7 @@ export function MeetingCard({
   hasAnyConnection,
   connectedPlatforms: _connectedPlatforms,
   provisioningInProgress,
+  meetingsMissing,
   runningSessionId,
   runningAction,
   onCreateMeetings,
@@ -199,6 +207,9 @@ export function MeetingCard({
   const hasAnyMeeting = virtualWithMeeting.length > 0;
   const hasAnyVirtual = allSchedules.some((s) => s.is_virtual);
 
+  // Is this event far out and missing meetings?
+  const isDeferred = isEventFarOut(event) && virtualMissingMeeting.length > 0;
+
   const platformsUsed = new Set(
     virtualWithMeeting.map((s) => schedulePlatform(s)).filter(Boolean),
   );
@@ -218,6 +229,10 @@ export function MeetingCard({
     }
 
     if (!hasAnyMeeting) {
+      if (isDeferred) return 'Meetings will be created closer to the date.';
+      if (virtualMissingMeeting.some((s) => s.platform)) {
+        return 'Meeting links not provided yet.';
+      }
       return 'No meetings created yet.';
     }
 
@@ -234,6 +249,12 @@ export function MeetingCard({
       }`;
     } else {
       base = `${virtualWithMeeting.length} sessions on mixed platforms`;
+    }
+
+    if (virtualMissingMeeting.length > 0) {
+      base += `, ${virtualMissingMeeting.length} missing ${
+        virtualMissingMeeting.length === 1 ? 'link' : 'links'
+      }`;
     }
 
     if (inPersonSchedules.length > 0) {
@@ -288,7 +309,7 @@ export function MeetingCard({
             </div>
           </button>
 
-          {/* Right-hand controls — outside the toggle so clicks don't fold the card */}
+          {/* Right-hand controls */}
           <div className="shrink-0 w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <Button
               size="sm"
@@ -343,8 +364,7 @@ export function MeetingCard({
         {/* BODY — collapsible */}
         {expanded && (
           <div id="meeting-card-body">
-            {/* Provisioning banner — shown while the async worker is still
-                creating meetings for in-window sessions. */}
+            {/* Provisioning banner — active worker */}
             {isHost && provisioningInProgress && (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-start gap-2.5 mt-4">
                 <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0 mt-0.5" />
@@ -359,6 +379,69 @@ export function MeetingCard({
                 </div>
               </div>
             )}
+
+            {/* Missing-links banner — persistent, worker not running */}
+            {isHost &&
+              !provisioningInProgress &&
+              meetingsMissing &&
+              !isDeferred && (
+                <div className="rounded-lg border border-amber-300/60 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20 p-3 flex items-start gap-2.5 mt-4">
+                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                      Meeting links not provided yet
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      {virtualMissingMeeting.length === 1
+                        ? '1 virtual session is missing a meeting link.'
+                        : `${virtualMissingMeeting.length} virtual sessions are missing meeting links.`}{' '}
+                      Create them automatically or paste links in the editor.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                      {hasAnyConnection ? (
+                        <Button
+                          size="sm"
+                          className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                          onClick={onCreateMeetings}
+                          disabled={runningAction === 'create'}
+                        >
+                          {runningAction === 'create' ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                              Creating…
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-3.5 w-3.5 mr-1.5" />
+                              Create meetings
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                          onClick={onOpenPlatformPicker}
+                        >
+                          <Plug className="h-3.5 w-3.5 mr-1.5" />
+                          Connect a platform
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer"
+                        onClick={() => {
+                          window.location.href = editEventHref;
+                        }}
+                      >
+                        <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                        Paste links manually
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {(hasAnyMeeting ||
               virtualMissingMeeting.length > 0 ||
@@ -390,6 +473,7 @@ export function MeetingCard({
                       meta={meta}
                       joinLink={joinLink}
                       isHost={isHost}
+                      isDeferred={isDeferred}
                       running={
                         runningSessionId === s.id ? runningAction : null
                       }
@@ -410,6 +494,7 @@ export function MeetingCard({
               !provisioningInProgress && (
                 <EmptyMeetingState
                   isDraft={isDraft}
+                  isDeferred={isDeferred}
                   hasAnyConnection={hasAnyConnection}
                   sessionCount={virtualMissingMeeting.length}
                   runningAction={runningAction}
@@ -434,7 +519,9 @@ export function MeetingCard({
                           : 'sessions have no meeting yet'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Create them automatically or paste links in the editor.
+                        {isDeferred
+                          ? 'These will be created automatically closer to the date, or you can create them now.'
+                          : 'Create them automatically or paste links in the editor.'}
                       </p>
                     </div>
                   </div>
@@ -544,6 +631,7 @@ export function MeetingCard({
 
 function EmptyMeetingState({
   isDraft,
+  isDeferred,
   hasAnyConnection,
   sessionCount,
   runningAction,
@@ -553,6 +641,7 @@ function EmptyMeetingState({
   editEventHref,
 }: {
   isDraft: boolean;
+  isDeferred: boolean;
   hasAnyConnection: boolean;
   sessionCount: number;
   runningAction: MeetingCardProps['runningAction'];
@@ -562,19 +651,48 @@ function EmptyMeetingState({
   editEventHref: string;
 }) {
   return (
-    <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+    <div
+      className={cn(
+        'mt-4 rounded-lg border p-4',
+        isDeferred
+          ? 'border-blue-200 bg-blue-50/60 dark:border-blue-900/40 dark:bg-blue-950/20'
+          : 'border-border bg-muted/30',
+      )}
+    >
       <div className="flex items-start gap-3">
-        <Plug className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+        {isDeferred ? (
+          <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+        ) : (
+          <Plug className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+        )}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">
-            No meetings created yet
+          <p
+            className={cn(
+              'text-sm font-medium',
+              isDeferred
+                ? 'text-blue-800 dark:text-blue-300'
+                : 'text-foreground',
+            )}
+          >
+            {isDeferred
+              ? 'Meetings scheduled for later'
+              : 'No meetings created yet'}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p
+            className={cn(
+              'text-xs mt-1',
+              isDeferred
+                ? 'text-blue-700 dark:text-blue-400'
+                : 'text-muted-foreground',
+            )}
+          >
             {isDraft
               ? 'A meeting will be created automatically for each virtual session when you publish.'
-              : hasAnyConnection
-                ? `Create meetings for all ${sessionCount} virtual sessions with one click, add a new session with a meeting, or paste links manually in the editor.`
-                : 'Connect a video platform to create meetings automatically, or paste links manually in the editor.'}
+              : isDeferred
+                ? 'Because this event is more than 30 days away, the video meetings will be created automatically as the date approaches. You can paste links manually if you need them now.'
+                : hasAnyConnection
+                  ? `Create meetings for all ${sessionCount} virtual sessions with one click, add a new session with a meeting, or paste links manually in the editor.`
+                  : 'Connect a video platform to create meetings automatically, or paste links manually in the editor.'}
           </p>
         </div>
       </div>
@@ -583,34 +701,42 @@ function EmptyMeetingState({
         <div className="flex flex-wrap items-center gap-2 mt-3">
           {hasAnyConnection ? (
             <>
-              <Button
-                size="sm"
-                className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
-                onClick={onCreateMeetings}
-                disabled={runningAction === 'create'}
-              >
-                {runningAction === 'create' ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    Creating…
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-3.5 w-3.5 mr-1.5" />
-                    Create meetings
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="cursor-pointer"
-                onClick={onAddMeeting}
-                disabled={runningAction === 'add'}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add meeting
-              </Button>
+              {/* Hide "Create meetings now" for deferred events, as the 
+                  backend will skip them until they are within 30 days. */}
+              {!isDeferred && (
+                <Button
+                  size="sm"
+                  className="cursor-pointer bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={onCreateMeetings}
+                  disabled={runningAction === 'create'}
+                >
+                  {runningAction === 'create' ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5 mr-1.5" />
+                      Create meetings now
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Add meeting is still useful to add a brand new session */}
+              {!isDeferred && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="cursor-pointer"
+                  onClick={onAddMeeting}
+                  disabled={runningAction === 'add'}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add meeting
+                </Button>
+              )}
             </>
           ) : (
             <Button
@@ -622,10 +748,15 @@ function EmptyMeetingState({
               Connect a platform
             </Button>
           )}
+          
+          {/* Paste links manually becomes the primary action for deferred events */}
           <Button
             size="sm"
-            variant="outline"
-            className="cursor-pointer"
+            variant={isDeferred ? "default" : "outline"}
+            className={cn(
+              "cursor-pointer",
+              isDeferred && "bg-blue-600 hover:bg-blue-700 text-white"
+            )}
             onClick={() => {
               window.location.href = editEventHref;
             }}
@@ -716,6 +847,7 @@ interface SessionRowProps {
   meta: PlatformMeta | undefined;
   joinLink: string | undefined;
   isHost: boolean;
+  isDeferred: boolean;
   running: MeetingCardProps['runningAction'];
   onJoin: (link: string) => void;
   onEdit: (sessionId: string) => void;
@@ -730,6 +862,7 @@ function SessionRow({
   meta,
   joinLink,
   isHost,
+  isDeferred,
   running,
   onJoin,
   onEdit,
@@ -792,7 +925,7 @@ function SessionRow({
               {meta ? ` · ${meta.label}` : ''}
             </p>
           </div>
-        ) : session.platform ? (
+        ) : session.platform && !isDeferred ? (
           <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5">
             <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
             <p className="text-xs text-primary">
@@ -801,8 +934,10 @@ function SessionRow({
           </div>
         ) : (
           <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5">
-            <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0" />
-            <p className="text-xs text-muted-foreground">No meeting yet</p>
+            <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              {isDeferred ? 'Meeting will be created closer to the date' : 'No meeting yet'}
+            </p>
           </div>
         )}
       </div>
