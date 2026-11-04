@@ -20,27 +20,18 @@ export type AttendanceStatus =
 
 // ============================================================
 // EVENT ATTENDANCE SUMMARY
-// (mirrors Go EventAttendanceSummaryResponse)
 // ============================================================
 
 export interface SessionAttendanceSummary {
   session_id: string;
   title: string;
   provider: AttendanceProvider;
-  scheduled_start: string; // ISO 8601
-  scheduled_end: string;   // ISO 8601
+  scheduled_start: string;
+  scheduled_end: string;
   registered_count: number;
   attended_count: number;
   avg_duration_seconds: number;
   has_attendance_data: boolean;
-
-  /**
-   * Video meeting ID — required to call
-   * POST /video/meetings/:id/fetch-attendance.
-   *
-   * Backend TODO: add to SessionAttendanceSummaryResponse so the
-   * pane can offer "Fetch attendance" for Google Meet sessions.
-   */
   video_meeting_id?: string;
 }
 
@@ -58,7 +49,6 @@ export interface EventAttendanceSummary {
 
 // ============================================================
 // SESSION ROSTER
-// (mirrors Go SessionStatusResponse — extended with identity)
 // ============================================================
 
 export interface SessionRosterEntry {
@@ -76,8 +66,7 @@ export interface SessionRosterEntry {
   last_derived_at: string;
   display_name?: string;
   email?: string;
-  phone?: string; 
-  /** True when this row is the event host rather than a registered attendee. */
+  phone?: string;
   is_host?: boolean;
 }
 
@@ -116,18 +105,13 @@ export interface MySessionLinksResponse {
 
 // ============================================================
 // EVENT ATTENDEE DIRECTORY
-// (mirrors Go EventAttendeeResponse + EventAttendeeDetailResponse)
 // ============================================================
 
-/**
- * One row in the event attendee list. Backed by
- * attendee_rollup_statuses — one per (attendee, event).
- *
- * `effective_status` uses the same vocabulary as AttendanceStatus.
- * The backend emits it as a derived value:
- *   confirmed > full > partial > joined > no-show > registered
- */
-// lib/types/attendance.ts
+/** Per-session status for the green/gray dots in the UI. */
+export interface SessionBreakdown {
+  session_id: string;
+  status: AttendanceStatus;
+}
 
 export interface EventAttendeeRow {
   attendee_id: string;
@@ -139,14 +123,13 @@ export interface EventAttendeeRow {
   sessions_attended: number;
   sessions_confirmed: number;
   total_duration_seconds: number;
-  registered_at: string;    // ISO 8601
-  last_activity_at: string; // ISO 8601
-  is_host: boolean;      
+  registered_at: string;
+  last_activity_at: string;
+  is_host: boolean;
+  /** ADDED: Per-session statuses for UI dots. */
+  session_breakdowns: SessionBreakdown[];
 }
 
-/**
- * Response body of GET /events/:eventId/attendees.
- */
 export interface EventAttendeesPayload {
   attendees: EventAttendeeRow[];
   total: number;
@@ -154,54 +137,35 @@ export interface EventAttendeesPayload {
   page_size: number;
 }
 
-/**
- * Query params accepted by GET /events/:eventId/attendees.
- * All optional; the backend applies defaults.
- */
 export interface ListAttendeesParams {
-  /** Free-text search across display_name and email. */
+  /** Filter by a specific session. */
+  session_id?: string;
   search?: string;
-  /** Comma-separated AttendanceStatus values. */
   status?: string;
-  /** Sort field. Defaults to "name". */
   sort_by?: 'name' | 'registered_at' | 'status' | 'duration';
-  /** Sort direction. Defaults to "asc". */
   sort_order?: 'asc' | 'desc';
-  /** 1-indexed page number. Defaults to 1. */
   page?: number;
-  /** Rows per page. Defaults to 20, capped at 100. */
   page_size?: number;
 }
 
-/**
- * Per-session detail for one attendee, returned by
- * GET /events/:eventId/attendees/:attendeeId.
- */
 export interface EventAttendeeSessionDetail {
   session_id: string;
   title: string;
   provider: AttendanceProvider;
-  scheduled_start: string; // ISO 8601
-  scheduled_end: string;   // ISO 8601
+  scheduled_start: string;
+  scheduled_end: string;
   derived_status: AttendanceStatus;
   host_confirmed: boolean;
   total_duration_seconds: number;
   last_derived_at: string;
 }
 
-/**
- * Full detail for one attendee in one event: rollup fields plus
- * the per-session breakdown.
- */
 export interface EventAttendeeDetail extends EventAttendeeRow {
   sessions: EventAttendeeSessionDetail[];
 }
 
-
-
 // ============================================================
 // CROSS-EVENT ATTENDEE DIRECTORY
-// (mirrors Go CrossEventAttendeeResponse)
 // ============================================================
 
 export interface CrossEventAttendee {
@@ -220,9 +184,9 @@ export interface CrossEventAttendee {
   total_duration_seconds: number;
   registered_at: string;
   last_activity_at: string;
-
-  /** True when the row represents the host of the event rather than a registered attendee. */
   is_host?: boolean;
+  /** ADDED: Per-session statuses for UI dots. */
+  session_breakdowns: SessionBreakdown[];
 }
 
 export interface CrossEventAttendeesPayload {
@@ -234,12 +198,19 @@ export interface CrossEventAttendeesPayload {
 
 export interface ListAllAttendeesParams {
   event_id?: string;
-  team_id?: string;                    // ← NEW
-  scope?: 'team' | 'personal';         // ← NEW
+  team_id?: string;
+  scope?: 'team' | 'personal';
+  /** ADDED: Filter by a specific session. */
+  session_id?: string;
   search?: string;
   status?: string;
   sort_by?: 'name' | 'event' | 'registered_at' | 'status' | 'duration';
   sort_order?: 'asc' | 'desc';
   page?: number;
   page_size?: number;
+}
+
+export interface SessionLookupPayload {
+  provider_session_id: string;
+  attendance_session_id: string;
 }

@@ -33,9 +33,6 @@ const LOGO_SRC = '/logo.png';
  *
  * Keys must match the platform values your API returns on
  * event.schedules[].platform — e.g. "google_meet", "zoom".
- *
- * If you add a new platform (Teams, Webex), add the key here and
- * drop the matching .png in public/platforms/.
  */
 const PLATFORM_LOGOS: Record<string, { label: string; src: string }> = {
   google_meet: { label: 'Google Meet', src: '/platforms/google-meet.png' },
@@ -295,12 +292,18 @@ export interface ExportPDFOptions {
    * Video platforms used by the event, e.g. ["google_meet", "zoom"].
    * Rendered as a row of small badges under the host line. Pass an
    * empty array or omit for in-person-only or cross-event exports.
-   *
-   * Keys must match PLATFORM_LOGOS above.
    */
   platforms?: string[];
   /** Optional filter summary, e.g. "Status: Registered · Search: anna". */
   filtersSummary?: string;
+  /**
+   * NEW: When the report is scoped to a specific session, pass its
+   * title here. It's rendered in bold blue under the title and
+   * appended to the filename.
+   *
+   * Example: "Day 1 - Docker"
+   */
+  sessionName?: string;
   /** Output filename (without path). */
   filename?: string;
 }
@@ -317,6 +320,7 @@ export async function exportToPDF(
   const hostName = options.hostName ?? '';
   const platforms = options.platforms ?? [];
   const filtersSummary = options.filtersSummary ?? '';
+  const sessionName = options.sessionName ?? '';
   const filename = options.filename ?? `attendees-${todayStamp()}.pdf`;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
@@ -327,7 +331,7 @@ export async function exportToPDF(
   // ------------------------------------------------------------
   // HEADER — white, minimal.
   // ------------------------------------------------------------
-  const headerHeight = 130;
+  const headerHeight = 170;
 
   doc.setFillColor(...BRAND.primary);
   doc.rect(0, 0, pageWidth, 2, 'F');
@@ -368,9 +372,20 @@ export async function exportToPDF(
   doc.text(title, textLeft, 52);
 
   // ------------------------------------------------------------
-  // HOST LINE
+  // SESSION NAME — shown right under the title when scoped.
   // ------------------------------------------------------------
   let metaY = 72;
+  if (sessionName) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...BRAND.primary);
+    doc.text(sessionName, textLeft, metaY);
+    metaY += 20;
+  }
+
+  // ------------------------------------------------------------
+  // HOST LINE
+  // ------------------------------------------------------------
   if (hostName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
@@ -496,22 +511,16 @@ export async function exportToPDF(
       lineWidth: 0.5,
     },
     columnStyles: {
-      0: { cellWidth: 110, overflow: 'linebreak' },        // Name
-      1: { cellWidth: 190, overflow: 'linebreak' },        // Email
-      2: { cellWidth: 80,  overflow: 'linebreak' },        // Phone
-      3: { cellWidth: 'auto', overflow: 'linebreak' },     // Event
-      4: { cellWidth: 70,  overflow: 'linebreak' },        // Event Date
-      5: { cellWidth: 68,  overflow: 'linebreak' },        // Attendance
-      6: { cellWidth: 60,  overflow: 'linebreak' },        // Sessions
-      7: { cellWidth: 60,  overflow: 'linebreak' },        // Duration
-      8: { cellWidth: 72,  overflow: 'linebreak' },        // Registered
+      0: { cellWidth: 110, overflow: 'linebreak' },
+      1: { cellWidth: 190, overflow: 'linebreak' },
+      2: { cellWidth: 80,  overflow: 'linebreak' },
+      3: { cellWidth: 'auto', overflow: 'linebreak' },
+      4: { cellWidth: 70,  overflow: 'linebreak' },
+      5: { cellWidth: 68,  overflow: 'linebreak' },
+      6: { cellWidth: 60,  overflow: 'linebreak' },
+      7: { cellWidth: 60,  overflow: 'linebreak' },
+      8: { cellWidth: 72,  overflow: 'linebreak' },
     },
-    /**
-     * Shrink font for very long, unbroken strings so they don't
-     * dominate the row height. Values are tuned for typical attendee
-     * data — increase the thresholds if you see cells still wrapping
-     * awkwardly.
-     */
     didParseCell: (data) => {
       if (data.section !== 'body') return;
       const text = String(data.cell.raw ?? '');

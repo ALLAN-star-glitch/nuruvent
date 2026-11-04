@@ -21,6 +21,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
 import {
@@ -122,20 +129,36 @@ export function AttendanceCard({
 }: AttendanceCardProps) {
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('all');
 
   const sessions = summary?.sessions ?? [];
   const totals = summary?.totals;
+
+  const availableSessions = useMemo(
+    () => sessions.map((s) => ({
+      id: s.session_id,
+      title: s.title || 'Untitled session',
+      date: s.scheduled_start,
+    })),
+    [sessions],
+  );
+
+  // Filter sessions based on the selected dropdown
+  const filteredSessions = useMemo(() => {
+    if (selectedSessionId === 'all') return sessions;
+    return sessions.filter((s) => s.session_id === selectedSessionId);
+  }, [sessions, selectedSessionId]);
 
   const openSession = useMemo(
     () => sessions.find((s) => s.session_id === openSessionId) ?? null,
     [sessions, openSessionId],
   );
 
-  const anyAttendance = sessions.some((s) => s.has_attendance_data);
+  const anyAttendance = filteredSessions.some((s) => s.has_attendance_data);
 
   const providersUsed = useMemo(
-    () => Array.from(new Set(sessions.map((s) => s.provider).filter(Boolean))),
-    [sessions],
+    () => Array.from(new Set(filteredSessions.map((s) => s.provider).filter(Boolean))),
+    [filteredSessions],
   );
 
   const collapsedSummary = (() => {
@@ -144,6 +167,14 @@ export function AttendanceCard({
     if (!totals || totals.sessions_with_attendance === 0) {
       return 'No attendance recorded yet.';
     }
+    
+    if (selectedSessionId !== 'all') {
+      const s = filteredSessions[0];
+      if (!s) return 'Session not found';
+      if (!s.has_attendance_data) return 'No attendance recorded for this session yet.';
+      return `${s.attended_count} attended · avg ${formatDuration(s.avg_duration_seconds)}`;
+    }
+
     const sessionsLabel =
       totals.sessions_with_attendance === 1 ? 'session' : 'sessions';
     const attendeesLabel =
@@ -215,8 +246,35 @@ export function AttendanceCard({
               </div>
             </button>
 
-            {/* Right-hand control — outside the toggle so clicks don't fold the card */}
-            <div className="shrink-0 w-full sm:w-auto">
+            {/* Right-hand control */}
+            <div className="shrink-0 w-full sm:w-auto flex items-center gap-2">
+              {expanded && availableSessions.length > 1 && (
+                <Select
+                  value={selectedSessionId}
+                  onValueChange={setSelectedSessionId}
+                >
+                  <SelectTrigger className="h-9 w-full sm:w-[200px] cursor-pointer text-xs">
+                    <SelectValue placeholder="All Sessions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Sessions
+                    </SelectItem>
+                    {availableSessions.map((s) => (
+                      <SelectItem
+                        key={s.id}
+                        value={s.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[160px] truncate align-middle">
+                          {s.title} ({formatSessionDate(s.date)})
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
               <Button
                 size="sm"
                 variant="outline"
@@ -240,7 +298,7 @@ export function AttendanceCard({
           {expanded && (
             <div id="attendance-card-body">
               {/* EMPTY STATE */}
-              {!loading && !error && sessions.length === 0 && (
+              {!loading && !error && filteredSessions.length === 0 && (
                 <div className="mt-4 rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center">
                   <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm font-medium text-foreground">
@@ -253,11 +311,11 @@ export function AttendanceCard({
               )}
 
               {/* SESSION LIST */}
-              {!loading && !error && sessions.length > 0 && (
+              {!loading && !error && filteredSessions.length > 0 && (
                 <>
                   <Separator className="my-4" />
                   <div className="space-y-3">
-                    {sessions.map((s) => (
+                    {filteredSessions.map((s) => (
                       <SessionAttendanceRow
                         key={s.session_id}
                         session={s}
@@ -279,7 +337,7 @@ export function AttendanceCard({
               )}
 
               {/* FOOTER */}
-              {!loading && !error && sessions.length > 0 && (
+              {!loading && !error && filteredSessions.length > 0 && (
                 <>
                   <Separator className="my-4" />
                   <div className="flex items-center justify-between gap-2">

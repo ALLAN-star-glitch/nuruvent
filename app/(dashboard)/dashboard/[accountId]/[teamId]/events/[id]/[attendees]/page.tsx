@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/preserve-manual-memoization */
 /* eslint-disable react-hooks/set-state-in-effect */
 // app/(dashboard)/dashboard/[accountId]/[teamId]/events/[id]/attendees/page.tsx
 
@@ -87,6 +89,7 @@ import {
 import {
   useGetEventAttendeeDetailQuery,
   useGetEventAttendeesQuery,
+  useLazyLookupSessionByProviderIDQuery,
 } from '@/lib/store/api/attendanceApi';
 import { useGetEventByIdQuery } from '@/lib/store/api/eventsApi';
 import { getEventHostName } from '@/lib/utils/eventDisplay';
@@ -95,6 +98,7 @@ import type {
   EventAttendeeDetail,
   EventAttendeeRow,
   ListAttendeesParams,
+  SessionBreakdown,
 } from '@/lib/types/attendance';
 
 import {
@@ -200,6 +204,61 @@ function formatDateTime(iso: string | undefined): string {
   });
 }
 
+// Renders the session dots for a given attendee.
+function SessionDots({
+  breakdowns,
+  totalSessions,
+}: {
+  breakdowns: SessionBreakdown[];
+  totalSessions: number;
+}) {
+  if (!breakdowns || breakdowns.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  const MAX_DOTS = 10;
+  const visible = breakdowns.slice(0, MAX_DOTS);
+  const remaining = Math.max(totalSessions, breakdowns.length) - visible.length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visible.map((b, idx) => {
+        let bg = 'bg-slate-200 dark:bg-slate-700';
+        let label = 'Unknown';
+
+        const s = b.status?.replace(/_/g, '-');
+        if (s === 'full' || s === 'confirmed') {
+          bg = 'bg-emerald-500';
+          label = 'Attended';
+        } else if (s === 'partial' || s === 'joined') {
+          bg = 'bg-amber-400';
+          label = 'Partial';
+        } else if (s === 'registered' || s === 'no-show') {
+          bg = 'bg-slate-300 dark:bg-slate-600';
+          label = 'Not attended';
+        }
+
+        return (
+          <div
+            key={b.session_id || idx}
+            className={`h-2.5 w-2.5 rounded-full ${bg}`}
+            title={`Session ${idx + 1}: ${label}`}
+          />
+        );
+      })}
+
+      {remaining > 0 && (
+        <div
+          className="flex h-[18px] items-center justify-center rounded-full bg-primary px-2 text-[10px] font-bold text-primary-foreground shadow-sm cursor-help hover:bg-primary/90 transition-colors"
+          title={`${remaining} more sessions not shown`}
+        >
+          +{remaining}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type SortField = 'name' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
@@ -221,6 +280,15 @@ export default function EventAttendeesPage() {
   const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>(
     'all',
   );
+
+  // Session filter state: two IDs.
+  // - `selectedSessionScheduleId` = event_schedules.id (dropdown value)
+  // - `selectedAttendanceSessionId` = sessions.id (API query value)
+  const [selectedSessionScheduleId, setSelectedSessionScheduleId] =
+    useState<string>('all');
+  const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] =
+    useState<string>('all');
+
   const [sortField, setSortField] = useState<SortField>('registered_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -236,6 +304,8 @@ export default function EventAttendeesPage() {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   const [isExporting, setIsExporting] = useState(false);
+
+  const [lookupSession] = useLazyLookupSessionByProviderIDQuery();
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -254,17 +324,75 @@ export default function EventAttendeesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedStatus, sortField, sortDirection, itemsPerPage]);
+  }, [
+    selectedStatus,
+    selectedAttendanceSessionId,
+    sortField,
+    sortDirection,
+    itemsPerPage,
+  ]);
 
   useEffect(() => {
     setSelectedIds([]);
     setSelectAll(false);
   }, [currentPage]);
 
+  // Fetch the full event (with schedules) for the session dropdown.
+  const { data: eventResponse } = useGetEventByIdQuery(eventId, {
+    skip: !eventId,
+  });
+  const event = eventResponse?.data;
+
+  // Reset the session filter if the event changes.
+  useEffect(() => {
+    setSelectedSessionScheduleId('all');
+    setSelectedAttendanceSessionId('all');
+  }, [eventId]);
+
+  // Build the dropdown options from the event's schedules.
+  const availableSessions = useMemo(() => {
+    if (!event?.schedules) return [];
+    return event.schedules.map((s: any, idx: number) => ({
+      id: s.id, // event_schedules.id
+      title: s.session_name || `Session ${idx + 1}`,
+      start_date: s.start_date,
+    }));
+  }, [event?.schedules]);
+
+  // Resolve the human-readable title of the selected session.
+  const selectedSessionTitle = useMemo(() => {
+    if (selectedSessionScheduleId === 'all') return '';
+    return (
+      availableSessions.find((s) => s.id === selectedSessionScheduleId)
+        ?.title ?? ''
+    );
+  }, [selectedSessionScheduleId, availableSessions]);
+
+  const handleSessionSelect = async (eventScheduleID: string) => {
+    setSelectedSessionScheduleId(eventScheduleID);
+
+    if (eventScheduleID === 'all') {
+      setSelectedAttendanceSessionId('all');
+      return;
+    }
+
+    try {
+      const result = await lookupSession(eventScheduleID).unwrap();
+      const attendanceSessionID = result.data.attendance_session_id;
+      setSelectedAttendanceSessionId(attendanceSessionID || eventScheduleID);
+    } catch {
+      setSelectedAttendanceSessionId(eventScheduleID);
+    }
+  };
+
   const queryParams: ListAttendeesParams = useMemo(
     () => ({
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
+      session_id:
+        selectedAttendanceSessionId === 'all'
+          ? undefined
+          : selectedAttendanceSessionId,
       sort_by: sortField,
       sort_order: sortDirection,
       page: currentPage,
@@ -273,6 +401,7 @@ export default function EventAttendeesPage() {
     [
       searchQuery,
       selectedStatus,
+      selectedAttendanceSessionId,
       sortField,
       sortDirection,
       currentPage,
@@ -295,10 +424,6 @@ export default function EventAttendeesPage() {
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
 
-  const { data: eventResponse } = useGetEventByIdQuery(eventId, {
-    skip: !eventId,
-  });
-  const event = eventResponse?.data;
   const eventName = event?.display_name ?? event?.name ?? 'Event';
   const eventStartDate = event?.start_date;
   const eventHostName = event ? getEventHostName(event) : '';
@@ -401,6 +526,7 @@ export default function EventAttendeesPage() {
     let n = 0;
     if (searchQuery) n++;
     if (selectedStatus !== 'all') n++;
+    if (selectedSessionScheduleId !== 'all') n++;
     return n;
   };
 
@@ -408,6 +534,8 @@ export default function EventAttendeesPage() {
     setSearchInput('');
     setSearchQuery('');
     setSelectedStatus('all');
+    setSelectedSessionScheduleId('all');
+    setSelectedAttendanceSessionId('all');
     setSortField('registered_at');
     setSortDirection('desc');
     setCurrentPage(1);
@@ -428,12 +556,18 @@ export default function EventAttendeesPage() {
     setIsExporting(true);
     try {
       const stamp = new Date().toISOString().slice(0, 10);
-      const slug = eventName.replace(/\s+/g, '-').toLowerCase();
+
+      // Include the session name in the slug if a session is selected.
+      const sessionSlug = selectedSessionTitle
+        ? `-${selectedSessionTitle.replace(/\s+/g, '-').toLowerCase()}`
+        : '';
+      const slug = `${eventName.replace(/\s+/g, '-').toLowerCase()}${sessionSlug}`;
 
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
           selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+          selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
           .filter(Boolean)
           .join('  ·  ') || undefined;
@@ -446,6 +580,11 @@ export default function EventAttendeesPage() {
         event_id: eventId,
       })) as unknown as Parameters<typeof exportToCSV>[0];
 
+      // Scope the title to the session when applicable.
+      const title = selectedSessionTitle
+        ? `${eventName} — ${selectedSessionTitle}`
+        : `${eventName} Attendees`;
+
       if (format === 'csv') {
         exportToCSV(rows, `${slug}-attendees-${stamp}.csv`);
       } else if (format === 'json') {
@@ -454,8 +593,11 @@ export default function EventAttendeesPage() {
         await exportToExcel(rows, `${slug}-attendees-${stamp}.xlsx`);
       } else if (format === 'pdf') {
         await exportToPDF(rows, {
-          title: `${eventName} Attendees`,
-          subtitle: 'Event attendee directory',
+          title,
+          subtitle: selectedSessionTitle
+            ? 'Session attendance report'
+            : 'Event attendee directory',
+          sessionName: selectedSessionTitle || undefined,
           hostName: eventHostName,
           platforms: eventPlatforms,
           filtersSummary,
@@ -625,6 +767,33 @@ export default function EventAttendeesPage() {
                         className="w-full pl-9"
                       />
                     </div>
+
+                    {/* Session Dropdown */}
+                    <Select
+                      value={selectedSessionScheduleId}
+                      onValueChange={handleSessionSelect}
+                      disabled={availableSessions.length === 0}
+                    >
+                      <SelectTrigger className="w-full cursor-pointer md:w-[200px]">
+                        <SelectValue placeholder="All Sessions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Sessions
+                        </SelectItem>
+                        {availableSessions.map((s) => (
+                          <SelectItem
+                            key={s.id}
+                            value={s.id}
+                            className="cursor-pointer"
+                          >
+                            <span className="inline-block max-w-[180px] truncate align-middle">
+                              {s.title}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
                     <Select
                       value={selectedStatus}
@@ -925,16 +1094,17 @@ export default function EventAttendeesPage() {
                                   {s.label}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="px-4 py-4 text-sm text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {a.sessions_attended}
-                                </span>{' '}
-                                / {a.sessions_total}
-                                {a.sessions_confirmed > 0 && (
-                                  <span className="ml-2 text-xs text-primary">
-                                    · {a.sessions_confirmed} confirmed
+                              <TableCell className="px-4 py-4 text-sm">
+                                <div className="flex flex-col gap-1.5">
+                                  <SessionDots
+                                    breakdowns={a.session_breakdowns ?? []}
+                                    totalSessions={a.sessions_total}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {a.sessions_attended} / {a.sessions_total}{' '}
+                                    attended
                                   </span>
-                                )}
+                                </div>
                               </TableCell>
                               <TableCell className="px-4 py-4 text-sm text-muted-foreground">
                                 {formatDuration(a.total_duration_seconds)}
@@ -1153,11 +1323,12 @@ export default function EventAttendeesPage() {
                           </div>
 
                           <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
-                            <span className="text-muted-foreground">
+                            <span className="text-muted-foreground flex items-center gap-1.5">
                               Sessions:{' '}
-                              <span className="font-medium text-foreground">
-                                {a.sessions_attended} / {a.sessions_total}
-                              </span>
+                              <SessionDots
+                                breakdowns={a.session_breakdowns ?? []}
+                                totalSessions={a.sessions_total}
+                              />
                             </span>
                             <span className="text-muted-foreground">
                               {formatDuration(a.total_duration_seconds)}
@@ -1392,6 +1563,35 @@ export default function EventAttendeesPage() {
               </div>
 
               <div className="mb-5 space-y-1.5">
+                <Label className="text-sm font-medium">Session</Label>
+                <Select
+                  value={selectedSessionScheduleId}
+                  onValueChange={handleSessionSelect}
+                  disabled={availableSessions.length === 0}
+                >
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
+                    <SelectValue placeholder="All Sessions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Sessions
+                    </SelectItem>
+                    {availableSessions.map((s) => (
+                      <SelectItem
+                        key={s.id}
+                        value={s.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[260px] truncate align-middle">
+                          {s.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
@@ -1493,7 +1693,7 @@ export default function EventAttendeesPage() {
         </SheetContent>
       </Sheet>
 
-      {/* Detail dialog — unchanged */}
+      {/* Detail dialog */}
       <Dialog
         open={openAttendeeId !== null}
         onOpenChange={(open) => !open && setOpenAttendeeId(null)}
@@ -1522,7 +1722,7 @@ export default function EventAttendeesPage() {
             </div>
           ) : detail ? (
             <div className="min-w-0 space-y-4 sm:space-y-6">
-              {/* ... your existing detail body, unchanged ... */}
+              {/* ... existing detail body, unchanged ... */}
             </div>
           ) : (
             <div className="py-8 text-center text-sm text-muted-foreground">

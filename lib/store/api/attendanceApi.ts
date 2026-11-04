@@ -11,6 +11,7 @@ import type {
   SessionRosterPayload,
   CrossEventAttendeesPayload,
   ListAllAttendeesParams,
+  SessionLookupPayload,
 } from '@/lib/types/attendance';
 
 export const attendanceApi = api.injectEndpoints({
@@ -131,8 +132,36 @@ export const attendanceApi = api.injectEndpoints({
       ],
     }),
 
+    // ============================================================
+    // SESSION LOOKUP (event_schedule_id → attendance_session_id)
+    // ============================================================
 
-        // ============================================================
+    /**
+     * GET /attendance/sessions/lookup?provider_session_id=...
+     *
+     * Resolves an event_schedules.id (the provider session ID) to
+     * the corresponding attendance sessions.id. Used by the
+     * attendee page's Session dropdown to send the correct ID to
+     * the filter query.
+     */
+    lookupSessionByProviderID: builder.query<
+      BaseResponse<SessionLookupPayload>,
+      string
+    >({
+      query: (providerSessionID) => ({
+        url: '/attendance/sessions/lookup',
+        method: 'GET',
+        params: { provider_session_id: providerSessionID },
+      }),
+      providesTags: (_r, _e, providerSessionID) => [
+        {
+          type: 'Attendance' as const,
+          id: `LOOKUP-${providerSessionID}`,
+        },
+      ],
+    }),
+
+    // ============================================================
     // CROSS-EVENT ATTENDEE DIRECTORY
     // ============================================================
 
@@ -142,23 +171,23 @@ export const attendanceApi = api.injectEndpoints({
      * Cross-event attendee directory, scoped to the caller's
      * accounts. Backed by attendee_rollup_statuses.
      */
-   getAttendees: builder.query<
-    BaseResponse<CrossEventAttendeesPayload>,
-    ListAllAttendeesParams | void
-  >({
-    query: (params) => ({
-      url: '/attendees',
-      method: 'GET',
-      params: params ?? undefined,
+    getAttendees: builder.query<
+      BaseResponse<CrossEventAttendeesPayload>,
+      ListAllAttendeesParams | void
+    >({
+      query: (params) => ({
+        url: '/attendees',
+        method: 'GET',
+        params: params ?? undefined,
       }),
       providesTags: (_r, _e, params) => [
-    { type: 'Attendance' as const, id: 'ALL-ATTENDEES' },
-    {
-      type: 'Attendance' as const,
-      id: `TEAM-ATTENDEES-${params?.team_id ?? 'all'}`,
-    },
-  ],
-  }),
+        { type: 'Attendance' as const, id: 'ALL-ATTENDEES' },
+        {
+          type: 'Attendance' as const,
+          id: `TEAM-ATTENDEES-${params?.team_id ?? 'all'}`,
+        },
+      ],
+    }),
 
     // ============================================================
     // EXPORT
@@ -181,8 +210,6 @@ export const attendanceApi = api.injectEndpoints({
   }),
 });
 
-
-
 // ============================================================
 // HOOKS
 // ============================================================
@@ -194,5 +221,7 @@ export const {
   useGetMySessionLinksQuery,
   useGetEventAttendeesQuery,
   useGetEventAttendeeDetailQuery,
-useGetAttendeesQuery,
+  useGetAttendeesQuery,
+  useLookupSessionByProviderIDQuery,
+  useLazyLookupSessionByProviderIDQuery,
 } = attendanceApi;
