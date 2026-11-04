@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/set-state-in-effect */
 // app/(dashboard)/dashboard/[accountId]/[teamId]/attendees/page.tsx
 
@@ -82,13 +83,20 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
-import { useGetAttendeesQuery } from '@/lib/store/api/attendanceApi';
-import { useListMyEventsQuery } from '@/lib/store/api/eventsApi';
+import {
+  useGetAttendeesQuery,
+  useLazyLookupSessionByProviderIDQuery,
+} from '@/lib/store/api/attendanceApi';
+import {
+  useListMyEventsQuery,
+  useGetEventByIdQuery,
+} from '@/lib/store/api/eventsApi';
 import { useGetTeamQuery } from '@/lib/store/api/teamsApi';
 import type {
   AttendanceStatus,
   CrossEventAttendee,
   ListAllAttendeesParams,
+  SessionBreakdown,
 } from '@/lib/types/attendance';
 
 import {
@@ -99,7 +107,6 @@ import {
 } from '@/lib/utils/exportAttendees';
 import { StatsCards } from '@/components/registrations/stat_cards';
 import { StatsCardsSkeleton } from '@/components/registrations/skeleton-loaders';
-
 
 interface StatusDisplay {
   label: string;
@@ -182,15 +189,6 @@ function formatDuration(seconds: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-/**
- * Duration display for the attendees directory.
- *
- * An attendee with no recorded attendance time shows a state-aware
- * label rather than a dash, so the column never looks like missing
- * data. The state comes from `effective_status`, not from the
- * duration itself — a registered attendee who never joined should
- * read "Not yet joined", not "0 min".
- */
 function durationDisplay(
   seconds: number,
   status: string | undefined,
@@ -227,6 +225,65 @@ function slugify(input: string): string {
   );
 }
 
+// Renders a row of colored dots representing each session's status.
+// 🟢 = Full/Confirmed | 🟡 = Partial/Joined | ⚪ = Registered/No-show
+// Caps at 10 dots to prevent UI breakage for huge events (e.g., 518 sessions).
+function SessionDots({
+  breakdowns,
+  totalSessions,
+}: {
+  breakdowns: SessionBreakdown[];
+  totalSessions: number;
+}) {
+  if (!breakdowns || breakdowns.length === 0) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+
+  const MAX_DOTS = 10;
+  const visibleBreakdowns = breakdowns.slice(0, MAX_DOTS);
+
+  const maxTotal = Math.max(totalSessions, breakdowns.length);
+  const remainingCount = maxTotal - visibleBreakdowns.length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {visibleBreakdowns.map((b, idx) => {
+        let bg = 'bg-slate-200 dark:bg-slate-700';
+        let label = 'Unknown';
+
+        const s = b.status?.replace(/_/g, '-');
+        if (s === 'full' || s === 'confirmed') {
+          bg = 'bg-emerald-500';
+          label = 'Attended';
+        } else if (s === 'partial' || s === 'joined') {
+          bg = 'bg-amber-400';
+          label = 'Partial';
+        } else if (s === 'registered' || s === 'no-show') {
+          bg = 'bg-slate-300 dark:bg-slate-600';
+          label = 'Not attended';
+        }
+
+        return (
+          <div
+            key={b.session_id || idx}
+            className={`h-2.5 w-2.5 rounded-full ${bg}`}
+            title={`Session ${idx + 1}: ${label}`}
+          />
+        );
+      })}
+
+      {remainingCount > 0 && (
+        <div
+          className="flex h-[18px] items-center justify-center rounded-full bg-primary px-2 text-[10px] font-bold text-primary-foreground shadow-sm cursor-help hover:bg-primary/90 transition-colors"
+          title={`${remainingCount} more sessions not shown`}
+        >
+          +{remainingCount}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type SortField = 'name' | 'event' | 'registered_at' | 'status' | 'duration';
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'table' | 'grid';
@@ -244,6 +301,15 @@ export default function AttendeesPage() {
     'all',
   );
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
+
+  // Session selection: two separate IDs
+  // - `selectedSessionScheduleId` = event_schedules.id (for the dropdown)
+  // - `selectedAttendanceSessionId` = sessions.id (for the API filter)
+  const [selectedSessionScheduleId, setSelectedSessionScheduleId] =
+    useState<string>('all');
+  const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] =
+    useState<string>('all');
+
   const [sortField, setSortField] = useState<SortField>('registered_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -262,6 +328,8 @@ export default function AttendeesPage() {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  const [lookupSession] = useLazyLookupSessionByProviderIDQuery();
+
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -279,18 +347,30 @@ export default function AttendeesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedStatus, selectedEventId, sortField, sortDirection, itemsPerPage]);
+  }, [
+    selectedStatus,
+    selectedEventId,
+    selectedAttendanceSessionId,
+    sortField,
+    sortDirection,
+    itemsPerPage,
+  ]);
 
   useEffect(() => {
     setSelectedIds([]);
     setSelectAll(false);
   }, [currentPage]);
 
+  // Reset session filter if the event changes
+  useEffect(() => {
+    setSelectedSessionScheduleId('all');
+    setSelectedAttendanceSessionId('all');
+  }, [selectedEventId]);
+
   // Fetch the active team so we can pass its type to the events query.
   const { data: team } = useGetTeamQuery(teamId, { skip: !teamId });
 
   // Team-scoped event list for the "Event" dropdown.
-  // Skipped until the team resolves so we don't send team_type=undefined.
   const { data: eventsResponse } = useListMyEventsQuery(
     {
       page: 1,
@@ -304,19 +384,68 @@ export default function AttendeesPage() {
     { skip: !teamId || !team },
   );
 
-const events = useMemo(() => {
-  const list = eventsResponse?.data?.data ?? [];
-  return list.map((e) => ({
-    id: e.id,
-    title: e.display_name || e.name || 'Untitled event',
-    organizer: e.organizer,
-  }));
-}, [eventsResponse]);
+  // Fetch full event detail (with schedules) when an event is selected.
+  // The events list endpoint doesn't return the schedules array, so we
+  // need a separate call for the session dropdown.
+  const { data: eventDetailResponse, isLoading: isEventDetailLoading } =
+    useGetEventByIdQuery(selectedEventId, {
+      skip: selectedEventId === 'all',
+    });
+
+  const events = useMemo(() => {
+    const list = eventsResponse?.data?.data ?? [];
+    return list.map((e) => ({
+      id: e.id,
+      title: e.display_name || e.name || 'Untitled event',
+      organizer: e.organizer,
+    }));
+  }, [eventsResponse]);
 
   const rawEvents = useMemo(
     () => eventsResponse?.data?.data ?? [],
     [eventsResponse],
   );
+
+  // Extract sessions from the fetched event detail.
+  // These IDs are event_schedules.id — the dropdown will display them
+  // and pass them to handleSessionSelect for resolution.
+  const availableSessions = useMemo(() => {
+    if (selectedEventId === 'all') return [];
+    const schedules = eventDetailResponse?.data?.schedules ?? [];
+    if (schedules.length === 0) return [];
+
+    return schedules.map((s: any, idx: number) => ({
+      id: s.id, // event_schedules.id
+      title: s.session_name || `Session ${idx + 1}`,
+      date: s.start_date,
+    }));
+  }, [selectedEventId, eventDetailResponse]);
+
+  // Resolve the title of the selected session for use in exports.
+  const selectedSessionTitle = useMemo(() => {
+    if (selectedSessionScheduleId === 'all') return '';
+    return (
+      availableSessions.find((s) => s.id === selectedSessionScheduleId)
+        ?.title ?? ''
+    );
+  }, [selectedSessionScheduleId, availableSessions]);
+
+  const handleSessionSelect = async (eventScheduleID: string) => {
+    setSelectedSessionScheduleId(eventScheduleID);
+
+    if (eventScheduleID === 'all') {
+      setSelectedAttendanceSessionId('all');
+      return;
+    }
+
+    try {
+      const result = await lookupSession(eventScheduleID).unwrap();
+      const attendanceSessionID = result.data.attendance_session_id;
+      setSelectedAttendanceSessionId(attendanceSessionID || eventScheduleID);
+    } catch {
+      setSelectedAttendanceSessionId(eventScheduleID);
+    }
+  };
 
   const queryParams: ListAllAttendeesParams = useMemo(
     () => ({
@@ -325,6 +454,10 @@ const events = useMemo(() => {
       search: searchQuery || undefined,
       status: selectedStatus === 'all' ? undefined : selectedStatus,
       event_id: selectedEventId === 'all' ? undefined : selectedEventId,
+      session_id:
+        selectedAttendanceSessionId === 'all'
+          ? undefined
+          : selectedAttendanceSessionId,
       sort_by: sortField,
       sort_order: sortDirection,
       page: currentPage,
@@ -335,6 +468,7 @@ const events = useMemo(() => {
       searchQuery,
       selectedStatus,
       selectedEventId,
+      selectedAttendanceSessionId,
       sortField,
       sortDirection,
       currentPage,
@@ -507,6 +641,7 @@ const events = useMemo(() => {
     if (searchQuery) n++;
     if (selectedStatus !== 'all') n++;
     if (selectedEventId !== 'all') n++;
+    if (selectedSessionScheduleId !== 'all') n++;
     return n;
   };
 
@@ -515,6 +650,8 @@ const events = useMemo(() => {
     setSearchQuery('');
     setSelectedStatus('all');
     setSelectedEventId('all');
+    setSelectedSessionScheduleId('all');
+    setSelectedAttendanceSessionId('all');
     setSortField('registered_at');
     setSortDirection('desc');
     setCurrentPage(1);
@@ -538,25 +675,38 @@ const events = useMemo(() => {
     try {
       const stamp = new Date().toISOString().slice(0, 10);
 
-      const title = isScopedToEvent
-        ? `${scopedEvent!.title} — Attendees`
-        : 'All Events Attendees';
+      // Build the title and filename based on scope.
+      // 1. Session selected → include session name.
+      // 2. Event selected (no session) → include event name.
+      // 3. Nothing selected → cross-event.
+      const sessionSlug = selectedSessionTitle
+        ? `-${slugify(selectedSessionTitle)}`
+        : '';
 
-      const subtitle = isScopedToEvent
-        ? 'Attendees for this event'
-        : 'Cross-event attendee directory';
-
-      const slug = isScopedToEvent
-        ? slugify(scopedEvent!.title)
+      const baseSlug = isScopedToEvent
+        ? `${slugify(scopedEvent!.title)}${sessionSlug}`
         : 'all-events';
 
-      const filenameBase = `${slug}-attendees-${stamp}`;
+      const filenameBase = `${baseSlug}-attendees-${stamp}`;
+
+      const title = selectedSessionTitle
+        ? `${scopedEvent?.title ?? 'Event'} — ${selectedSessionTitle}`
+        : isScopedToEvent
+          ? `${scopedEvent!.title} — Attendees`
+          : 'All Events Attendees';
+
+      const subtitle = selectedSessionTitle
+        ? 'Session attendance report'
+        : isScopedToEvent
+          ? 'Attendees for this event'
+          : 'Cross-event attendee directory';
 
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
           selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
           isScopedToEvent ? `Event: ${scopedEvent!.title}` : null,
+          selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
           .filter(Boolean)
           .join('  ·  ') || undefined;
@@ -567,16 +717,17 @@ const events = useMemo(() => {
         exportToJSON(attendees, `${filenameBase}.json`);
       } else if (format === 'xlsx') {
         await exportToExcel(attendees, `${filenameBase}.xlsx`);
-     } else if (format === 'pdf') {
-  await exportToPDF(attendees, {
-    title,
-    subtitle,
-    hostName: scopedEvent?.organizer?.display_name ?? '',
-    filtersSummary,
-    platforms: exportPlatforms,
-    filename: `${filenameBase}.pdf`,
-  });
-}
+      } else if (format === 'pdf') {
+        await exportToPDF(attendees, {
+          title,
+          subtitle,
+          sessionName: selectedSessionTitle || undefined,
+          hostName: scopedEvent?.organizer?.display_name ?? '',
+          filtersSummary,
+          platforms: exportPlatforms,
+          filename: `${filenameBase}.pdf`,
+        });
+      }
     } finally {
       setIsExporting(false);
     }
@@ -619,14 +770,18 @@ const events = useMemo(() => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold text-foreground">
-            {isScopedToEvent
-              ? `${scopedEvent!.title} — Attendees`
-              : 'All Events Attendees'}
+            {selectedSessionTitle
+              ? `${scopedEvent?.title ?? 'Event'} — ${selectedSessionTitle}`
+              : isScopedToEvent
+                ? `${scopedEvent!.title} — Attendees`
+                : 'All Events Attendees'}
           </h1>
           <p className="mt-1 truncate text-sm text-muted-foreground">
-            {isScopedToEvent
-              ? 'Attendees for this event.'
-              : 'Manage and track attendees across your events.'}
+            {selectedSessionTitle
+              ? 'Attendees for this session.'
+              : isScopedToEvent
+                ? 'Attendees for this event.'
+                : 'Manage and track attendees across your events.'}
           </p>
         </div>
 
@@ -735,6 +890,35 @@ const events = useMemo(() => {
                           >
                             <span className="inline-block max-w-[200px] truncate align-middle">
                               {e.title}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {/* Session Dropdown */}
+                    <Select
+                      value={selectedSessionScheduleId}
+                      onValueChange={handleSessionSelect}
+                      disabled={
+                        selectedEventId === 'all' || isEventDetailLoading
+                      }
+                    >
+                      <SelectTrigger className="w-full cursor-pointer md:w-[200px]">
+                        <SelectValue placeholder="All Sessions" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Sessions
+                        </SelectItem>
+                        {availableSessions.map((s) => (
+                          <SelectItem
+                            key={s.id}
+                            value={s.id}
+                            className="cursor-pointer"
+                          >
+                            <span className="inline-block max-w-[180px] truncate align-middle">
+                              {s.title}
                             </span>
                           </SelectItem>
                         ))}
@@ -1070,11 +1254,18 @@ const events = useMemo(() => {
                                   {s.label}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="px-4 py-4 text-sm text-muted-foreground">
-                                <span className="font-medium text-foreground">
-                                  {a.sessions_attended}
-                                </span>{' '}
-                                / {a.sessions_total}
+
+                              <TableCell className="px-4 py-4 text-sm">
+                                <div className="flex flex-col gap-1.5">
+                                  <SessionDots
+                                    breakdowns={a.session_breakdowns}
+                                    totalSessions={a.sessions_total}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {a.sessions_attended} / {a.sessions_total}{' '}
+                                    attended
+                                  </span>
+                                </div>
                               </TableCell>
                               <TableCell className="px-4 py-4 text-sm text-muted-foreground">
                                 {dur.italic ? (
@@ -1309,11 +1500,12 @@ const events = useMemo(() => {
                           </div>
 
                           <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
-                            <span className="text-muted-foreground">
+                            <span className="text-muted-foreground flex items-center gap-1.5">
                               Sessions:{' '}
-                              <span className="font-medium text-foreground">
-                                {a.sessions_attended} / {a.sessions_total}
-                              </span>
+                              <SessionDots
+                                breakdowns={a.session_breakdowns}
+                                totalSessions={a.sessions_total}
+                              />
                             </span>
                             <span className="text-muted-foreground">
                               {dur.italic ? (
@@ -1578,6 +1770,35 @@ const events = useMemo(() => {
               </div>
 
               <div className="mb-5 space-y-1.5">
+                <Label className="text-sm font-medium">Session</Label>
+                <Select
+                  value={selectedSessionScheduleId}
+                  onValueChange={handleSessionSelect}
+                  disabled={selectedEventId === 'all' || isEventDetailLoading}
+                >
+                  <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
+                    <SelectValue placeholder="All Sessions" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Sessions
+                    </SelectItem>
+                    {availableSessions.map((s) => (
+                      <SelectItem
+                        key={s.id}
+                        value={s.id}
+                        className="cursor-pointer"
+                      >
+                        <span className="inline-block max-w-[260px] truncate align-middle">
+                          {s.title}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
@@ -1745,8 +1966,8 @@ const events = useMemo(() => {
                   <Badge
                     variant="outline"
                     className={`${
-                    statusDisplay(selectedAttendee.effective_status).color
-                  } mt-1 border`}
+                      statusDisplay(selectedAttendee.effective_status).color
+                    } mt-1 border`}
                   >
                     {statusDisplay(selectedAttendee.effective_status).label}
                   </Badge>
