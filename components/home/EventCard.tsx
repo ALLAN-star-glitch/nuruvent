@@ -66,16 +66,17 @@ interface EventCardProps {
 // HELPERS
 // ============================================================
 
-function getEventTypeIcon(slug: string | undefined) {
+function getEventTypeIcon(slug: string | undefined, className?: string) {
   const s = (slug ?? '').toLowerCase();
-  if (s.includes('workshop')) return <Briefcase className="h-3.5 w-3.5" />;
-  if (s.includes('webinar')) return <Presentation className="h-3.5 w-3.5" />;
-  if (s.includes('bootcamp')) return <GraduationCap className="h-3.5 w-3.5" />;
-  if (s.includes('meetup')) return <Users2 className="h-3.5 w-3.5" />;
-  if (s.includes('conference')) return <Mic2 className="h-3.5 w-3.5" />;
-  if (s.includes('seminar')) return <BookOpen className="h-3.5 w-3.5" />;
-  if (s.includes('networking')) return <Handshake className="h-3.5 w-3.5" />;
-  return <Briefcase className="h-3.5 w-3.5" />;
+  const cls = className ?? 'h-3.5 w-3.5';
+  if (s.includes('workshop')) return <Briefcase className={cls} />;
+  if (s.includes('webinar')) return <Presentation className={cls} />;
+  if (s.includes('bootcamp')) return <GraduationCap className={cls} />;
+  if (s.includes('meetup')) return <Users2 className={cls} />;
+  if (s.includes('conference')) return <Mic2 className={cls} />;
+  if (s.includes('seminar')) return <BookOpen className={cls} />;
+  if (s.includes('networking')) return <Handshake className={cls} />;
+  return <Briefcase className={cls} />;
 }
 
 // ============================================================
@@ -421,13 +422,21 @@ export function EventCard({ event, onClick, featured = false }: EventCardProps) 
               priority={featured}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full w-full bg-muted text-muted-foreground">
-              <CalendarDays className="h-16 w-16 stroke-1 opacity-50" />
-              <span className="text-sm font-medium text-muted-foreground mt-2">
-                No Image Available
-              </span>
-            </div>
+            <Image
+              src="/default-event-cover.jpg"
+              alt={event.display_name || event.name}
+              fill
+              unoptimized
+              className={cn(
+                'object-cover transition-all duration-700 ease-out',
+                isHovered ? 'scale-105' : 'scale-100',
+              )}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            />
           )}
+
+          {/* Subtle dark gradient so text and badges remain readable */}
+          <div className="absolute inset-0 bg-black/10" />
 
           <div
             className={cn(
