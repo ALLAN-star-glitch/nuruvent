@@ -121,6 +121,13 @@ export const INSTITUTION_TYPES_FALLBACK: InstitutionTypeOption[] = [
   { value: 'institution_type_association', label: 'Association' },
   { value: 'institution_type_school', label: 'School' },
   { value: 'institution_type_university', label: 'University' },
+  { value: 'institution_type_college', label: 'College' },                  // NEW
+  { value: 'institution_type_high_school', label: 'High School' },          // NEW
+  { value: 'institution_type_ngo', label: 'NGO / Non-Profit' },
+  { value: 'institution_type_government', label: 'Government Agency' },
+  { value: 'institution_type_religious', label: 'Religious Organization' },
+  { value: 'institution_type_community', label: 'Community Organization' },
+  { value: 'institution_type_other', label: 'Other' },
 ];
 
 // ============================================================
@@ -147,4 +154,6 @@ export const PROFESSIONAL_TYPES_FALLBACK: ProfessionalTypeOption[] = [
   { value: 'professional_type_coach', label: 'Coach' },
   { value: 'professional_type_consultant', label: 'Consultant' },
   { value: 'professional_type_freelancer', label: 'Freelancer' },
+  { value: 'professional_type_organizer', label: 'Organizer' },
+  { value: 'professional_type_learner', label: 'Learner' },
 ];

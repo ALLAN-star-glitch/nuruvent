@@ -23,14 +23,15 @@ export type AccountType =
  * Professional type — describes what kind of professional a personal
  * user is. Mirrors backend `types.ProfessionalType`.
  *
- * Only applies to `account_type_personal` users. Institution accounts
- * and invited users do not have a professional type.
+ * Only applies to `account_type_personal` users.
  */
 export type ProfessionalType =
   | 'professional_type_trainer'
   | 'professional_type_coach'
   | 'professional_type_consultant'
-  | 'professional_type_freelancer';
+  | 'professional_type_freelancer'
+  | 'professional_type_organizer'
+  | 'professional_type_learner';
 
 /**
  * Institution type — describes what kind of institution an
@@ -44,7 +45,14 @@ export type InstitutionType =
   | 'institution_type_institute'
   | 'institution_type_association'
   | 'institution_type_school'
-  | 'institution_type_university';
+  | 'institution_type_university'
+  | 'institution_type_college'       // NEW
+  | 'institution_type_high_school'   // NEW
+  | 'institution_type_ngo'
+  | 'institution_type_government'
+  | 'institution_type_religious'
+  | 'institution_type_community'
+  | 'institution_type_other';
 
 /**
  * Account-level role. Mirrors the `role` values stored in
@@ -248,9 +256,6 @@ export interface BaseResponse<T = unknown> {
 // ============================================================
 // 3. REFERENCE DATA — fetched from the backend, not hardcoded
 // ============================================================
-//
-// These interfaces mirror the shape of the *_types endpoints
-// (GET /account-types, GET /professional-types, GET /institution-types).
 
 /** Mirrors a row from GET /api/v1/account-types. */
 export interface AccountTypeRef {
