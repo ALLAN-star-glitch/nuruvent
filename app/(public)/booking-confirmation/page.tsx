@@ -37,7 +37,6 @@ import { cn } from '@/lib/utils';
 
 import { useGetRegistrationQuery } from '@/lib/store/api/registrationsApi';
 import { useGetEventBySlugQuery } from '@/lib/store/api/eventsApi';
-import { useGetUserTeamsQuery } from '@/lib/store/api/teamsApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import { selectIsAuthenticated } from '@/lib/store/slices/authSlice';
 
@@ -71,7 +70,6 @@ export default function BookingConfirmationPage() {
   const printRef = useRef<HTMLDivElement>(null);
 
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const { data: teamsData } = useGetUserTeamsQuery();
 
   const {
     data: regRes,
@@ -91,15 +89,12 @@ export default function BookingConfirmationPage() {
   const registration = regRes?.data;
   const event = eventRes?.data;
 
-  const owningTeam = useMemo(
-    () => teamsData?.teams?.find((t) => t.id === event?.team_id) ?? null,
-    [teamsData, event?.team_id],
-  );
-
-  const ticketsHref =
-    owningTeam && event?.team_id
-      ? `/dashboard/${owningTeam.account_id}/${event.team_id}/tickets`
-      : '/dashboard/tickets';
+  // Build the correct dashboard URL directly from the event's IDs.
+  // This avoids needing to fetch the user's teams list.
+  const ticketsHref = useMemo(() => {
+    if (!event) return '/dashboard/tickets';
+    return `/dashboard/${event.account_id}/${event.team_id}/tickets`;
+  }, [event]);
 
   const isLoading = regLoading || eventLoading;
   const isError = regError || eventError || !registration || !event;
