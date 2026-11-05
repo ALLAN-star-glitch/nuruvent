@@ -6,11 +6,14 @@ import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
 import { CategoryFilter } from '@/components/home/CategoryFilter';
 import { EventGrid } from '@/components/home/EventGrid';
-import { SITE_NAME, SITE_URL } from '@/lib/constants';
+
+const SITE_URL = 'https://nuruvent.com';
+const SITE_NAME = 'Nuruvent Solutions';
 
 const PAGE_TITLE = `Browse Training Events, Workshops & Online Courses | ${SITE_NAME}`;
 const PAGE_DESCRIPTION =
-  'Discover certified training events, live workshops, self-paced courses, and technical masterclasses. Filter by category, date, format, or topic.';
+  'Discover certified training events, live workshops, self-paced courses, technical masterclasses, and academic events. Filter by category, date, format, or topic.';
+
 const PAGE_URL = `${SITE_URL}/events`;
 
 export const metadata: Metadata = {
@@ -30,7 +33,7 @@ export const metadata: Metadata = {
         url: '/events.png',
         width: 1200,
         height: 630,
-        alt: 'Browse Certified Training Events & Courses on Nuruvent',
+        alt: 'Browse Certified Training Events & Courses on Nuruvent Solutions',
       },
     ],
   },
@@ -39,6 +42,8 @@ export const metadata: Metadata = {
     title: PAGE_TITLE,
     description: PAGE_DESCRIPTION,
     images: ['/events.png'],
+    site: '@nuruvent',
+    creator: '@nuruvent',
   },
   keywords: [
     'training events and courses',
@@ -50,6 +55,11 @@ export const metadata: Metadata = {
     'tech masterclasses',
     'M-Pesa course payments',
     'professional development courses',
+    'academic events',
+    'graduation ticketing',
+    'campus events Kenya',
+    'student union events',
+    'Nuruvent Solutions',
     'Nuruvent events and courses',
   ],
 };
@@ -109,9 +119,34 @@ export default function EventsPage() {
               },
               {
                 '@type': 'CollectionPage',
+                '@id': PAGE_URL,
                 name: PAGE_TITLE,
                 description: PAGE_DESCRIPTION,
                 url: PAGE_URL,
+                isPartOf: {
+                  '@type': 'WebSite',
+                  '@id': `${SITE_URL}/#website`,
+                  url: SITE_URL,
+                  name: SITE_NAME,
+                },
+                about: {
+                  '@type': 'Thing',
+                  name: 'Professional Training, Academic Events & Online Courses',
+                },
+              },
+              {
+                '@type': 'WebSite',
+                '@id': `${SITE_URL}/#website`,
+                url: SITE_URL,
+                name: SITE_NAME,
+                potentialAction: {
+                  '@type': 'SearchAction',
+                  target: {
+                    '@type': 'EntryPoint',
+                    urlTemplate: `${SITE_URL}/events?q={search_term_string}`,
+                  },
+                  'query-input': 'required name=search_term_string',
+                },
               },
             ],
           }),
@@ -124,7 +159,7 @@ export default function EventsPage() {
         <div className="absolute inset-0 z-0">
           <Image
             src="/how-it-works.png"
-            alt="Training Events & Courses Catalog"
+            alt="Training Events & Courses Catalog on Nuruvent Solutions"
             fill
             className="object-cover object-right"
             priority
