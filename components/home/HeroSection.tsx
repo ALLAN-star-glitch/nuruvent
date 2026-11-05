@@ -1,3 +1,5 @@
+// components/home/HeroSection.tsx
+
 'use client';
 
 import Link from 'next/link';
@@ -21,7 +23,7 @@ export function HeroSection() {
   useEffect(() => {
     const generateQR = async () => {
       try {
-        const verifyUrl = 
+        const verifyUrl =
           typeof window !== 'undefined'
             ? `${window.location.origin}/verify`
             : 'https://nuruvent.com/verify';
@@ -48,19 +50,17 @@ export function HeroSection() {
       <div className="absolute inset-0 z-0 hidden md:block">
         <Image
           src="/hero-image-desktop.png"
-          alt="Training events and online courses"
+          alt="Nuruvent Solutions training events and online courses platform"
           fill
           priority
           sizes="100vw"
           className="object-cover object-right"
         />
 
-        {/* Desktop overlay — lighter, so the right side stays crisp */}
         <div className="hidden lg:block absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/25 to-transparent" />
         </div>
 
-        {/* Tablet overlay */}
         <div className="hidden md:block lg:hidden absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/50" />
         </div>
@@ -70,7 +70,7 @@ export function HeroSection() {
       <div className="absolute inset-0 z-0 md:hidden">
         <Image
           src="/hero-image-desktop.png"
-          alt="Training Events and Online Courses"
+          alt="Nuruvent Solutions training events and online courses platform"
           fill
           className="object-cover object-right"
           priority
@@ -116,12 +116,12 @@ export function HeroSection() {
             {/* Badge */}
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-sm sm:text-sm">
               <Sparkles className="h-3 w-3" />
-              <span>Host & Attend Events, Courses & Workshops</span>
+              <span>Host Events, Manage Teams, Get Paid</span>
             </div>
 
             {/* Heading */}
             <h1 className="mb-4 text-3xl font-extrabold leading-[1.15] tracking-tight text-foreground sm:text-4xl md:text-5xl lg:text-[3.25rem] xl:text-6xl">
-              <span className="text-primary">Nuruvent</span>
+              <span className="text-primary">Nuruvent Solutions</span>
               <span className="text-foreground"> — Where </span>
               <span className="text-secondary">Professionals</span>
               <span className="text-foreground"> Grow</span>
@@ -129,8 +129,9 @@ export function HeroSection() {
 
             {/* Subheading */}
             <p className="mx-auto mb-6 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg lg:mx-0">
-              Live events, self-paced courses, and certified training — for
-              universities, institutes, corporate teams, and coaches.
+              The all-in-one platform for training events, academic milestones,
+              and online courses. Built for universities, institutes, and
+              independent trainers.
             </p>
 
             {/* Feature chips */}
@@ -145,6 +146,12 @@ export function HeroSection() {
                 <CheckCircle className="h-4 w-4 text-tertiary" />
                 <span className="text-xs font-medium text-muted-foreground sm:text-sm">
                   QR-Verified Certificates
+                </span>
+              </div>
+              <div className="flex items-center gap-2 rounded-full border border-border bg-muted px-3.5 py-1.5 shadow-sm">
+                <CheckCircle className="h-4 w-4 text-tertiary" />
+                <span className="text-xs font-medium text-muted-foreground sm:text-sm">
+                  7-Day Payouts
                 </span>
               </div>
             </div>
@@ -200,7 +207,6 @@ export function HeroSection() {
 
           {/* Right column */}
           <div className="relative hidden min-h-[420px] lg:col-span-7 lg:block">
-            {/* Floating badges sit on the LEFT edge of this column */}
             <div className="animate-float absolute left-4 top-8 z-20 flex items-center gap-3 rounded-2xl border border-border/60 bg-card/85 p-3 shadow-xl backdrop-blur-md">
               <div className="rounded-xl bg-tertiary/15 p-2">
                 <Award className="h-5 w-5 text-tertiary" />
@@ -238,15 +244,14 @@ export function HeroSection() {
               </div>
               <div>
                 <p className="text-xs font-bold text-foreground">
-                  For Every Role
+                  Built for Teams
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Hosts · Teams · Learners
+                  Admins · Managers · Members
                 </p>
               </div>
             </div>
 
-            {/* Desktop Floating QR Code */}
             {qrDataUrl && (
               <div
                 className="animate-float absolute bottom-6 right-8 z-20 flex flex-col items-center gap-2 rounded-2xl border border-border/60 bg-card/90 p-3 shadow-xl backdrop-blur-md"
