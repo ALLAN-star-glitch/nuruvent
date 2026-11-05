@@ -1,4 +1,7 @@
+/* eslint-disable react/no-unescaped-entities */
 /* eslint-disable react-hooks/set-state-in-effect */
+// app/(dashboard)/dashboard/[accountId]/[teamId]/events/page.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,6 +11,7 @@ import {
   AlertCircle,
   Award,
   Calendar,
+  Info, // <-- NEW IMPORT
   LogIn,
   Plus,
   RefreshCw,
@@ -641,6 +645,21 @@ export default function EventsDashboardPage() {
               <Plus className="h-4 w-4" /> Create event
             </Button>
           </Link>
+        </div>
+      </div>
+
+      {/* NEW: Platform Notice Banner */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-950/20 p-4 flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/40 shrink-0">
+          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+            Video integrations are under review
+          </p>
+         <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+          Google Meet and Zoom connections are coming soon. For now, select <strong>"Use a different link"</strong> while setting up your schedule to paste your own meeting URL. Automatic attendance tracking will be available once they are approved.
+        </p>
         </div>
       </div>
 
