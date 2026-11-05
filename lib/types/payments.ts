@@ -33,7 +33,8 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  registration_id: string;
+  kind: 'registration' | 'certificate_batch';
+  registration_id?: string;
   user_id?: string;
   guest_email?: string;
   currency: string;
@@ -41,12 +42,33 @@ export interface Order {
   discount_total: number;
   total_amount: number;
   status: OrderStatus;
+  
+  /** 
+   * Latest payment status, hydrated by the backend.
+   * Used by guests polling GET /orders/:id to detect success.
+   */
+  payment_status?: PaymentStatus;
+  
   expires_at: string;
   paid_at?: string;
   cancelled_at?: string;
   created_at: string;
   updated_at: string;
   items: OrderItem[];
+
+  // Certificate batch fields
+  batch_attendee_count?: number;
+  batch_context?: {
+    event_id: string;
+    account_id: string;
+    template_id: string;
+    price_per_cert_minor: number;
+    event_title: string;
+    event_date?: string;
+    event_duration?: string;
+    issuer_name?: string;
+    attendee_count: number;
+  };
 }
 
 // ============================================================
@@ -101,18 +123,6 @@ export interface RefundRequest {
 // ============================================================
 // LEDGER — payment list row + stats
 // ============================================================
-//
-// These types mirror the payment module's read models. They are what
-// the organizer's payments page consumes.
-//
-// The ledger status set is narrower than the write-side PaymentStatus
-// above: `cancelled` never appears in a payment row (that's an order
-// state), and `refunded` only appears here (it's a payment-level
-// outcome).
-//
-// Amounts are in minor units. Fees are computed on the backend using
-// the rates snapshotted at order creation (platform) and payment
-// initiation (processing).
 
 export type LedgerPaymentStatus =
   | 'succeeded'
@@ -123,30 +133,21 @@ export type LedgerPaymentStatus =
 
 export type LedgerPaymentMethod = 'mpesa' | 'card';
 
-/**
- * One row in the payments ledger.
- *
- * Returned by GET /payments. Contains the fully-resolved attendee,
- * event, and fee breakdown for one payment.
- */
 export interface PaymentListItem {
   id: string;
   order_id: string;
   registration_id: string;
   registration_number?: string;
 
-  // Attendee
   attendee_name: string;
   attendee_email: string;
   attendee_phone?: string;
 
-  // Event
   event_id: string;
   event_title: string;
   event_start_date?: string;
   event_image_url?: string;
 
-  // Amounts — minor units
   amount: number;
   currency: string;
   platform_fee: number;
@@ -155,7 +156,6 @@ export interface PaymentListItem {
   platform_fee_rate: number;
   processing_fee_rate: number;
 
-  // Status
   status: LedgerPaymentStatus;
   status_label: string;
   provider: string;
@@ -163,7 +163,6 @@ export interface PaymentListItem {
   method_label: string;
   transaction_id?: string;
 
-  // Timing
   initiated_at: string;
   completed_at?: string;
   created_at: string;

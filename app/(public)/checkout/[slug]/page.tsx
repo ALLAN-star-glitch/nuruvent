@@ -37,7 +37,7 @@ import { useGetRegistrationQuery } from '@/lib/store/api/registrationsApi';
 import {
   useCreateOrderMutation,
   useInitiatePaymentMutation,
-  useGetPaymentQuery,
+  useGetOrderQuery, // <-- Changed from useGetPaymentQuery
 } from '@/lib/store/api/paymentsApi';
 
 // ============================================================
@@ -113,11 +113,11 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null); // <-- Changed from paymentId
 
-  // ---- M-Pesa poll ----
-  const { data: paymentRes } = useGetPaymentQuery(paymentId ?? '', {
-    skip: !paymentId,
+  // ---- Order poll (works for guests via optionalAuth) ----
+  const { data: orderRes } = useGetOrderQuery(orderId ?? '', {
+    skip: !orderId,
     pollingInterval: 3000,
   });
 
@@ -130,25 +130,25 @@ export default function CheckoutPage() {
     return registration?.guest?.email ?? guestEmail ?? '';
   }, [registration, guestEmail]);
 
-  // ---- M-Pesa success/failure redirect ----
+  // ---- Success/failure redirect (based on order.payment_status) ----
   useEffect(() => {
-    const payment = paymentRes?.data;
-    if (!payment || !registration) return;
+    const order = orderRes?.data;
+    if (!order || !registration) return;
 
-    if (payment.status === 'succeeded') {
+    if (order.payment_status === 'succeeded') {
       const params = new URLSearchParams({
-        reference: payment.id,
+        reference: order.id, // use order id as reference for the confirmation page
         registration: registration.id,
         slug: slug ?? '',
       });
       if (guestEmail) params.set('email', guestEmail);
       router.push(`/booking-confirmation?${params.toString()}`);
-    } else if (payment.status === 'failed') {
-      setError(payment.failure_reason || 'Payment failed.');
-      setPaymentId(null);
+    } else if (order.payment_status === 'failed') {
+      setError('Payment failed. Please try again.');
+      setOrderId(null);
       setSubmitting(false);
     }
-  }, [paymentRes, router, registration, slug, guestEmail]);
+  }, [orderRes, router, registration, slug, guestEmail]);
 
   // ---- Prefill phone ----
   useEffect(() => {
@@ -208,7 +208,7 @@ export default function CheckoutPage() {
     );
   }
 
-  // ---- Success redirect helper ----
+  // ---- Success redirect helper (for card) ----
   const goToConfirmation = (paymentReference: string) => {
     const params = new URLSearchParams({
       reference: paymentReference,
@@ -238,6 +238,9 @@ export default function CheckoutPage() {
       }).unwrap();
 
       const order = orderRes.data;
+
+      // Save orderId so polling starts
+      setOrderId(order.id);
 
       const payRes = await initiatePayment({
         order_id: order.id,
@@ -298,8 +301,7 @@ export default function CheckoutPage() {
         });
         return;
       }
-
-      setPaymentId(payment.id);
+      // For M-Pesa, polling on orderId will pick up the result.
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
@@ -329,7 +331,7 @@ export default function CheckoutPage() {
     },
   ];
 
-  const showPolling = !!paymentId;
+  const showPolling = !!orderId;
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 text-foreground selection:bg-primary/10">
