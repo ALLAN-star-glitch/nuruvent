@@ -356,16 +356,24 @@ export default function EventDetailPage({
     // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const windowMs = 30 * 24 * 60 * 60 * 1000;
+    
     return (event.schedules ?? []).some((s) => {
       if (!s.is_virtual || !s.platform) return false;
+      
+      // 1. If it already has a generated meeting ID, it's provisioned.
       if (s.video_meeting_id) return false;
+
+      // 2. NEW: If the user pasted a manual link, we don't need to provision.
+      if (s.zoom_link || s.meet_link) return false;
+
+      // 3. Check the 30-day window.
       const t = new Date(s.start_date).getTime();
       return t - now <= windowMs;
     });
   }, [event]);
 
   const provisioningInProgress =
-    hasUnprovisionedSessions && pollAttempts < 15;
+  hasUnprovisionedSessions && pollAttempts < 15;
 
   const meetingsMissing =
     hasUnprovisionedSessions && pollAttempts >= 15;
