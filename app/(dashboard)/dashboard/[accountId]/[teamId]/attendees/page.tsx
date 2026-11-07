@@ -144,7 +144,7 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
     color: 'bg-primary/10 text-primary border-primary/30',
     icon: CheckCircle2,
   },
-  'no-show': {
+  no_show: {
     label: 'No Show',
     color:
       'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
@@ -158,7 +158,7 @@ const STATUS_OPTIONS: AttendanceStatus[] = [
   'partial',
   'full',
   'confirmed',
-  'no-show',
+  'no_show',
 ];
 
 const UNKNOWN_STATUS: StatusDisplay = {
@@ -169,8 +169,7 @@ const UNKNOWN_STATUS: StatusDisplay = {
 
 function statusDisplay(status: string | undefined): StatusDisplay {
   if (!status) return UNKNOWN_STATUS;
-  const normalized = status.replace(/_/g, '-') as AttendanceStatus;
-  return statusConfig[normalized] ?? UNKNOWN_STATUS;
+  return statusConfig[status as AttendanceStatus] ?? UNKNOWN_STATUS;
 }
 
 function initials(name: string): string {
@@ -193,11 +192,10 @@ function durationDisplay(
   seconds: number,
   status: string | undefined,
 ): { text: string; italic: boolean } {
-  const normalized = (status ?? '').replace(/_/g, '-');
-  if (normalized === 'registered' && (!seconds || seconds <= 0)) {
+  if (status === 'registered' && (!seconds || seconds <= 0)) {
     return { text: 'Not yet joined', italic: true };
   }
-  if (normalized === 'no-show' && (!seconds || seconds <= 0)) {
+  if (status === 'no_show' && (!seconds || seconds <= 0)) {
     return { text: 'Did not attend', italic: true };
   }
   return { text: formatDuration(seconds), italic: false };
@@ -225,9 +223,6 @@ function slugify(input: string): string {
   );
 }
 
-// Renders a row of colored dots representing each session's status.
-// 🟢 = Full/Confirmed | 🟡 = Partial/Joined | ⚪ = Registered/No-show
-// Caps at 10 dots to prevent UI breakage for huge events (e.g., 518 sessions).
 function SessionDots({
   breakdowns,
   totalSessions,
@@ -251,14 +246,14 @@ function SessionDots({
         let bg = 'bg-slate-200 dark:bg-slate-700';
         let label = 'Unknown';
 
-        const s = b.status?.replace(/_/g, '-');
+        const s = b.status;
         if (s === 'full' || s === 'confirmed') {
           bg = 'bg-emerald-500';
           label = 'Attended';
         } else if (s === 'partial' || s === 'joined') {
           bg = 'bg-amber-400';
           label = 'Partial';
-        } else if (s === 'registered' || s === 'no-show') {
+        } else if (s === 'registered' || s === 'no_show') {
           bg = 'bg-slate-300 dark:bg-slate-600';
           label = 'Not attended';
         }
@@ -297,14 +292,11 @@ export default function AttendeesPage() {
 
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>(
-    'all',
-  );
+  // ✅ Default status is now 'joined' instead of 'all'
+  const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('joined');
+  
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
 
-  // Session selection: two separate IDs
-  // - `selectedSessionScheduleId` = event_schedules.id (for the dropdown)
-  // - `selectedAttendanceSessionId` = sessions.id (for the API filter)
   const [selectedSessionScheduleId, setSelectedSessionScheduleId] =
     useState<string>('all');
   const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] =
@@ -361,16 +353,13 @@ export default function AttendeesPage() {
     setSelectAll(false);
   }, [currentPage]);
 
-  // Reset session filter if the event changes
   useEffect(() => {
     setSelectedSessionScheduleId('all');
     setSelectedAttendanceSessionId('all');
   }, [selectedEventId]);
 
-  // Fetch the active team so we can pass its type to the events query.
   const { data: team } = useGetTeamQuery(teamId, { skip: !teamId });
 
-  // Team-scoped event list for the "Event" dropdown.
   const { data: eventsResponse } = useListMyEventsQuery(
     {
       page: 1,
@@ -384,9 +373,6 @@ export default function AttendeesPage() {
     { skip: !teamId || !team },
   );
 
-  // Fetch full event detail (with schedules) when an event is selected.
-  // The events list endpoint doesn't return the schedules array, so we
-  // need a separate call for the session dropdown.
   const { data: eventDetailResponse, isLoading: isEventDetailLoading } =
     useGetEventByIdQuery(selectedEventId, {
       skip: selectedEventId === 'all',
@@ -406,22 +392,18 @@ export default function AttendeesPage() {
     [eventsResponse],
   );
 
-  // Extract sessions from the fetched event detail.
-  // These IDs are event_schedules.id — the dropdown will display them
-  // and pass them to handleSessionSelect for resolution.
   const availableSessions = useMemo(() => {
     if (selectedEventId === 'all') return [];
     const schedules = eventDetailResponse?.data?.schedules ?? [];
     if (schedules.length === 0) return [];
 
     return schedules.map((s: any, idx: number) => ({
-      id: s.id, // event_schedules.id
+      id: s.id,
       title: s.session_name || `Session ${idx + 1}`,
       date: s.start_date,
     }));
   }, [selectedEventId, eventDetailResponse]);
 
-  // Resolve the title of the selected session for use in exports.
   const selectedSessionTitle = useMemo(() => {
     if (selectedSessionScheduleId === 'all') return '';
     return (
@@ -452,7 +434,8 @@ export default function AttendeesPage() {
       team_id: teamId,
       scope: 'team',
       search: searchQuery || undefined,
-      status: selectedStatus === 'all' ? undefined : selectedStatus,
+      // ✅ No longer conditional, since 'all' is removed from options
+      status: selectedStatus,
       event_id: selectedEventId === 'all' ? undefined : selectedEventId,
       session_id:
         selectedAttendanceSessionId === 'all'
@@ -484,6 +467,7 @@ export default function AttendeesPage() {
   } = useGetAttendeesQuery(queryParams);
 
   const payload = response?.data;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const attendees: CrossEventAttendee[] = payload?.attendees ?? [];
   const total = payload?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage));
@@ -552,18 +536,14 @@ export default function AttendeesPage() {
   }, [attendees, isScopedToEvent, scopedEvent, rawEvents]);
 
   const stats = useMemo(() => {
-    const attended = attendees.filter(
-      (a) =>
-        a.effective_status === 'full' || a.effective_status === 'confirmed',
-    ).length;
     const registered = attendees.filter(
       (a) => a.effective_status === 'registered',
     ).length;
     const noShow = attendees.filter(
-      (a) => (a.effective_status ?? '').replace(/_/g, '-') === 'no-show',
+      (a) => a.effective_status === 'no_show',
     ).length;
     const hosts = attendees.filter((a) => a.is_host).length;
-    return { attended, registered, noShow, hosts };
+    return { registered, noShow, hosts };
   }, [attendees]);
 
   const errorMessage = error
@@ -639,7 +619,7 @@ export default function AttendeesPage() {
   const getActiveFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
-    if (selectedStatus !== 'all') n++;
+    // Status is always active now, so we don't count it as an optional filter
     if (selectedEventId !== 'all') n++;
     if (selectedSessionScheduleId !== 'all') n++;
     return n;
@@ -648,7 +628,7 @@ export default function AttendeesPage() {
   const resetFilters = () => {
     setSearchInput('');
     setSearchQuery('');
-    setSelectedStatus('all');
+    setSelectedStatus('joined'); // Reset to default
     setSelectedEventId('all');
     setSelectedSessionScheduleId('all');
     setSelectedAttendanceSessionId('all');
@@ -675,10 +655,6 @@ export default function AttendeesPage() {
     try {
       const stamp = new Date().toISOString().slice(0, 10);
 
-      // Build the title and filename based on scope.
-      // 1. Session selected → include session name.
-      // 2. Event selected (no session) → include event name.
-      // 3. Nothing selected → cross-event.
       const sessionSlug = selectedSessionTitle
         ? `-${slugify(selectedSessionTitle)}`
         : '';
@@ -704,7 +680,7 @@ export default function AttendeesPage() {
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
-          selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+          selectedStatus ? `Status: ${selectedStatus}` : null,
           isScopedToEvent ? `Event: ${scopedEvent!.title}` : null,
           selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
@@ -740,13 +716,6 @@ export default function AttendeesPage() {
       sub: 'attendees',
       tone: 'primary' as const,
       icon: <Users className="h-4 w-4" />,
-    },
-    {
-      label: 'Attended',
-      value: stats.attended,
-      sub: 'on this page',
-      tone: 'emerald' as const,
-      icon: <CheckCircle2 className="h-4 w-4" />,
     },
     {
       label: 'Hosts',
@@ -838,7 +807,7 @@ export default function AttendeesPage() {
       {/* Content — loading gate */}
       {isLoading ? (
         <>
-          <StatsCardsSkeleton cards={4} desktopColumns={4} />
+          <StatsCardsSkeleton cards={3} desktopColumns={3} />
           <Card className="border-border/60 shadow-none">
             <CardContent className="flex items-center justify-center p-12 sm:p-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -896,48 +865,55 @@ export default function AttendeesPage() {
                       </SelectContent>
                     </Select>
 
-                    {/* Session Dropdown */}
-                    <Select
-                      value={selectedSessionScheduleId}
-                      onValueChange={handleSessionSelect}
-                      disabled={
-                        selectedEventId === 'all' || isEventDetailLoading
-                      }
-                    >
-                      <SelectTrigger className="w-full cursor-pointer md:w-[200px]">
-                        <SelectValue placeholder="All Sessions" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all" className="cursor-pointer">
-                          All Sessions
-                        </SelectItem>
-                        {availableSessions.map((s) => (
-                          <SelectItem
-                            key={s.id}
-                            value={s.id}
-                            className="cursor-pointer"
-                          >
-                            <span className="inline-block max-w-[180px] truncate align-middle">
-                              {s.title}
-                            </span>
+                    {/* Session Dropdown - requires Event selection */}
+                    <div className="w-full md:w-[200px]">
+                      <Select
+                        value={selectedSessionScheduleId}
+                        onValueChange={handleSessionSelect}
+                        disabled={selectedEventId === 'all' || isEventDetailLoading}
+                      >
+                        <SelectTrigger className="w-full cursor-pointer">
+                          <SelectValue
+                            placeholder={
+                              selectedEventId === 'all'
+                                ? 'Select event first'
+                                : 'All Sessions'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="cursor-pointer">
+                            All Sessions
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          {availableSessions.map((s) => (
+                            <SelectItem
+                              key={s.id}
+                              value={s.id}
+                              className="cursor-pointer"
+                            >
+                              <span className="inline-block max-w-[180px] truncate align-middle">
+                                {s.title}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedEventId === 'all' && (
+                        <p className="text-[10px] text-muted-foreground mt-1 ml-1">
+                          Select an event to filter by session
+                        </p>
+                      )}
+                    </div>
 
+                    {/* Status Dropdown - "All Status" removed */}
                     <Select
                       value={selectedStatus}
-                      onValueChange={(v) =>
-                        setSelectedStatus(v as 'all' | AttendanceStatus)
-                      }
+                      onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
                     >
                       <SelectTrigger className="w-full cursor-pointer md:w-[170px]">
-                        <SelectValue placeholder="All Status" />
+                        <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all" className="cursor-pointer">
-                          All Status
-                        </SelectItem>
                         {STATUS_OPTIONS.map((s) => (
                           <SelectItem
                             key={s}
@@ -1410,7 +1386,7 @@ export default function AttendeesPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {attendees.length > 0 ? (
                   attendees.map((a) => {
-                    const s = statusConfig[a.effective_status];
+                    const s = statusDisplay(a.effective_status);
                     const StatusIcon = s.icon;
                     const isSelected = isRowSelected(a);
                     const dur = durationDisplay(
@@ -1777,7 +1753,13 @@ export default function AttendeesPage() {
                   disabled={selectedEventId === 'all' || isEventDetailLoading}
                 >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
-                    <SelectValue placeholder="All Sessions" />
+                    <SelectValue
+                      placeholder={
+                        selectedEventId === 'all'
+                          ? 'Select event first'
+                          : 'All Sessions'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="cursor-pointer">
@@ -1796,23 +1778,24 @@ export default function AttendeesPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedEventId === 'all' && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Select an event to filter by session
+                  </p>
+                )}
               </div>
 
               <div className="mb-5 space-y-1.5">
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
-                  onValueChange={(v) =>
-                    setSelectedStatus(v as 'all' | AttendanceStatus)
-                  }
+                  onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
                 >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
-                    <SelectValue placeholder="All Status" />
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all" className="cursor-pointer">
-                      All Status
-                    </SelectItem>
+                    {/* ✅ "All Status" is removed */}
                     {STATUS_OPTIONS.map((s) => (
                       <SelectItem
                         key={s}

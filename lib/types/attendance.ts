@@ -16,7 +16,7 @@ export type AttendanceStatus =
   | 'partial'
   | 'full'
   | 'confirmed'
-  | 'no-show';
+  | 'no_show';
 
 // ============================================================
 // EVENT ATTENDANCE SUMMARY
