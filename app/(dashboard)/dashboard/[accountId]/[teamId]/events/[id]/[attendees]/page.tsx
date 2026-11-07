@@ -147,7 +147,7 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
     color: 'bg-primary/10 text-primary border-primary/30',
     icon: CheckCircle2,
   },
-  'no_show': {
+  no_show: {
     label: 'No Show',
     color:
       'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
@@ -226,7 +226,7 @@ function SessionDots({
         let bg = 'bg-slate-200 dark:bg-slate-700';
         let label = 'Unknown';
 
-        const s = b.status?.replace(/_/g, '-');
+        const s = b.status;
         if (s === 'full' || s === 'confirmed') {
           bg = 'bg-emerald-500';
           label = 'Attended';
@@ -277,13 +277,10 @@ export default function EventAttendeesPage() {
 
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>(
-    'all',
-  );
+  
+  // ✅ Default status is 'joined' instead of 'all'
+  const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('joined');
 
-  // Session filter state: two IDs.
-  // - `selectedSessionScheduleId` = event_schedules.id (dropdown value)
-  // - `selectedAttendanceSessionId` = sessions.id (API query value)
   const [selectedSessionScheduleId, setSelectedSessionScheduleId] =
     useState<string>('all');
   const [selectedAttendanceSessionId, setSelectedAttendanceSessionId] =
@@ -388,7 +385,8 @@ export default function EventAttendeesPage() {
   const queryParams: ListAttendeesParams = useMemo(
     () => ({
       search: searchQuery || undefined,
-      status: selectedStatus === 'all' ? undefined : selectedStatus,
+      // ✅ No longer conditional, since 'all' is removed from options
+      status: selectedStatus,
       session_id:
         selectedAttendanceSessionId === 'all'
           ? undefined
@@ -525,7 +523,7 @@ export default function EventAttendeesPage() {
   const getActiveFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
-    if (selectedStatus !== 'all') n++;
+    // Status is always active now, so we don't count it as an optional filter
     if (selectedSessionScheduleId !== 'all') n++;
     return n;
   };
@@ -533,7 +531,7 @@ export default function EventAttendeesPage() {
   const resetFilters = () => {
     setSearchInput('');
     setSearchQuery('');
-    setSelectedStatus('all');
+    setSelectedStatus('joined'); // Reset to default
     setSelectedSessionScheduleId('all');
     setSelectedAttendanceSessionId('all');
     setSortField('registered_at');
@@ -557,7 +555,6 @@ export default function EventAttendeesPage() {
     try {
       const stamp = new Date().toISOString().slice(0, 10);
 
-      // Include the session name in the slug if a session is selected.
       const sessionSlug = selectedSessionTitle
         ? `-${selectedSessionTitle.replace(/\s+/g, '-').toLowerCase()}`
         : '';
@@ -566,7 +563,7 @@ export default function EventAttendeesPage() {
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
-          selectedStatus !== 'all' ? `Status: ${selectedStatus}` : null,
+          selectedStatus ? `Status: ${selectedStatus}` : null,
           selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
           .filter(Boolean)
@@ -580,7 +577,6 @@ export default function EventAttendeesPage() {
         event_id: eventId,
       })) as unknown as Parameters<typeof exportToCSV>[0];
 
-      // Scope the title to the session when applicable.
       const title = selectedSessionTitle
         ? `${eventName} — ${selectedSessionTitle}`
         : `${eventName} Attendees`;
@@ -616,13 +612,6 @@ export default function EventAttendeesPage() {
       sub: 'attendees',
       tone: 'primary' as const,
       icon: <Users className="h-4 w-4" />,
-    },
-    {
-      label: 'Attended',
-      value: stats.attended,
-      sub: 'on this page',
-      tone: 'emerald' as const,
-      icon: <CheckCircle2 className="h-4 w-4" />,
     },
     {
       label: 'Hosts',
@@ -735,7 +724,7 @@ export default function EventAttendeesPage() {
 
       {isLoading ? (
         <>
-          <StatsCardsSkeleton cards={4} desktopColumns={4} />
+          <StatsCardsSkeleton cards={3} desktopColumns={3} />
           <Card className="border-border/60 shadow-none">
             <CardContent className="flex items-center justify-center p-12 sm:p-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -795,19 +784,15 @@ export default function EventAttendeesPage() {
                       </SelectContent>
                     </Select>
 
+                    {/* Status Dropdown - "All Status" removed */}
                     <Select
                       value={selectedStatus}
-                      onValueChange={(v) =>
-                        setSelectedStatus(v as 'all' | AttendanceStatus)
-                      }
+                      onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
                     >
                       <SelectTrigger className="w-full cursor-pointer md:w-[170px]">
-                        <SelectValue placeholder="All Status" />
+                        <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all" className="cursor-pointer">
-                          All Status
-                        </SelectItem>
                         {STATUS_OPTIONS.map((s) => (
                           <SelectItem
                             key={s}
@@ -1595,17 +1580,13 @@ export default function EventAttendeesPage() {
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
-                  onValueChange={(v) =>
-                    setSelectedStatus(v as 'all' | AttendanceStatus)
-                  }
+                  onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
                 >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
-                    <SelectValue placeholder="All Status" />
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all" className="cursor-pointer">
-                      All Status
-                    </SelectItem>
+                    {/* ✅ "All Status" is removed */}
                     {STATUS_OPTIONS.map((s) => (
                       <SelectItem
                         key={s}
