@@ -81,7 +81,7 @@ function statusBadge(status: AttendanceStatus) {
         label: 'Joined',
         tone: 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950/30 dark:border-blue-900/50',
       };
-    case 'no-show':
+    case 'no_show':
       return {
         label: 'No show',
         tone: 'text-destructive bg-destructive/10 border-destructive/30',

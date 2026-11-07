@@ -233,7 +233,7 @@ function SessionDots({
         } else if (s === 'partial' || s === 'joined') {
           bg = 'bg-amber-400';
           label = 'Partial';
-        } else if (s === 'registered' || s === 'no-show') {
+        } else if (s === 'registered' || s === 'no_show') {
           bg = 'bg-slate-300 dark:bg-slate-600';
           label = 'Not attended';
         }
