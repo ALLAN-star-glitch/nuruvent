@@ -20,6 +20,34 @@ const BRAND = {
 } as const;
 
 // ============================================================
+// UTILITIES — top-level, before columns
+// ============================================================
+
+/** Capitalizes first letter of every word. */
+function toTitleCase(name: string | undefined): string {
+  if (!name) return '—';
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** Sanitizes string for use in filenames. */
+function sanitizeFilename(input: string): string {
+  return (
+    input
+      .trim()
+      .toLowerCase()
+      .replace(/[\s\u2010-\u2015/\\:]+/g, '-')
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 120) || 'certificates'
+  );
+}
+
+// ============================================================
 // COLUMNS
 // ============================================================
 
@@ -34,7 +62,8 @@ export const getCertificateExportColumns = (
 ): ExportColumn[] => [
   { key: 'id',                label: 'Certificate ID',   get: (c) => c.id },
   { key: 'verification_code', label: 'Verify Code',      get: (c) => c.verification_code },
-  { key: 'recipient_name',    label: 'Recipient Name',   get: (c) => c.recipient_name },
+  // ✅ Title case
+  { key: 'recipient_name',    label: 'Recipient Name',   get: (c) => toTitleCase(c.recipient_name) },
   { key: 'recipient_email',   label: 'Recipient Email',  get: (c) => c.recipient_email },
   { key: 'event_title',       label: 'Event/Course',     get: (c) => c.metadata?.context_title || '—' },
   { key: 'issuer_name',       label: 'Issuer',           get: () => issuer },
@@ -46,7 +75,8 @@ export const getCertificateExportColumns = (
 ];
 
 export const getPDFColumns = (issuer: string): ExportColumn[] => [
-  { key: 'recipient_name',    label: 'Name',         get: (c) => c.recipient_name },
+  // ✅ Title case
+  { key: 'recipient_name',    label: 'Name',         get: (c) => toTitleCase(c.recipient_name) },
   { key: 'recipient_email',   label: 'Email',        get: (c) => c.recipient_email },
   { key: 'event_title',       label: 'Event/Course', get: (c) => c.metadata?.context_title || '—' },
   { key: 'issuer_name',       label: 'Issuer',       get: () => issuer },
@@ -57,7 +87,7 @@ export const getPDFColumns = (issuer: string): ExportColumn[] => [
 ];
 
 // ============================================================
-// UTILITIES
+// UTILITIES (cont.)
 // ============================================================
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -257,8 +287,13 @@ export async function exportCertificatesToPDF(
   const hostName = options.hostName ?? 'Organizer';
   const hostLogoUrl = options.hostLogoUrl ?? '';
   const filtersSummary = options.filtersSummary ?? '';
-  const filename = options.filename ?? `certificates-${todayStamp()}.pdf`;
   const verifyUrl = options.verifyUrl ?? 'https://nuruvent.com/verify';
+
+  // ✅ Sanitized filename fallback
+  const rawNameParts = [title];
+  if (subtitle) rawNameParts.push(subtitle);
+  rawNameParts.push(todayStamp());
+  const filename = options.filename ?? `${sanitizeFilename(rawNameParts.join(' '))}.pdf`;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -273,9 +308,7 @@ export async function exportCertificatesToPDF(
   doc.setFillColor(...BRAND.secondary);
   doc.rect(0, 2, pageWidth, 1, 'F');
 
-  // ------------------------------------------------------------
-  // LOGO
-  // ------------------------------------------------------------
+  // Logo
   const logo = await loadImageDataUrl(hostLogoUrl);
   let textLeft = margin;
 
@@ -297,17 +330,13 @@ export async function exportCertificatesToPDF(
     textLeft = margin + targetW + 24;
   }
 
-  // ------------------------------------------------------------
-  // TITLE
-  // ------------------------------------------------------------
+  // Title
   doc.setTextColor(...BRAND.neutralDark);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.text(title, textLeft, 52);
 
-  // ------------------------------------------------------------
-  // HOST
-  // ------------------------------------------------------------
+  // Host
   let metaY = 72;
   if (hostName) {
     doc.setFont('helvetica', 'normal');
@@ -317,9 +346,7 @@ export async function exportCertificatesToPDF(
     metaY += 18;
   }
 
-  // ------------------------------------------------------------
-  // META
-  // ------------------------------------------------------------
+  // Meta line
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(...BRAND.neutralGray);
@@ -331,73 +358,62 @@ export async function exportCertificatesToPDF(
   doc.text(metaParts.join('  ·  '), textLeft, metaY);
   metaY += 14;
 
-  // ------------------------------------------------------------
-  // FILTERS
-  // ------------------------------------------------------------
   if (filtersSummary) {
     doc.setFontSize(9);
     doc.text(filtersSummary, textLeft, metaY);
   }
 
-  // ------------------------------------------------------------
-  // QR CODE & LINK (Top Right) - DRAWN LAST SO IT'S ON TOP
-  // ------------------------------------------------------------
-  let qrBottomY = 26; // Track the lowest point of the QR block
+  // QR + verify link
+  let qrBottomY = 26;
   const qrDataUrl = await generateQRCodeDataUrl(verifyUrl);
-  
+
   if (qrDataUrl) {
     const qrSize = 80;
     const qrX = pageWidth - margin - qrSize;
     const qrY = 26;
-    
-    // Draw QR Code
+
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-    
-    // Scan label
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.neutralGray);
-    doc.text('Scan to verify certificate', qrX + qrSize / 2, qrY + qrSize + 12, { align: 'center' });
+    doc.text(
+      'Scan to verify certificate',
+      qrX + qrSize / 2,
+      qrY + qrSize + 12,
+      { align: 'center' },
+    );
 
-    // Clickable Button
     const linkText = 'Or click here to verify';
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    
+
     const textWidth = doc.getTextWidth(linkText);
     const btnPaddingX = 6;
     const btnPaddingY = 4;
     const btnWidth = textWidth + btnPaddingX * 2;
     const btnHeight = 8 + btnPaddingY * 2;
-    
-    const btnX = qrX + (qrSize / 2) - (btnWidth / 2);
+
+    const btnX = qrX + qrSize / 2 - btnWidth / 2;
     const btnY = qrY + qrSize + 18;
 
-    // Draw button background
     doc.setFillColor(240, 245, 255);
     doc.setDrawColor(...BRAND.primary);
     doc.setLineWidth(0.5);
     doc.roundedRect(btnX, btnY, btnWidth, btnHeight, 3, 3, 'FD');
 
-    // Draw button text
     doc.setTextColor(...BRAND.primary);
     doc.text(linkText, btnX + btnPaddingX, btnY + btnHeight - btnPaddingY - 1);
-    
-    // Draw clickable area
+
     doc.link(btnX, btnY, btnWidth, btnHeight, { url: verifyUrl });
 
-    // Update the bottom Y coordinate
     qrBottomY = btnY + btnHeight;
   }
 
-  // ------------------------------------------------------------
-  // TOTALS BLOCK
-  // ------------------------------------------------------------
+  // Totals block
   const totals = computeTotals(rows);
-
-  // Ensure Totals block starts below the QR Code OR the meta text, whichever is lower
   const totalsY = Math.max(metaY + 24, qrBottomY + 24);
-  
+
   const totalsBlockH = 62;
   const innerPad = 16;
 
@@ -454,9 +470,7 @@ export async function exportCertificatesToPDF(
   doc.setLineWidth(0.5);
   doc.line(margin, headerHeight - 8, pageWidth - margin, headerHeight - 8);
 
-  // ------------------------------------------------------------
-  // TABLE
-  // ------------------------------------------------------------
+  // Table
   const columns = getPDFColumns(hostName);
   const head = [columns.map((c) => c.label)];
   const body = rows.map((r) => columns.map((c) => String(c.get(r) ?? '')));
@@ -495,14 +509,14 @@ export async function exportCertificatesToPDF(
     alternateRowStyles: { fillColor: BRAND.lightGray },
     bodyStyles: { lineColor: BRAND.border, lineWidth: 0.5 },
     columnStyles: {
-      0:  { cellWidth: 110, overflow: 'linebreak' },
-      1:  { cellWidth: 140, overflow: 'linebreak' },
-      2:  { cellWidth: 'auto', overflow: 'linebreak' },
-      3:  { cellWidth: 80, overflow: 'linebreak' },
-      4:  { cellWidth: 65, overflow: 'linebreak' },
-      5:  { cellWidth: 65, overflow: 'linebreak' },
-      6:  { cellWidth: 60, overflow: 'linebreak' },
-      7:  { cellWidth: 85, overflow: 'linebreak' },
+      0: { cellWidth: 110, overflow: 'linebreak' },
+      1: { cellWidth: 140, overflow: 'linebreak' },
+      2: { cellWidth: 'auto', overflow: 'linebreak' },
+      3: { cellWidth: 80, overflow: 'linebreak' },
+      4: { cellWidth: 65, overflow: 'linebreak' },
+      5: { cellWidth: 65, overflow: 'linebreak' },
+      6: { cellWidth: 60, overflow: 'linebreak' },
+      7: { cellWidth: 85, overflow: 'linebreak' },
     },
     didParseCell: (data) => {
       if (data.section !== 'body') return;
@@ -512,9 +526,7 @@ export async function exportCertificatesToPDF(
     },
   });
 
-  // ------------------------------------------------------------
-  // FOOTER on every page
-  // ------------------------------------------------------------
+  // Footer on every page
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

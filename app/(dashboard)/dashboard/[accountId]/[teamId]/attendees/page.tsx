@@ -114,50 +114,45 @@ interface StatusDisplay {
   icon: React.ComponentType<{ className?: string }>;
 }
 
+// ✅ 1. Map raw statuses to user-friendly displays
 const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
   registered: {
     label: 'Registered',
-    color:
-      'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50',
+    color: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50',
     icon: ClockIcon,
   },
   joined: {
-    label: 'Joined',
-    color:
-      'bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/50',
+    label: 'Partial',
+    color: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
     icon: ClockIcon,
   },
   partial: {
     label: 'Partial',
-    color:
-      'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
+    color: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
     icon: ClockIcon,
   },
   full: {
     label: 'Attended',
-    color:
-      'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
+    color: 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
     icon: CheckCircle2,
   },
   confirmed: {
-    label: 'Confirmed',
-    color: 'bg-primary/10 text-primary border-primary/30',
+    label: 'Attended',
+    color: 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
     icon: CheckCircle2,
   },
   no_show: {
     label: 'No Show',
-    color:
-      'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
+    color: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
     icon: XCircle,
   },
 };
 
+// ✅ 2. Only show 4 distinct options in the dropdown
 const STATUS_OPTIONS: AttendanceStatus[] = [
   'registered',
-  'joined',
   'partial',
   'full',
-  'confirmed',
   'no_show',
 ];
 
@@ -245,8 +240,8 @@ function SessionDots({
       {visibleBreakdowns.map((b, idx) => {
         let bg = 'bg-slate-200 dark:bg-slate-700';
         let label = 'Unknown';
-
         const s = b.status;
+
         if (s === 'full' || s === 'confirmed') {
           bg = 'bg-emerald-500';
           label = 'Attended';
@@ -292,8 +287,8 @@ export default function AttendeesPage() {
 
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  // ✅ Default status is now 'joined' instead of 'all'
-  const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('joined');
+  
+  const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>('all');
   
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
 
@@ -429,13 +424,19 @@ export default function AttendeesPage() {
     }
   };
 
+  // ✅ 3. Map UI "Partial" -> backend "joined"
+  const backendStatus = useMemo(() => {
+    if (selectedStatus === 'all') return undefined;
+    if (selectedStatus === 'partial') return 'joined';
+    return selectedStatus;
+  }, [selectedStatus]);
+
   const queryParams: ListAllAttendeesParams = useMemo(
     () => ({
       team_id: teamId,
       scope: 'team',
       search: searchQuery || undefined,
-      // ✅ No longer conditional, since 'all' is removed from options
-      status: selectedStatus,
+      status: backendStatus,
       event_id: selectedEventId === 'all' ? undefined : selectedEventId,
       session_id:
         selectedAttendanceSessionId === 'all'
@@ -449,7 +450,7 @@ export default function AttendeesPage() {
     [
       teamId,
       searchQuery,
-      selectedStatus,
+      backendStatus,
       selectedEventId,
       selectedAttendanceSessionId,
       sortField,
@@ -459,12 +460,15 @@ export default function AttendeesPage() {
     ],
   );
 
+  // ✅ 4. Force a network call on every filter change
   const {
     data: response,
     isLoading,
     isFetching,
     error,
-  } = useGetAttendeesQuery(queryParams);
+  } = useGetAttendeesQuery(queryParams, {
+    refetchOnMountOrArgChange: true, // ✅ Bypasses RTK Query cache
+  });
 
   const payload = response?.data;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -619,7 +623,7 @@ export default function AttendeesPage() {
   const getActiveFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
-    // Status is always active now, so we don't count it as an optional filter
+    if (selectedStatus !== 'all') n++;
     if (selectedEventId !== 'all') n++;
     if (selectedSessionScheduleId !== 'all') n++;
     return n;
@@ -628,7 +632,7 @@ export default function AttendeesPage() {
   const resetFilters = () => {
     setSearchInput('');
     setSearchQuery('');
-    setSelectedStatus('joined'); // Reset to default
+    setSelectedStatus('all');
     setSelectedEventId('all');
     setSelectedSessionScheduleId('all');
     setSelectedAttendanceSessionId('all');
@@ -680,7 +684,9 @@ export default function AttendeesPage() {
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
-          selectedStatus ? `Status: ${selectedStatus}` : null,
+          selectedStatus !== 'all'
+            ? `Status: ${statusConfig[selectedStatus as AttendanceStatus].label}`
+            : null,
           isScopedToEvent ? `Event: ${scopedEvent!.title}` : null,
           selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
@@ -865,7 +871,6 @@ export default function AttendeesPage() {
                       </SelectContent>
                     </Select>
 
-                    {/* Session Dropdown - requires Event selection */}
                     <div className="w-full md:w-[200px]">
                       <Select
                         value={selectedSessionScheduleId}
@@ -905,15 +910,17 @@ export default function AttendeesPage() {
                       )}
                     </div>
 
-                    {/* Status Dropdown - "All Status" removed */}
                     <Select
                       value={selectedStatus}
-                      onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
+                      onValueChange={(v) => setSelectedStatus(v as 'all' | AttendanceStatus)}
                     >
                       <SelectTrigger className="w-full cursor-pointer md:w-[170px]">
-                        <SelectValue placeholder="Status" />
+                        <SelectValue placeholder="All Status" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Status
+                        </SelectItem>
                         {STATUS_OPTIONS.map((s) => (
                           <SelectItem
                             key={s}
@@ -973,34 +980,19 @@ export default function AttendeesPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem
-                              value="name"
-                              className="cursor-pointer text-sm"
-                            >
+                            <SelectItem value="name" className="cursor-pointer text-sm">
                               Name
                             </SelectItem>
-                            <SelectItem
-                              value="event"
-                              className="cursor-pointer text-sm"
-                            >
+                            <SelectItem value="event" className="cursor-pointer text-sm">
                               Event
                             </SelectItem>
-                            <SelectItem
-                              value="registered_at"
-                              className="cursor-pointer text-sm"
-                            >
+                            <SelectItem value="registered_at" className="cursor-pointer text-sm">
                               Registered
                             </SelectItem>
-                            <SelectItem
-                              value="status"
-                              className="cursor-pointer text-sm"
-                            >
+                            <SelectItem value="status" className="cursor-pointer text-sm">
                               Status
                             </SelectItem>
-                            <SelectItem
-                              value="duration"
-                              className="cursor-pointer text-sm"
-                            >
+                            <SelectItem value="duration" className="cursor-pointer text-sm">
                               Duration
                             </SelectItem>
                           </SelectContent>
@@ -1789,13 +1781,15 @@ export default function AttendeesPage() {
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
-                  onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
+                  onValueChange={(v) => setSelectedStatus(v as 'all' | AttendanceStatus)}
                 >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* ✅ "All Status" is removed */}
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
                       <SelectItem
                         key={s}
