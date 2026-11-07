@@ -36,6 +36,10 @@ const socialLinks = [
   { label: 'WhatsApp', href: '#', icon: FaWhatsapp },
 ];
 
+// Facebook post permalink — embedded as an iframe.
+const FACEBOOK_POST_URL =
+  'https://www.facebook.com/plugins/post.php?href=https%3A%2F%2Fwww.facebook.com%2Fpermalink.php%3Fstory_fbid%3Dpfbid0LsvYbZbuGese73GW35q1BjgVP6TBp8ehDNST6XubGpzzyzemxYgG6zdn2yJfiBmql%26id%3D61596450773652&show_text=true&width=500';
+
 export function Footer() {
   const pathname = usePathname();
 
@@ -48,23 +52,24 @@ export function Footer() {
     <footer className="bg-background border-t border-border">
       <div className="container mx-auto px-4">
         {/* Main Footer */}
-        <div className="py-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="py-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand Column */}
-          <div className="space-y-4">
+          <div className="space-y-4 sm:col-span-2 lg:col-span-1">
             <Link href="/" className="flex items-center">
               <Image
                 src="/logo.png"
-                alt="Nuruvent"
-                width={120}
-                height={40}
+                alt="Nuruvent Solutions"
+                width={140}
+                height={48}
               />
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-              Light Your Training Events. Illuminate Your Growth.
+              The all-in-one platform for educational, academic, and training
+              events. AI event generation, automated attendance, and secure
+              M-Pesa payments.
             </p>
             <p className="text-sm text-muted-foreground">
-              The all-in-one platform for training events — built in Kenya,
-              for the world.
+              Built in Kenya, for the world.
             </p>
           </div>
 
@@ -120,18 +125,18 @@ export function Footer() {
             </h3>
             <div className="space-y-3">
               <a
-                href="mailto:hello@nuruvent.com"
+                href="mailto:info@nuruvent.com"
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Mail className="h-4 w-4 shrink-0" />
-                hello@nuruvent.com
+                info@nuruvent.com
               </a>
               <a
-                href="tel:+254700000000"
+                href="tel:+254740955111"
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Phone className="h-4 w-4 shrink-0" />
-                +254 700 000 000
+                0740 955 111
               </a>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 shrink-0" />
@@ -158,13 +163,35 @@ export function Footer() {
               })}
             </div>
           </div>
+
+          {/* Facebook Post Column */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-4">
+              Latest on Facebook
+            </h3>
+            <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
+              <iframe
+                src={FACEBOOK_POST_URL}
+                width="100%"
+                height="392"
+                style={{ border: 'none', overflow: 'hidden' }}
+                scrolling="no"
+                frameBorder="0"
+                allowFullScreen
+                allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                title="Nuruvent Solutions Facebook post"
+                className="w-full h-[392px]"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="border-t border-border py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} Nuruvent. All rights reserved.
+              © {new Date().getFullYear()} Nuruvent Solutions. All rights
+              reserved.
             </p>
             <div className="flex items-center gap-6 flex-wrap justify-center">
               <Link
