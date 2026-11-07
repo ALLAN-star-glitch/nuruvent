@@ -37,7 +37,7 @@ import { useGetRegistrationQuery } from '@/lib/store/api/registrationsApi';
 import {
   useCreateOrderMutation,
   useInitiatePaymentMutation,
-  useGetOrderQuery, // <-- Changed from useGetPaymentQuery
+  useGetOrderQuery,
 } from '@/lib/store/api/paymentsApi';
 
 // ============================================================
@@ -113,7 +113,11 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [orderId, setOrderId] = useState<string | null>(null); // <-- Changed from paymentId
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [pollStartedAt, setPollStartedAt] = useState<number | null>(null);
+  
+  // NEW: Track the active payment method to prevent wrong UI screen
+  const [activePollMethod, setActivePollMethod] = useState<PaymentMethod | null>(null);
 
   // ---- Order poll (works for guests via optionalAuth) ----
   const { data: orderRes } = useGetOrderQuery(orderId ?? '', {
@@ -136,19 +140,41 @@ export default function CheckoutPage() {
     if (!order || !registration) return;
 
     if (order.payment_status === 'succeeded') {
+      setPollStartedAt(null);
       const params = new URLSearchParams({
-        reference: order.id, // use order id as reference for the confirmation page
+        reference: order.id,
         registration: registration.id,
         slug: slug ?? '',
       });
       if (guestEmail) params.set('email', guestEmail);
       router.push(`/booking-confirmation?${params.toString()}`);
     } else if (order.payment_status === 'failed') {
-      setError('Payment failed. Please try again.');
+      setPollStartedAt(null);
+      setError('Payment failed or was cancelled. Please try again.');
       setOrderId(null);
+      setActivePollMethod(null);
       setSubmitting(false);
     }
   }, [orderRes, router, registration, slug, guestEmail]);
+
+  // ---- Poll Timeout (Fix for lost webhooks) ----
+  const POLL_TIMEOUT_MS = 120_000; // 2 minutes
+
+  useEffect(() => {
+    if (!orderId || !pollStartedAt) return;
+
+    const timer = setTimeout(() => {
+      setError(
+        'We didn’t receive a payment confirmation. If you cancelled the prompt, no money was taken. You can try again.',
+      );
+      setOrderId(null);
+      setPollStartedAt(null);
+      setActivePollMethod(null);
+      setSubmitting(false);
+    }, POLL_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [orderId, pollStartedAt]);
 
   // ---- Prefill phone ----
   useEffect(() => {
@@ -239,9 +265,6 @@ export default function CheckoutPage() {
 
       const order = orderRes.data;
 
-      // Save orderId so polling starts
-      setOrderId(order.id);
-
       const payRes = await initiatePayment({
         order_id: order.id,
         method,
@@ -291,9 +314,9 @@ export default function CheckoutPage() {
             setError('Payment cancelled. You can try again when ready.');
             setSubmitting(false);
           },
-          onError: (err: unknown) => {
+         onError: (err: any) => {
             const msg =
-              (err as { message?: string })?.message ||
+              err?.message ||
               'Card payment failed. Please try again.';
             setError(msg);
             setSubmitting(false);
@@ -301,7 +324,12 @@ export default function CheckoutPage() {
         });
         return;
       }
-      // For M-Pesa, polling on orderId will pick up the result.
+
+      // For M-Pesa ONLY: Save orderId, start the timer, and show the polling UI
+      setOrderId(order.id);
+      setPollStartedAt(Date.now());
+      setActivePollMethod('mpesa');
+      
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
@@ -331,7 +359,8 @@ export default function CheckoutPage() {
     },
   ];
 
-  const showPolling = !!orderId;
+  // Only show the full-page polling spinner if we actually initiated an M-Pesa push
+  const showPolling = !!orderId && activePollMethod === 'mpesa';
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 text-foreground selection:bg-primary/10">
@@ -394,12 +423,33 @@ export default function CheckoutPage() {
                     </span>
                     .
                   </p>
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground mb-8">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
                     <span>
                       Waiting for payment confirmation. Do not close this
                       window.
                     </span>
+                  </div>
+
+                  {/* FIX 2: Explicit Cancel Button */}
+                  <div className="w-full max-w-sm mt-auto pt-4 border-t border-border/60">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setOrderId(null);
+                        setPollStartedAt(null);
+                        setActivePollMethod(null);
+                        setSubmitting(false);
+                        setError('');
+                      }}
+                      className="w-full cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                    >
+                      Cancel & try again
+                    </Button>
+                    <p className="mt-3 text-[11px] text-muted-foreground text-center">
+                      If you cancelled the prompt, no money was taken.
+                    </p>
                   </div>
                 </CardContent>
               </Card>

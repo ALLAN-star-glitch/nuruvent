@@ -9,16 +9,12 @@ import {
   Globe,
   Award,
   HardDrive,
-  ShieldCheck,
   Video,
   ArrowRight,
   HelpCircle,
   Sparkles,
   Smartphone,
   CreditCard,
-  TrendingUp,
-  Users,
-  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,12 +28,7 @@ export function PricingContent() {
 
   useEffect(() => {
     try {
-      // Get the user's timezone from the browser
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
-      // If the timezone is NOT Nairobi (or general Kenya/East Africa), default to USD
-      // We check for 'Africa/Nairobi' specifically.
-      // You can also check for 'Africa/' as a broader East Africa fallback.
       if (tz !== 'Africa/Nairobi') {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrency('USD');
@@ -47,7 +38,16 @@ export function PricingContent() {
     }
   }, []);
 
-  const formatPrice = (usdAmount: number, suffix = '') => {
+  /**
+   * Format a USD amount into the selected currency.
+   * - `decimals`: pass 2 for sub-dollar prices (certificates, storage) so
+   *   USD renders `$0.15` instead of `$0`.
+   */
+  const formatPrice = (
+    usdAmount: number,
+    suffix = '',
+    decimals = 0,
+  ) => {
     const kesAmount = Math.round(usdAmount * EXCHANGE_RATE_KES);
 
     if (usdAmount === 0) {
@@ -57,7 +57,11 @@ export function PricingContent() {
     if (currency === 'KES') {
       return `KES ${kesAmount.toLocaleString()}${suffix}`;
     }
-    return `$${usdAmount.toLocaleString()}${suffix}`;
+
+    return `$${usdAmount.toLocaleString(undefined, {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })}${suffix}`;
   };
 
   return (
@@ -251,7 +255,7 @@ export function PricingContent() {
                 </p>
               </div>
 
-              {/* Payment processing fees */}
+              {/* Payment processing fees — real Paystack rates */}
               <div className="mb-6 p-4 bg-muted rounded-2xl border border-border">
                 <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   Payment Processing Fees
@@ -262,27 +266,27 @@ export function PricingContent() {
                       <Smartphone className="h-5 w-5 text-tertiary" />
                       M-Pesa / Airtel Money
                     </span>
-                    <span className="font-bold text-tertiary">3.5%</span>
+                    <span className="font-bold text-tertiary">1.5%</span>
                   </div>
                   <div className="flex justify-between items-center text-base">
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <CreditCard className="h-5 w-5 text-primary" />
                       Local Cards
                     </span>
-                    <span className="font-bold text-primary">3.5%</span>
+                    <span className="font-bold text-primary">2.9%</span>
                   </div>
                   <div className="flex justify-between items-center text-base">
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <Globe className="h-5 w-5 text-secondary" />
                       International Cards
                     </span>
-                    <span className="font-bold text-secondary">4.5%</span>
+                    <span className="font-bold text-secondary">3.8%</span>
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     On a {formatPrice(7.69)} M-Pesa ticket, you receive{' '}
-                    <span className="font-bold text-foreground">{formatPrice(7.08)}</span>.
+                    <span className="font-bold text-foreground">{formatPrice(7.23)}</span>.
                   </p>
                 </div>
               </div>
@@ -318,12 +322,12 @@ export function PricingContent() {
 
         </div>
 
-        {/* Honest banner — speaks to hosts with a concrete number */}
+        {/* Honest banner — KES 940 */}
         <div className="max-w-5xl mx-auto mt-8">
           <div className="text-center p-6 bg-gradient-to-r from-tertiary/5 via-primary/5 to-secondary/5 border border-primary/15 rounded-2xl">
             <p className="text-base md:text-lg text-muted-foreground">
               <span className="font-bold text-foreground">
-                On a KES 1,000 M-Pesa ticket, you receive KES 920.
+                On a KES 1,000 M-Pesa ticket, you receive KES 940.
               </span>{' '}
               No monthly fees. No fixed per-ticket charges. Payouts every Monday.
             </p>
@@ -373,9 +377,8 @@ export function PricingContent() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            {/* UPDATED CERTIFICATE CARD - Prominent and Animated */}
+            {/* CERTIFICATE CARD */}
             <div className="relative group bg-card border-2 border-secondary/30 p-8 rounded-3xl shadow-lg hover:shadow-2xl hover:border-secondary/60 transition-all duration-500 flex flex-col md:col-span-2 overflow-hidden">
-              {/* Animated background glow */}
               <div className="absolute inset-0 bg-gradient-to-r from-secondary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
               <div className="flex flex-col md:flex-row items-start gap-6 relative z-10">
@@ -387,28 +390,27 @@ export function PricingContent() {
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-2 gap-2">
                     <h4 className="text-2xl font-bold">QR-Verified Certificates</h4>
                     <span className="text-secondary-600 font-bold text-base bg-secondary/10 px-3 py-1 rounded-full">
-                      From {formatPrice(0.15, ' / cert')}
+                      From {formatPrice(0.15, ' / cert', 2)}
                     </span>
                   </div>
                   <p className="text-base text-muted-foreground leading-relaxed mb-6">
                     Secure, automatically generated certificates with QR codes for instant public verification. Perfect for CPD tracking and professional development.
                   </p>
                   
-                  {/* Tier breakdown */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-border pt-4">
                     <div className="flex flex-col">
                       <span className="text-sm text-muted-foreground font-medium">Default</span>
-                      <span className="font-bold text-foreground text-lg">{formatPrice(0.15, ' / cert')}</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.15, ' / cert', 2)}</span>
                       <span className="text-xs text-muted-foreground mt-1">Basic styling</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm text-muted-foreground font-medium">Professional</span>
-                      <span className="font-bold text-foreground text-lg">{formatPrice(0.30, ' / cert')}</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.30, ' / cert', 2)}</span>
                       <span className="text-xs text-muted-foreground mt-1">Logo & signature</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm text-muted-foreground font-medium">Premium</span>
-                      <span className="font-bold text-foreground text-lg">{formatPrice(0.45, ' / cert')}</span>
+                      <span className="font-bold text-foreground text-lg">{formatPrice(0.45, ' / cert', 2)}</span>
                       <span className="text-xs text-muted-foreground mt-1">Full branding & watermark</span>
                     </div>
                   </div>
@@ -424,7 +426,7 @@ export function PricingContent() {
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-2 gap-2">
                   <h4 className="text-2xl font-bold">Extended Replay Storage</h4>
                   <span className="text-primary font-bold text-base">
-                    {formatPrice(9.99, ' / month')}
+                    {formatPrice(9.99, ' / month', 2)}
                   </span>
                 </div>
                 <p className="text-base text-muted-foreground leading-relaxed">
@@ -432,117 +434,6 @@ export function PricingContent() {
                   100 GB of fast global video delivery.
                 </p>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===== COMPARISON TABLE ===== */}
-      <section className="py-20 container mx-auto px-4 max-w-5xl">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">
-            How Nuruvent Compares
-          </h2>
-          <p className="text-lg text-muted-foreground mt-2 max-w-3xl mx-auto">
-            A 20-ticket workshop at KES 1,950 per ticket — that&apos;s KES 39,000 in total sales,
-            paid via M-Pesa. Here&apos;s what each platform charges and what the host actually
-            receives.
-          </p>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
-            <thead>
-              <tr className="border-b border-border bg-muted text-muted-foreground text-sm uppercase tracking-wider">
-                <th className="py-4 px-6 font-semibold">Platform</th>
-                <th className="py-4 px-6 font-semibold">Platform Fee</th>
-                <th className="py-4 px-6 font-semibold">Fixed Fee Per Ticket</th>
-                <th className="py-4 px-6 font-semibold">Payment Processing</th>
-                <th className="py-4 px-6 font-semibold text-right">You Receive</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border text-base">
-              <tr className="bg-primary/5 font-semibold">
-                <td className="py-4 px-6 flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" />
-                  <span>Nuruvent</span>
-                </td>
-                <td className="py-4 px-6 text-primary font-bold">4.5%</td>
-                <td className="py-4 px-6 text-primary font-bold">KES 0</td>
-                <td className="py-4 px-6 text-primary font-bold">3.5% M-Pesa</td>
-                <td className="py-4 px-6 text-right font-black text-tertiary text-lg">
-                  KES 35,880
-                </td>
-              </tr>
-              <tr className="text-muted-foreground">
-                <td className="py-4 px-6">Luma</td>
-                <td className="py-4 px-6">5.0%</td>
-                <td className="py-4 px-6">KES 0</td>
-                <td className="py-4 px-6">~2.9% (Stripe)</td>
-                <td className="py-4 px-6 text-right font-medium text-foreground">
-                  ~KES 35,919
-                </td>
-              </tr>
-              <tr className="text-muted-foreground">
-                <td className="py-4 px-6">Enkare</td>
-                <td className="py-4 px-6">~10%</td>
-                <td className="py-4 px-6">KES 0</td>
-                <td className="py-4 px-6">Passed to host</td>
-                <td className="py-4 px-6 text-right font-medium text-foreground">
-                  ~KES 35,100
-                </td>
-              </tr>
-              <tr className="text-muted-foreground">
-                <td className="py-4 px-6">Eventbrite</td>
-                <td className="py-4 px-6">3.7%</td>
-                <td className="py-4 px-6">KES 233 / ticket</td>
-                <td className="py-4 px-6 text-error">~2.9%</td>
-                <td className="py-4 px-6 text-right font-medium text-error">
-                  ~KES 30,992
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <p className="text-sm text-muted-foreground text-center mt-4">
-          Payouts on Nuruvent arrive every Monday, straight to M-Pesa or your bank. Luma and
-          Eventbrite pay out via international settlement.
-        </p>
-
-        {/* Advantage callouts */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
-            <div className="p-2.5 bg-tertiary/10 rounded-xl">
-              <TrendingUp className="h-5 w-5 text-tertiary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">vs. Luma</p>
-              <p className="text-xl font-black text-tertiary">
-                − KES 39
-              </p>
-            </div>
-          </div>
-          <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
-            <div className="p-2.5 bg-tertiary/10 rounded-xl">
-              <Users className="h-5 w-5 text-tertiary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">More than Enkare</p>
-              <p className="text-xl font-black text-tertiary">
-                + KES 780
-              </p>
-            </div>
-          </div>
-          <div className="p-5 bg-tertiary/5 border border-tertiary/20 rounded-2xl flex items-center gap-4">
-            <div className="p-2.5 bg-tertiary/10 rounded-xl">
-              <Clock className="h-5 w-5 text-tertiary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">More than Eventbrite</p>
-              <p className="text-xl font-black text-tertiary">
-                + KES 4,888
-              </p>
             </div>
           </div>
         </div>
@@ -566,7 +457,7 @@ export function PricingContent() {
               },
               {
                 q: 'What does a paid event cost me?',
-                a: 'A 4.5% Nuruvent fee, plus payment processing charged at cost by our provider. M-Pesa and Airtel Money are 3.5%. Local cards are 3.5%. International cards are 4.5%. On a KES 1,000 M-Pesa ticket, you receive KES 920.',
+                a: 'A 4.5% Nuruvent fee, plus payment processing charged at cost by our provider: 1.5% for M-Pesa and Airtel Money, 2.9% for local cards, and 3.8% for international cards. On a KES 1,000 M-Pesa ticket, you receive KES 940.',
               },
               {
                 q: 'Can I pass the fees to my attendees instead?',
@@ -583,10 +474,6 @@ export function PricingContent() {
               {
                 q: 'How does Zoom and Google Meet attendance tracking work?',
                 a: 'Paste your Zoom or Google Meet link when you create the event. We connect automatically and log when each attendee joins and leaves. That data feeds into your CPD hour reports — no manual tracking needed.',
-              },
-              {
-                q: 'How is Nuruvent different from Luma or Eventbrite?',
-                a: 'Two big things. First, price: on a KES 39,000 M-Pesa event, you keep KES 35,880 with Nuruvent — about KES 780 more than Enkare, and KES 4,888 more than Eventbrite. Second, payouts: we pay out weekly to your M-Pesa, not through international bank settlement.',
               },
             ].map((faq) => (
               <div
