@@ -5,16 +5,15 @@ import type { CrossEventAttendee } from '@/lib/types/attendance';
 // BRAND
 // ============================================================
 
-/** Nuruvent brand palette — keep in sync with globals.css. */
 const BRAND = {
-  primary:     [26, 115, 232]  as [number, number, number], // #1A73E8
-  secondary:   [251, 188, 4]   as [number, number, number], // #FBBC04
-  tertiary:    [52, 168, 83]   as [number, number, number], // #34A853
-  error:       [234, 67, 53]   as [number, number, number], // #EA4335
-  neutralDark: [32, 33, 36]    as [number, number, number], // #202124
-  neutralGray: [95, 99, 104]   as [number, number, number], // #5F6368
-  lightGray:   [248, 249, 250] as [number, number, number], // #F8F9FA
-  border:      [232, 234, 237] as [number, number, number], // #E8EAED
+  primary:     [26, 115, 232]  as [number, number, number],
+  secondary:   [251, 188, 4]   as [number, number, number],
+  tertiary:    [52, 168, 83]   as [number, number, number],
+  error:       [234, 67, 53]   as [number, number, number],
+  neutralDark: [32, 33, 36]    as [number, number, number],
+  neutralGray: [95, 99, 104]   as [number, number, number],
+  lightGray:   [248, 249, 250] as [number, number, number],
+  border:      [232, 234, 237] as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
 } as const;
 
@@ -22,24 +21,55 @@ const BRAND = {
 // ASSETS
 // ============================================================
 
-/**
- * Path to the Nuruvent logo. Adjust to wherever your logo lives
- * in /public. A transparent PNG works best.
- */
 const LOGO_SRC = '/logo.png';
 
-/**
- * Platform logos and display labels. Paths are relative to /public.
- *
- * Keys must match the platform values your API returns on
- * event.schedules[].platform — e.g. "google_meet", "zoom".
- */
 const PLATFORM_LOGOS: Record<string, { label: string; src: string }> = {
   google_meet: { label: 'Google Meet', src: '/platforms/google-meet.png' },
   zoom:        { label: 'Zoom',        src: '/platforms/zoom.png' },
   teams:       { label: 'Microsoft Teams', src: '/platforms/teams.webp' },
   webex:       { label: 'Webex',       src: '/platforms/webex.png' },
 };
+
+// ============================================================
+// UTILITIES
+// ============================================================
+
+/** Maps raw backend statuses to user-friendly labels. */
+function statusLabel(status: string | undefined): string {
+  if (!status) return 'Unknown';
+  if (status === 'full' || status === 'confirmed') return 'Attended';
+  if (status === 'partial' || status === 'joined') return 'Partial';
+  if (status === 'no_show') return 'No Show';
+  if (status === 'registered') return 'Registered';
+  return status;
+}
+
+/** 
+ * Capitalizes the first letter of every word. 
+ * e.g. "carol kim" -> "Carol Kim"
+ */
+function toTitleCase(name: string | undefined): string {
+  if (!name) return '—';
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/** Sanitizes string for filename use. */
+function sanitizeFilename(input: string): string {
+  return (
+    input
+      .trim()
+      .toLowerCase()
+      .replace(/[\s\u2010-\u2015/\\:]+/g, '-')
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 120) || 'attendees'
+  );
+}
 
 // ============================================================
 // COLUMNS — canonical set (CSV / Excel / JSON)
@@ -52,7 +82,8 @@ export interface ExportColumn {
 }
 
 export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
-  { key: 'display_name', label: 'Name', get: (a) => a.display_name },
+  // ✅ Apply Title Case to the name
+  { key: 'display_name', label: 'Name', get: (a) => toTitleCase(a.display_name) },
   { key: 'email', label: 'Email', get: (a) => a.email || '—' },
   { key: 'phone', label: 'Phone', get: (a) => a.phone || '—' },
   { key: 'event_name', label: 'Event', get: (a) => a.event_name },
@@ -64,7 +95,7 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
   {
     key: 'effective_status',
     label: 'Attendance Status',
-    get: (a) => a.effective_status,
+    get: (a) => statusLabel(a.effective_status),
   },
   { key: 'is_host', label: 'Host', get: (a) => (a.is_host ? 'Yes' : 'No') },
   {
@@ -99,7 +130,8 @@ export const ATTENDEE_EXPORT_COLUMNS: ExportColumn[] = [
 // ============================================================
 
 export const PDF_COLUMNS: ExportColumn[] = [
-  { key: 'display_name', label: 'Name', get: (a) => a.display_name },
+  // ✅ Apply Title Case to the name here too
+  { key: 'display_name', label: 'Name', get: (a) => toTitleCase(a.display_name) },
   { key: 'email', label: 'Email', get: (a) => a.email || '—' },
   { key: 'phone', label: 'Phone', get: (a) => a.phone || '—' },
   { key: 'event_name', label: 'Event', get: (a) => a.event_name },
@@ -109,7 +141,11 @@ export const PDF_COLUMNS: ExportColumn[] = [
     get: (a) =>
       a.event_start_date ? formatShortDate(a.event_start_date) : '—',
   },
-  { key: 'effective_status', label: 'Attendance', get: (a) => a.effective_status },
+  {
+    key: 'effective_status',
+    label: 'Attendance',
+    get: (a) => statusLabel(a.effective_status),
+  },
   {
     key: 'sessions',
     label: 'Sessions',
@@ -128,7 +164,7 @@ export const PDF_COLUMNS: ExportColumn[] = [
 ];
 
 // ============================================================
-// UTILITIES
+// UTILITIES (cont.)
 // ============================================================
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -156,7 +192,6 @@ function todayPretty(): string {
   });
 }
 
-/** "Oct 3, 26" — compact date for the PDF table. */
 function formatShortDate(iso: string | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -168,10 +203,6 @@ function formatShortDate(iso: string | undefined): string {
   });
 }
 
-/**
- * Human-readable duration: "45m", "2h", "2h 15m".
- * Returns "—" for zero, negative, or missing values.
- */
 function formatDurationHuman(seconds: number | undefined): string {
   if (!seconds || seconds <= 0) return '—';
   const totalMinutes = Math.round(seconds / 60);
@@ -181,11 +212,6 @@ function formatDurationHuman(seconds: number | undefined): string {
   return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
-/**
- * Fetches an image URL and returns it as a data URL so jsPDF can
- * embed it without needing a server. Returns null on any failure
- * so the PDF still renders without the image.
- */
 async function loadImageDataUrl(
   src: string,
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
@@ -282,29 +308,12 @@ export async function exportToExcel(
 // ============================================================
 
 export interface ExportPDFOptions {
-  /** Main heading, e.g. "Computer Science Workshop Attendees". */
   title?: string;
-  /** Optional sub-heading under the title. */
   subtitle?: string;
-  /** Optional host name shown in the header. */
   hostName?: string;
-  /**
-   * Video platforms used by the event, e.g. ["google_meet", "zoom"].
-   * Rendered as a row of small badges under the host line. Pass an
-   * empty array or omit for in-person-only or cross-event exports.
-   */
   platforms?: string[];
-  /** Optional filter summary, e.g. "Status: Registered · Search: anna". */
   filtersSummary?: string;
-  /**
-   * NEW: When the report is scoped to a specific session, pass its
-   * title here. It's rendered in bold blue under the title and
-   * appended to the filename.
-   *
-   * Example: "Day 1 - Docker"
-   */
   sessionName?: string;
-  /** Output filename (without path). */
   filename?: string;
 }
 
@@ -321,27 +330,24 @@ export async function exportToPDF(
   const platforms = options.platforms ?? [];
   const filtersSummary = options.filtersSummary ?? '';
   const sessionName = options.sessionName ?? '';
-  const filename = options.filename ?? `attendees-${todayStamp()}.pdf`;
+
+  const rawNameParts = [title];
+  if (sessionName) rawNameParts.push(sessionName);
+  rawNameParts.push(todayStamp());
+  const filename = options.filename ?? `${sanitizeFilename(rawNameParts.join(' '))}.pdf`;
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 24;
 
-  // ------------------------------------------------------------
-  // HEADER — white, minimal.
-  // ------------------------------------------------------------
   const headerHeight = 170;
 
   doc.setFillColor(...BRAND.primary);
   doc.rect(0, 0, pageWidth, 2, 'F');
-
   doc.setFillColor(...BRAND.secondary);
   doc.rect(0, 2, pageWidth, 1, 'F');
 
-  // ------------------------------------------------------------
-  // LOGO — top-left.
-  // ------------------------------------------------------------
   const logo = await loadImageDataUrl(LOGO_SRC);
   let textLeft = margin;
 
@@ -350,30 +356,15 @@ export async function exportToPDF(
     const aspect = logo.width / logo.height;
     const targetW = Math.min(280, targetH * aspect);
     const logoY = 26;
-    doc.addImage(
-      logo.dataUrl,
-      'PNG',
-      margin,
-      logoY,
-      targetW,
-      targetH,
-      undefined,
-      'FAST',
-    );
+    doc.addImage(logo.dataUrl, 'PNG', margin, logoY, targetW, targetH, undefined, 'FAST');
     textLeft = margin + targetW + 24;
   }
 
-  // ------------------------------------------------------------
-  // TITLE
-  // ------------------------------------------------------------
   doc.setTextColor(...BRAND.neutralDark);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.text(title, textLeft, 52);
 
-  // ------------------------------------------------------------
-  // SESSION NAME — shown right under the title when scoped.
-  // ------------------------------------------------------------
   let metaY = 72;
   if (sessionName) {
     doc.setFont('helvetica', 'bold');
@@ -383,9 +374,6 @@ export async function exportToPDF(
     metaY += 20;
   }
 
-  // ------------------------------------------------------------
-  // HOST LINE
-  // ------------------------------------------------------------
   if (hostName) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
@@ -394,9 +382,6 @@ export async function exportToPDF(
     metaY += 18;
   }
 
-  // ------------------------------------------------------------
-  // PLATFORM BADGES
-  // ------------------------------------------------------------
   if (platforms.length > 0) {
     const iconH = 12;
     let cursorX = textLeft;
@@ -414,16 +399,7 @@ export async function exportToPDF(
 
       if (icon) {
         const iconW = iconH * (icon.width / icon.height);
-        doc.addImage(
-          icon.dataUrl,
-          'PNG',
-          cursorX,
-          metaY - 9,
-          iconW,
-          iconH,
-          undefined,
-          'FAST',
-        );
+        doc.addImage(icon.dataUrl, 'PNG', cursorX, metaY - 9, iconW, iconH, undefined, 'FAST');
         doc.text(meta.label, cursorX + iconW + 5, metaY);
         cursorX += iconW + 5 + doc.getTextWidth(meta.label) + 16;
       } else {
@@ -437,9 +413,6 @@ export async function exportToPDF(
     if (rendered > 0) metaY += 16;
   }
 
-  // ------------------------------------------------------------
-  // META LINE
-  // ------------------------------------------------------------
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(...BRAND.neutralGray);
@@ -451,26 +424,17 @@ export async function exportToPDF(
   doc.text(metaParts.join('  ·  '), textLeft, metaY);
   metaY += 14;
 
-  // ------------------------------------------------------------
-  // FILTERS SUMMARY
-  // ------------------------------------------------------------
   if (filtersSummary) {
     doc.setFontSize(9);
     doc.text(filtersSummary, textLeft, metaY);
   }
 
-  // Divider under header
   doc.setDrawColor(...BRAND.border);
   doc.setLineWidth(0.5);
   doc.line(margin, headerHeight - 8, pageWidth - margin, headerHeight - 8);
 
-  // ------------------------------------------------------------
-  // TABLE
-  // ------------------------------------------------------------
   const head = [PDF_COLUMNS.map((c) => c.label)];
-  const body = rows.map((r) =>
-    PDF_COLUMNS.map((c) => String(c.get(r) ?? '')),
-  );
+  const body = rows.map((r) => PDF_COLUMNS.map((c) => String(c.get(r) ?? '')));
 
   autoTable(doc, {
     head,
@@ -529,9 +493,6 @@ export async function exportToPDF(
     },
   });
 
-  // ------------------------------------------------------------
-  // FOOTER on every page
-  // ------------------------------------------------------------
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);

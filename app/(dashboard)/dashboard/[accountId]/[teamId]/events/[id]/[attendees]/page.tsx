@@ -117,6 +117,7 @@ interface StatusDisplay {
   icon: React.ComponentType<{ className?: string }>;
 }
 
+// ✅ 1. Map raw statuses to user-friendly displays
 const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
   registered: {
     label: 'Registered',
@@ -125,9 +126,9 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
     icon: ClockIcon,
   },
   joined: {
-    label: 'Joined',
+    label: 'Partial',
     color:
-      'bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-950/30 dark:text-sky-400 dark:border-sky-900/50',
+      'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50',
     icon: ClockIcon,
   },
   partial: {
@@ -143,8 +144,9 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
     icon: CheckCircle2,
   },
   confirmed: {
-    label: 'Confirmed',
-    color: 'bg-primary/10 text-primary border-primary/30',
+    label: 'Attended',
+    color:
+      'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50',
     icon: CheckCircle2,
   },
   no_show: {
@@ -155,12 +157,11 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
   },
 };
 
+// ✅ 2. Only show 4 distinct options in the dropdown
 const STATUS_OPTIONS: AttendanceStatus[] = [
   'registered',
-  'joined',
   'partial',
   'full',
-  'confirmed',
   'no_show',
 ];
 
@@ -278,8 +279,8 @@ export default function EventAttendeesPage() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   
-  // ✅ Default status is 'joined' instead of 'all'
-  const [selectedStatus, setSelectedStatus] = useState<AttendanceStatus>('joined');
+  // ✅ Default is 'all', restoring "All Status"
+  const [selectedStatus, setSelectedStatus] = useState<'all' | AttendanceStatus>('all');
 
   const [selectedSessionScheduleId, setSelectedSessionScheduleId] =
     useState<string>('all');
@@ -382,11 +383,18 @@ export default function EventAttendeesPage() {
     }
   };
 
+  // ✅ 3. Map UI selection to exact backend string
+  const backendStatus = useMemo(() => {
+    if (selectedStatus === 'all') return undefined;
+    if (selectedStatus === 'partial') return 'joined'; // Backend uses 'joined'
+    return selectedStatus;
+  }, [selectedStatus]);
+
+  // ✅ 4. Every change to the filters triggers a fresh network request because they are in the dependency array
   const queryParams: ListAttendeesParams = useMemo(
     () => ({
       search: searchQuery || undefined,
-      // ✅ No longer conditional, since 'all' is removed from options
-      status: selectedStatus,
+      status: backendStatus,
       session_id:
         selectedAttendanceSessionId === 'all'
           ? undefined
@@ -398,7 +406,7 @@ export default function EventAttendeesPage() {
     }),
     [
       searchQuery,
-      selectedStatus,
+      backendStatus,
       selectedAttendanceSessionId,
       sortField,
       sortDirection,
@@ -407,6 +415,7 @@ export default function EventAttendeesPage() {
     ],
   );
 
+
   const {
     data: response,
     isLoading,
@@ -414,7 +423,10 @@ export default function EventAttendeesPage() {
     error,
   } = useGetEventAttendeesQuery(
     { eventId, params: queryParams },
-    { skip: !eventId },
+    { 
+      skip: !eventId,
+      refetchOnMountOrArgChange: true, //Forces a network call every time filters change
+    },
   );
 
   const payload = response?.data;
@@ -523,7 +535,7 @@ export default function EventAttendeesPage() {
   const getActiveFilterCount = () => {
     let n = 0;
     if (searchQuery) n++;
-    // Status is always active now, so we don't count it as an optional filter
+    if (selectedStatus !== 'all') n++;
     if (selectedSessionScheduleId !== 'all') n++;
     return n;
   };
@@ -531,7 +543,7 @@ export default function EventAttendeesPage() {
   const resetFilters = () => {
     setSearchInput('');
     setSearchQuery('');
-    setSelectedStatus('joined'); // Reset to default
+    setSelectedStatus('all'); // Reset to 'all'
     setSelectedSessionScheduleId('all');
     setSelectedAttendanceSessionId('all');
     setSortField('registered_at');
@@ -563,7 +575,9 @@ export default function EventAttendeesPage() {
       const filtersSummary =
         [
           searchQuery ? `Search: "${searchQuery}"` : null,
-          selectedStatus ? `Status: ${selectedStatus}` : null,
+          selectedStatus !== 'all'
+            ? `Status: ${statusConfig[selectedStatus].label}`
+            : null,
           selectedSessionTitle ? `Session: ${selectedSessionTitle}` : null,
         ]
           .filter(Boolean)
@@ -784,15 +798,18 @@ export default function EventAttendeesPage() {
                       </SelectContent>
                     </Select>
 
-                    {/* Status Dropdown - "All Status" removed */}
+                    {/* Status Dropdown */}
                     <Select
                       value={selectedStatus}
-                      onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
+                      onValueChange={(v) => setSelectedStatus(v as 'all' | AttendanceStatus)}
                     >
                       <SelectTrigger className="w-full cursor-pointer md:w-[170px]">
-                        <SelectValue placeholder="Status" />
+                        <SelectValue placeholder="All Status" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="all" className="cursor-pointer">
+                          All Status
+                        </SelectItem>
                         {STATUS_OPTIONS.map((s) => (
                           <SelectItem
                             key={s}
@@ -1580,13 +1597,15 @@ export default function EventAttendeesPage() {
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={selectedStatus}
-                  onValueChange={(v) => setSelectedStatus(v as AttendanceStatus)}
+                  onValueChange={(v) => setSelectedStatus(v as 'all' | AttendanceStatus)}
                 >
                   <SelectTrigger className="h-11 w-full cursor-pointer rounded-xl">
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* ✅ "All Status" is removed */}
+                    <SelectItem value="all" className="cursor-pointer">
+                      All Status
+                    </SelectItem>
                     {STATUS_OPTIONS.map((s) => (
                       <SelectItem
                         key={s}
@@ -1750,9 +1769,6 @@ export function StatsCardsSkeleton({
     </div>
   );
 }
-
-
-
 
 function Shimmer({ className }: { className?: string }) {
   return (
