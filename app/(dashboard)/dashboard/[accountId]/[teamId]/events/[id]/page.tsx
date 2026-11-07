@@ -657,6 +657,8 @@ export default function EventDetailPage({
         }
       }
 
+
+      
       await updateEvent({
         id: event.id,
         data: { schedules },
