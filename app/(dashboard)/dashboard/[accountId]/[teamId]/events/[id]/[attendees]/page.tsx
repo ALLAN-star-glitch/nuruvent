@@ -147,7 +147,7 @@ const statusConfig: Record<AttendanceStatus, StatusDisplay> = {
     color: 'bg-primary/10 text-primary border-primary/30',
     icon: CheckCircle2,
   },
-  'no-show': {
+  'no_show': {
     label: 'No Show',
     color:
       'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50',
@@ -161,7 +161,7 @@ const STATUS_OPTIONS: AttendanceStatus[] = [
   'partial',
   'full',
   'confirmed',
-  'no-show',
+  'no_show',
 ];
 
 function initials(name: string): string {
@@ -453,7 +453,7 @@ export default function EventAttendeesPage() {
       (a) => a.effective_status === 'registered',
     ).length;
     const noShow = attendees.filter(
-      (a) => a.effective_status === 'no-show',
+      (a) => a.effective_status === 'no_show',
     ).length;
     const hosts = attendees.filter((a) => a.is_host).length;
     return { attended, registered, noShow, hosts };
